@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한국 미 육군 사격장 직위 공고 아카이브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F4F1; --surface:#FFFFFF; --ink:#17231F; --muted:#5B6963; --rule:#CFD7D1; --rule-soft:#E3E8E4;
+  --red:#B3261E; --red-soft:#F7E4E2; --mark:#FBE69A;
+  --hum:#2F5D8A; --cas:#5B6F1F; --rod:#98541A;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans KR","Arial Narrow",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101714; --surface:#17201C; --ink:#E2E8E4; --muted:#96A49D; --rule:#2D3934; --rule-soft:#222C28;
+    --red:#EE6A62; --red-soft:#3A201E; --mark:#5B4C14;
+    --hum:#86AEDB; --cas:#AFC46A; --rod:#DE9F62; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101714; --surface:#17201C; --ink:#E2E8E4; --muted:#96A49D; --rule:#2D3934; --rule-soft:#222C28;
+  --red:#EE6A62; --red-soft:#3A201E; --mark:#5B4C14;
+  --hum:#86AEDB; --cas:#AFC46A; --rod:#DE9F62; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{word-break:keep-all;overflow-wrap:break-word;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 28px 64px}
+
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 32px;margin-bottom:18px}
+.top h1{font-family:var(--cond);font-weight:600;font-size:clamp(28px,4vw,40px);line-height:1.05;letter-spacing:-.01em;margin:0}
+.top p{margin:0;color:var(--muted);max-width:52ch}
+
+/* timeline */
+.tl{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:14px 16px 8px;margin-bottom:18px}
+.tl-scroll{overflow-x:auto}
+.tl svg{display:block;width:100%;min-width:720px;height:auto}
+.tl .yr{fill:var(--muted);font-size:12px;font-family:var(--cond)}
+.tl .grid{stroke:var(--rule-soft);stroke-width:1}
+.tl .lane{stroke:var(--rule);stroke-width:1}
+.tl .lane-name{fill:var(--ink);font-size:13px;font-weight:600;font-family:var(--cond)}
+.tl .lane-city{fill:var(--muted);font-size:12px}
+.pt{cursor:pointer}
+.pt circle.core{stroke:var(--surface);stroke-width:2}
+.pt.hum circle.core{fill:var(--hum)} .pt.cas circle.core{fill:var(--cas)} .pt.rod circle.core{fill:var(--rod)}
+.pt.dim{opacity:.18}
+.pt circle.ring{fill:none;stroke:var(--red);stroke-width:3;opacity:0}
+.pt.sel circle.ring{opacity:1}
+.pt:focus{outline:none} .pt:focus-visible circle.ring{opacity:1;stroke-dasharray:3 3}
+.tl-foot{display:flex;flex-wrap:wrap;gap:4px 20px;color:var(--muted);font-size:12.5px;padding:4px 2px 2px}
+
+/* controls */
+.controls{display:grid;grid-template-columns:minmax(220px,1.4fr) auto;gap:10px 18px;align-items:center;margin-bottom:18px}
+.search{position:relative}
+.search input{width:100%;padding:10px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+.search input::placeholder{color:var(--muted)}
+.toggles{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.toggles .sep{width:1px;height:22px;background:var(--rule);margin:0 6px}
+.tg{border:1px solid var(--rule);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+.tg[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sw{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.sw.hum{background:var(--hum)} .sw.cas{background:var(--cas)} .sw.rod{background:var(--rod)}
+.terms{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--muted);font-size:13px}
+.term{border:0;background:none;padding:2px 6px;border-radius:3px;cursor:pointer;color:var(--ink);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;font-size:13px}
+.term:hover{text-decoration-color:var(--red)}
+.term[aria-pressed="true"]{background:var(--mark);text-decoration:none}
+
+/* main */
+.work{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;align-items:start}
+.work.comparing{grid-template-columns:minmax(0,1fr)}
+.work.comparing .list{display:none}
+.list{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:var(--surface);border:1px solid var(--rule);border-radius:4px}
+.count{margin:0;padding:10px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--surface)}
+.list ol{list-style:none;margin:0;padding:0}
+.item{display:grid;grid-template-columns:10px 1fr;column-gap:10px;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--rule-soft);padding:11px 14px;cursor:pointer}
+.item:hover{background:var(--rule-soft)}
+.item[aria-current="true"]{background:var(--red-soft);box-shadow:inset 3px 0 0 var(--red)}
+.item .sw{margin-top:7px}
+.i-title{font-weight:500;line-height:1.35}
+.i-meta{grid-column:2;display:flex;gap:12px;font-size:12.5px;color:var(--muted);margin-top:2px}
+.empty{padding:18px 14px;color:var(--muted)}
+.empty button{margin-top:8px}
+
+.detail{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:26px 30px 30px;min-width:0}
+.d-sites{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:4px}
+.d-sites span{display:inline-flex;align-items:center;gap:6px}
+.d-head h2{font-family:var(--cond);font-weight:600;font-size:clamp(24px,2.6vw,32px);line-height:1.12;margin:0 0 14px}
+.d-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--bg);border-radius:4px;padding:7px 14px;font-size:14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+.btn.ghost[aria-pressed="true"]{border-color:var(--red);color:var(--red)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0;margin:0 0 26px;border-top:1px solid var(--rule)}
+.facts div{padding:9px 12px 9px 0;border-bottom:1px solid var(--rule-soft)}
+.facts dt{font-size:12px;color:var(--muted)}
+.facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.facts .big dd{font-family:var(--cond);font-size:22px;font-weight:600;line-height:1.2}
+.detail h3{font-size:15px;font-weight:600;margin:0 0 8px}
+.detail section{margin-bottom:24px;max-width:78ch}
+.spec{border-left:3px solid var(--red);padding:2px 0 2px 16px}
+.spec p{margin:0;font-size:16px;line-height:1.7}
+.duties{margin:0;padding-left:1.1em}
+.duties li{margin-bottom:6px;padding-left:2px}
+.pre{white-space:pre-line;margin:0;color:var(--ink)}
+details{border-top:1px solid var(--rule);padding:10px 0;max-width:78ch}
+details:last-of-type{border-bottom:1px solid var(--rule)}
+summary{cursor:pointer;font-weight:600}
+details ul{margin:10px 0 0;padding-left:1.1em} details li{margin-bottom:4px}
+details .pre{margin-top:10px;font-size:14px}
+a{color:inherit;text-underline-offset:3px}
+.btn{text-decoration:none}
+mark{background:var(--mark);color:inherit;padding:0 1px;border-radius:2px}
+.story-note{font-size:13.5px;color:var(--muted);margin:-12px 0 22px}
+
+/* compare */
+.cmp-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
+.cmp-head h2{font-family:var(--cond);font-weight:600;font-size:28px;margin:0}
+.cmp-scroll{overflow-x:auto}
+table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--rule)}
+.cmp thead th{border-bottom:2px solid var(--ink)}
+.cmp thead th:first-child{width:96px}
+.cmp th[scope="row"]{font-size:13px;color:var(--muted);font-weight:600}
+.cmp .c-title{font-family:var(--cond);font-size:19px;font-weight:600;line-height:1.2;display:block;margin:2px 0 4px}
+.cmp .c-meta{font-size:13px;color:var(--muted);font-weight:400;display:flex;flex-wrap:wrap;gap:4px 12px}
+.cmp ul{margin:0;padding-left:1.1em} .cmp li{margin-bottom:5px}
+.cmp td{font-size:14px}
+
+/* tray */
+.tray{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:6px;padding:8px 10px 8px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:calc(100% - 24px);flex-wrap:wrap;z-index:5}
+.tray[hidden]{display:none}
+.tray .chips{display:flex;gap:6px;flex-wrap:wrap}
+.tray .chip{border:1px solid color-mix(in srgb,var(--bg) 35%,transparent);border-radius:999px;padding:2px 4px 2px 10px;font-size:13px;display:inline-flex;gap:4px;align-items:center}
+.tray .chip button{background:none;border:0;color:inherit;cursor:pointer;padding:0 6px;font-size:15px;line-height:1}
+.tray .btn{background:var(--bg);color:var(--ink);border-color:var(--bg);padding:5px 12px}
+.tray .btn.ghost{background:transparent;color:var(--bg);border-color:transparent}
+
+.note{margin-top:28px;color:var(--muted);font-size:13px;max-width:90ch}
+.note p{margin:0 0 6px}
+
+@media (max-width: 900px){
+  .wrap{padding:18px 14px 90px}
+  .controls{grid-template-columns:1fr}
+  .work{grid-template-columns:1fr}
+  .list{position:static;max-height:420px}
+  .detail{padding:20px 18px 24px}
+  .tl svg{min-width:940px}
+  .tray{left:10px;right:10px;bottom:10px;transform:none;flex-wrap:nowrap;justify-content:space-between;padding:8px 8px 8px 14px}
+  .tray .chips{display:none}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>한국 미 육군 사격장 직위 공고</h1>
+    <p id="subline"></p>
+  </header>
+
+  <section class="tl" aria-label="근무지별 공고 시기">
+    <div class="tl-scroll"><svg id="tl" viewBox="0 0 1000 188" role="group" aria-label="공고 타임라인"></svg></div>
+    <div class="tl-foot"><span>점을 누르면 해당 공고가 열립니다.</span><span>점이 클수록 직급이 높습니다 (GS-9 ~ GS-13).</span></div>
+  </section>
+
+  <section class="controls" aria-label="검색과 필터">
+    <div class="search">
+      <label for="q" class="sr" style="position:absolute;left:-9999px">공고 본문 검색</label>
+      <input id="q" type="search" placeholder="제목, 업무, 자격요건에서 검색 (예: RFMSS, targetry)" autocomplete="off">
+    </div>
+    <div class="toggles" id="toggles"></div>
+    <div class="terms" id="terms"><span>자주 찾는 용어</span></div>
+  </section>
+
+  <main class="work" id="work">
+    <aside class="list" aria-label="공고 목록">
+      <p class="count" id="count" aria-live="polite"></p>
+      <ol id="list"></ol>
+    </aside>
+    <article class="detail" id="detail" tabindex="-1"></article>
+  </main>
+
+  <footer class="note">
+    <p>출처: USAJOBS Historic JOA API. Department of the Army 공고 중 한국 근무지이고 직위명에 range 등이 들어간 공고만 모았습니다. GitHub Actions가 매주 자동으로 갱신합니다.</p>
+    <p>근무지는 공고의 근무 도시로 나눴습니다. PYEONGTAEK은 Humphreys, Tongduchon과 Camp Casey는 Casey, Yongpyong(영평)은 Rodriguez로 표시합니다. Story Live Fire Complex를 본문에 명시한 공고는 상세 화면에 따로 표시합니다.</p>
+  </footer>
+</div>
+
+<div class="tray" id="tray" hidden>
+  <span id="tray-label"></span>
+  <span class="chips" id="tray-chips"></span>
+  <button class="btn" id="tray-open">나란히 비교</button>
+  <button class="btn ghost" id="tray-clear">비우기</button>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function(){
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const SITES = {
+  Humphreys:{name:'Humphreys', city:'평택', cls:'hum'},
+  Casey:{name:'Casey', city:'동두천', cls:'cas'},
+  Rodriguez:{name:'Rodriguez', city:'영평', cls:'rod'}
+};
+const SITE_KEYS = Object.keys(SITES);
+const TERMS = ['RFMSS','Surface Danger','RTLP','Targetry','Level II','Host Nation','385-63'];
+const MAX_CMP = 3;
+
+DATA.forEach(r => {
+  if (r.title === r.title.toUpperCase()) {
+    r.title = r.title.toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase()).replace(/\bRfmss\b/,'RFMSS');
+  }
+  r.hay = [r.title, r.org, r.annNo, r.summary, r.spec, r.quals, r.duties.join(' '), r.conditions.join(' ')].join('\n').toLowerCase();
+});
+const byId = new Map(DATA.map(r => [String(r.id), r]));
+const grades = [...new Set(DATA.map(r => r.gradeNum))].sort((a,b)=>a-b);
+const years = DATA.map(r => r.open.slice(0,4)).sort();
+
+const state = { q:'', sites:new Set(), grades:new Set(), sel:null, cmp:[], comparing:false };
+
+const $ = id => document.getElementById(id);
+function h(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  if (attrs) for (const [k,v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return e;
+}
+function hl(text){
+  const frag = document.createDocumentFragment();
+  const q = state.q.trim();
+  if (!q) { frag.append(text); return frag; }
+  const lower = text.toLowerCase(), ql = q.toLowerCase();
+  let i = 0, j;
+  while ((j = lower.indexOf(ql, i)) !== -1) {
+    if (j > i) frag.append(text.slice(i, j));
+    frag.append(h('mark', null, text.slice(j, j + q.length)));
+    i = j + q.length;
+  }
+  frag.append(text.slice(i));
+  return frag;
+}
+const siteSw = s => h('span', {class:'sw ' + SITES[s].cls, 'aria-hidden':'true'});
+const money = n => n ? '$' + Math.round(n).toLocaleString('en-US') : '';
+const matches = r =>
+  (!state.sites.size || r.sites.some(s => state.sites.has(s))) &&
+  (!state.grades.size || state.grades.has(r.gradeNum)) &&
+  (!state.q.trim() || r.hay.includes(state.q.trim().toLowerCase()));
+
+$('subline').textContent = `USAJOBS 과거 공고 중 한국 근무 사격장 직위 ${DATA.length}건, ${years[0]}–${years[years.length-1]}년. 근무지·직급·용어로 걸러 보고, 최대 ${MAX_CMP}건까지 나란히 비교할 수 있습니다. 데이터 갱신 __UPDATED__.`;
+
+/* ---------- timeline ---------- */
+const svgNS = 'http://www.w3.org/2000/svg';
+const W = 1000, L = 150, R = 18, TOP = 34, LANE = 50;
+const yMin = Number(years[0]), yMax = Math.max(Number(years[years.length-1]), new Date().getFullYear());
+const t0 = Date.UTC(yMin,0,1), t1 = Date.UTC(yMax,11,31);
+const xOf = d => L + (Date.parse(d) - t0) / (t1 - t0) * (W - L - R);
+const rOf = g => ({9:5, 11:6.5, 12:8, 13:9.5})[g] || 6;
+function s(tag, attrs){ const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function buildTimeline(){
+  const svg = $('tl');
+  for (let y = yMin; y <= yMax; y++) {
+    const x = xOf(`${y}-01-01`);
+    svg.append(s('line', {class:'grid', x1:x, x2:x, y1:24, y2:TOP + LANE*3 - 12}));
+    const t = s('text', {class:'yr', x:x + 4, y:16}); t.textContent = y; svg.append(t);
+  }
+  SITE_KEYS.forEach((k, i) => {
+    const y = TOP + LANE*i + 12;
+    svg.append(s('line', {class:'lane', x1:L - 6, x2:W - R, y1:y, y2:y}));
+    const n = s('text', {class:'lane-name', x:0, y:y - 2}); n.textContent = SITES[k].name; svg.append(n);
+    const c = s('text', {class:'lane-city', x:0, y:y + 14}); c.textContent = SITES[k].city; svg.append(c);
+  });
+  const lastX = {};
+  [...DATA].sort((a,b)=>a.open.localeCompare(b.open)).forEach(r => {
+    r.sites.filter(k => SITES[k]).forEach(k => {
+      const i = SITE_KEYS.indexOf(k);
+      const x = xOf(r.open);
+      let y = TOP + LANE*i + 12;
+      const prev = lastX[k];
+      if (prev && x - prev.x < 16) y += prev.off === 0 ? -11 : (prev.off < 0 ? 11 : -11);
+      lastX[k] = {x, off: y - (TOP + LANE*i + 12)};
+      const g = s('g', {class:'pt ' + SITES[k].cls, 'data-id':r.id, tabindex:0, role:'button'});
+      g.setAttribute('aria-label', `${r.open} ${r.title} ${r.grade} ${SITES[k].name}`);
+      const tt = s('title', {}); tt.textContent = `${r.open}  ${r.title}  ${r.grade}`; g.append(tt);
+      g.append(s('circle', {class:'ring', cx:x, cy:y, r:rOf(r.gradeNum) + 4}));
+      g.append(s('circle', {class:'core', cx:x, cy:y, r:rOf(r.gradeNum)}));
+      g.addEventListener('click', () => select(r.id, true));
+      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.id, true); } });
+      svg.append(g);
+    });
+  });
+}
+function paintTimeline(){
+  document.querySelectorAll('#tl .pt').forEach(g => {
+    const r = byId.get(g.dataset.id);
+    g.classList.toggle('dim', !matches(r));
+    g.classList.toggle('sel', String(state.sel) === g.dataset.id);
+  });
+}
+
+/* ---------- controls ---------- */
+function buildControls(){
+  const box = $('toggles');
+  SITE_KEYS.forEach(k => {
+    box.append(h('button', {class:'tg', 'aria-pressed':'false', 'data-site':k, onclick:e => {
+      state.sites.has(k) ? state.sites.delete(k) : state.sites.add(k);
+      e.currentTarget.setAttribute('aria-pressed', state.sites.has(k)); render();
+    }}, siteSw(k), `${SITES[k].name} ${DATA.filter(r=>r.sites.includes(k)).length}`));
+  });
+  box.append(h('span', {class:'sep', 'aria-hidden':'true'}));
+  grades.forEach(g => {
+    box.append(h('button', {class:'tg', 'aria-pressed':'false', onclick:e => {
+      state.grades.has(g) ? state.grades.delete(g) : state.grades.add(g);
+      e.currentTarget.setAttribute('aria-pressed', state.grades.has(g)); render();
+    }}, `GS-${g}`));
+  });
+  const terms = $('terms');
+  TERMS.forEach(t => terms.append(h('button', {class:'term', 'aria-pressed':'false', 'data-term':t, onclick:() => {
+    setQuery(state.q.toLowerCase() === t.toLowerCase() ? '' : t);
+  }}, t)));
+  let timer;
+  $('q').addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => { state.q = e.target.value; render(); }, 120); });
+}
+function setQuery(v){ $('q').value = v; state.q = v; render(); }
+function resetFilters(){
+  state.sites.clear(); state.grades.clear();
+  document.querySelectorAll('#toggles .tg').forEach(b => b.setAttribute('aria-pressed','false'));
+  setQuery('');
+}
+
+/* ---------- list ---------- */
+function renderList(rows){
+  const ol = $('list'); ol.textContent = '';
+  $('count').textContent = rows.length === DATA.length ? `전체 ${DATA.length}건` : `${DATA.length}건 중 ${rows.length}건`;
+  if (!rows.length) {
+    ol.append(h('li', {class:'empty'}, '조건에 맞는 공고가 없습니다. 검색어나 필터를 줄여 보세요.', h('br'),
+      h('button', {class:'btn ghost', onclick:resetFilters}, '필터 초기화')));
+    return;
+  }
+  rows.forEach(r => {
+    ol.append(h('li', null, h('button', {class:'item', 'aria-current': String(state.sel) === String(r.id) ? 'true' : null,
+      onclick:() => select(r.id, false)},
+      r.sites.filter(k=>SITES[k]).length ? siteSw(r.sites.find(k=>SITES[k])) : h('span'),
+      h('span', {class:'i-title'}, r.title),
+      h('span', {class:'i-meta'}, h('span', null, r.open.slice(0,7)), h('span', null, r.grade), h('span', null, r.sites.map(k => SITES[k] ? SITES[k].name : r.cities.join(', ')).join(' / ')))
+    )));
+  });
+}
+
+/* ---------- detail ---------- */
+function fact(label, value, big){ return value ? h('div', {class: big ? 'big' : null}, h('dt', null, label), h('dd', null, value)) : null; }
+function renderDetail(){
+  const box = $('detail'); box.textContent = '';
+  const r = byId.get(String(state.sel));
+  if (!r) { box.append(h('p', {class:'empty'}, '왼쪽 목록이나 타임라인에서 공고를 고르세요.')); return; }
+  const inCmp = state.cmp.includes(r.id);
+  const full = !inCmp && state.cmp.length >= MAX_CMP;
+  box.append(
+    h('div', {class:'d-head'},
+      h('div', {class:'d-sites'}, r.sites.filter(k=>SITES[k]).map(k => h('span', null, siteSw(k), `${SITES[k].name} (${SITES[k].city})`))),
+      h('h2', null, hl(r.title)),
+      h('div', {class:'d-actions'},
+        h('a', {class:'btn', href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, 'USAJOBS 원문 열기'),
+        h('button', {class:'btn ghost', 'aria-pressed': String(inCmp), disabled: full, onclick:() => toggleCmp(r.id)},
+          inCmp ? '비교에서 빼기' : (full ? `비교는 ${MAX_CMP}건까지` : '비교에 추가'))
+      )
+    ),
+    h('dl', {class:'facts'},
+      fact('직급', r.grade, true),
+      fact('직렬', r.series, true),
+      fact('공고 기간', `${r.open} ~ ${r.close}`),
+      fact('연봉', r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : ''),
+      fact('근무 도시', r.cities.join(', ')),
+      fact('감독직', r.supervisory ? '예' : '아니오'),
+      fact('보안 등급', r.clearance),
+      fact('채용 상태', r.status),
+      fact('소속', r.org),
+      fact('공고 번호', r.annNo)
+    )
+  );
+  if (r.story) box.append(h('p', {class:'story-note'}, '이 공고는 특수경력 요건에 Story Live Fire Complex 운영 경험을 직접 명시합니다.'));
+  if (r.spec) box.append(h('section', {class:'spec'}, h('h3', null, '특수경력 요건'), h('p', null, hl(r.spec))));
+  if (r.duties.length) box.append(h('section', null, h('h3', null, `주요 업무 ${r.duties.length}개 항목`), h('ul', {class:'duties'}, r.duties.map(d => h('li', null, hl(d))))));
+  if (r.summary) box.append(h('section', null, h('h3', null, '공고 개요'), h('p', {class:'pre'}, hl(r.summary))));
+  if (r.conditions.length) box.append(h('details', null, h('summary', null, `근무 조건 ${r.conditions.length}개 항목`), h('ul', null, r.conditions.map(c => h('li', null, hl(c))))));
+  if (r.quals) box.append(h('details', null, h('summary', null, '자격요건 원문 전체'), h('div', {class:'pre'}, hl(r.quals))));
+  if (state.q.trim() && r.hay.includes(state.q.trim().toLowerCase())) {
+    box.querySelectorAll('details').forEach(d => { if (d.querySelector('mark')) d.open = true; });
+  }
+}
+
+/* ---------- compare ---------- */
+function toggleCmp(id){
+  const i = state.cmp.indexOf(id);
+  if (i >= 0) state.cmp.splice(i, 1); else if (state.cmp.length < MAX_CMP) state.cmp.push(id);
+  if (state.cmp.length < 2) state.comparing = false;
+  render();
+}
+function renderTray(){
+  const tray = $('tray');
+  tray.hidden = state.cmp.length === 0 || state.comparing;
+  $('tray-label').textContent = `비교 ${state.cmp.length}/${MAX_CMP}`;
+  const chips = $('tray-chips'); chips.textContent = '';
+  state.cmp.forEach(id => {
+    const r = byId.get(String(id));
+    chips.append(h('span', {class:'chip'}, `${r.open.slice(0,4)} ${r.grade}`,
+      h('button', {'aria-label': `${r.title} 비교에서 빼기`, onclick:() => toggleCmp(id)}, '×')));
+  });
+  $('tray-open').disabled = state.cmp.length < 2;
+}
+function renderCompare(){
+  const box = $('detail'); box.textContent = '';
+  const rows = state.cmp.map(id => byId.get(String(id)));
+  const col = fn => rows.map(r => h('td', null, fn(r)));
+  box.append(
+    h('div', {class:'cmp-head'}, h('h2', null, `공고 ${rows.length}건 비교`),
+      h('div', {class:'d-actions', style:'margin:0'},
+        h('button', {class:'btn', onclick:() => { state.comparing = false; render(); }}, '목록으로 돌아가기'))),
+    h('div', {class:'cmp-scroll'}, h('table', {class:'cmp'},
+      h('thead', null, h('tr', null, h('th', {scope:'col'}, ''), rows.map(r => h('th', {scope:'col'},
+        h('span', {class:'c-meta'}, r.sites.filter(k=>SITES[k]).map(k => h('span', null, siteSw(k), ' ', SITES[k].name))),
+        h('span', {class:'c-title'}, r.title),
+        h('span', {class:'c-meta'}, h('span', null, r.grade), h('span', null, r.open), h('a', {href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, '원문')))))),
+      h('tbody', null,
+        h('tr', null, h('th', {scope:'row'}, '특수경력'), col(r => hl(r.spec || '추출된 문구 없음'))),
+        h('tr', null, h('th', {scope:'row'}, '주요 업무'), col(r => h('ul', null, r.duties.map(d => h('li', null, hl(d)))))),
+        h('tr', null, h('th', {scope:'row'}, '연봉'), col(r => r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : '')),
+        h('tr', null, h('th', {scope:'row'}, '소속'), col(r => r.org)),
+        h('tr', null, h('th', {scope:'row'}, '보안 등급'), col(r => r.clearance || '')),
+        h('tr', null, h('th', {scope:'row'}, '근무 조건'), col(r => h('ul', null, r.conditions.map(c => h('li', null, hl(c))))))
+      )
+    ))
+  );
+}
+
+/* ---------- flow ---------- */
+function select(id, fromTimeline){
+  state.sel = id; state.comparing = false;
+  try { history.replaceState(null, '', '#' + id); } catch(e) {}
+  render();
+  if (window.matchMedia('(max-width: 900px)').matches || fromTimeline) {
+    $('detail').scrollIntoView({block:'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  }
+}
+function render(){
+  const rows = DATA.filter(matches);
+  if (!state.comparing && rows.length && !rows.some(r => String(r.id) === String(state.sel))) state.sel = rows[0].id;
+  document.querySelectorAll('.term').forEach(b => b.setAttribute('aria-pressed', String(state.q.trim().toLowerCase() === b.dataset.term.toLowerCase())));
+  renderList(rows);
+  paintTimeline();
+  $('work').classList.toggle('comparing', state.comparing);
+  state.comparing ? renderCompare() : renderDetail();
+  renderTray();
+}
+$('tray-open').addEventListener('click', () => { state.comparing = true; render(); $('work').scrollIntoView({block:'start'}); });
+$('tray-clear').addEventListener('click', () => { state.cmp = []; state.comparing = false; render(); });
+
+buildTimeline();
+buildControls();
+try { const sc = document.querySelector('.tl-scroll'); sc.scrollLeft = sc.scrollWidth; } catch(e) {}
+const hashId = location.hash.slice(1);
+state.sel = byId.has(hashId) ? Number(hashId) : DATA[0].id;
+render();
+})();
+</script>
+</body>
+</html>

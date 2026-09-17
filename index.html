@@ -189,8 +189,8 @@ table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed
   </main>
 
   <footer class="note">
-    <p>출처: USAJOBS Historic JOA API. Department of the Army 공고 중 한국 근무지이고 직위명에 range 등이 들어간 공고만 모았습니다.</p>
-    <p>근무지는 공고의 근무 도시로 나눴습니다. PYEONGTAEK은 Humphreys, Tongduchon과 Camp Casey는 Casey, Yongpyong(영평)은 Rodriguez로 표시합니다. Story를 근무지로 올린 공고는 없고, 2019년 Casey 공고 1건이 특수경력에 Story Live Fire Complex를 명시합니다.</p>
+    <p>출처: USAJOBS Historic JOA API. Department of the Army 공고 중 한국 근무지이고 직위명에 range 등이 들어간 공고만 모았습니다. GitHub Actions가 매주 자동으로 갱신합니다.</p>
+    <p>근무지는 공고의 근무 도시로 나눴습니다. PYEONGTAEK은 Humphreys, Tongduchon과 Camp Casey는 Casey, Yongpyong(영평)은 Rodriguez로 표시합니다. Story Live Fire Complex를 본문에 명시한 공고는 상세 화면에 따로 표시합니다.</p>
   </footer>
 </div>
 
@@ -259,18 +259,19 @@ const matches = r =>
   (!state.grades.size || state.grades.has(r.gradeNum)) &&
   (!state.q.trim() || r.hay.includes(state.q.trim().toLowerCase()));
 
-$('subline').textContent = `USAJOBS 과거 공고 중 한국 근무 사격장 직위 ${DATA.length}건, ${years[0]}–${years[years.length-1]}년. 근무지·직급·용어로 걸러 보고, 최대 ${MAX_CMP}건까지 나란히 비교할 수 있습니다.`;
+$('subline').textContent = `USAJOBS 과거 공고 중 한국 근무 사격장 직위 ${DATA.length}건, ${years[0]}–${years[years.length-1]}년. 근무지·직급·용어로 걸러 보고, 최대 ${MAX_CMP}건까지 나란히 비교할 수 있습니다. 데이터 갱신 2026-09-17.`;
 
 /* ---------- timeline ---------- */
 const svgNS = 'http://www.w3.org/2000/svg';
 const W = 1000, L = 150, R = 18, TOP = 34, LANE = 50;
-const t0 = Date.UTC(2017,0,1), t1 = Date.UTC(2026,6,1);
+const yMin = Number(years[0]), yMax = Math.max(Number(years[years.length-1]), new Date().getFullYear());
+const t0 = Date.UTC(yMin,0,1), t1 = Date.UTC(yMax,11,31);
 const xOf = d => L + (Date.parse(d) - t0) / (t1 - t0) * (W - L - R);
 const rOf = g => ({9:5, 11:6.5, 12:8, 13:9.5})[g] || 6;
 function s(tag, attrs){ const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 function buildTimeline(){
   const svg = $('tl');
-  for (let y = 2017; y <= 2026; y++) {
+  for (let y = yMin; y <= yMax; y++) {
     const x = xOf(`${y}-01-01`);
     svg.append(s('line', {class:'grid', x1:x, x2:x, y1:24, y2:TOP + LANE*3 - 12}));
     const t = s('text', {class:'yr', x:x + 4, y:16}); t.textContent = y; svg.append(t);
@@ -353,7 +354,7 @@ function renderList(rows){
       onclick:() => select(r.id, false)},
       r.sites.filter(k=>SITES[k]).length ? siteSw(r.sites.find(k=>SITES[k])) : h('span'),
       h('span', {class:'i-title'}, r.title),
-      h('span', {class:'i-meta'}, h('span', null, r.open.slice(0,7)), h('span', null, r.grade), h('span', null, r.sites.join(' / ')))
+      h('span', {class:'i-meta'}, h('span', null, r.open.slice(0,7)), h('span', null, r.grade), h('span', null, r.sites.map(k => SITES[k] ? SITES[k].name : r.cities.join(', ')).join(' / ')))
     )));
   });
 }
