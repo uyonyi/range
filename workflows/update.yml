@@ -1,0 +1,48 @@
+name: 공고 데이터 자동 업데이트
+
+on:
+  schedule:
+    - cron: "0 21 * * 0"   # 매주 월요일 06:00 (한국시간)
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "2017년부터 전체 다시 받기"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 패키지 설치
+        run: pip install requests
+
+      - name: USAJOBS에서 공고 수집
+        env:
+          FULL: ${{ github.event.inputs.full == 'true' && '1' || '0' }}
+        run: python scripts/fetch_update.py
+
+      - name: 페이지 생성
+        run: python scripts/build.py
+
+      - name: 바뀐 내용이 있으면 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          if [ -z "$(git status --porcelain data/range_korea.json scripts/template.html)" ] && git ls-files --error-unmatch index.html >/dev/null 2>&1; then
+            echo "새 공고 없음. 커밋하지 않습니다."
+            exit 0
+          fi
+          git add data/range_korea.json index.html
+          git commit -m "공고 데이터 자동 업데이트 $(TZ=Asia/Seoul date +%F)"
+          git push
