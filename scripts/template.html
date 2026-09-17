@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>한국 미 육군 사격장 직위 공고 아카이브</title>
+<title>U.S. Army Range Positions in Korea — USAJOBS Archive</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#F2F4F1; --surface:#FFFFFF; --ink:#17231F; --muted:#5B6963; --rule:#CFD7D1; --rule-soft:#E3E8E4;
   --red:#B3261E; --red-soft:#F7E4E2; --mark:#FBE69A;
   --hum:#2F5D8A; --cas:#5B6F1F; --rod:#98541A;
-  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  --cond:"IBM Plex Sans Condensed","IBM Plex Sans KR","Arial Narrow",system-ui,sans-serif;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans","Arial Narrow",system-ui,sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -119,6 +119,7 @@ a{color:inherit;text-underline-offset:3px}
 .btn{text-decoration:none}
 mark{background:var(--mark);color:inherit;padding:0 1px;border-radius:2px}
 .story-note{font-size:13.5px;color:var(--muted);margin:-12px 0 22px}
+.link-note{font-size:13px;color:var(--muted);margin:-14px 0 22px;max-width:58ch}
 
 /* compare */
 .cmp-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}
@@ -145,6 +146,7 @@ table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed
 
 .note{margin-top:28px;color:var(--muted);font-size:13px;max-width:90ch}
 .note p{margin:0 0 6px}
+.note .disc{border-top:1px solid var(--rule);margin-top:14px;padding-top:12px}
 
 @media (max-width: 900px){
   .wrap{padding:18px 14px 90px}
@@ -162,26 +164,26 @@ table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>한국 미 육군 사격장 직위 공고</h1>
+    <h1>U.S. Army Range Positions in Korea</h1>
     <p id="subline"></p>
   </header>
 
-  <section class="tl" aria-label="근무지별 공고 시기">
-    <div class="tl-scroll"><svg id="tl" viewBox="0 0 1000 188" role="group" aria-label="공고 타임라인"></svg></div>
-    <div class="tl-foot"><span>점을 누르면 해당 공고가 열립니다.</span><span>점이 클수록 직급이 높습니다 (GS-9 ~ GS-13).</span></div>
+  <section class="tl" aria-label="Announcements over time by site">
+    <div class="tl-scroll"><svg id="tl" viewBox="0 0 1000 188" role="group" aria-label="Announcement timeline"></svg></div>
+    <div class="tl-foot"><span>Select a dot to open that announcement.</span><span>Larger dots are higher grades (GS-9 to GS-13).</span></div>
   </section>
 
-  <section class="controls" aria-label="검색과 필터">
+  <section class="controls" aria-label="Search and filters">
     <div class="search">
-      <label for="q" class="sr" style="position:absolute;left:-9999px">공고 본문 검색</label>
-      <input id="q" type="search" placeholder="제목, 업무, 자격요건에서 검색 (예: RFMSS, targetry)" autocomplete="off">
+      <label for="q" class="sr" style="position:absolute;left:-9999px">Search announcement text</label>
+      <input id="q" type="search" placeholder="Search titles, duties and qualifications (e.g. RFMSS, targetry)" autocomplete="off">
     </div>
     <div class="toggles" id="toggles"></div>
-    <div class="terms" id="terms"><span>자주 찾는 용어</span></div>
+    <div class="terms" id="terms"><span>Common terms</span></div>
   </section>
 
   <main class="work" id="work">
-    <aside class="list" aria-label="공고 목록">
+    <aside class="list" aria-label="Announcement list">
       <p class="count" id="count" aria-live="polite"></p>
       <ol id="list"></ol>
     </aside>
@@ -189,16 +191,17 @@ table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed
   </main>
 
   <footer class="note">
-    <p>출처: USAJOBS Historic JOA API. Department of the Army 공고 중 한국 근무지이고 직위명에 range 등이 들어간 공고만 모았습니다. GitHub Actions가 매주 자동으로 갱신합니다.</p>
-    <p>근무지는 공고의 근무 도시로 나눴습니다. PYEONGTAEK은 Humphreys, Tongduchon과 Camp Casey는 Casey, Yongpyong(영평)은 Rodriguez로 표시합니다. Story Live Fire Complex를 본문에 명시한 공고는 상세 화면에 따로 표시합니다.</p>
+    <p>Source: USAJOBS Historic JOA API. Includes Department of the Army announcements with a Korea duty location and a range-related position title. Refreshed weekly by GitHub Actions.</p>
+    <p>Sites are grouped by the duty city on each announcement: PYEONGTAEK as Humphreys, Tongduchon and Camp Casey as Casey, Yongpyong as Rodriguez. Announcements that name Story Live Fire Complex in their text are flagged on the detail view.</p>
+      <p class="disc"><strong>Disclaimer.</strong> Unofficial personal reference project, not affiliated with or endorsed by USAJOBS, the U.S. Office of Personnel Management, the Department of Defense or the Department of the Army. Announcement text is a U.S. Government work reproduced from the public Historic JOA API for reference only; it is not redistributed as a data product or feed. This archive may be incomplete or out of date and carries no hiring information of its own — always check the original announcement on USAJOBS, which is the authoritative source.</p>
   </footer>
 </div>
 
 <div class="tray" id="tray" hidden>
   <span id="tray-label"></span>
   <span class="chips" id="tray-chips"></span>
-  <button class="btn" id="tray-open">나란히 비교</button>
-  <button class="btn ghost" id="tray-clear">비우기</button>
+  <button class="btn" id="tray-open">Compare</button>
+  <button class="btn ghost" id="tray-clear">Clear</button>
 </div>
 
 <script id="data" type="application/json">__DATA__</script>
@@ -206,9 +209,9 @@ table.cmp{border-collapse:collapse;width:100%;min-width:720px;table-layout:fixed
 (function(){
 const DATA = JSON.parse(document.getElementById('data').textContent);
 const SITES = {
-  Humphreys:{name:'Humphreys', city:'평택', cls:'hum'},
-  Casey:{name:'Casey', city:'동두천', cls:'cas'},
-  Rodriguez:{name:'Rodriguez', city:'영평', cls:'rod'}
+  Humphreys:{name:'Humphreys', city:'Pyeongtaek', cls:'hum'},
+  Casey:{name:'Casey', city:'Tongduchon', cls:'cas'},
+  Rodriguez:{name:'Rodriguez', city:'Yongpyong', cls:'rod'}
 };
 const SITE_KEYS = Object.keys(SITES);
 const TERMS = ['RFMSS','Surface Danger','RTLP','Targetry','Level II','Host Nation','385-63'];
@@ -259,7 +262,7 @@ const matches = r =>
   (!state.grades.size || state.grades.has(r.gradeNum)) &&
   (!state.q.trim() || r.hay.includes(state.q.trim().toLowerCase()));
 
-$('subline').textContent = `USAJOBS 과거 공고 중 한국 근무 사격장 직위 ${DATA.length}건, ${years[0]}–${years[years.length-1]}년. 근무지·직급·용어로 걸러 보고, 최대 ${MAX_CMP}건까지 나란히 비교할 수 있습니다. 데이터 갱신 __UPDATED__.`;
+$('subline').textContent = `${DATA.length} range positions in Korea from the USAJOBS historic archive, ${years[0]}–${years[years.length-1]}. Filter by site, grade or term, and compare up to ${MAX_CMP} announcements side by side. Updated __UPDATED__.`;
 
 /* ---------- timeline ---------- */
 const svgNS = 'http://www.w3.org/2000/svg';
@@ -343,10 +346,10 @@ function resetFilters(){
 /* ---------- list ---------- */
 function renderList(rows){
   const ol = $('list'); ol.textContent = '';
-  $('count').textContent = rows.length === DATA.length ? `전체 ${DATA.length}건` : `${DATA.length}건 중 ${rows.length}건`;
+  $('count').textContent = rows.length === DATA.length ? `All ${DATA.length} announcements` : `${rows.length} of ${DATA.length} announcements`;
   if (!rows.length) {
-    ol.append(h('li', {class:'empty'}, '조건에 맞는 공고가 없습니다. 검색어나 필터를 줄여 보세요.', h('br'),
-      h('button', {class:'btn ghost', onclick:resetFilters}, '필터 초기화')));
+    ol.append(h('li', {class:'empty'}, 'No announcements match. Try a shorter search term or fewer filters.', h('br'),
+      h('button', {class:'btn ghost', onclick:resetFilters}, 'Reset filters')));
     return;
   }
   rows.forEach(r => {
@@ -354,7 +357,7 @@ function renderList(rows){
       onclick:() => select(r.id, false)},
       r.sites.filter(k=>SITES[k]).length ? siteSw(r.sites.find(k=>SITES[k])) : h('span'),
       h('span', {class:'i-title'}, r.title),
-      h('span', {class:'i-meta'}, h('span', null, r.open.slice(0,7)), h('span', null, r.grade), h('span', null, r.sites.map(k => SITES[k] ? SITES[k].name : r.cities.join(', ')).join(' / ')))
+      h('span', {class:'i-meta'}, h('span', null, r.open.slice(0,7)), h('span', null, r.grade), h('span', null, r.sites.map(k => SITES[k] ? SITES[k].name : (r.cities.join(', ') || 'Other')).join(' / ')))
     )));
   });
 }
@@ -364,7 +367,7 @@ function fact(label, value, big){ return value ? h('div', {class: big ? 'big' : 
 function renderDetail(){
   const box = $('detail'); box.textContent = '';
   const r = byId.get(String(state.sel));
-  if (!r) { box.append(h('p', {class:'empty'}, '왼쪽 목록이나 타임라인에서 공고를 고르세요.')); return; }
+  if (!r) { box.append(h('p', {class:'empty'}, 'Select an announcement from the list or the timeline.')); return; }
   const inCmp = state.cmp.includes(r.id);
   const full = !inCmp && state.cmp.length >= MAX_CMP;
   box.append(
@@ -372,30 +375,31 @@ function renderDetail(){
       h('div', {class:'d-sites'}, r.sites.filter(k=>SITES[k]).map(k => h('span', null, siteSw(k), `${SITES[k].name} (${SITES[k].city})`))),
       h('h2', null, hl(r.title)),
       h('div', {class:'d-actions'},
-        h('a', {class:'btn', href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, 'USAJOBS 원문 열기'),
+        h('a', {class:'btn', href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, 'Open original on USAJOBS'),
         h('button', {class:'btn ghost', 'aria-pressed': String(inCmp), disabled: full, onclick:() => toggleCmp(r.id)},
-          inCmp ? '비교에서 빼기' : (full ? `비교는 ${MAX_CMP}건까지` : '비교에 추가'))
-      )
+          inCmp ? 'Remove from comparison' : (full ? `Compare holds ${MAX_CMP}` : 'Add to comparison'))
+      ),
+      h('p', {class:'link-note'}, 'Opens the original announcement on USAJOBS. Everything shown below is taken from that same announcement.')
     ),
     h('dl', {class:'facts'},
-      fact('직급', r.grade, true),
-      fact('직렬', r.series, true),
-      fact('공고 기간', `${r.open} ~ ${r.close}`),
-      fact('연봉', r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : ''),
-      fact('근무 도시', r.cities.join(', ')),
-      fact('감독직', r.supervisory ? '예' : '아니오'),
-      fact('보안 등급', r.clearance),
-      fact('채용 상태', r.status),
-      fact('소속', r.org),
-      fact('공고 번호', r.annNo)
+      fact('Grade', r.grade, true),
+      fact('Series', r.series, true),
+      fact('Open period', `${r.open} to ${r.close}`),
+      fact('Salary', r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : ''),
+      fact('Duty city', r.cities.join(', ')),
+      fact('Supervisory', r.supervisory ? 'Yes' : 'No'),
+      fact('Clearance', r.clearance),
+      fact('Status', r.status),
+      fact('Organization', r.org),
+      fact('Announcement no.', r.annNo)
     )
   );
-  if (r.story) box.append(h('p', {class:'story-note'}, '이 공고는 특수경력 요건에 Story Live Fire Complex 운영 경험을 직접 명시합니다.'));
-  if (r.spec) box.append(h('section', {class:'spec'}, h('h3', null, '특수경력 요건'), h('p', null, hl(r.spec))));
-  if (r.duties.length) box.append(h('section', null, h('h3', null, `주요 업무 ${r.duties.length}개 항목`), h('ul', {class:'duties'}, r.duties.map(d => h('li', null, hl(d))))));
-  if (r.summary) box.append(h('section', null, h('h3', null, '공고 개요'), h('p', {class:'pre'}, hl(r.summary))));
-  if (r.conditions.length) box.append(h('details', null, h('summary', null, `근무 조건 ${r.conditions.length}개 항목`), h('ul', null, r.conditions.map(c => h('li', null, hl(c))))));
-  if (r.quals) box.append(h('details', null, h('summary', null, '자격요건 원문 전체'), h('div', {class:'pre'}, hl(r.quals))));
+  if (r.story) box.append(h('p', {class:'story-note'}, 'This announcement names Story Live Fire Complex experience in its specialized experience requirement.'));
+  if (r.spec) box.append(h('section', {class:'spec'}, h('h3', null, 'Specialized experience'), h('p', null, hl(r.spec))));
+  if (r.duties.length) box.append(h('section', null, h('h3', null, `Major duties (${r.duties.length})`), h('ul', {class:'duties'}, r.duties.map(d => h('li', null, hl(d))))));
+  if (r.summary) box.append(h('section', null, h('h3', null, 'Summary'), h('p', {class:'pre'}, hl(r.summary))));
+  if (r.conditions.length) box.append(h('details', null, h('summary', null, `Conditions of employment (${r.conditions.length})`), h('ul', null, r.conditions.map(c => h('li', null, hl(c))))));
+  if (r.quals) box.append(h('details', null, h('summary', null, 'Full qualifications text'), h('div', {class:'pre'}, hl(r.quals))));
   if (state.q.trim() && r.hay.includes(state.q.trim().toLowerCase())) {
     box.querySelectorAll('details').forEach(d => { if (d.querySelector('mark')) d.open = true; });
   }
@@ -411,12 +415,12 @@ function toggleCmp(id){
 function renderTray(){
   const tray = $('tray');
   tray.hidden = state.cmp.length === 0 || state.comparing;
-  $('tray-label').textContent = `비교 ${state.cmp.length}/${MAX_CMP}`;
+  $('tray-label').textContent = `Comparing ${state.cmp.length}/${MAX_CMP}`;
   const chips = $('tray-chips'); chips.textContent = '';
   state.cmp.forEach(id => {
     const r = byId.get(String(id));
     chips.append(h('span', {class:'chip'}, `${r.open.slice(0,4)} ${r.grade}`,
-      h('button', {'aria-label': `${r.title} 비교에서 빼기`, onclick:() => toggleCmp(id)}, '×')));
+      h('button', {'aria-label': `Remove ${r.title} from comparison`, onclick:() => toggleCmp(id)}, '×')));
   });
   $('tray-open').disabled = state.cmp.length < 2;
 }
@@ -425,21 +429,21 @@ function renderCompare(){
   const rows = state.cmp.map(id => byId.get(String(id)));
   const col = fn => rows.map(r => h('td', null, fn(r)));
   box.append(
-    h('div', {class:'cmp-head'}, h('h2', null, `공고 ${rows.length}건 비교`),
+    h('div', {class:'cmp-head'}, h('h2', null, `Comparing ${rows.length} announcements`),
       h('div', {class:'d-actions', style:'margin:0'},
-        h('button', {class:'btn', onclick:() => { state.comparing = false; render(); }}, '목록으로 돌아가기'))),
+        h('button', {class:'btn', onclick:() => { state.comparing = false; render(); }}, 'Back to list'))),
     h('div', {class:'cmp-scroll'}, h('table', {class:'cmp'},
       h('thead', null, h('tr', null, h('th', {scope:'col'}, ''), rows.map(r => h('th', {scope:'col'},
         h('span', {class:'c-meta'}, r.sites.filter(k=>SITES[k]).map(k => h('span', null, siteSw(k), ' ', SITES[k].name))),
         h('span', {class:'c-title'}, r.title),
-        h('span', {class:'c-meta'}, h('span', null, r.grade), h('span', null, r.open), h('a', {href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, '원문')))))),
+        h('span', {class:'c-meta'}, h('span', null, r.grade), h('span', null, r.open), h('a', {href:`https://www.usajobs.gov/job/${r.id}`, target:'_blank', rel:'noopener'}, 'Original')))))),
       h('tbody', null,
-        h('tr', null, h('th', {scope:'row'}, '특수경력'), col(r => hl(r.spec || '추출된 문구 없음'))),
-        h('tr', null, h('th', {scope:'row'}, '주요 업무'), col(r => h('ul', null, r.duties.map(d => h('li', null, hl(d)))))),
-        h('tr', null, h('th', {scope:'row'}, '연봉'), col(r => r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : '')),
-        h('tr', null, h('th', {scope:'row'}, '소속'), col(r => r.org)),
-        h('tr', null, h('th', {scope:'row'}, '보안 등급'), col(r => r.clearance || '')),
-        h('tr', null, h('th', {scope:'row'}, '근무 조건'), col(r => h('ul', null, r.conditions.map(c => h('li', null, hl(c))))))
+        h('tr', null, h('th', {scope:'row'}, 'Specialized experience'), col(r => hl(r.spec || 'Not stated'))),
+        h('tr', null, h('th', {scope:'row'}, 'Major duties'), col(r => h('ul', null, r.duties.map(d => h('li', null, hl(d)))))),
+        h('tr', null, h('th', {scope:'row'}, 'Salary'), col(r => r.salary[0] ? `${money(r.salary[0])} – ${money(r.salary[1])}` : '')),
+        h('tr', null, h('th', {scope:'row'}, 'Organization'), col(r => r.org)),
+        h('tr', null, h('th', {scope:'row'}, 'Clearance'), col(r => r.clearance || '')),
+        h('tr', null, h('th', {scope:'row'}, 'Conditions'), col(r => h('ul', null, r.conditions.map(c => h('li', null, hl(c))))))
       )
     ))
   );
