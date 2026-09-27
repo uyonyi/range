@@ -39,12 +39,6 @@
   "positionOpeningStatus": "Candidate selected",
   "hiringpaths": [
    {
-    "hiringPath": "Veterans"
-   },
-   {
-    "hiringPath": "Military spouses"
-   },
-   {
     "hiringPath": "Family of overseas employees"
    },
    {
@@ -55,6 +49,12 @@
    },
    {
     "hiringPath": "Land and base management"
+   },
+   {
+    "hiringPath": "Veterans"
+   },
+   {
+    "hiringPath": "Military spouses"
    }
   ],
   "jobcategories": [
@@ -143,12 +143,6 @@
   "positionOpeningStatus": "Applications under review",
   "hiringpaths": [
    {
-    "hiringPath": "Veterans"
-   },
-   {
-    "hiringPath": "Military spouses"
-   },
-   {
     "hiringPath": "Family of overseas employees"
    },
    {
@@ -159,6 +153,12 @@
    },
    {
     "hiringPath": "Land and base management"
+   },
+   {
+    "hiringPath": "Veterans"
+   },
+   {
+    "hiringPath": "Military spouses"
    }
   ],
   "jobcategories": [
