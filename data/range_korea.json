@@ -39,6 +39,9 @@
   "positionOpeningStatus": "Candidate selected",
   "hiringpaths": [
    {
+    "hiringPath": "Career transition (CTAP, ICTAP, RPL)"
+   },
+   {
     "hiringPath": "Veterans"
    },
    {
@@ -49,9 +52,6 @@
    },
    {
     "hiringPath": "Federal employees - Competitive service"
-   },
-   {
-    "hiringPath": "Career transition (CTAP, ICTAP, RPL)"
    },
    {
     "hiringPath": "Military spouses"
@@ -146,19 +146,19 @@
     "hiringPath": "Military spouses"
    },
    {
-    "hiringPath": "Federal employees - Competitive service"
-   },
-   {
     "hiringPath": "Career transition (CTAP, ICTAP, RPL)"
    },
    {
-    "hiringPath": "Family of overseas employees"
+    "hiringPath": "Federal employees - Competitive service"
+   },
+   {
+    "hiringPath": "Veterans"
    },
    {
     "hiringPath": "Land and base management"
    },
    {
-    "hiringPath": "Veterans"
+    "hiringPath": "Family of overseas employees"
    }
   ],
   "jobcategories": [
