@@ -166,7 +166,7 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #brief{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.55);z-index:30}#brief.hidden{display:none}
 #brief .bc{max-width:520px;margin:16px;background:rgba(12,16,20,.94);border:1px solid rgba(255,200,40,.5);border-left:4px solid #ffc828;border-radius:10px;padding:18px 20px}
 #brief .bt{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;color:#ffc828}#brief h3{margin:8px 0 6px;font-size:20px}#brief p{margin:6px 0;line-height:1.5;font-size:14px}#brief .bn{color:#9ad7ff}#brief .bm{margin:10px 0 14px;font-size:12px;color:#9aa6ad}
-#radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:80vw;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:14px;padding:7px 12px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}
+#radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(640px,86vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:14px;padding:7px 12px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 11px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:4px}#radio .re{font:600 14px/1.35 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:12px;color:#9fb8a8;margin-top:3px}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -286,6 +286,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <h3>비행</h3>
     <div class="opt col">
       <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
+      <div>무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
@@ -444,7 +445,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=da20d6f8"></script><script>window.SIM_LANG='ko';</script>
-<script src="js/app.ko.js?v=da20d6f8"></script>
+<script src="sites/yeongin.js?v=24a6638f"></script><script>window.SIM_LANG='ko';</script>
+<script src="js/app.ko.js?v=24a6638f"></script>
 </body>
 </html>
