@@ -39,11 +39,17 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html'):
     data['logo'] = 'data:image/jpeg;base64,' + base64.b64encode(open('logo.jpg', 'rb').read()).decode()
     import math
     F = PRIV['flat']; H = math.radians(F['H'])
-    flat = {'name': '평지 · 기본 코스' if lang == 'ko' else 'Flat · default course', 'crs': F['crs'],
+    flat = {'name': '정규 훈련 코스' if lang == 'ko' else 'Standard training course', 'crs': F['crs'],
             'e0': F['SE'] + math.sin(H) * 170 + math.cos(H) * 25, 'n0': F['SN'] + math.cos(H) * 170 - math.sin(H) * 25, 'brg': F['H']}
     pre = 'window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';' + ('window.SIM_MOBILE=true;' if mobile else '') + "window.SIM_LANG='" + lang + "';"
     pre += 'window.SIM_FLAT_SITE=' + json.dumps(flat, ensure_ascii=False) + ';'
     sites = json.load(open('sites.json', encoding='utf-8')) if os.path.exists('sites.json') else []
+    sites = [s for s in sites if s['id'] == 'yeongin']
+    for s in sites:   # 내부판: 정사영상을 파일 안에 넣어 오프라인에서도 입힘
+        s = s; s['name'] = '산악 훈련장 · 영인산'; s['name_en'] = 'Mountain site · Yeonginsan'
+        op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+        if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
+    pre += "window.SIM_DEFAULT_SITE='flat';"
     pre += 'window.SIM_SITES=' + json.dumps(sites, ensure_ascii=False) + ';'
     o = t.replace('/*PROJ4*/', lib['PROJ4']).replace('/*THREE*/', lib['THREE']).replace('/*GEOTIFF*/', lib['GEOTIFF']).replace('/*DATA*/', pre).replace('/*GAME*/', game)
     open(out, 'w', encoding='utf-8').write(o); print(out, len(o) // 1024, 'KB')

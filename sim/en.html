@@ -157,6 +157,7 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
 .afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
 #irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
+.sitepick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sitepick.hidden{display:none}.stc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}.stc b{font-size:15px}.stc small{font-size:11px;opacity:.75}.stc.on{border-color:#4fe3ff;background:rgba(79,227,255,.1)}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -219,6 +220,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   <div class="card">
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>Real-terrain drone obstacle course · web simulator (prototype v0.5)</h2>
+    <div id="sitePickWrap"><div class="pickLbl">Training site</div><div id="sitePick" class="sitepick"></div></div>
     <div class="pickLbl">Airframe <small>approximated from public specs · speed, size and handling differ</small></div>
     <div id="afCards" class="afcards"></div>
     <div class="pickLbl">Mission</div>

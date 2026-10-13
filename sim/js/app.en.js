@@ -199,7 +199,7 @@ function sitesAll() {
   try { const s = localStorage.getItem('fpvsim_site_custom'); if (s) L.push(JSON.parse(s)); } catch (e) { }
   return L;
 }
-function siteCurrentId() { try { return localStorage.getItem('fpvsim_site') || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
+function siteCurrentId() { try { return localStorage.getItem('fpvsim_site') || window.SIM_DEFAULT_SITE || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
 function siteSelect(id) { try { localStorage.setItem('fpvsim_site', id); } catch (e) { } }
 function siteLoad() {
   const id = siteCurrentId(), L = sitesAll();
@@ -3642,14 +3642,19 @@ function afUI() {
     b.onclick = () => { setAirframe(id); afUI(); };
     box.appendChild(b);
   }
+  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0 };
   document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
-    const ok = (MS_OK[b.dataset.ms] || []).includes(SET.af); b.disabled = !ok; b.classList.toggle('off', !ok);
-    b.title = ok ? '' : 'Not available for this airframe';
+    const site = HAS[b.dataset.ms] !== false, ok = (MS_OK[b.dataset.ms] || []).includes(SET.af) && site; b.disabled = !ok; b.classList.toggle('off', !ok);
+    b.title = ok ? '' : !site ? 'Not available at this site' : 'Not available for this airframe';
   });
+  // 훈련장 고르기 (두 곳 이상일 때만)
+  const sp = $('sitePick'), L = sitesAll();
+  if (sp) { $('sitePickWrap').style.display = L.length < 2 ? 'none' : ''; sp.innerHTML = '';
+    for (const st of L) { const b = document.createElement('button'); b.className = 'stc' + (st.id === SITE.id ? ' on' : ''); b.innerHTML = `<b>${stName(st)}</b><small>${st.flat ? 'Flat · standard obstacle course' : 'Real terrain · ' + (st.course ? 'course laid along a route' : 'DEM')}</small>`;
+      b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; sp.appendChild(b); } }
   const segA = $('segAcro'); if (segA) segA.querySelectorAll('button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.acro));
 }
 document.querySelectorAll('#segAcro button').forEach(b => b.addEventListener('click', () => { SET.acro = b.dataset.v === '1'; saveSet(); afUI(); }));
-setAirframe(SET.af); afUI();
 
 // =====================================================================
 //  밤 · 열화상 · 산불 감시
@@ -3745,5 +3750,6 @@ document.querySelectorAll('#segTime button').forEach(b => b.addEventListener('cl
 function syncTime() { document.querySelectorAll('#segTime button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.night)); }
 envApply(); syncTime();
 
+setAirframe(SET.af); afUI();
 Object.assign(window.__sim, { FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
