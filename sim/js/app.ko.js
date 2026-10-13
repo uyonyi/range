@@ -1479,7 +1479,7 @@ function sfx(kind) {
 
 
 // =====================================================================
-//  background music (절차 생성: 신스 루프, 104 BPM)
+//  background music (절차 생성: 장면별 스타일 5가지, 구간마다 화음·멜로디 새로 만듦)
 // =====================================================================
 const MUS = { on: true, vol: 0.5, timer: null, next: 0, step: 0, bus: null };
 try { const m = JSON.parse(localStorage.getItem('fpvsim_fpv_music') || '{}'); if (m.on !== undefined) MUS.on = m.on; if (m.vol !== undefined) MUS.vol = m.vol; } catch (e) { }
@@ -1516,26 +1516,88 @@ function noiseHit(t, type, freq, q, gain, dur, dest) {
   const g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   s.connect(f); f.connect(g); g.connect(dest || MUS.bus); s.start(t, Math.random()); s.stop(t + dur + 0.02); return f;
 }
+// ---- 곡 구성: 장면에 따라 다른 스타일, 구간(인트로·A·B·브레이크)마다 화음·멜로디를 새로 만듦 ----
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
+function chordOf(name) {   // 'Am' -> [베이스(E2~D#3), [3화음(G3~F#4 근음)]]
+  const m = /^([A-G][b#]?)(m?)(7?)$/.exec(name), r = NOTE[m[1]], minor = !!m[2];
+  const root = 40 + ((r - 4 + 12) % 12), t0 = 55 + ((r - 7 + 12) % 12), tri = [t0, t0 + (minor ? 3 : 4), t0 + 7];
+  if (m[3]) tri.push(t0 + 10); return [root, tri];
+}
+const STYLES = {
+  drive:   { bpm: 126, scale: [0, 2, 3, 5, 7, 8, 10], key: 9, progs: [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'G'], ['F', 'G', 'Am', 'Am'], ['Dm', 'F', 'Am', 'G']], kick: 'four', bass: 'roll', lead: 'sawtooth', arp: 16, hat: 16 },
+  action:  { bpm: 140, scale: [0, 2, 3, 5, 7, 8, 10], key: 4, progs: [['Em', 'C', 'G', 'D'], ['Em', 'D', 'C', 'B'], ['C', 'D', 'Em', 'Em'], ['Em', 'G', 'D', 'C']], kick: 'four', bass: 'oct', lead: 'square', arp: 16, hat: 16 },
+  tension: { bpm: 98, scale: [0, 1, 3, 5, 7, 8, 10], key: 2, progs: [['Dm', 'Bb', 'Gm', 'A'], ['Dm', 'Dm', 'Bb', 'A'], ['Gm', 'Dm', 'Bb', 'A'], ['Dm', 'C', 'Bb', 'A']], kick: 'half', bass: 'pulse', lead: 'triangle', arp: 8, hat: 8, drone: true },
+  forest:  { bpm: 112, scale: [0, 2, 4, 7, 9], key: 7, progs: [['G', 'Em', 'C', 'D'], ['Em', 'C', 'G', 'D'], ['C', 'G', 'D', 'Em'], ['G', 'D', 'Em', 'C']], kick: 'two', bass: 'walk', lead: 'triangle', arp: 8, hat: 8, pluck: true },
+  night:   { bpm: 84, scale: [0, 2, 3, 5, 7, 8, 10], key: 0, progs: [['Cm', 'Ab', 'Eb', 'Bb'], ['Cm', 'Fm', 'Ab', 'G'], ['Ab', 'Eb', 'Bb', 'Cm']], kick: 'sparse', bass: 'long', lead: 'sine', arp: 8, hat: 0, drone: true }
+};
+const SECTIONS = [{ n: 'intro', bars: 4, e: 1 }, { n: 'A', bars: 8, e: 2 }, { n: 'B', bars: 8, e: 3 }, { n: 'brk', bars: 4, e: 1 }, { n: 'A2', bars: 8, e: 3 }, { n: 'B2', bars: 8, e: 4 }];
+const SONG = { style: 'drive', want: 'drive', sec: 0, bar: 0, prog: null, motif: null, seed: 1, rnd: Math.random };
+function songStyleFor() {
+  if (typeof ENV !== 'undefined' && ENV.night) return 'night';
+  if (S.state === 'menu' || S.state === 'result') return 'drive';
+  const k = S.kind; if (k === 'race' || k === 'strike') return 'action';
+  if (k === 'forest') return 'forest';
+  if (k === 'recon' || k === 'fire' || k === 'sar' || k === 'track') return 'tension';
+  if (k === 'ridge') return 'forest';
+  return 'drive';
+}
+function songSection() {   // 구간이 바뀔 때마다 새 화음 진행·멜로디
+  const st = STYLES[SONG.style], r = SONG.rnd;
+  SONG.prog = st.progs[Math.floor(r() * st.progs.length)].map(chordOf);
+  const sc = st.scale, base = 62 + ((st.key - 2 + 12) % 12), L = [];   // 멜로디 음역 D4~F#5
+  let deg = Math.floor(r() * sc.length);
+  for (let i = 0; i < 16; i++) {   // 8분음표 16개 = 2마디 동기
+    if (r() < (SECTIONS[SONG.sec].e >= 3 ? 0.3 : 0.45)) { L.push(0); continue; }
+    deg = Math.max(0, Math.min(sc.length + 2, deg + Math.round((r() - 0.5) * 4)));
+    L.push(base + sc[deg % sc.length] + 12 * Math.floor(deg / sc.length));
+  }
+  SONG.motif = L; SONG.var = L.map(n => n && r() < 0.35 ? n + (r() < 0.5 ? 2 : -1) : n);
+}
 function musicSchedule() {
   const ctx = AU.ctx; if (!ctx) return;
-  const s16 = 60 / BPM / 4;
   while (MUS.next < ctx.currentTime + 0.15) {
-    const t = MUS.next, st = MUS.step % 16, bar = Math.floor(MUS.step / 16) % 16, ch = CHORDS[bar % 4], full = bar >= 4;
+    let st = STYLES[SONG.style]; const s16 = 60 / st.bpm / 4, t = MUS.next, step = MUS.step % 16;
+    if (step === 0) {   // 마디 시작
+      if (!SONG.prog) songSection();
+      SONG.bar++; let sec = SECTIONS[SONG.sec];
+      const want = songStyleFor(); SONG.want = want;
+      if (SONG.bar >= sec.bars || (want !== SONG.style && SONG.bar % 4 === 0)) {
+        SONG.bar = 0; SONG.sec = (SONG.sec + 1) % SECTIONS.length;
+        if (want !== SONG.style) { SONG.style = want; SONG.sec = 0; st = STYLES[want]; MUS.dly && MUS.dly.delayTime.setValueAtTime(3 * 60 / st.bpm / 4, t); }
+        songSection();
+      }
+    }
+    const sec = SECTIONS[SONG.sec], bar = SONG.bar, ch = SONG.prog[bar % 4];
+    // 속도·부스트에 따라 한 단계 더
+    let e = sec.e; if (S.state === 'run' && (S.boosting || (DR.v && DR.v.length() > 14))) e = Math.min(4, e + 1); if (S.state === 'menu') e = Math.min(e, 2);
+    const last = bar === sec.bars - 1;
     if (MUS.on && MUS.vol > 0) {
-      if (st % 4 === 0) {   // 킥 + 사이드체인
+      const k = st.kick, kickOn = e >= 2 && (k === 'four' ? step % 4 === 0 : k === 'half' ? step === 0 || step === 8 : k === 'two' ? step === 0 || step === 10 : step === 0 && bar % 2 === 0);
+      if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) {
         const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-        g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 0.3);
+        g.gain.setValueAtTime(e === 1 ? 0.5 : 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 0.3);
         MUS.duck.gain.setValueAtTime(0.3, t); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3);
       }
-      if (st === 4 || st === 12) { noiseHit(t, 'bandpass', 1800, 0.8, 0.38, 0.17); noiseHit(t, 'highpass', 3000, 0, 0.12, 0.09); }   // 클랩
-      noiseHit(t, 'highpass', 8000, 0, st % 4 === 2 ? 0.1 : (st % 2 ? 0.035 : 0.055), st % 4 === 2 ? 0.14 : 0.035);                 // 하이햇 16분
-      if (st % 4 !== 0) note('sawtooth', mf(ch[0] - 12 + (st % 4 === 2 ? 12 : 0)), t, s16 * 0.9, 0.16, 650, MUS.duck);            // 굴러가는 베이스
-      if (st === 0) for (const n of ch[1]) note('sawtooth', mf(n), t, s16 * 15, 0.022, 1500, MUS.duck, 0.12);                     // 패드
-      if (full) { const ar = ch[1].concat(ch[1].map(n => n + 12)); note('square', mf(ar[(st + bar) % ar.length] + 12), t, s16 * 0.8, 0.026, 3200, MUS.duck); }   // 16분 아르페지오
-      if (bar >= 8 && st % 2 === 0) { const n = HOOK[bar % 4][st / 2]; if (n) { const o1 = note('sawtooth', mf(n), t, s16 * 1.9, 0.045, 3600); note('square', mf(n) * 1.004, t, s16 * 1.9, 0.03, 3000, MUS.dly); } }   // 리드 훅
-      if ((bar === 7 || bar === 15) && st === 0) { const f = noiseHit(t, 'highpass', 400, 0, 0.06, s16 * 16); f.frequency.exponentialRampToValueAtTime(9000, t + s16 * 16); }   // 상승음
-      if ((bar === 7 || bar === 15) && st >= 12) noiseHit(t, 'bandpass', 1900, 0.8, 0.22 + (st - 12) * 0.05, 0.1);                 // 필인
-      if ((bar === 0 || bar === 8) && st === 0) noiseHit(t, 'highpass', 5000, 0, 0.18, 1.6);                                       // 크래시
+      if (e >= 2 && (step === 4 || step === 12) && k !== 'sparse') { noiseHit(t, 'bandpass', 1800, 0.8, 0.32, 0.17); noiseHit(t, 'highpass', 3000, 0, 0.1, 0.09); }
+      if (st.hat && e >= 2 && step % (16 / st.hat) === 0) noiseHit(t, 'highpass', 8000, 0, step % 4 === 2 ? 0.09 : 0.035, step % 4 === 2 ? 0.12 : 0.035);
+      if (st.drone && step === 0 && bar % 2 === 0) note('sine', mf(ch[0] - 12), t, s16 * 32, 0.05, 0, MUS.duck, 0.4);
+      // 베이스
+      const b = st.bass, bn = ch[0] - 12;
+      if (b === 'roll' && step % 4 !== 0) note('sawtooth', mf(bn + (step % 4 === 2 ? 12 : 0)), t, s16 * 0.9, 0.15, 650, MUS.duck);
+      if (b === 'oct' && step % 2 === 0) note('sawtooth', mf(bn + (step % 4 === 2 ? 12 : 0)), t, s16 * 1.6, 0.15, 800, MUS.duck);
+      if (b === 'pulse' && step % 2 === 0 && e >= 1) note('square', mf(bn), t, s16 * 1.2, 0.08, 420, MUS.duck);
+      if (b === 'walk' && step % 4 === 0) note('triangle', mf(bn + [0, 7, 12, 7][step / 4]), t, s16 * 3.5, 0.2, 0, MUS.duck);
+      if (b === 'long' && step === 0) note('sine', mf(bn), t, s16 * 15, 0.16, 0, MUS.duck, 0.05);
+      // 패드
+      if (step === 0) for (const n of ch[1]) note('sawtooth', mf(n), t, s16 * 15, e >= 3 ? 0.02 : 0.026, e >= 3 ? 1800 : 1100, MUS.duck, 0.18);
+      // 아르페지오 (에너지 3 이상, 또는 숲 스타일의 퉁기는 소리)
+      if ((e >= 3 || st.pluck) && step % (16 / st.arp) === 0) { const ar = ch[1].concat(ch[1].map(n => n + 12)), i = (step / (16 / st.arp) + bar) % ar.length; note(st.pluck ? 'triangle' : 'square', mf(ar[i] + (st.pluck ? 0 : 12)), t, s16 * (st.pluck ? 2.5 : 0.8), st.pluck ? 0.05 : 0.022, st.pluck ? 2400 : 3200, MUS.duck); }
+      // 멜로디 (A·B 구간, 2마디 동기 + 변형)
+      if (sec.n !== 'intro' && sec.n !== 'brk' && step % 2 === 0) { const M = bar % 4 >= 2 ? SONG.var : SONG.motif, n = M[(bar % 2) * 8 + step / 2]; if (n && (e >= 3 || sec.n === 'A')) { note(st.lead, mf(n), t, s16 * 1.8, st.lead === 'sine' || st.lead === 'triangle' ? 0.07 : 0.04, 3400); if (e >= 3) note('square', mf(n) * 1.004, t, s16 * 1.8, 0.022, 3000, MUS.dly); } }
+      // 구간 끝 필인·상승음, 시작 크래시
+      if (last && step === 0 && e >= 2) { const f = noiseHit(t, 'highpass', 400, 0, 0.05, s16 * 16); f.frequency.exponentialRampToValueAtTime(9000, t + s16 * 16); }
+      if (last && step >= 12 && e >= 2) noiseHit(t, 'bandpass', 1900, 0.8, 0.2 + (step - 12) * 0.05, 0.1);
+      if (bar === 0 && step === 0 && sec.e >= 2) noiseHit(t, 'highpass', 5000, 0, 0.16, 1.6);
     }
     MUS.next += s16; MUS.step++;
   }
@@ -2308,6 +2370,7 @@ function handleKeys() {
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
+    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA')) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
@@ -2371,14 +2434,14 @@ function frame(now, noRender) {
   skyU.time.value = S.simT;
   const tutHold = S.kind === 'tutorial' && S.tut && S.tut.st !== 'fly';
   if (S.state === 'run') {
-    if (!tutHold) {
+    if (!tutHold && !S.brief) {
       acc += dt;
       while (acc >= STEP) {
         acc -= STEP; _prevP.copy(DR.p); stepDrone(STEP); S.bumpT -= STEP; S.hitCD -= STEP;
         if (S.kind === 'course' || S.kind === 'tutorial') checkObjectives(_prevP, DR.p, STEP); else if (isMission()) msStep(_prevP, DR.p, STEP);
       }
     }
-    if (S.running && !S.finished && (S.kind === 'course' || isMission())) S.t += dt;
+    if (S.running && !S.finished && !S.brief && (S.kind === 'course' || isMission())) S.t += dt;
     S.flyT += dt;
     if (S.running && !REC_T0_SET && REC) { REC.t0 = S.flyT; REC_T0_SET = true; }
     if (!S.running) REC_T0_SET = false;
@@ -3292,7 +3355,7 @@ let fakeNow = 0;
 function advance(sec, step, skipRender) { step = step || 1 / 60; const n = Math.max(1, Math.round(sec / step)); if (!fakeNow) fakeNow = last; for (let i = 0; i < n; i++) { fakeNow += step * 1000; frame(fakeNow, skipRender || i < n - 1); } }
 
 // 시험용 핸들
-window.__sim = { STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on }) };
+window.__sim = { STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
 // =====================================================================
 //  기체 종류 · 새 임무 (숲길 통과 · 타임 레이스 · 정찰 · 타격)
 //  속도·크기는 공개 제원 수준의 근사값 (기체 이름은 형상 참고용)
@@ -3510,15 +3573,15 @@ const RACE = (function () {
 const RECON = (function () {
   const out = []; if (!VEC || !VEC.bld || !CRS_C) return out;
   const st = BY.pad_start, B = VEC.bld.map(b => ({ b, d: Math.hypot(b[0] - st.down, b[1] - st.side) })).filter(x => x.d > 100 && x.d < 640).sort((p, q) => p.d - q.d);
-  for (const x of B) { if (out.length >= 5) break; if (out.some(o => Math.hypot(o.b[0] - x.b[0], o.b[1] - x.b[1]) < 110)) continue; out.push(x); }
+  for (const x of B) { if (out.length >= 9) break; if (out.some(o => Math.hypot(o.b[0] - x.b[0], o.b[1] - x.b[1]) < 110)) continue; out.push(x); }
   return out.map((x, i) => { const [d, s, w, l, ang, h] = x.b, tp = W(d, s, h * 0.6);
-    return { kind: 'ms', t: 'recon', label: `정찰 ${i + 1} · 건물 (${Math.round(w)}×${Math.round(l)} m)`, tp, mk: W(d, s, h + 6), need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y + 15))]; } }; });
+    return { kind: 'ms', t: 'recon', wl: `${Math.round(w)}×${Math.round(l)} m`, d, s, label: '', tp, mk: W(d, s, h + 6), need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y + 15))]; } }; });
 })();
 // 타격 표적 (가상의 표적 차량 3대)
 const STRIKE = (function () {
   if (!PATHL) return [];
   const L = [], body = mat(0x59604a, { roughness: 0.85 }), dark = mat(0x2c3026, { roughness: 0.9 }), mark = mat(0xff3b30, { roughness: 0.6, emissive: 0x220000 });
-  [[200, 5], [340, -5], [470, 4]].forEach(([s, off], i) => {
+  [[150, 5], [235, -6], [320, 5], [400, -4], [475, 4]].forEach(([s, off], i) => {
     const q = PATHL.at(Math.min(s, PATHL.total - 8)), d = q.d - q.ts * off, sd = q.s + q.td * off, c = W(d, sd, 0), yaw = Math.atan2(q.ts, q.td);
     const g = new THREE.Group(); g.position.copy(c); g.rotation.y = Math.PI / 2 - yaw; MSG.strike.add(g);
     const hull = new THREE.Mesh(UBOX, body); hull.scale.set(2.4, 1.3, 5.2); hull.position.y = 1.05; g.add(hull);
@@ -3527,7 +3590,7 @@ const STRIKE = (function () {
     const x = new THREE.Mesh(UBOX, mark); x.scale.set(1.6, 0.04, 1.6); x.position.set(0, 1.72, 0.6); g.add(x);
     g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.userData.heat = 0.28; } });
     const col = boxCol(hull, 'stk'); col.off = true;
-    L.push({ kind: 'ms', t: 'strike', label: `표적 ${i + 1} · 차량`, g, col, c: c.clone().add(new V3(0, 1.4, 0)), mk: c.clone().add(new V3(0, 5, 0)), hull,
+    L.push({ kind: 'ms', t: 'strike', label: `표적 ${i + 1} · 차량`, g, col, parts: g.children.filter(x => x.isMesh), c: c.clone().add(new V3(0, 1.4, 0)), mk: c.clone().add(new V3(0, 5, 0)), hull,
       pts(p) { return [p.clone(), this.c.clone()]; } });
   });
   return L;
@@ -3541,22 +3604,24 @@ function msStart(kind) {
   const a = AFc(); let L = [];
   if (kind === 'forest' && FLANE) L = FLANE.cps.map(c => passCP(c.label, c.q, c.hw, c.y0, c.y1));
   if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
-  if (kind === 'recon') L = RECON;
-  if (kind === 'fire') { L = FIRE; MSG.fire.visible = true; FIRE.forEach(f => f.done = false); S.fireRep = []; }
-  if (kind === 'strike') { L = STRIKE; MSG.strike.visible = true; STRIKE.forEach(t => { t.col.off = false; if (!t.hull.userData.m0) t.hull.userData.m0 = t.hull.material; }); }
+  if (kind === 'recon') L = reconPick();
+  if (kind === 'fire') L = firePick();
+  if (kind === 'strike') L = strikePick();
   const SC = scenStart(kind, a); if (SC) L = SC;
-  L.forEach(o => o.done = false); MS.list = L; MS.kind = kind;
+  L.forEach(o => o.done = false); MS.list = L; MS.kind = kind; MS.t0 = 0; MS.events = []; S.decoyHit = 0;
   // 시작 위치: 고정익·자폭 고정익은 공중에서
   const p0 = startPos(), o = msObj(); let h = startHead();
   if (o) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
   if (a.cls === 'wing') { p0.y = groundAt(p0.x, p0.z) + (a.kam ? 45 : 30); wingAir(p0, h); } else resetDrone(p0, h);
   MS.launch = { p: DR.p.clone(), h };
   S.respawn = null;
+  if (ENV.ir) { irSet(false); irSet(true); }   // 바뀐 열 세기 반영
+  MS.par = msPar(kind, L); briefShow(kind, L);
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
   o.done = true; sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
-  MS.idx++; S.recT = 0;
+  MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
   renderList();
   if (MS.idx >= MS.list.length) msFinish();
@@ -3572,7 +3637,8 @@ function msStep(prev, cur, dt) {
       else { const h = x.y - terrainAt(x.x, x.z); ok = Math.abs(lat) <= o.hw && h >= o.y0 && h <= o.y1; }
       if (ok) msNext(); else if (S.bumpT <= 0) { showMsg('MISS · 다시 통과', '#ff9a40', 1); sfx('bad'); S.bumpT = 0.6; }
     }
-  } else if (o.t === 'fire') fireCheck(o, cur, dt);
+  } else if (o.t === 'fire') fireStep(cur, dt);
+  else if (o.t === 'strikeAll') strikeAim(o, cur);
   else if (o.t === 'sarfind' || o.t === 'land' || o.t === 'track') scenStep(o, cur, dt);
   else if (o.t === 'recon') {
     const inView = sensorSees(o.tp, cur, AFc().reconD || 260);
@@ -3591,16 +3657,21 @@ function sensorSees(tp, cur, maxD) {
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
-  const o = msObj(); if (!o || o.t !== 'strike') return false;
-  const l = o.hull.worldToLocal(DR.p.clone()), inX = Math.abs(l.x) < 0.5 + 0.9 / 2.4, inY = Math.abs(l.y) < 0.5 + 0.9 / 1.3, inZ = Math.abs(l.z) < 0.5 + 0.9 / 5.2;
-  const hit = inX && inY && inZ;
-  if (!hit) return false;
+  const so = msObj(); if (!so || so.t !== 'strikeAll') return false;
+  const o = STRIKE.find(t => !t.dead && (() => { const l = t.hull.worldToLocal(DR.p.clone()); return Math.abs(l.x) < 0.5 + 0.9 / 2.4 && Math.abs(l.y) < 0.5 + 0.9 / 1.3 && Math.abs(l.z) < 0.5 + 0.9 / 5.2; })());
+  if (!o) return false;
+  if (o.decoy) {   // 기만체: 가시광으로는 같지만 열화상으로는 차가움
+    o.dead = true; o.col.off = true; o.hull.material = mat(0x1d1d1b, { roughness: 1 }); S.decoyHit++; S.pen += 20;
+    spawnImpact(o.c.clone(), true); sfx('crash'); shake = 0.15; DR.alive = false; S.deadT = 1.8; droneM.g.visible = false;
+    showMsg('DECOY +20s', '#ff9a40', 1.8); radio(L2('기만체였습니다. 열화상(T)으로 엔진 열을 확인하세요.', 'That was a decoy. Check for engine heat in thermal (T).')); return true;
+  }
   const err = Math.hypot(DR.p.x - o.c.x, DR.p.z - o.c.z);
   S.hitsS++; S.errS.push(err); o.dead = true; o.col.off = true;
   o.hull.material = mat(0x1d1d1b, { roughness: 1 });
   spawnImpact(o.c.clone(), true); spawnImpact(DR.p.clone(), true); sfx('crash'); rumble(1, 1, 400); shake = 0.2;
   DR.alive = false; S.deadT = 1.8; droneM.g.visible = false;
-  msNext(`HIT · 중심에서 ${err.toFixed(1)} m`, '#5dff9a');
+  sfx('good'); showMsg(`HIT · 중심에서 ${err.toFixed(1)} m`, '#5dff9a', 1.4); so.label = strikeLabel(); renderList();
+  if (S.hitsS >= STRIKE.filter(t => !t.decoy).length) { so.done = true; MS.idx++; msFinish(); }
   return true;
 }
 function msFinish() {
@@ -3610,8 +3681,8 @@ function msFinish() {
     S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden');
     const a = AFc(), total = S.t + S.pen, nm = MS_NAME[S.kind];
     ui.resSub.textContent = `${nm} · ${a.name} · ${MODES[SET.diff].name}`;
-    const rows = [['비행 시간', fmt(S.t)], ['벌점', '+' + S.pen.toFixed(0) + ' s'], ['합계', fmt(total)], ['충돌', S.impacts + ' 회']];
-    if (S.kind === 'strike') rows.push(['명중', S.hitsS + ' / ' + STRIKE.length], ['기체 손실(빗나감)', (S.lost || 0) + ' 대'], ['평균 오차', (S.errS.reduce((x, y) => x + y, 0) / Math.max(1, S.errS.length)).toFixed(1) + ' m']);
+    const G = msGrade(total), rows = [[L2('등급', 'Grade'), `<b style="color:${G.c};font-size:18px">${G.g}</b> (${L2('기준', 'par')} ${fmt(MS.par || 0)})`], ['비행 시간', fmt(S.t)], ['벌점', '+' + S.pen.toFixed(0) + ' s'], ['합계', fmt(total)], ['충돌', S.impacts + ' 회']];
+    if (S.kind === 'strike') rows.push(['명중', S.hitsS + ' / ' + STRIKE.filter(t => !t.decoy).length], [L2('기만체 타격', 'Decoys hit'), (S.decoyHit || 0) + L2(' 대', '')], ['기체 손실(빗나감)', (S.lost || 0) + ' 대'], ['평균 오차', (S.errS.reduce((x, y) => x + y, 0) / Math.max(1, S.errS.length)).toFixed(1) + ' m']);
     else if (S.lost) rows.push(['기체 손실', S.lost + ' 대']);
     if (S.kind === 'sar' && S.sarXY) rows.push(['실종자 위치 (EPSG:5186)', S.sarXY[0].toFixed(0) + ', ' + S.sarXY[1].toFixed(0)]);
     if (S.kind === 'sar' && S.kitErr !== undefined) rows.push(['키트 오차', S.kitErr.toFixed(1) + ' m']);
@@ -3628,8 +3699,9 @@ function msFinish() {
 function msOsd() {
   const o = msObj(), a = AFc(); let h = '';
   if (a.cls === 'wing') h += `<div><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼</div>' : '');
-  if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
+  if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
   else if (isMission()) h += `<div><b>HIT</b>${S.impacts}</div>`;
+  if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
   if (o && o.t === 'fire') h += o.inView ? `<div style="color:#ffb070">HOT ${Math.min(100, S.recT / o.need * 100).toFixed(0)}% ●</div>` : o.seenVis ? '<div style="color:#9aa6ad">열화상(T)으로 확인</div>' : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : '열화상 끔 · T'}</div>`;
   h += scenOsd(o);
   if (o && o.t === 'recon') h += `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">REC ${Math.min(100, S.recT / o.need * 100).toFixed(0)}%${o.inView ? ' ●' : ' · 화면 가운데나 아래 카메라에 담기'}</div>`;
@@ -3729,10 +3801,10 @@ const FIRE = (function () {
   const smokeM = new THREE.MeshLambertMaterial({ color: 0x9a9a96, transparent: true, opacity: 0.22, depthWrite: false });
   const hotM = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), plumeM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
   const emberM = new THREE.MeshBasicMaterial({ color: 0xff7a22, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     let q, d, s, tries = 0;
     do { q = PATHL.at(60 + r() * (PATHL.total - 100)); const off = (r() < 0.5 ? -1 : 1) * (45 + r() * 90); d = q.d - q.ts * off; s = q.s + q.td * off; tries++; }
-    while (tries < 30 && (L.some(f => Math.hypot(f.d - d, f.s - s) < 90) || (FLANE && FLANE.clear.some(p => Math.hypot(p[0] - d, p[1] - s) < 10))));
+    while (tries < 30 && (L.some(f => Math.hypot(f.d - d, f.s - s) < 70) || (FLANE && FLANE.clear.some(p => Math.hypot(p[0] - d, p[1] - s) < 10))));
     const c = W(d, s, 0), g = new THREE.Group(); g.position.copy(c); MSG.fire.add(g);
     const hot = new THREE.Mesh(new THREE.CircleGeometry(2.6, 20), hotM); hot.rotation.x = -Math.PI / 2; hot.position.y = 0.25; hot.userData.irOnly = true; hot.visible = false; g.add(hot);
     const pl = new THREE.Mesh(UCYL, plumeM); pl.scale.set(1.4, 16, 1.4); pl.position.y = 8; pl.userData.irOnly = true; pl.visible = false; g.add(pl);
@@ -3757,6 +3829,7 @@ function envTick(dt) {
   envT += dt;
   if (!MSG.fire.visible) return;
   for (const f of FIRE) {
+    if (!f.on || !f.active) continue;
     f.em.material.opacity = 0.55 + 0.35 * Math.sin(envT * 9 + f.d) * Math.sin(envT * 5.3);
     f.em.visible = !ENV.ir && (ENV.night || true);
     for (const p of f.puffs) { const u = (envT * 0.12 + p.userData.ph) % 1; p.position.set(Math.sin(u * 7 + f.s) * 1.5 * u, 1 + u * 22, Math.cos(u * 5) * 1.2 * u); const k = 1 + u * 4; p.scale.set(k, k, k); p.visible = !ENV.ir && !ENV.night; }
@@ -3890,7 +3963,7 @@ const RIDGE = (function () {
 function scenStart(kind, a) {
   ['sar', 'track', 'ridge'].forEach(k => MSG[k] && (MSG[k].visible = false));
   if (kind === 'sar' && SAR) {
-    MSG.sar.visible = true; SAR.kit = null;
+    MSG.sar.visible = true; SAR.kit = null; sarRandom();
     const L = [{ kind: 'ms', t: 'sarfind', label: '실종자 수색 · 구역 반경 80 m', tp: SAR.tp, mk: SAR.area, need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
     if (a.drop) L.push({ kind: 'ms', t: 'sarkit', label: '구조 키트 투하 (5 m 이내)', mk: SAR.c.clone().add(new V3(0, 8, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } });
     if (a.cls === 'wing') L.push(passCP('복귀 · 출발점 상공 통과', { d: BY.pad_start.down, s: BY.pad_start.side, td: 1, ts: 0 }, 0, 35, 35, 14));
@@ -3898,8 +3971,8 @@ function scenStart(kind, a) {
     return L;
   }
   if (kind === 'track' && TRACK) {
-    MSG.track.visible = true; TRACK.s = 0; TRACK.go = false; S.trT = 0; S.trWin = 0;
-    const p0 = trackPose(0); TRACK.g.position.copy(p0.p); TRACK.g.rotation.y = -p0.h;
+    MSG.track.visible = true; TRACK.go = false; S.trT = 0; S.trWin = 0; trackRandom();
+    const p0 = trackPose(TRACK.s); TRACK.g.position.copy(p0.p); TRACK.g.rotation.y = -p0.h;
     return [{ kind: 'ms', t: 'track', label: '차량 추적 · 시야에 60초 유지', mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
   }
   if (kind === 'ridge' && RIDGE) {
@@ -3927,7 +4000,7 @@ function scenStep(o, cur, dt) {
   }
 }
 function scenTick(dt) {
-  WIND.t += dt;
+  WIND.t += dt; msEvents(dt);
   if (TRACK && MSG.track && MSG.track.visible && TRACK.go && S.state === 'run') {
     TRACK.s = Math.min(TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
     TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; TRACK.g.rotation.x = Math.atan2(ah.p.y - vp.p.y, 3) * 1;
@@ -3954,6 +4027,136 @@ function scenOsd(o) {
     b.onclick = () => { if (b.dataset.l === cur) return; try { localStorage.setItem('fpvsim_lang', b.dataset.l); } catch (e) { }
       if (window.SIM_DUAL) location.reload(); else location.href = b.dataset.l === 'en' ? 'en.html' : 'index.html'; }; });
 })();
+
+// =====================================================================
+//  임무 진행 (매번 달라지는 배치 · 브리핑 · 무전 · 시간에 따른 사건 · 등급)
+// =====================================================================
+const L2 = (ko, en) => window.SIM_LANG === 'en' ? en : ko;
+const shuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+function nearOrder(L, p) { const out = [], rest = L.slice(); let c = p; while (rest.length) { let k = 0, bd = 1e9; rest.forEach((o, i) => { const d = Math.hypot(o.tp.x - c.x, o.tp.z - c.z); if (d < bd) { bd = d; k = i; } }); c = rest[k].tp; out.push(rest.splice(k, 1)[0]); } return out; }
+function reconPick() {
+  const L = nearOrder(shuffle(RECON).slice(0, Math.min(4, RECON.length)), startPos());
+  L.forEach((o, i) => { o.label = `정찰 ${i + 1} · 건물 (${o.wl})`; o.done = false; }); return L;
+}
+// 산불: 후보 8곳 중 5곳, 3곳은 처음부터 · 2곳은 나중에 신고
+function firePick() {
+  MSG.fire.visible = true; S.fireRep = [];
+  FIRE.forEach(f => { f.on = false; f.g.visible = false; f.done = false; f.spread = false; });
+  const P = shuffle(FIRE).slice(0, 5), when = [0, 0, 0, 40 + Math.random() * 20, 85 + Math.random() * 25];
+  P.forEach((f, i) => { f.on = true; f.ignT = when[i]; f.active = when[i] === 0; f.g.visible = f.active; f.label = `불씨 ${i + 1} · 수색 구역 반경 50 m`; });
+  return P;
+}
+function fireStep(cur, dt) {
+  for (const f of MS.list) {
+    if (f.done || !f.active) continue;
+    const vis = sensorSees(f.tp, cur, (AFc().reconD || 260) * 0.8);
+    f.inView = vis && ENV.ir; f.seenVis = vis && !ENV.ir;
+    f.recT = f.inView ? (f.recT || 0) + dt : Math.max(0, (f.recT || 0) - dt * 0.4);
+    if (f.recT >= f.need) {
+      const xy = to5186(f.d, f.s); flashPhoto(); f.done = true; S.fireRep.push(xy); sfx('good');
+      showMsg(xy ? `불씨 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '불씨 보고 ✓', '#ffb070', 1.6);
+      MS.idx = MS.list.findIndex(x => !x.done); if (MS.idx < 0) { MS.idx = MS.list.length; msFinish(); } renderList(); return;
+    }
+  }
+  const o = msObj(); if (o) S.recT = o.recT || 0;
+}
+// 타격: 차량 5대 중 실물 3대(엔진 열) · 기만체 2대(차가움)
+function strikeLabel() { const n = STRIKE.filter(t => !t.decoy).length; return L2(`실물 표적 타격 ${S.hitsS || 0}/${n} · 기만체 ${STRIKE.length - n}대 섞임`, `Hit real targets ${S.hitsS || 0}/${n} · ${STRIKE.length - n} decoys mixed in`); }
+function strikePick() {
+  MSG.strike.visible = true; S.hitsS = 0;
+  const roles = shuffle([0, 0, 0, 1, 1]);
+  STRIKE.forEach((t, i) => { t.decoy = !!roles[i]; t.dead = false; t.col.off = false; if (!t.hull.userData.m0) t.hull.userData.m0 = t.hull.material; t.hull.material = t.hull.userData.m0; t.parts.forEach(p => p.userData.heat = t.decoy ? 0.0 : 0.5); });
+  return [{ kind: 'ms', t: 'strikeAll', label: strikeLabel(), mk: STRIKE[0].mk.clone(), pts(p) { return [p.clone(), this.mk.clone()]; } }];
+}
+function strikeAim(o, cur) { let b = null, bd = 1e9; for (const t of STRIKE) { if (t.dead) continue; const d = t.c.distanceTo(cur); if (d < bd) { bd = d; b = t; } } if (b) o.mk.copy(b.c); }
+// 기준 시간 · 등급
+function msPar(kind, L) {
+  const a = AFc(), v = a.cls === 'wing' ? a.cruise : Math.min(a.top, 12);
+  if (kind === 'forest') return (FLANE ? FLANE.total : 400) / Math.min(v, 6) + 15;
+  if (kind === 'race') return (PATHL ? PATHL.total : 500) / (v * 0.85) + 10;
+  if (kind === 'ridge') return (RIDGE ? RIDGE.len : 900) / (v * 0.8) + 20;
+  if (kind === 'recon') return 60 + L.length * 45;
+  if (kind === 'fire') return 200;
+  if (kind === 'strike') return 150;
+  if (kind === 'sar') return 220;
+  if (kind === 'track') return 150;
+  return 180;
+}
+function msGrade(total) {
+  if (S.kind === 'track') return S.trackOK ? { g: S.trT / Math.max(1, S.trWin) > 0.8 ? 'S' : 'A', c: '#5dff9a' } : { g: 'C', c: '#ff6060' };
+  const r = total / Math.max(1, MS.par || 1);
+  return r <= 1 ? { g: 'S', c: '#ffc828' } : r <= 1.3 ? { g: 'A', c: '#5dff9a' } : r <= 1.7 ? { g: 'B', c: '#4fe3ff' } : { g: 'C', c: '#ff9a40' };
+}
+// 무전 (화면 아래 가운데, 몇 초 뒤 사라짐)
+let radioT = 0;
+function radio(text) { const el = $('radio'); if (!el) return; el.innerHTML = '<b>📻</b> ' + text; el.classList.add('show'); radioT = 5; sfx('good'); }
+// 브리핑
+const BRIEF = window.SIM_LANG === 'en' ? {
+  forest: ['Forest trail', 'Follow a narrow trail cut through the forest beside the main route: gates, tight gaps and fallen trunks to the finish.', 'Trees are 2–3 m apart. Stay low, under the canopy (below 3 m AGL).'],
+  race: ['Valley time race', 'Fly through the rings along the valley, in order, as fast as you can.', 'Boost (BST) takes you to the airframe top speed. Miss a ring and you must come back through it.'],
+  recon: ['Building recon', 'Find and photograph 4 random real buildings from the topo map.', 'Hold each building centered on screen or in the belly cam for 1.5 s. Targets change every run.'],
+  strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
+  fire: ['Wildfire watch', '3 hotspots reported in the forest. More reports may come in during the flight.', 'Find each hotspot with thermal (T) and report its coordinates. After 150 s a hotspot spreads (+15 s).'],
+  sar: ['Search & rescue', 'A hiker is missing near the trails. The location changes every run.', 'Under the canopy only thermal shows them. The radio narrows the area over time. Drop the kit, then return and land.'],
+  track: ['Vehicle tracking', 'Keep a car driving on a real road in view for 60 s.', 'Closer than 25 m and you are spotted (no tracking time). The car changes speed and stops now and then.'],
+  ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.']
+} : {
+  forest: ['숲 속 좁은 길', '주 경로 옆 숲 속에 낸 좁은 길을 따라 게이트·좁은 틈·쓰러진 나무를 지나 결승까지.', '나무 사이는 2~3 m. 수관 아래(지면 3 m 이하)로 낮게 날 것.'],
+  race: ['계곡 타임 레이스', '계곡을 따라 놓인 링을 순서대로 최단 시간에 통과.', '부스트(BST)로 기체 최고 속도까지. 링을 빗나가면 되돌아와 다시 통과.'],
+  recon: ['건물 정찰', '수치지형도에 있는 실제 건물 중 무작위 4곳을 찾아 촬영.', '건물을 화면 가운데나 아래 카메라에 1.5초 담기. 매번 대상이 바뀜.'],
+  strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
+  fire: ['산불 감시', '숲 속 불씨 3곳이 신고됨. 비행 중 추가 신고가 들어올 수 있음.', '열화상(T)으로 불씨를 찾아 좌표 보고. 신고 후 150초가 지나면 번져서 +15초.'],
+  sar: ['실종자 수색·구조', '등산로 근처에서 실종자 신고. 위치는 매번 다름.', '숲 아래는 열화상으로만 보임. 시간이 지나면 무전으로 구역이 좁혀짐. 찾으면 키트 투하 후 복귀 착륙.'],
+  track: ['차량 추적', '실제 도로를 달리는 차량을 60초 동안 시야에 유지.', '25 m 안으로 붙으면 노출(추적 시간 안 쌓임). 차량은 속도를 바꾸고 중간에 서기도 함.'],
+  ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.']
+};
+function briefShow(kind, L) {
+  const b = BRIEF[kind], el = $('brief'); if (!b || !el) return;
+  const cond = [WIND.lv ? (WIND.lv === 1 ? L2('바람 약 3 m/s', 'Wind 3 m/s') : L2('바람 강 7 m/s', 'Wind 7 m/s')) : L2('바람 없음', 'No wind'), ENV.night ? L2('밤', 'Night') : L2('낮', 'Day'), AFc().name].join(' · ');
+  el.innerHTML = `<div class="bc"><div class="bt">BRIEFING</div><h3>${b[0]}</h3><p>${b[1]}</p><p class="bn">${b[2]}</p><div class="bm">${cond} · ${L2('기준 시간', 'Par time')} ${fmt(MS.par)}</div><button class="primary" id="briefGo">${L2('시작', 'Start')}</button></div>`;
+  el.classList.remove('hidden'); S.brief = true;
+  const go = () => { el.classList.add('hidden'); S.brief = false; };
+  $('briefGo').onclick = go; el.onpointerdown = e => { if (e.target === el) go(); };
+  BRIEF_GO = go;
+}
+let BRIEF_GO = null;
+// 시간에 따른 사건 (불씨 추가·번짐, 실종자 구역 좁힘, 차량 정차·속도 변화)
+function msEvents(dt) {
+  if (S.state !== 'run' || S.brief || !isMission()) return;
+  MS.t0 += dt; const t = MS.t0;
+  radioT -= dt; if (radioT <= 0) { const el = $('radio'); if (el) el.classList.remove('show'); }
+  if (S.kind === 'fire') {
+    for (const [i, f] of MS.list.entries()) {
+      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; radio(L2(`새 신고 · 불씨 ${i + 1} (지도 표시 구역)`, `New report · hotspot ${i + 1} (area on map)`)); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
+      if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; radio(L2(`불씨 ${i + 1} 번짐 · +15초`, `Hotspot ${i + 1} spread · +15 s`)); f.g.scale.setScalar(1.8); }
+    }
+  }
+  if (S.kind === 'sar') {
+    const o = msObj();
+    if (o && o.t === 'sarfind') {
+      if (!MS.h1 && t > 60) { MS.h1 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.55); o.label = L2('실종자 수색 · 구역 반경 40 m', 'Find the hiker · area radius 40 m'); radio(L2('목격 제보 · 수색 구역을 반경 40 m로 좁힘', 'Sighting reported · area narrowed to 40 m')); renderList(); }
+      if (!MS.h2 && t > 130) { MS.h2 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.6); o.label = L2('실종자 수색 · 구역 반경 20 m', 'Find the hiker · area radius 20 m'); radio(L2('휴대전화 위치 · 반경 20 m', 'Phone location · within 20 m')); renderList(); }
+    }
+  }
+  if (S.kind === 'track' && TRACK && TRACK.go) {
+    const T = TRACK; T.tt = (T.tt || 0) + dt;
+    if (T.stopT > 0) { T.stopT -= dt; T.v = 0; if (T.stopT <= 0) radio(L2('차량 다시 출발', 'Vehicle moving again')); }
+    else { T.v = T.base * (0.8 + 0.35 * Math.sin(T.tt * 0.11 + T.ph)); if (T.stops.length && T.s > T.stops[0]) { T.stops.shift(); T.stopT = 6 + Math.random() * 6; radio(L2('차량 정차 · 계속 시야 유지', 'Vehicle stopped · keep it in view')); } }
+  }
+}
+// 실종자·차량 무작위 배치 (scenStart 에서 부름)
+const SAR_POOL = (function () {
+  if (!SAR) return [];
+  const st = BY.pad_start, P = [];
+  for (const a of VEC.trail) for (let i = 0; i < a.length; i += 6) { const d = a[i], s = a[i + 1], dist = Math.hypot(d - st.down, s - st.side); if (dist > 220 && dist < 520 && INB(d, s) && !P.some(p => Math.hypot(p[0] - d, p[1] - s) < 90)) P.push([d, s]); }
+  return P.length ? P : [[SAR.d, SAR.s]];
+})();
+function sarRandom() {
+  const q = SAR_POOL[Math.floor(Math.random() * SAR_POOL.length)], d = q[0] + (Math.random() - 0.5) * 12, s = q[1] + (Math.random() - 0.5) * 12, c = W(d, s, 0);
+  SAR.d = d; SAR.s = s; SAR.c.copy(c); SAR.tp.copy(c).add(new V3(0, 0.3, 0)); SAR.g.position.copy(c); SAR.g.rotation.y = Math.random() * 6.28;
+  const ang = Math.random() * 6.283; SAR.area.copy(W(d + Math.cos(ang) * 45, s + Math.sin(ang) * 45, 30)); MS.h1 = MS.h2 = false;
+}
+function trackRandom() { const T = TRACK; T.s = Math.random() * T.total * 0.25; T.base = 7 + Math.random() * 3; T.ph = Math.random() * 6; T.tt = 0; T.stopT = 0; T.stops = [T.s + 400 + Math.random() * 300, T.s + 1100 + Math.random() * 400]; }
 
 // ---------------- 데이터 출처 ----------------
 const EN_ = window.SIM_LANG === 'en';

@@ -1,6 +1,6 @@
 
 // =====================================================================
-//  background music (절차 생성: 신스 루프, 104 BPM)
+//  background music (절차 생성: 장면별 스타일 5가지, 구간마다 화음·멜로디 새로 만듦)
 // =====================================================================
 const MUS = { on: true, vol: 0.5, timer: null, next: 0, step: 0, bus: null };
 try { const m = JSON.parse(localStorage.getItem('hroc_fpv_music') || '{}'); if (m.on !== undefined) MUS.on = m.on; if (m.vol !== undefined) MUS.vol = m.vol; } catch (e) { }
@@ -37,26 +37,88 @@ function noiseHit(t, type, freq, q, gain, dur, dest) {
   const g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   s.connect(f); f.connect(g); g.connect(dest || MUS.bus); s.start(t, Math.random()); s.stop(t + dur + 0.02); return f;
 }
+// ---- 곡 구성: 장면에 따라 다른 스타일, 구간(인트로·A·B·브레이크)마다 화음·멜로디를 새로 만듦 ----
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
+function chordOf(name) {   // 'Am' -> [베이스(E2~D#3), [3화음(G3~F#4 근음)]]
+  const m = /^([A-G][b#]?)(m?)(7?)$/.exec(name), r = NOTE[m[1]], minor = !!m[2];
+  const root = 40 + ((r - 4 + 12) % 12), t0 = 55 + ((r - 7 + 12) % 12), tri = [t0, t0 + (minor ? 3 : 4), t0 + 7];
+  if (m[3]) tri.push(t0 + 10); return [root, tri];
+}
+const STYLES = {
+  drive:   { bpm: 126, scale: [0, 2, 3, 5, 7, 8, 10], key: 9, progs: [['Am', 'F', 'C', 'G'], ['Am', 'G', 'F', 'G'], ['F', 'G', 'Am', 'Am'], ['Dm', 'F', 'Am', 'G']], kick: 'four', bass: 'roll', lead: 'sawtooth', arp: 16, hat: 16 },
+  action:  { bpm: 140, scale: [0, 2, 3, 5, 7, 8, 10], key: 4, progs: [['Em', 'C', 'G', 'D'], ['Em', 'D', 'C', 'B'], ['C', 'D', 'Em', 'Em'], ['Em', 'G', 'D', 'C']], kick: 'four', bass: 'oct', lead: 'square', arp: 16, hat: 16 },
+  tension: { bpm: 98, scale: [0, 1, 3, 5, 7, 8, 10], key: 2, progs: [['Dm', 'Bb', 'Gm', 'A'], ['Dm', 'Dm', 'Bb', 'A'], ['Gm', 'Dm', 'Bb', 'A'], ['Dm', 'C', 'Bb', 'A']], kick: 'half', bass: 'pulse', lead: 'triangle', arp: 8, hat: 8, drone: true },
+  forest:  { bpm: 112, scale: [0, 2, 4, 7, 9], key: 7, progs: [['G', 'Em', 'C', 'D'], ['Em', 'C', 'G', 'D'], ['C', 'G', 'D', 'Em'], ['G', 'D', 'Em', 'C']], kick: 'two', bass: 'walk', lead: 'triangle', arp: 8, hat: 8, pluck: true },
+  night:   { bpm: 84, scale: [0, 2, 3, 5, 7, 8, 10], key: 0, progs: [['Cm', 'Ab', 'Eb', 'Bb'], ['Cm', 'Fm', 'Ab', 'G'], ['Ab', 'Eb', 'Bb', 'Cm']], kick: 'sparse', bass: 'long', lead: 'sine', arp: 8, hat: 0, drone: true }
+};
+const SECTIONS = [{ n: 'intro', bars: 4, e: 1 }, { n: 'A', bars: 8, e: 2 }, { n: 'B', bars: 8, e: 3 }, { n: 'brk', bars: 4, e: 1 }, { n: 'A2', bars: 8, e: 3 }, { n: 'B2', bars: 8, e: 4 }];
+const SONG = { style: 'drive', want: 'drive', sec: 0, bar: 0, prog: null, motif: null, seed: 1, rnd: Math.random };
+function songStyleFor() {
+  if (typeof ENV !== 'undefined' && ENV.night) return 'night';
+  if (S.state === 'menu' || S.state === 'result') return 'drive';
+  const k = S.kind; if (k === 'race' || k === 'strike') return 'action';
+  if (k === 'forest') return 'forest';
+  if (k === 'recon' || k === 'fire' || k === 'sar' || k === 'track') return 'tension';
+  if (k === 'ridge') return 'forest';
+  return 'drive';
+}
+function songSection() {   // 구간이 바뀔 때마다 새 화음 진행·멜로디
+  const st = STYLES[SONG.style], r = SONG.rnd;
+  SONG.prog = st.progs[Math.floor(r() * st.progs.length)].map(chordOf);
+  const sc = st.scale, base = 62 + ((st.key - 2 + 12) % 12), L = [];   // 멜로디 음역 D4~F#5
+  let deg = Math.floor(r() * sc.length);
+  for (let i = 0; i < 16; i++) {   // 8분음표 16개 = 2마디 동기
+    if (r() < (SECTIONS[SONG.sec].e >= 3 ? 0.3 : 0.45)) { L.push(0); continue; }
+    deg = Math.max(0, Math.min(sc.length + 2, deg + Math.round((r() - 0.5) * 4)));
+    L.push(base + sc[deg % sc.length] + 12 * Math.floor(deg / sc.length));
+  }
+  SONG.motif = L; SONG.var = L.map(n => n && r() < 0.35 ? n + (r() < 0.5 ? 2 : -1) : n);
+}
 function musicSchedule() {
   const ctx = AU.ctx; if (!ctx) return;
-  const s16 = 60 / BPM / 4;
   while (MUS.next < ctx.currentTime + 0.15) {
-    const t = MUS.next, st = MUS.step % 16, bar = Math.floor(MUS.step / 16) % 16, ch = CHORDS[bar % 4], full = bar >= 4;
+    let st = STYLES[SONG.style]; const s16 = 60 / st.bpm / 4, t = MUS.next, step = MUS.step % 16;
+    if (step === 0) {   // 마디 시작
+      if (!SONG.prog) songSection();
+      SONG.bar++; let sec = SECTIONS[SONG.sec];
+      const want = songStyleFor(); SONG.want = want;
+      if (SONG.bar >= sec.bars || (want !== SONG.style && SONG.bar % 4 === 0)) {
+        SONG.bar = 0; SONG.sec = (SONG.sec + 1) % SECTIONS.length;
+        if (want !== SONG.style) { SONG.style = want; SONG.sec = 0; st = STYLES[want]; MUS.dly && MUS.dly.delayTime.setValueAtTime(3 * 60 / st.bpm / 4, t); }
+        songSection();
+      }
+    }
+    const sec = SECTIONS[SONG.sec], bar = SONG.bar, ch = SONG.prog[bar % 4];
+    // 속도·부스트에 따라 한 단계 더
+    let e = sec.e; if (S.state === 'run' && (S.boosting || (DR.v && DR.v.length() > 14))) e = Math.min(4, e + 1); if (S.state === 'menu') e = Math.min(e, 2);
+    const last = bar === sec.bars - 1;
     if (MUS.on && MUS.vol > 0) {
-      if (st % 4 === 0) {   // 킥 + 사이드체인
+      const k = st.kick, kickOn = e >= 2 && (k === 'four' ? step % 4 === 0 : k === 'half' ? step === 0 || step === 8 : k === 'two' ? step === 0 || step === 10 : step === 0 && bar % 2 === 0);
+      if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) {
         const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-        g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 0.3);
+        g.gain.setValueAtTime(e === 1 ? 0.5 : 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 0.3);
         MUS.duck.gain.setValueAtTime(0.3, t); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3);
       }
-      if (st === 4 || st === 12) { noiseHit(t, 'bandpass', 1800, 0.8, 0.38, 0.17); noiseHit(t, 'highpass', 3000, 0, 0.12, 0.09); }   // 클랩
-      noiseHit(t, 'highpass', 8000, 0, st % 4 === 2 ? 0.1 : (st % 2 ? 0.035 : 0.055), st % 4 === 2 ? 0.14 : 0.035);                 // 하이햇 16분
-      if (st % 4 !== 0) note('sawtooth', mf(ch[0] - 12 + (st % 4 === 2 ? 12 : 0)), t, s16 * 0.9, 0.16, 650, MUS.duck);            // 굴러가는 베이스
-      if (st === 0) for (const n of ch[1]) note('sawtooth', mf(n), t, s16 * 15, 0.022, 1500, MUS.duck, 0.12);                     // 패드
-      if (full) { const ar = ch[1].concat(ch[1].map(n => n + 12)); note('square', mf(ar[(st + bar) % ar.length] + 12), t, s16 * 0.8, 0.026, 3200, MUS.duck); }   // 16분 아르페지오
-      if (bar >= 8 && st % 2 === 0) { const n = HOOK[bar % 4][st / 2]; if (n) { const o1 = note('sawtooth', mf(n), t, s16 * 1.9, 0.045, 3600); note('square', mf(n) * 1.004, t, s16 * 1.9, 0.03, 3000, MUS.dly); } }   // 리드 훅
-      if ((bar === 7 || bar === 15) && st === 0) { const f = noiseHit(t, 'highpass', 400, 0, 0.06, s16 * 16); f.frequency.exponentialRampToValueAtTime(9000, t + s16 * 16); }   // 상승음
-      if ((bar === 7 || bar === 15) && st >= 12) noiseHit(t, 'bandpass', 1900, 0.8, 0.22 + (st - 12) * 0.05, 0.1);                 // 필인
-      if ((bar === 0 || bar === 8) && st === 0) noiseHit(t, 'highpass', 5000, 0, 0.18, 1.6);                                       // 크래시
+      if (e >= 2 && (step === 4 || step === 12) && k !== 'sparse') { noiseHit(t, 'bandpass', 1800, 0.8, 0.32, 0.17); noiseHit(t, 'highpass', 3000, 0, 0.1, 0.09); }
+      if (st.hat && e >= 2 && step % (16 / st.hat) === 0) noiseHit(t, 'highpass', 8000, 0, step % 4 === 2 ? 0.09 : 0.035, step % 4 === 2 ? 0.12 : 0.035);
+      if (st.drone && step === 0 && bar % 2 === 0) note('sine', mf(ch[0] - 12), t, s16 * 32, 0.05, 0, MUS.duck, 0.4);
+      // 베이스
+      const b = st.bass, bn = ch[0] - 12;
+      if (b === 'roll' && step % 4 !== 0) note('sawtooth', mf(bn + (step % 4 === 2 ? 12 : 0)), t, s16 * 0.9, 0.15, 650, MUS.duck);
+      if (b === 'oct' && step % 2 === 0) note('sawtooth', mf(bn + (step % 4 === 2 ? 12 : 0)), t, s16 * 1.6, 0.15, 800, MUS.duck);
+      if (b === 'pulse' && step % 2 === 0 && e >= 1) note('square', mf(bn), t, s16 * 1.2, 0.08, 420, MUS.duck);
+      if (b === 'walk' && step % 4 === 0) note('triangle', mf(bn + [0, 7, 12, 7][step / 4]), t, s16 * 3.5, 0.2, 0, MUS.duck);
+      if (b === 'long' && step === 0) note('sine', mf(bn), t, s16 * 15, 0.16, 0, MUS.duck, 0.05);
+      // 패드
+      if (step === 0) for (const n of ch[1]) note('sawtooth', mf(n), t, s16 * 15, e >= 3 ? 0.02 : 0.026, e >= 3 ? 1800 : 1100, MUS.duck, 0.18);
+      // 아르페지오 (에너지 3 이상, 또는 숲 스타일의 퉁기는 소리)
+      if ((e >= 3 || st.pluck) && step % (16 / st.arp) === 0) { const ar = ch[1].concat(ch[1].map(n => n + 12)), i = (step / (16 / st.arp) + bar) % ar.length; note(st.pluck ? 'triangle' : 'square', mf(ar[i] + (st.pluck ? 0 : 12)), t, s16 * (st.pluck ? 2.5 : 0.8), st.pluck ? 0.05 : 0.022, st.pluck ? 2400 : 3200, MUS.duck); }
+      // 멜로디 (A·B 구간, 2마디 동기 + 변형)
+      if (sec.n !== 'intro' && sec.n !== 'brk' && step % 2 === 0) { const M = bar % 4 >= 2 ? SONG.var : SONG.motif, n = M[(bar % 2) * 8 + step / 2]; if (n && (e >= 3 || sec.n === 'A')) { note(st.lead, mf(n), t, s16 * 1.8, st.lead === 'sine' || st.lead === 'triangle' ? 0.07 : 0.04, 3400); if (e >= 3) note('square', mf(n) * 1.004, t, s16 * 1.8, 0.022, 3000, MUS.dly); } }
+      // 구간 끝 필인·상승음, 시작 크래시
+      if (last && step === 0 && e >= 2) { const f = noiseHit(t, 'highpass', 400, 0, 0.05, s16 * 16); f.frequency.exponentialRampToValueAtTime(9000, t + s16 * 16); }
+      if (last && step >= 12 && e >= 2) noiseHit(t, 'bandpass', 1900, 0.8, 0.2 + (step - 12) * 0.05, 0.1);
+      if (bar === 0 && step === 0 && sec.e >= 2) noiseHit(t, 'highpass', 5000, 0, 0.16, 1.6);
     }
     MUS.next += s16; MUS.step++;
   }
