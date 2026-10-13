@@ -8,3 +8,7 @@ USAJOBS Historic JOA API에서 한국 근무 육군 사격장 직위 공고를 �
 - `.github/workflows/update.yml`: 매주 월요일 06:00(KST) 자동 실행
 
 수동 실행: Actions 탭 → 공고 데이터 자동 업데이트 → Run workflow
+
+## 드론 지형 시뮬레이터
+
+`sim/` 폴더 — 실제 지형 위 드론 장애물 코스 웹 시뮬레이터. 주소: https://uyonyi.github.io/range/sim/ (자세한 내용은 `sim/README.md`)
