@@ -166,7 +166,14 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #brief{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.55);z-index:30}#brief.hidden{display:none}
 #brief .bc{max-width:520px;margin:16px;background:rgba(12,16,20,.94);border:1px solid rgba(255,200,40,.5);border-left:4px solid #ffc828;border-radius:10px;padding:18px 20px}
 #brief .bt{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;color:#ffc828}#brief h3{margin:8px 0 6px;font-size:20px}#brief p{margin:6px 0;line-height:1.5;font-size:14px}#brief .bn{color:#9ad7ff}#brief .bm{margin:10px 0 14px;font-size:12px;color:#9aa6ad}
-#radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(640px,86vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:14px;padding:7px 12px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 11px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:4px}#radio .re{font:600 14px/1.35 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:12px;color:#9fb8a8;margin-top:3px}
+#radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(440px,70vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:12px;padding:5px 9px;border-radius:7px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 9px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:3px}#radio .re{font:600 11.5px/1.3 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:10.5px;color:#9fb8a8;margin-top:2px}
+body.touch #radio{bottom:auto;top:calc(54px + env(safe-area-inset-top));max-width:min(360px,46vw)}
+.lyHide{display:none!important}
+body.lyEditing .lyHide{display:block!important;opacity:.3}
+body.lyEditing #osd,body.lyEditing #obj,body.lyEditing #list,body.lyEditing #map,body.lyEditing #belly,body.lyEditing #radio,body.lyEditing #guide,body.lyEditing #bottom,body.lyEditing #scope,body.lyEditing #tc .tb{outline:2px dashed #ffc828;outline-offset:2px;cursor:move;pointer-events:auto!important;touch-action:none}
+body.lyEditing #belly,body.lyEditing #scope,body.lyEditing #guide{display:block!important;min-width:120px;min-height:40px}body.lyEditing #radio{opacity:1}
+body.lyEditing #guide:empty::after{content:'GUIDE'}
+#lyBar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:60;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(10,13,16,.92);border:1px solid #ffc828;border-radius:10px;padding:6px 8px;font-size:12px;max-width:96vw}#lyBar.hidden{display:none}#lyBar .ln{color:#ffc828;font-weight:600;margin-right:4px}#lyBar button{padding:5px 9px;font-size:12px}#lyBar .sz{min-width:40px;text-align:center}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -280,6 +287,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="attrib"></div>
 <div id="brief" class="hidden"></div>
 <div id="radio"></div>
+<div id="lyBar" class="hidden"></div>
 <div id="setPanel" class="panel hidden">
   <div class="card" style="max-width:760px">
     <h1>SETTINGS</h1><h2>Settings · changes are saved in this browser</h2>
@@ -429,7 +437,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="pause" class="panel hidden">
   <div class="card" style="max-width:420px">
     <h1>PAUSED</h1><h2>Pause</h2>
-    <div class="btns"><button class="primary" id="bResume">Resume</button><button id="bRestart">Restart</button><button id="bPauseRp">Replay so far</button><button id="bMenu">Menu</button></div>
+    <div class="btns"><button class="primary" id="bResume">Resume</button><button id="bRestart">Restart</button><button id="bPauseRp">Replay so far</button><button id="bMenu">Menu</button><button id="bLayout">Edit HUD layout</button></div>
   </div>
 </div>
 
@@ -445,7 +453,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=555b6a39"></script><script>window.SIM_LANG='en';</script>
-<script src="js/app.en.js?v=555b6a39"></script>
+<script src="sites/yeongin.js?v=dacaab42"></script><script>window.SIM_LANG='en';</script>
+<script src="js/app.en.js?v=dacaab42"></script>
 </body>
 </html>
