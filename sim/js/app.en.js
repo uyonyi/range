@@ -1716,10 +1716,10 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0 };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true };
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -1757,6 +1757,7 @@ function startRun(kind) {
   if (kind === 'course' || kind === 'free') recStart(); else REC = null;
   showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? (IS_TOUCH ? 'READY · left stick up to take off' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
+  COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 None · Takeoff 허가'), 1500);
 }
 function curObj() {
   if (S.state === 'menu' || S.state === 'replay' || S.state === 'result') return null;
@@ -1778,6 +1779,7 @@ function completeObj(status, msg, col) {
 }
 function finishRun() {
   S.finished = true; S.running = false;
+  comm(`${CS}, CONTROL. Course complete, good flying. CONTROL out.`, '코스 완주 · 수고했음');
   const rec = recFinish();
   setTimeout(() => {
     if (S.state !== 'run') return;
@@ -3535,6 +3537,8 @@ function lostDrone(why) {
   if (S.kind === 'strike') showMsg(why === 'stk' ? 'HIT' : 'MISS · drone lost', '#ff6060', 1.6);
   else { showMsg(a.kam ? 'DETONATED · drone lost' : 'CRASH · drone lost', '#ff5050', 1.6); if (S.kind === 'race' || S.kind === 'forest' || S.kind === 'recon') S.pen += 10; }
   droneM.g.visible = false;
+  if (isMission() && !(a.kam && S.kind === 'strike')) comm(`${CS}, CONTROL, we lost your feed. Relaunching from the start point.`, '영상 끊김 · 출발점에서 재발진');
+  else if (a.kam && S.kind === 'strike') comm('Miss, no effect on target. Next drone is up.', '빗나감 · 다음 기체 발진');
 }
 function deadTick(dt) { S.deadT -= dt; if (S.deadT <= 0) { respawn(); } }
 
@@ -3621,7 +3625,7 @@ function msStart(kind) {
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
   o.done = true; sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
-  MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
+  MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; commAck(o, S.kind);
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
   renderList();
   if (MS.idx >= MS.list.length) msFinish();
@@ -3663,7 +3667,7 @@ function strikeDetonate() {
   if (o.decoy) {   // 기만체: 가시광으로는 같지만 열화상으로는 차가움
     o.dead = true; o.col.off = true; o.hull.material = mat(0x1d1d1b, { roughness: 1 }); S.decoyHit++; S.pen += 20;
     spawnImpact(o.c.clone(), true); sfx('crash'); shake = 0.15; DR.alive = false; S.deadT = 1.8; droneM.g.visible = false;
-    showMsg('DECOY +20s', '#ff9a40', 1.8); radio(L2('기만체였습니다. 열화상(T)으로 엔진 열을 확인하세요.', 'That was a decoy. Check for engine heat in thermal (T).')); return true;
+    showMsg('DECOY +20s', '#ff9a40', 1.8); comm(`Negative, ${CS}, that was a decoy. Confirm heat signature before you commit.`, '기만체였음. 돌입 전 열 신호(T) 확인할 것.'); return true;
   }
   const err = Math.hypot(DR.p.x - o.c.x, DR.p.z - o.c.z);
   S.hitsS++; S.errS.push(err); o.dead = true; o.col.off = true;
@@ -3671,11 +3675,13 @@ function strikeDetonate() {
   spawnImpact(o.c.clone(), true); spawnImpact(DR.p.clone(), true); sfx('crash'); rumble(1, 1, 400); shake = 0.2;
   DR.alive = false; S.deadT = 1.8; droneM.g.visible = false;
   sfx('good'); showMsg(`HIT · off center ${err.toFixed(1)} m`, '#5dff9a', 1.4); so.label = strikeLabel(); renderList();
+  { const left = STRIKE.filter(t => !t.decoy && !t.dead).length; comm(left ? `Good hit, target destroyed. ${left} remaining. Next drone is up.` : 'Good effect on all targets. Cease fire, cease fire.', left ? `명중 확인. 남은 표적 ${left}대. 다음 기체 발진.` : '모든 표적 무력화. 사격 중지.'); }
   if (S.hitsS >= STRIKE.filter(t => !t.decoy).length) { so.done = true; MS.idx++; msFinish(); }
   return true;
 }
 function msFinish() {
   S.finished = true; S.running = false;
+  comm(`Mission complete. Good work, ${CS}. CONTROL out.`, '임무 완료 · 수고했음.');
   setTimeout(() => {
     if (S.state !== 'run') return;
     S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden');
@@ -3990,17 +3996,17 @@ function scenStep(o, cur, dt) {
     const pad = startPos(); if (DR.landed && Math.hypot(DR.p.x - pad.x, DR.p.z - pad.z) < 2.5) msNext('Landed ✓', '#5dff9a');
   } else if (o.t === 'track') {
     const T = TRACK, vp = trackPose(T.s);
-    if (!T.go && cur.distanceTo(vp.p) < 220) { T.go = true; showMsg('Vehicle moving · start tracking', '#ffc828', 1.6); }
+    if (!T.go && cur.distanceTo(vp.p) < 220) { T.go = true; showMsg('Vehicle moving · start tracking', '#ffc828', 1.6); comm(`${CS}, target is moving. You have the eye, keep it.`, '표적 차량 move 시작 · 관측 유지'); }
     const tp = vp.p.clone().add(new V3(0, 1, 0)), dd = cur.distanceTo(tp), see = sensorSees(tp, cur, 320);
     o.close = dd < 25; o.inView = see && !o.close;
     if (T.go) { S.trWin += dt; if (o.inView) S.trT += dt; }
     o.mk.copy(vp.p).add(new V3(0, 12, 0));
-    if (S.trT >= o.need) { S.trackOK = true; msNext(`Tracking success · ${S.trT.toFixed(0)} s / ${S.trWin.toFixed(0)} s`, '#5dff9a'); }
+    if (S.trT >= o.need) { S.trackOK = true; comm('Good track, we have what we need. Break off and RTB.', '추적 완료 · 이탈 후 복귀'); msNext(`Tracking success · ${S.trT.toFixed(0)} s / ${S.trWin.toFixed(0)} s`, '#5dff9a'); }
     else if (T.s >= T.total - 1) { S.trackOK = false; msNext(`Vehicle arrived · tracked ${S.trT.toFixed(0)} s (not enough)`, '#ff9a40'); }
   }
 }
 function scenTick(dt) {
-  WIND.t += dt; msEvents(dt);
+  WIND.t += dt; msEvents(dt); commTick(dt);
   if (TRACK && MSG.track && MSG.track.visible && TRACK.go && S.state === 'run') {
     TRACK.s = Math.min(TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
     TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; TRACK.g.rotation.x = Math.atan2(ah.p.y - vp.p.y, 3) * 1;
@@ -4053,7 +4059,7 @@ function fireStep(cur, dt) {
     f.inView = vis && ENV.ir; f.seenVis = vis && !ENV.ir;
     f.recT = f.inView ? (f.recT || 0) + dt : Math.max(0, (f.recT || 0) - dt * 0.4);
     if (f.recT >= f.need) {
-      const xy = to5186(f.d, f.s); flashPhoto(); f.done = true; S.fireRep.push(xy); sfx('good');
+      const xy = to5186(f.d, f.s); flashPhoto(); f.done = true; S.fireRep.push(xy); sfx('good'); commAck(f, 'fire');
       showMsg(xy ? `Hotspot reported ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : 'Hotspot reported ✓', '#ffb070', 1.6);
       MS.idx = MS.list.findIndex(x => !x.done); if (MS.idx < 0) { MS.idx = MS.list.length; msFinish(); } renderList(); return;
     }
@@ -4115,7 +4121,7 @@ function briefShow(kind, L) {
   const cond = [WIND.lv ? (WIND.lv === 1 ? L2('바람 약 3 m/s', 'Wind 3 m/s') : L2('바람 강 7 m/s', 'Wind 7 m/s')) : L2('바람 None', 'No wind'), ENV.night ? L2('밤', 'Night') : L2('낮', 'Day'), AFc().name].join(' · ');
   el.innerHTML = `<div class="bc"><div class="bt">BRIEFING</div><h3>${b[0]}</h3><p>${b[1]}</p><p class="bn">${b[2]}</p><div class="bm">${cond} · ${L2('기준 시간', 'Par time')} ${fmt(MS.par)}</div><button class="primary" id="briefGo">${L2('시작', 'Start')}</button></div>`;
   el.classList.remove('hidden'); S.brief = true;
-  const go = () => { el.classList.add('hidden'); S.brief = false; };
+  const go = () => { el.classList.add('hidden'); S.brief = false; commStart(kind); };
   $('briefGo').onclick = go; el.onpointerdown = e => { if (e.target === el) go(); };
   BRIEF_GO = go;
 }
@@ -4124,24 +4130,23 @@ let BRIEF_GO = null;
 function msEvents(dt) {
   if (S.state !== 'run' || S.brief || !isMission()) return;
   MS.t0 += dt; const t = MS.t0;
-  radioT -= dt; if (radioT <= 0) { const el = $('radio'); if (el) el.classList.remove('show'); }
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
-      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; radio(L2(`새 신고 · 불씨 ${i + 1} (지도 표시 구역)`, `New report · hotspot ${i + 1} (area on map)`)); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
-      if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; radio(L2(`불씨 ${i + 1} 번짐 · +15초`, `Hotspot ${i + 1} spread · +15 s`)); f.g.scale.setScalar(1.8); }
+      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; comm(`${CS}, CONTROL. New fire report, hotspot ${i + 1}, grid ${grid(f.d, f.s)}. Over.`, `새 산불 신고 · 불씨 ${i + 1} (지도 표시 구역)`); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
+      if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; comm(`${CS}, hotspot ${i + 1} is spreading. Expedite your report.`, `불씨 ${i + 1} 번짐 · +15초`); f.g.scale.setScalar(1.8); }
     }
   }
   if (S.kind === 'sar') {
     const o = msObj();
     if (o && o.t === 'sarfind') {
-      if (!MS.h1 && t > 60) { MS.h1 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.55); o.label = L2('실종자 수색 · 구역 반경 40 m', 'Find the hiker · area radius 40 m'); radio(L2('목격 제보 · 수색 구역을 반경 40 m로 좁힘', 'Sighting reported · area narrowed to 40 m')); renderList(); }
-      if (!MS.h2 && t > 130) { MS.h2 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.6); o.label = L2('실종자 수색 · 구역 반경 20 m', 'Find the hiker · area radius 20 m'); radio(L2('휴대전화 위치 · 반경 20 m', 'Phone location · within 20 m')); renderList(); }
+      if (!MS.h1 && t > 60) { MS.h1 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.55); o.label = L2('실종자 수색 · 구역 반경 40 m', 'Find the hiker · area radius 40 m'); comm(`${CS}, CONTROL. Witness report, subject within four zero meters of the marked area. Over.`, '목격 제보 · 수색 구역 반경 40 m'); renderList(); }
+      if (!MS.h2 && t > 130) { MS.h2 = true; o.mk.lerp(SAR.tp.clone().setY(o.mk.y), 0.6); o.label = L2('실종자 수색 · 구역 반경 20 m', 'Find the hiker · area radius 20 m'); comm('Phone ping narrows it to two zero meters. Look under the canopy, use thermal.', '휴대전화 위치 · 반경 20 m, 열화상으로 수관 아래 확인'); renderList(); }
     }
   }
   if (S.kind === 'track' && TRACK && TRACK.go) {
     const T = TRACK; T.tt = (T.tt || 0) + dt;
-    if (T.stopT > 0) { T.stopT -= dt; T.v = 0; if (T.stopT <= 0) radio(L2('차량 Restart 출발', 'Vehicle moving again')); }
-    else { T.v = T.base * (0.8 + 0.35 * Math.sin(T.tt * 0.11 + T.ph)); if (T.stops.length && T.s > T.stops[0]) { T.stops.shift(); T.stopT = 6 + Math.random() * 6; radio(L2('차량 정차 · Resume 시야 유지', 'Vehicle stopped · keep it in view')); } }
+    if (T.stopT > 0) { T.stopT -= dt; T.v = 0; if (T.stopT <= 0) comm('Target is moving again. Stay on it.', '차량 Restart 출발 · Resume 추적'); }
+    else { T.v = T.base * (0.8 + 0.35 * Math.sin(T.tt * 0.11 + T.ph)); if (T.stops.length && T.s > T.stops[0]) { T.stops.shift(); T.stopT = 6 + Math.random() * 6; comm('Target has stopped. Hold your standoff, keep eyes on.', '차량 정차 · Zoom 유지하며 관측'); } }
   }
 }
 // 실종자·차량 무작위 배치 (scenStart 에서 부름)
@@ -4157,6 +4162,84 @@ function sarRandom() {
   const ang = Math.random() * 6.283; SAR.area.copy(W(d + Math.cos(ang) * 45, s + Math.sin(ang) * 45, 30)); MS.h1 = MS.h2 = false;
 }
 function trackRandom() { const T = TRACK; T.s = Math.random() * T.total * 0.25; T.base = 7 + Math.random() * 3; T.ph = Math.random() * 6; T.tt = 0; T.stopT = 0; T.stops = [T.s + 400 + Math.random() * 300, T.s + 1100 + Math.random() * 400]; }
+
+// =====================================================================
+//  무전 교신 (영어 · 원격 통제소가 지시). 화면 표시 + 무전 잡음 + 영어 음성(SETTINGS)
+// =====================================================================
+const CS = 'EAGLE ONE';
+const PHON = { A: 'Alpha', B: 'Bravo', C: 'Charlie', D: 'Delta', E: 'Echo', F: 'Foxtrot', G: 'Golf', H: 'Hotel', J: 'Juliett', K: 'Kilo', L: 'Lima', M: 'Mike', N: 'November', P: 'Papa', Q: 'Quebec', R: 'Romeo', S: 'Sierra', T: 'Tango', U: 'Uniform', V: 'Victor', W: 'Whiskey', X: 'X-ray', Y: 'Yankee', Z: 'Zulu' };
+const DIG = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'niner'];
+// 코스 좌표 -> MGRS 8자리 (예: 52S CF 1693 7959)
+function grid(d, s) {
+  try {
+    const en = projector(SITE.crs, 'EPSG:32652')(SITE_X.toEN(d, s)), e = en[0], n = en[1], zone = 52;
+    const set = zone % 6 || 6, cols = ['ABCDEFGH', 'JKLMNPQR', 'STUVWXYZ'][(set - 1) % 3], rows = zone % 2 ? 'ABCDEFGHJKLMNPQRSTUV' : 'FGHJKLMNPQRSTUVABCDE';
+    const c = cols[Math.floor(e / 1e5) - 1], r = rows[Math.floor(n / 1e5) % 20], ee = String(Math.floor(e % 1e5 / 10)).padStart(4, '0'), nn = String(Math.floor(n % 1e5 / 10)).padStart(4, '0');
+    return `${zone}S ${c}${r} ${ee} ${nn}`;
+  } catch (e) { return '—'; }
+}
+// 음성용: 격자 글자는 음성 문자, 숫자는 한 자리씩
+function speakify(t) {
+  return t.replace(/(\d+)S ([A-Z])([A-Z]) (\d{4}) (\d{4})/g, (m, z, a, b, x, y) => `grid ${PHON[a]} ${PHON[b]}, ${x.split('').map(d => DIG[+d]).join(' ')}, ${y.split('').map(d => DIG[+d]).join(' ')}`)
+    .replace(/\bEAGLE ONE\b/g, 'Eagle One').replace(/\bCONTROL\b/g, 'Control').replace(/\bRTB\b/g, 'R T B');
+}
+const COMM = { q: [], busy: 0, voice: null };
+function pickVoice() { try { const V = speechSynthesis.getVoices(); COMM.voice = V.find(v => /en-US/.test(v.lang) && /Male|David|Guy|Daniel|Alex/i.test(v.name)) || V.find(v => /^en/.test(v.lang)) || null; } catch (e) { } }
+try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) { }
+function squelch(open) {
+  const ctx = AU.ctx; if (!ctx || !AU.master) return; const t = ctx.currentTime;
+  noiseHit(t, 'bandpass', 1400, 0.6, open ? 0.12 : 0.09, open ? 0.12 : 0.18, AU.master);
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = open ? 1300 : 900; g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + 0.1);
+}
+// en: 영어 교신, ko: 한국어 자막 (한국어 화면에서만)
+function comm(en, ko, from) {
+  if (S.state !== 'run' && S.state !== 'result') return;
+  COMM.q.push({ en, ko, from: from || 'CONTROL' }); if (COMM.q.length > 4) COMM.q.shift();
+}
+function commTick(dt) {
+  COMM.busy -= dt; radioT -= dt;
+  if (radioT <= 0) { const el = $('radio'); if (el) el.classList.remove('show'); }
+  if (COMM.busy > 0 || !COMM.q.length) return;
+  const m = COMM.q.shift(), el = $('radio'); if (!el) return;
+  el.innerHTML = `<div class="rf">📻 ${m.from}</div><div class="re">${m.en}</div>` + (window.SIM_LANG !== 'en' && m.ko ? `<div class="rk">${m.ko}</div>` : '');
+  el.classList.add('show'); const dur = Math.max(3.5, m.en.length / 14); radioT = dur + 1; COMM.busy = dur + 0.6;
+  squelch(true);
+  if (SET.voice !== false && window.speechSynthesis) {
+    try { const u = new SpeechSynthesisUtterance(speakify(m.en)); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice; u.rate = 1.08; u.pitch = 0.85; u.volume = 0.9;
+      u.onend = () => squelch(false); if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.35, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
+      speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { }
+  } else setTimeout(() => squelch(false), dur * 900);
+}
+// 임무 시작 교신
+function commStart(kind) {
+  const w = WIND.lv ? `Winds ${WIND.lv === 1 ? 'three' : 'seven'} meters per second from west-northwest. ` : '';
+  const n = ENV.night ? 'Night ops, keep your strobes on. ' : '';
+  const T = {
+    forest: [`${CS}, CONTROL. Cleared for launch. Proceed into the forest trail, stay low under the canopy. ${w}Over.`, 'Takeoff 허가. 숲길로 진입, 수관 아래로 낮게.'],
+    race: [`${CS}, CONTROL. Range is hot. Rings are set along the valley. Go when ready. ${w}`, '코스 준비 완료. 계곡 링 따라 출발.'],
+    recon: [`${CS}, CONTROL. Four structures tasked for imagery. First target, grid ${MS.list[0] ? grid(MS.list[0].d, MS.list[0].s) : '—'}. ${n}Over.`, '건물 4곳 촬영 임무. 첫 대상 좌표 전달.'],
+    strike: [`${CS}, CONTROL. Five vehicles in the valley, two are decoys. Positive ID by thermal before you commit. Cleared hot.`, '차량 5대 중 2대 기만체. 열화상으로 식별 후 돌입. 공격 허가.'],
+    fire: [`${CS}, CONTROL. Fire watch requested. Three hotspots reported, report grids as you find them. ${w}Over.`, '산불 감시 요청. 불씨 3곳, 찾는 대로 좌표 보고.'],
+    sar: [`${CS}, CONTROL. Missing hiker, last seen near the trail. Search the marked area, use thermal under the trees. ${n}Over.`, '실종자 수색. 표시 구역, 나무 아래는 열화상.'],
+    track: [`${CS}, CONTROL. Target vehicle on the forest road. Close in, then maintain standoff and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 접근 후 Zoom 유지, 60초 관측.'],
+    ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 FLIGHT 승인. 능선 위 돌풍 주의.']
+  }[kind];
+  if (T) comm(T[0], T[1]);
+}
+let COMM_LAST = 0;
+function commAck(o, kind) {   // 목표 하나 끝났을 때
+  const left = MS.list.filter(x => !x.done).length;
+  if (kind === 'recon') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
+  if (kind === 'fire') return comm(`Copy hotspot, grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? '' : ' All reported.'}`, `불씨 좌표 접수, 진화대 출동.${left ? '' : ' 모두 보고됨.'}`);
+  if (kind === 'sar' && o.t === 'sarfind') return comm(`Copy, subject located at grid ${grid(SAR.d, SAR.s)}. ${AFc().drop ? 'Drop the rescue kit within five meters.' : 'Return to base.'}`, `실종자 위치 확인. ${AFc().drop ? '구조 키트 5 m 이내 Drop.' : '복귀.'}`);
+  if (kind === 'sar' && o.t === 'sarkit') return comm('Good drop, kit on the ground. Ground team is en route. RTB.', '키트 전달 확인. 구조대 move 중. 복귀.');
+  if (kind === 'forest' || kind === 'race' || kind === 'ridge') {
+    const done = MS.list.length - left, half = Math.floor(MS.list.length / 2);
+    if (o.label && /정상|Summit/.test(o.label)) return comm(`Summit reached. Nice work, ${CS}. Head down the far ridge.`, '정상 도착. 반대편 능선으로 Descend.');
+    if (done === half) return comm(`Halfway. ${S.pen ? 'Watch your clearances.' : 'Looking clean, keep it up.'}`, `절반 통과. ${S.pen ? '간격 주의.' : '깔Off함, Resume.'}`);
+    if (left === 1) return comm('Final gate ahead. Bring it home.', '마지막 통과점. 마무리.');
+  }
+}
 
 // ---------------- 데이터 출처 ----------------
 const EN_ = window.SIM_LANG === 'en';
@@ -4182,6 +4265,7 @@ $('credClose').onclick = () => $('credPanel').classList.add('hidden');
 // 화면 아래 작은 출처 (Site 자료가 있을 때)
 (function () { const el = $('attrib'); if (!el) return; el.textContent = SITE.credits ? (EN_ ? 'Map data © NGII Korea · 1:5,000 topo map · orthoimage 2025' : '지도 자료 © 국토지리정보원 · 수치지형도 1:5,000 · 정사영상 2025') : ''; })();
 
+document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle('on', (b.dataset.v === '1') === (SET.voice !== false)); b.addEventListener('click', () => { SET.voice = b.dataset.v === '1'; saveSet(); document.querySelectorAll('#segVoice button').forEach(x => x.classList.toggle('on', x === b)); if (!SET.voice) try { speechSynthesis.cancel(); } catch (e) { } }); });
 setAirframe(SET.af); afUI();
-Object.assign(window.__sim, { WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
