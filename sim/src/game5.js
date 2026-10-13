@@ -647,6 +647,13 @@ function scenOsd(o) {
   return '';
 }
 
+// 한국어 / English
+(function langTog() {
+  const cur = window.SIM_LANG === 'en' ? 'en' : 'ko';
+  document.querySelectorAll('#langTog button').forEach(b => { b.classList.toggle('on', b.dataset.l === cur);
+    b.onclick = () => { if (b.dataset.l === cur) return; try { localStorage.setItem('fpvsim_lang', b.dataset.l); } catch (e) { }
+      if (window.SIM_DUAL) location.reload(); else location.href = b.dataset.l === 'en' ? 'en.html' : 'index.html'; }; });
+})();
 setAirframe(SET.af); afUI();
 Object.assign(window.__sim, { WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
