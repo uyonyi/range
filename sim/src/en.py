@@ -473,4 +473,12 @@ EN.update({
 '<b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small>': '<b>Vehicle tracking</b><small>Keep a car on a real road in view for 60 s</small>',
 '<b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small>': '<b>Ridge run</b><small>Summit and back along a DEM-derived ridge path</small>',
 '바람 <span class="seg" id="segWind"><button data-v="0" class="on">없음</button><button data-v="1">약 3 m/s</button><button data-v="2">강 7 m/s</button></span>': 'Wind <span class="seg" id="segWind"><button data-v="0" class="on">None</button><button data-v="1">Light 3 m/s</button><button data-v="2">Strong 7 m/s</button></span>',
+'DROP 투하 · BST 부스트(켜기/끄기) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 가이드 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지': 'DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD guide · ZM camera distance · ⛶ full screen · ❚❚ pause',
+'<td>부스트 (누르는 동안)</td>': '<td>Boost (while held)</td>',
+"'부스트 켜기/끄기 (어디서나, 기체 최고 속도)'": "'Boost on/off (anywhere, airframe top speed)'",
+"'정찰 쿼드 · 66 cm · 1.3 kg'": "'Recon quad · 66 cm · 1.3 kg'",
+"'소형 정찰 쿼드 · 37 cm · 0.5 kg'": "'Compact recon quad · 37 cm · 0.5 kg'",
+"'고정익 정찰 · 손 투척 · 날개 1.37 m · 2.1 kg'": "'Fixed-wing recon · hand-launched · 1.37 m span · 2.1 kg'",
+"'고정익 정찰 · 날개 2.8 m · 6.1 kg'": "'Fixed-wing recon · 2.8 m span · 6.1 kg'",
+"'3.5시간 체공 · 큰 날개로 안정적 · 선회 반경 큼'": "'3.5 h endurance · stable big wing · wide turns'",
 })

@@ -139,7 +139,7 @@ function readInput(dt) {
   };
   for (const k in tgt) { const r = tgt[k] === 0 ? 7 : 3.2; ks[k] += clamp(tgt[k] - ks[k], -r * dt, r * dt); }
   IN.thr = ks.thr; IN.yaw = ks.yaw; IN.pitch = ks.pitch; IN.roll = ks.roll; IN.src = 'KEY';
-  IN.boost = !!keys[KB.boost] || !!TOUCH.boost;
+  IN.boost = !!BOOST.on;
   if (TOUCH.on) { for (const k of ['thr', 'yaw', 'pitch', 'roll']) if (Math.abs(TOUCH[k]) > Math.abs(IN[k])) { IN[k] = TOUCH[k]; IN.src = 'TOUCH'; } }
   const gp = getPad();
   if (gp && !RCUI.open) {

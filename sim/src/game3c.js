@@ -32,8 +32,7 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
   stick('tzL', 'yaw', 'thr'); stick('tzR', 'roll', 'pitch');
   const tap = (id, key) => { const b = $(id); b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); initAudio(); musicStart(); pressed.push(key); b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); }); };
   tap('tbDrop', 'Space'); tap('tbCam', 'KeyC'); tap('tbReset', 'KeyR'); tap('tbPause', 'Escape'); tap('tbAssist', 'KeyH'); tap('tbZoom', 'KeyZ'); tap('tbGuide', 'KeyV'); tap('tbBelly', 'KeyX'); tap('tbIR', 'KeyT');
-  const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); TOUCH.boost = true; bst.classList.add('down'); });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => bst.addEventListener(ev, () => { TOUCH.boost = false; bst.classList.remove('down'); }));
+  const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); boostToggle(); });   // 한 번 누르면 켜짐, 다시 누르면 꺼짐
   $('tbFull').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleFull(); });
   $('tut').addEventListener('pointerdown', () => { if (S.tut && S.tut.st !== 'fly') pressed.push('Enter'); });
   addEventListener('contextmenu', e => e.preventDefault());

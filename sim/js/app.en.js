@@ -1618,7 +1618,7 @@ function readInput(dt) {
   };
   for (const k in tgt) { const r = tgt[k] === 0 ? 7 : 3.2; ks[k] += clamp(tgt[k] - ks[k], -r * dt, r * dt); }
   IN.thr = ks.thr; IN.yaw = ks.yaw; IN.pitch = ks.pitch; IN.roll = ks.roll; IN.src = 'KEY';
-  IN.boost = !!keys[KB.boost] || !!TOUCH.boost;
+  IN.boost = !!BOOST.on;
   if (TOUCH.on) { for (const k of ['thr', 'yaw', 'pitch', 'roll']) if (Math.abs(TOUCH[k]) > Math.abs(IN[k])) { IN[k] = TOUCH[k]; IN.src = 'TOUCH'; } }
   const gp = getPad();
   if (gp && !RCUI.open) {
@@ -1679,7 +1679,7 @@ function startRun(kind) {
   enterFull();
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
   S.objState = OBJS.map(() => 0); S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
-  S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null;
+  S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
@@ -1831,8 +1831,7 @@ function stepDrone(dt) {
     DR.v.x += (FWD.x * af + RGT.x * ar - k * (DR.v.x - wv.x)) * dt;
     DR.v.z += (FWD.z * af + RGT.z * ar - k * (DR.v.z - wv.z)) * dt;
     // 브레이크 (스틱을 놓으면 멈춤)
-    if (boost && ip > 0) { DR.v.x += FWD.x * 7 * ip * dt; DR.v.z += FWD.z * 7 * ip * dt; }
-    if (md.brake > 0 && !boost && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
+    if (md.brake > 0 && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
     // 통과 assist: 열린 곳 가운데로 살짝 끌어당김
     if (assistOn && o) {
       const op = openingOf(o);
@@ -1963,7 +1962,11 @@ function refundPayload(msg) {
   if (S.kind === 'course') { S.payloads = Math.min(3, S.payloads + 1); const c = droneM.cans.find(c => !c.visible); if (c) c.visible = true; }
   showMsg(msg, '#ffc828', 1.8); sfx('bad');
 }
-function boostZone() {
+// Boost: 켜기/끄기 (어디서나 사용). 켜면 기체 최고 속도까지
+const BOOST = { on: false };
+function boostToggle(v) { BOOST.on = v === undefined ? !BOOST.on : !!v; const b = $('tbBoost'); if (b) b.classList.toggle('on', BOOST.on); if (S.state === 'run') showMsg(BOOST.on ? 'BOOST ON' : 'BOOST OFF', BOOST.on ? '#ff9a40' : '#9aa6ad', 0.8); }
+function boostZone() { return true; }
+function boostZoneOld() {
   if (S.kind === 'free') return true;
   const o = curObj(); if (!o || o.kind !== 'pass' || !o.b.pass || o.b.pass.kind !== 'tunnel') return false;
   return o.b.world(0, -o.b.pass.L / 2, o.b.pass.zc).distanceTo(DR.p) > 25;
@@ -2306,6 +2309,7 @@ function handleKeys() {
     const k = pressed.shift();
     if (RCUI.open) continue;
     if (k === 'KeyF') { toggleFull(); continue; }
+    if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }
@@ -2712,8 +2716,7 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
   stick('tzL', 'yaw', 'thr'); stick('tzR', 'roll', 'pitch');
   const tap = (id, key) => { const b = $(id); b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); initAudio(); musicStart(); pressed.push(key); b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); }); };
   tap('tbDrop', 'Space'); tap('tbCam', 'KeyC'); tap('tbReset', 'KeyR'); tap('tbPause', 'Escape'); tap('tbAssist', 'KeyH'); tap('tbZoom', 'KeyZ'); tap('tbGuide', 'KeyV'); tap('tbBelly', 'KeyX'); tap('tbIR', 'KeyT');
-  const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); TOUCH.boost = true; bst.classList.add('down'); });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => bst.addEventListener(ev, () => { TOUCH.boost = false; bst.classList.remove('down'); }));
+  const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); boostToggle(); });   // 한 번 누르면 켜짐, Restart 누르면 꺼짐
   $('tbFull').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleFull(); });
   $('tut').addEventListener('pointerdown', () => { if (S.tut && S.tut.st !== 'fly') pressed.push('Enter'); });
   addEventListener('contextmenu', e => e.preventDefault());
@@ -2863,7 +2866,7 @@ function updateGuide(subj) {
     steer();
     if (!lines.length) lines.push([`Aligned · fly forward (${K('fwd')})`, 'ok']);
   }
-  if (boostZone() && S.kind === 'course') lines.unshift([S.boosting ? 'BOOST ▲▲ fast return' : `BOOST ZONE · ${K('boost')} (hold) for a fast return`, 'warn']);
+  if (S.boosting) lines.unshift(['BOOST ▲▲', 'warn']);
   const el = $('guide'); el.classList.remove('hidden');
   el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join('');
 }
@@ -3238,7 +3241,7 @@ function kbHelp() {
   const n = keyName;
   const pair = (a, b, l) => `<tr><td>${n(KB[a])} / ${n(KB[b])}</td><td>${l}</td></tr>`, one = (a, l) => `<tr><td>${n(KB[a])}</td><td>${l}</td></tr>`;
   $('kbRows').innerHTML = pair('up', 'down', 'Climb / descend') + pair('yawL', 'yawR', 'Yaw left / right') + pair('fwd', 'back', 'Forward / back') + pair('left', 'right', 'Strafe left / right') +
-    one('drop', 'Drop payload') + one('boost', 'Boost (fast-return leg, hold)') + pair('cam', 'zoom', 'Switch camera · camera distance') + one('reset', 'Restart from last checkpoint') + one('assist', 'Flight assist on/off');
+    one('drop', 'Drop payload') + one('boost', 'Boost on/off (anywhere, airframe top speed)') + pair('cam', 'zoom', 'Switch camera · camera distance') + one('reset', 'Restart from last checkpoint') + one('assist', 'Flight assist on/off');
   $('keys').innerHTML = `${n(KB.up)}/${n(KB.down)} ${'climb·descend'} &nbsp;${n(KB.yawL)}/${n(KB.yawR)} ${'yaw'} &nbsp;${n(KB.fwd)}${n(KB.left)}${n(KB.back)}${n(KB.right)} ${'move'}<br>${n(KB.drop)} ${'Drop'} &nbsp;${n(KB.boost)} ${'Boost'} &nbsp;${n(KB.cam)} ${'Camera'} &nbsp;${n(KB.assist)} ${'assist'} &nbsp;B ${'music'} &nbsp;Esc ${'Pause'}`;
 }
 $('kbA').onclick = () => { KB = Object.assign({}, KB_PRESET.A); saveKB(); kbRender(); syncSeg(); $('kbHint').textContent = 'A · Default'; };
@@ -3295,14 +3298,16 @@ window.__sim = { STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, start
 //  속도·크기는 공개 제원 수준의 근사값 (기체 Name은 형상 참고용)
 // =====================================================================
 const AF = {
-  x2d: { tag: 'X2D', name: 'Recon quad', sub: 'X2D-type · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 7.5, easy: 10, sport: 13.9 }, tilt: { train: 20, easy: 28, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
+  x2d: { tag: 'X2D', name: 'Skydio X2D', sub: 'Recon quad · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 7.5, easy: 10, sport: 13.9 }, tilt: { train: 20, easy: 28, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
     note: 'Stabilized · hover · drop rig' },
-  anafi: { tag: 'ANAFI', name: 'Compact recon quad', sub: 'ANAFI USA-type · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 7.5, easy: 11, sport: 14.7 }, tilt: { train: 20, easy: 30, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
+  anafi: { tag: 'ANAFI', name: 'Parrot ANAFI USA', sub: 'Compact recon quad · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 7.5, easy: 11, sport: 14.7 }, tilt: { train: 20, easy: 30, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
     note: '32× zoom · long-range recon · IP53' },
   fpv: { tag: 'FPV', name: 'FPV racer', sub: '5-inch · 0.65 kg', cls: 'quad', top: 39, vmax: { train: 12, easy: 24, sport: 39 }, tilt: { train: 30, easy: 50, sport: 72 }, climb: 15, sink: 9, yaw: 320, tw: 3.5, R: 0.13, endur: 5, acro: true,
     note: 'Very fast · Acro option in Sport' },
-  fw: { tag: 'FW', name: 'Fixed-wing recon', sub: 'Hand-launched · 1.4 m span', cls: 'wing', cruise: 15, top: 25, stall: 9, span: 1.4, R: 0.45, endur: 60, bank: 50, nmax: 1.8, minAgl: 26, prate: 70, rrate: 160,
+  fw: { tag: 'RAVEN', name: 'RQ-11B Raven', sub: 'Fixed-wing recon · hand-launched · 1.37 m span · 2.1 kg', cls: 'wing', cruise: 13, top: 22.6, stall: 8.7, span: 1.37, R: 0.45, endur: '60~90', bank: 50, nmax: 1.8, minAgl: 26, prate: 70, rrate: 160,
     note: 'Cannot hover · turns by banking · watch the stall' },
+  puma: { tag: 'PUMA', name: 'RQ-20B Puma', sub: 'Fixed-wing recon · 2.8 m span · 6.1 kg', cls: 'wing', cruise: 14, top: 23, stall: 10.3, span: 2.8, R: 0.9, endur: 210, bank: 45, nmax: 1.6, minAgl: 30, prate: 50, rrate: 90, reconD: 600,
+    note: '3.5 h endurance · stable big wing · wide turns' },
   kfpv: { tag: 'K-FPV', name: 'Kamikaze FPV', sub: '7-inch · dummy warhead · 1.6 kg', cls: 'quad', top: 30, vmax: { train: 12, easy: 20, sport: 30 }, tilt: { train: 30, easy: 45, sport: 65 }, climb: 10, sink: 8, yaw: 240, tw: 2.2, R: 0.17, endur: 8, acro: true, kam: true,
     note: 'Detonates on contact · flies straight into the target' },
   kfw: { tag: 'K-FW', name: 'Loitering fixed-wing', sub: 'Loitering type · 0.7 m span', cls: 'wing', cruise: 26, top: 44, stall: 15, span: 0.7, R: 0.3, endur: 15, bank: 60, nmax: 2.6, minAgl: 10, prate: 90, rrate: 220, kam: true,
@@ -3310,7 +3315,7 @@ const AF = {
 };
 const AF_IDS = Object.keys(AF);
 AF_IDS.forEach(k => AF[k].id = k);
-const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: ['x2d', 'anafi', 'fpv', 'fw', 'kfw'], recon: ['x2d', 'anafi', 'fw'], fire: ['x2d', 'anafi', 'fw'], sar: ['x2d', 'anafi', 'fw'], track: ['x2d', 'anafi', 'fw'], ridge: ['x2d', 'anafi', 'fpv', 'fw'], strike: ['kfpv', 'kfw'], free: AF_IDS, tutorial: ['x2d'], demo: ['x2d'] };
+const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: ['x2d', 'anafi', 'fpv', 'fw', 'puma', 'kfw'], recon: ['x2d', 'anafi', 'fw', 'puma'], fire: ['x2d', 'anafi', 'fw', 'puma'], sar: ['x2d', 'anafi', 'fw', 'puma'], track: ['x2d', 'anafi', 'fw', 'puma'], ridge: ['x2d', 'anafi', 'fpv', 'fw', 'puma'], strike: ['kfpv', 'kfw'], free: AF_IDS, tutorial: ['x2d'], demo: ['x2d'] };
 if (!AF[SET.af]) SET.af = 'x2d';
 const MS_NAME = { forest: 'Forest trail', race: 'Time race', recon: 'Recon', strike: 'Strike', fire: 'Wildfire watch', sar: 'Search & rescue', track: 'Vehicle tracking', ridge: 'Ridge run' };
 function AFc() { return AF[SET.af] || AF.x2d; }
@@ -3387,6 +3392,7 @@ function makeModel(id, ghost) {
   if (id === 'fpv') return makeQuadFPV(ghost, false);
   if (id === 'kfpv') return makeQuadFPV(ghost, true);
   if (id === 'fw') return makeWing(ghost, false);
+  if (id === 'puma') { const w = makeWing(ghost, false); w.g.scale.setScalar(2.0); return w; }
   if (id === 'anafi') {   // X2D 형상을 줄이고 Drop 장치·안테나는 뗌
     const d = makeDrone(ghost); d.g.scale.setScalar(0.56); d.cans.forEach(c => d.g.remove(c)); d.g.children.filter(c => c.geometry === UCYL6).forEach(c => d.g.remove(c)); d.cans = []; return d;
   }
@@ -3425,7 +3431,8 @@ function stepWing(dt) {
     if (DR.p.y - ahead < a.minAgl && !a.kam) { gt = Math.max(gt, 0.25 + (a.minAgl - (DR.p.y - ahead)) * 0.03); DR.altT = Math.max(DR.altT, ahead + a.minAgl); }
     DR.pitch += (gt - DR.pitch) * (1 - Math.exp(-dt * 2.2));
     DR.roll += (ir * a.bank * DEG - DR.roll) * (1 - Math.exp(-dt * 2.8));
-    const vt = IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
+    S.boosting = !!IN.boost;
+    const vt = IN.boost ? a.top : IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
     V += clamp(vt - V, -4, 4) * dt * 0.9;
   } else {
     DR.pitch += -ip * a.prate * DEG * dt; DR.roll += ir * a.rrate * DEG * dt;
@@ -3639,6 +3646,7 @@ const AF_ICON = {
   fw: '<rect x="29" y="4" width="6" height="40" rx="3" fill="currentColor"/><rect x="4" y="14" width="56" height="6" rx="2" fill="currentColor"/><rect x="20" y="38" width="24" height="4" fill="currentColor"/>',
   kfpv: '<path d="M18 12l28 24M46 12L18 36" stroke="currentColor" stroke-width="3"/><circle cx="16" cy="10" r="8" fill="none" stroke="currentColor"/><circle cx="48" cy="10" r="8" fill="none" stroke="currentColor"/><circle cx="16" cy="38" r="8" fill="none" stroke="currentColor"/><circle cx="48" cy="38" r="8" fill="none" stroke="currentColor"/><rect x="28" y="8" width="8" height="32" rx="4" fill="#ff6a3d"/>',
   anafi: '<path d="M24 18l-10-7M40 18l10-7M24 30l-10 7M40 30l10 7" stroke="currentColor" stroke-width="3"/><circle cx="14" cy="11" r="6" fill="none" stroke="currentColor"/><circle cx="50" cy="11" r="6" fill="none" stroke="currentColor"/><circle cx="14" cy="37" r="6" fill="none" stroke="currentColor"/><circle cx="50" cy="37" r="6" fill="none" stroke="currentColor"/><rect x="26" y="12" width="12" height="24" rx="5" fill="currentColor"/>',
+  puma: '<rect x="29" y="6" width="6" height="36" rx="3" fill="currentColor"/><rect x="1" y="15" width="62" height="5" rx="2" fill="currentColor"/><rect x="22" y="37" width="20" height="4" fill="currentColor"/>',
   kfw: '<rect x="29" y="4" width="6" height="40" rx="3" fill="#ff6a3d"/><rect x="10" y="12" width="44" height="4" rx="2" fill="currentColor"/><rect x="14" y="32" width="36" height="4" rx="2" fill="currentColor"/>'
 };
 function afUI() {
