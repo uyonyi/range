@@ -2718,7 +2718,8 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
   $('tut').addEventListener('pointerdown', () => { if (S.tut && S.tut.st !== 'fly') pressed.push('Enter'); });
   addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('gesturestart', e => e.preventDefault());
-  const rot = () => $('rot').classList.toggle('hidden', !(innerHeight > innerWidth * 1.05));
+  // 세로 화면 안내: 전체화면 전환 중 잠깐 세로로 잡히는 크기 변화는 무시 (0.6초 넘게 세로일 때만)
+  let rotT = 0; const rot = () => { clearTimeout(rotT); const portrait = innerHeight > innerWidth * 1.05; if (!portrait) { $('rot').classList.add('hidden'); return; } rotT = setTimeout(() => $('rot').classList.toggle('hidden', !(innerHeight > innerWidth * 1.05)), 600); };
   addEventListener('resize', rot); addEventListener('orientationchange', () => setTimeout(rot, 200)); rot();
 })();
 
@@ -2726,11 +2727,7 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
 function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
 let fullAsk = 0;
 function enterFull() { if (!SET.autoFull || isFull() || /[?&]test/.test(location.search) || performance.now() - fullAsk < 1500) return; fullAsk = performance.now(); toggleFull(); }
-(function firstGesture() {
-  const go = e => { removeEventListener('pointerdown', go, true); removeEventListener('keydown', go, true);
-    if (e.target && e.target.closest && e.target.closest('#bFull,#tbFull')) return; enterFull(); };
-  addEventListener('pointerdown', go, true); addEventListener('keydown', go, true);
-})();
+// 메뉴를 고르는 중에는 전체화면으로 바꾸지 않음 (화면 크기가 바뀌며 메뉴가 흔들림) — 비행을 시작할 때만 전환
 function toggleFull() {
   const d = document.documentElement, fe = document.fullscreenElement || document.webkitFullscreenElement;
   try {
@@ -3942,6 +3939,13 @@ function scenOsd(o) {
   return '';
 }
 
+// 한국어 / English
+(function langTog() {
+  const cur = window.SIM_LANG === 'en' ? 'en' : 'ko';
+  document.querySelectorAll('#langTog button').forEach(b => { b.classList.toggle('on', b.dataset.l === cur);
+    b.onclick = () => { if (b.dataset.l === cur) return; try { localStorage.setItem('fpvsim_lang', b.dataset.l); } catch (e) { }
+      if (window.SIM_DUAL) location.reload(); else location.href = b.dataset.l === 'en' ? 'en.html' : 'index.html'; }; });
+})();
 setAirframe(SET.af); afUI();
 Object.assign(window.__sim, { WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();

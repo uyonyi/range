@@ -72,12 +72,43 @@ def build_public(outdir, site_ids=('yeongin',)):
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(game)
         tags = {'THREE': 'lib/three.min.js', 'GEOTIFF': 'lib/geotiff.js', 'PROJ4': 'lib/proj4.js'}
         for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
-        sites = ''.join(f'<script src="sites/{sid}.js"></script>' for sid in site_ids)
+        import hashlib
+        ver = hashlib.md5(game.encode()).hexdigest()[:8]
+        sites = ''.join(f'<script src="sites/{sid}.js?v={ver}"></script>' for sid in site_ids)
+        other = 'index.html' if lang == 'en' else 'en.html'
+        t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';</script>")
-        t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js"></script>')
+        t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
     tot = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(outdir) for f in fs)
     print('public build ->', outdir, tot // 1024, 'KB')
+
+
+def build_dual(mobile=False, out='hroc_fpv_simulator.html'):
+    """내부용 한 파일에 한국어·영어 둘 다 (첫 화면 오른쪽 위에서 바꿈, 브라우저에 기억)"""
+    pages = {}
+    for lang in ('ko', 'en'):
+        build(lang, mobile, '_tmp_' + lang + '.html')
+        h = open('_tmp_' + lang + '.html', encoding='utf-8').read(); os.remove('_tmp_' + lang + '.html')
+        pages[lang] = h
+    def split(h):
+        head = h[:h.index('<body>')]
+        body = h[h.index('<body>') + 6:h.index('<script>', h.index('<body>'))]
+        title = re.search(r'<title>(.*?)</title>', h).group(1)
+        scripts = re.findall(r'<script>(.*?)</script>', h[h.index('<body>'):], flags=re.S)
+        return head, body, title, scripts
+    hk, bk, tk, sk = split(pages['ko']); he, be, te, se = split(pages['en'])
+    # 스크립트: THREE, GEOTIFF, PROJ4, DATA(언어별), GAME(언어별)
+    esc = lambda s: s.replace('</script>', '<\\/script>')
+    o = hk + '<body>\n' + ''.join('<script>' + s + '</script>' for s in sk[:3])
+    o += '<script>' + sk[3] + '</script>'   # 현장·코스 데이터는 한 번만 (언어별 차이는 이름·언어 값뿐)
+    o += '<script type="text/plain" id="g_ko">' + esc(sk[4]) + '</script><script type="text/plain" id="g_en">' + esc(se[4]) + '</script>'
+    o += '<script>window.SIM_DUAL=true;window.SIM_PAGES=' + json.dumps({'ko': {'body': bk, 'title': tk}, 'en': {'body': be, 'title': te}}, ensure_ascii=False).replace('</', '<\\/') + ';' + """
+(function(){var L='ko';try{L=localStorage.getItem('fpvsim_lang')||'ko'}catch(e){}if(L!=='en')L='ko';
+document.documentElement.lang=L;document.title=SIM_PAGES[L].title;document.body.insertAdjacentHTML('afterbegin',SIM_PAGES[L].body);
+var run=function(id){var s=document.createElement('script');s.text=document.getElementById(id).textContent.split(String.fromCharCode(60,92,47)+'script>').join(String.fromCharCode(60,47)+'script>');document.body.appendChild(s)};
+if(L==='en'){window.SIM_LANG='en';if(window.SIM_FLAT_SITE)window.SIM_FLAT_SITE.name='Standard training course';}run('g_'+L);})();</script>\n</body>\n</html>\n"""
+    open(out, 'w', encoding='utf-8').write(o); print(out, len(o) // 1024, 'KB (KO+EN)')
 
 
 if __name__ == '__main__':
@@ -86,3 +117,4 @@ if __name__ == '__main__':
     else:
         build('ko', False, 'hroc_fpv_simulator_KO.html')
         build('en', False, 'hroc_fpv_simulator_EN.html')
+        build_dual(False, 'hroc_fpv_simulator.html')

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <title>FPV Terrain Trainer</title>
+<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="en")location.replace("index.html")}catch(e){}</script>
 <style>
 :root{--amber:#ffc828;--cyan:#4fe3ff;--red:#ff4d4d;--green:#5dff9a;--panel:rgba(10,13,16,.78);--line:rgba(255,255,255,.14);--text:#eef2f4;--mute:#9aa6ad}
 *{box-sizing:border-box}
@@ -157,12 +158,13 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
 .afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
 #irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
+.langtog{position:absolute;top:14px;right:14px;display:flex;border:1px solid rgba(255,255,255,.18);border-radius:8px;overflow:hidden}.langtog button{border:0;border-radius:0;padding:6px 10px;font-size:12px;background:transparent;color:#9aa6ad}.langtog button.on{background:#ffc828;color:#111}
 .sitepick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sitepick.hidden{display:none}.stc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}.stc b{font-size:15px}.stc small{font-size:11px;opacity:.75}.stc.on{border-color:#4fe3ff;background:rgba(79,227,255,.1)}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
 @media (max-width:1000px){.afcards{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-height:520px){.afcards{display:flex;overflow-x:auto}.afc{flex:0 0 118px;padding:6px 8px}.afc svg{width:34px;height:26px;margin:0}.afc small,.afc .nt{display:none}.afc .spec{font-size:11px}.msgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.msgrid button{padding:6px 9px}.msgrid button small{display:none}.pickLbl{margin:8px 0 4px}}
+@media (max-height:520px) and (pointer:coarse){.afcards{display:flex;overflow-x:auto}.afc{flex:0 0 118px;padding:6px 8px}.afc svg{width:34px;height:26px;margin:0}.afc small,.afc .nt{display:none}.afc .spec{font-size:11px}.msgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.msgrid button{padding:6px 9px}.msgrid button small{display:none}.pickLbl{margin:8px 0 4px}}
 @media (max-width:760px){.msgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.afcards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.afc{flex:0 0 136px;scroll-snap-align:start}}
 
 .opt.col{flex-direction:column;align-items:flex-start;gap:10px}
@@ -217,7 +219,8 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="rot" class="hidden"><div class="ph"></div><div>Please rotate your phone to landscape</div></div>
 
 <div id="menu" class="panel">
-  <div class="card">
+  <div class="card" style="position:relative">
+    <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>Real-terrain drone obstacle course · web simulator (prototype v0.5)</h2>
     <div id="sitePickWrap"><div class="pickLbl">Training site</div><div id="sitePick" class="sitepick"></div></div>
@@ -425,7 +428,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js"></script><script>window.SIM_LANG='en';</script>
-<script src="js/app.en.js"></script>
+<script src="sites/yeongin.js?v=e8f53a56"></script><script>window.SIM_LANG='en';</script>
+<script src="js/app.en.js?v=e8f53a56"></script>
 </body>
 </html>
