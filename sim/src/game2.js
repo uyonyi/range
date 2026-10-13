@@ -4,7 +4,6 @@
 //  앞 = -z. 접이식 팔 4개(앞 팔은 프로펠러 위, 뒤 팔은 거꾸로 달린 모터),
 //  기수 아래 짐벌(컬러 + 열상 2안), 위·아래 내비게이션 어안 카메라 6개, 뒤쪽 멀티밴드 안테나
 // =====================================================================
-const USPH = new THREE.SphereGeometry(1, 20, 12), UCAP = new THREE.CapsuleGeometry(1, 1, 6, 16);
 function makeDrone(ghost) {
   const g = new THREE.Group();
   const gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
@@ -63,8 +62,8 @@ function makeDrone(ghost) {
   add(USPH, LM(0xffffff), 0, 0.018, 0.168, 0.007, 0.007, 0.007);
   return { g, props, cans, leds: [ledG, ledR] };
 }
-const droneM = makeDrone(false); scene.add(droneM.g);
-const ghostM = makeDrone(true); scene.add(ghostM.g); ghostM.g.visible = false;
+let droneM = makeDrone(false); scene.add(droneM.g);
+let ghostM = makeDrone(true); scene.add(ghostM.g); ghostM.g.visible = false;
 const spot = new THREE.SpotLight(0xfff2dc, 0, 14, 0.7, 0.45, 1.2);
 scene.add(spot); const spotT = new THREE.Object3D(); scene.add(spotT); spot.target = spotT;   // 드론이 안 보이는(FPV) 상태에서도 켜지도록 장면에 직접 둠
 
