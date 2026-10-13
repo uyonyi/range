@@ -20,7 +20,7 @@ function applyGroundCanvas(cv) {
   groundMat.map = t; groundMat.needsUpdate = true; detailK.value = 0.45;
 }
 function resetGround() { if (groundMat.map !== groundMacro) groundMat.map.dispose(); groundMat.map = groundMacro; groundMat.needsUpdate = true; detailK.value = 1; }
-async function loadOrthoFile(file) {
+async function loadOrthoFile(file, opt) {
   if (!window.GeoTIFF) throw new Error('GeoTIFF 해석기가 없습니다');
   setOrthoStatus('읽는 중… (' + (file.size / 1048576).toFixed(0) + ' MB)', '#ffc828');
   const tiff = await GeoTIFF.fromBlob(file);
@@ -72,14 +72,15 @@ async function loadOrthoFile(file) {
   const m = GSZ / ORTHO_N;
   const [e00, n00] = c2i(GD1 - 0.5 * m, GS0 + 0.5 * m), [e10, n10] = c2i(GD1 - 0.5 * m, GS0 + 1.5 * m), [e01, n01] = c2i(GD1 - 1.5 * m, GS0 + 0.5 * m);
   const dEi = e10 - e00, dNi = n10 - n00, dEj = e01 - e00, dNj = n01 - n00;
-  let cover = 0;
+  let cover = 0; const FEATH = Math.max(2, 15 / (rx * step * mk)), ORTHO_GAIN = 1.3;   // 겨울 숲 사진이 어두워 조금 밝힘
   for (let j = 0; j < ORTHO_N; j++) {
     let E = e00 + dEj * j, N = n00 + dNj * j;
     for (let i = 0; i < ORTHO_N; i++, E += dEi, N += dNi) {
       const sx = (E - ox) * kx, sy = (oy - N) * ky;
       if (sx < 0 || sy < 0 || sx >= sw - 1 || sy >= sh - 1) continue;
       const x0 = sx | 0, y0 = sy | 0, fx = sx - x0, fy = sy - y0, a = (y0 * sw + x0) * 3, b = a + sw * 3, o = (j * ORTHO_N + i) * 4;
-      for (let c = 0; c < 3; c++) dd[o + c] = (src[a + c] * (1 - fx) + src[a + 3 + c] * fx) * (1 - fy) + (src[b + c] * (1 - fx) + src[b + 3 + c] * fx) * fy;
+      const wgt = Math.min(1, Math.min(sx, sy, sw - 1 - sx, sh - 1 - sy) / FEATH);   // 가장자리 15 m 는 기본 바닥과 부드럽게 섞음
+      for (let c = 0; c < 3; c++) { const v = Math.min(255, ((src[a + c] * (1 - fx) + src[a + 3 + c] * fx) * (1 - fy) + (src[b + c] * (1 - fx) + src[b + 3 + c] * fx) * fy) * ORTHO_GAIN); dd[o + c] = dd[o + c] * (1 - wgt) + v * wgt; }
       cover++;
     }
   }
@@ -87,11 +88,22 @@ async function loadOrthoFile(file) {
   applyGroundCanvas(cv);
   const pct = Math.round(cover / (ORTHO_N * ORTHO_N) * 100);
   setOrthoStatus(`위성사진 적용됨 (${(rx * step * mk).toFixed(2)} m/px, 바닥의 ${pct}%)`, '#5dff9a');
-  cv.toBlob(bl => { if (bl) IDB.put('ortho' + SITE_KEY, bl); }, 'image/jpeg', 0.9);
+  if (!(opt && opt.nosave)) cv.toBlob(bl => { if (bl) IDB.put('ortho' + SITE_KEY, bl); }, 'image/jpeg', 0.9);
   return { res: rx * step * mk, cover: pct, srcRes: res0 };
 }
+// 현장 기본 정사영상 (sites/*.tif, 현장 데이터의 ortho 항목) — 사용자가 올린 사진이 없을 때 자동으로 입힘
+async function autoOrtho() {
+  if (!SITE.ortho) return false;
+  try {
+    setOrthoStatus('현장 정사영상 불러오는 중…', '#ffc828');
+    const r = await fetch(SITE.ortho); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const bl = await r.blob(); await loadOrthoFile(bl, { nosave: true });
+    setOrthoStatus(setOrthoStatusTxt() + ' · ' + ((window.SIM_LANG === 'en' && SITE.orthoSrc_en) || SITE.orthoSrc || ''), '#5dff9a'); return true;
+  } catch (e) { setOrthoStatus('정사영상 없음 (기본 바닥)', ''); return false; }
+}
+function setOrthoStatusTxt() { const el = $('orthoStatus'); return el ? el.textContent : ''; }
 async function restoreOrtho() {
-  const bl = await IDB.get('ortho' + SITE_KEY); if (!bl) return;
+  const bl = await IDB.get('ortho' + SITE_KEY); if (!bl) { autoOrtho(); return; }
   try {
     const im = await createImageBitmap(bl); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; cv.getContext('2d').drawImage(im, 0, 0);
     applyGroundCanvas(cv); setOrthoStatus('저장된 위성사진 사용 중', '#5dff9a');
