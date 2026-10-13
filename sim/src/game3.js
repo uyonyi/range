@@ -8,10 +8,10 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0 };
 try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -181,11 +181,12 @@ function stepDrone(dt) {
   let vyAssist = 0;
   if (!grounded) {
     const af = G * Math.tan(DR.pitch), ar = G * Math.tan(DR.roll);
-    DR.v.x += (FWD.x * af + RGT.x * ar - k * DR.v.x) * dt;
-    DR.v.z += (FWD.z * af + RGT.z * ar - k * DR.v.z) * dt;
+    const wv = windAt(DR.p);   // 바람: 공기에 대한 속도로 저항
+    DR.v.x += (FWD.x * af + RGT.x * ar - k * (DR.v.x - wv.x)) * dt;
+    DR.v.z += (FWD.z * af + RGT.z * ar - k * (DR.v.z - wv.z)) * dt;
     // 브레이크 (스틱을 놓으면 멈춤)
     if (boost && ip > 0) { DR.v.x += FWD.x * 7 * ip * dt; DR.v.z += FWD.z * 7 * ip * dt; }
-    if (md.brake > 0 && !boost && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt); DR.v.x *= f; DR.v.z *= f; }
+    if (md.brake > 0 && !boost && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
     // 통과 보조: 열린 곳 가운데로 살짝 끌어당김
     if (assistOn && o) {
       const op = openingOf(o);
@@ -241,8 +242,8 @@ function stepDrone(dt) {
   }
   // 비행 구역 경계: 밀어냄
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
-  if (l > 520) {
-    const nx = rx / l, nz = rz / l; DR.p.x -= nx * (l - 520); DR.p.z -= nz * (l - 520);
+  if (l > 650) {
+    const nx = rx / l, nz = rz / l; DR.p.x -= nx * (l - 650); DR.p.z -= nz * (l - 650);
     const vo = DR.v.x * nx + DR.v.z * nz; if (vo > 0) { DR.v.x -= nx * vo * 1.5; DR.v.z -= nz * vo * 1.5; }
     if (S.msgCD <= 0) { showMsg('AREA LIMIT', '#ff9a40', 1); S.msgCD = 2; }
   }
@@ -256,11 +257,12 @@ function dropPayload(fromPos, fromVel, ghost) {
   if (!ghost && S.kind === 'course' && S.payloads <= 0) { showMsg('NO PAYLOAD', '#ff6060', 1); sfx('bad'); return; }
   const can = meshes.find(c => c.visible); if (can) can.visible = false;
   if (!ghost && S.kind === 'course') S.payloads--;
-  if (!ghost && (S.kind === 'free' || S.kind === 'tutorial') && !meshes.some(c => c.visible)) setTimeout(() => droneM.cans.forEach(c => c.visible = true), 1500);
+  if (!ghost && (S.kind === 'free' || S.kind === 'tutorial' || S.kind === 'sar') && !meshes.some(c => c.visible)) setTimeout(() => droneM.cans.forEach(c => c.visible = true), 1500);
   if (!ghost) recEvent({ k: 'drop', p: [fromPos.x, fromPos.y, fromPos.z], v: [fromVel.x, fromVel.y, fromVel.z] });
-  const m = new THREE.Mesh(UCYL, mat(0x7c8288, { roughness: 0.45, metalness: 0.5 })); m.scale.set(0.022, 0.12, 0.022); m.castShadow = true;
+  const kit = S.kind === 'sar';
+  const m = kit ? new THREE.Mesh(UBOX, mat(0xff6a00, { roughness: 0.7 })) : new THREE.Mesh(UCYL, mat(0x7c8288, { roughness: 0.45, metalness: 0.5 })); if (kit) m.scale.set(0.12, 0.08, 0.16); else m.scale.set(0.022, 0.12, 0.022); m.castShadow = true;
   m.position.copy(fromPos).add(new V3(0, -0.08, 0)); scene.add(m);
-  PAY.push({ m, v: fromVel.clone(), spin: new V3(Math.random() * 6, 0, Math.random() * 6), ghost, course: !ghost && (S.kind === 'course' || S.kind === 'tutorial') });
+  PAY.push({ m, v: fromVel.clone(), spin: new V3(Math.random() * 6, 0, Math.random() * 6), ghost, course: !ghost && (S.kind === 'course' || S.kind === 'tutorial'), kit });
   sfx('drop');
 }
 const _pp = new V3();
@@ -273,7 +275,9 @@ function updatePayloads(dt) {
     const pg = groundAt(P.m.position.x, P.m.position.z) + 0.03;
     if (P.m.position.y <= pg || hitObj) {
       const pos = P.m.position.clone(); if (pos.y < pg) pos.y = pg;
-      scene.remove(P.m); PAY.splice(i, 1);
+      PAY.splice(i, 1);
+      if (P.kit) { P.m.position.copy(pos); setTimeout(() => scene.remove(P.m), 20000); sarKit(pos); sfx('good'); continue; }
+      scene.remove(P.m);
       spawnImpact(pos, true); sfx('bang');
       if (P.course) evalDrop(pos, hitObj);
       else if (S.kind === 'free' && !P.ghost) { const r = nearestTarget(pos); showMsg(r ? `${r.name} ${r.hit ? 'HIT' : 'MISS ' + r.d.toFixed(1) + ' m'}` : 'IMPACT', r && r.hit ? '#5dff9a' : '#ffc828', 1.4); }
@@ -602,7 +606,7 @@ function updateHUD(dt, subj) {
     (dist !== null ? `<div><b>DIST</b>${dist.toFixed(0)} m</div>` : '') +
     (S.kind === 'course' ? `<div><b>HIT</b>${S.impacts}</div>` : '') +
     (o && o.kind === 'orbit' ? `<div style="color:#4fe3ff">ORBIT ${Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0)}%</div>` : '') +
-    (S.state === 'run' && (isMission() || AFc().cls === 'wing') ? msOsd() : '') +
+    (S.state === 'run' && (isMission() || AFc().cls === 'wing') ? msOsd() : '') + (S.state === 'run' ? windOsd(subj.p) : '') +
     (S.boosting ? '<div style="color:#ff9a40">BOOST ▲▲</div>' : '') +
     (S.state !== 'demo' && insideBunker(subj.p) ? `<div style="color:#5dff9a">SCAN ${Math.min(100, S.scan / 1.5 * 100).toFixed(0)}%</div>` : '');
   if (S.kind === 'course') {
@@ -772,7 +776,7 @@ function frame(now, noRender) {
   const focus = S.state === 'menu' ? (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)) : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt); envTick(dt);
+  updateFX(dt); envTick(dt); scenTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (!noRender) { renderer.render(scene, camera); renderBelly(); }
