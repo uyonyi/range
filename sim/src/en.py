@@ -481,4 +481,6 @@ EN.update({
 "'고정익 정찰 · 손 투척 · 날개 1.37 m · 2.1 kg'": "'Fixed-wing recon · hand-launched · 1.37 m span · 2.1 kg'",
 "'고정익 정찰 · 날개 2.8 m · 6.1 kg'": "'Fixed-wing recon · 2.8 m span · 6.1 kg'",
 "'3.5시간 체공 · 큰 날개로 안정적 · 선회 반경 큼'": "'3.5 h endurance · stable big wing · wide turns'",
+'<button id="bCred">데이터 출처</button>': '<button id="bCred">Data sources</button>',
+'<h2>데이터 출처 · 이 시뮬레이터에 쓰인 자료</h2>': '<h2>Data used in this simulator</h2>',
 })
