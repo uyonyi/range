@@ -438,4 +438,9 @@ EN.update({
 'FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span>': 'FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span>',
 '속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.': "Speed, size and climb rate approximate public specifications; this training-concept simulator does not reproduce the real aircraft's flight characteristics. Airframe names indicate shape only.",
 "KeyT: '열화상'": "KeyT: 'Thermal'",
+'<div class="pickLbl">훈련장</div>': '<div class="pickLbl">Training site</div>',
+"'이 훈련장에는 없는 임무'": "'Not available at this site'",
+"'평지 · 기본 장애물 코스'": "'Flat · standard obstacle course'",
+"'실제 지형 · '": "'Real terrain · '",
+"'경로 따라 배치한 코스'": "'course laid along a route'",
 })

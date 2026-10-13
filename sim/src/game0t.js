@@ -197,7 +197,7 @@ function sitesAll() {
   try { const s = localStorage.getItem('hroc_site_custom'); if (s) L.push(JSON.parse(s)); } catch (e) { }
   return L;
 }
-function siteCurrentId() { try { return localStorage.getItem('hroc_site') || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
+function siteCurrentId() { try { return localStorage.getItem('hroc_site') || window.SIM_DEFAULT_SITE || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
 function siteSelect(id) { try { localStorage.setItem('hroc_site', id); } catch (e) { } }
 function siteLoad() {
   const id = siteCurrentId(), L = sitesAll();
