@@ -231,6 +231,9 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <button data-start="recon" data-ms="recon"><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
       <button data-start="strike" data-ms="strike"><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
       <button data-start="fire" data-ms="fire"><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
+      <button data-start="sar" data-ms="sar"><b>수색·구조</b><small>숲 속 실종자 찾고 구조 키트 투하 · 복귀</small></button>
+      <button data-start="track" data-ms="track"><b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small></button>
+      <button data-start="ridge" data-ms="ridge"><b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small></button>
       <button data-start="free" data-ms="free"><b>자유 비행</b><small>제한 없이</small></button>
       <button id="bTut" data-ms="tutorial"><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
       <button data-start="demo" data-ms="demo"><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
@@ -242,6 +245,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="opt" style="margin-top:16px">
       <div>조종 난이도 <span class="seg" id="segDiff"><button data-v="train" class="on">입문</button><button data-v="easy">쉬움</button><button data-v="sport">스포츠</button></span></div>
       <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="1">밤</button></span></div>
+      <div>바람 <span class="seg" id="segWind"><button data-v="0" class="on">없음</button><button data-v="1">약 3 m/s</button><button data-v="2">강 7 m/s</button></span></div>
       <div>가이드 <span class="seg" id="segGuide"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
     </div>
     <div class="deskOnly">

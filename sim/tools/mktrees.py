@@ -67,7 +67,7 @@ nin = len(T)
 # ---------- 정사영상 밖 (절차적) ----------
 obox = Polygon([ds(x, y) for x, y in [(r.bounds.left, r.bounds.bottom), (r.bounds.right, r.bounds.bottom), (r.bounds.right, r.bounds.top), (r.bounds.left, r.bounds.top)]])
 OB = prep(obox.buffer(-1)); PATH = LineString(C['path'])
-PAL = [(52, 74, 46, 1), (60, 86, 52, 1), (88, 100, 70, 0), (104, 112, 82, 0), (76, 96, 60, 0), (118, 118, 92, 0)]
+PAL = [(46, 68, 40, 1), (54, 78, 46, 1), (66, 86, 54, 0), (76, 94, 60, 0), (60, 82, 50, 0), (86, 96, 66, 0)]
 SP = 6.0
 for d in np.arange(-400, 800, SP):
     for s in np.arange(-600, 600, SP):
