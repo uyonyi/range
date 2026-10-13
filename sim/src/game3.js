@@ -662,6 +662,7 @@ function handleKeys() {
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
+    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA')) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
@@ -725,14 +726,14 @@ function frame(now, noRender) {
   skyU.time.value = S.simT;
   const tutHold = S.kind === 'tutorial' && S.tut && S.tut.st !== 'fly';
   if (S.state === 'run') {
-    if (!tutHold) {
+    if (!tutHold && !S.brief) {
       acc += dt;
       while (acc >= STEP) {
         acc -= STEP; _prevP.copy(DR.p); stepDrone(STEP); S.bumpT -= STEP; S.hitCD -= STEP;
         if (S.kind === 'course' || S.kind === 'tutorial') checkObjectives(_prevP, DR.p, STEP); else if (isMission()) msStep(_prevP, DR.p, STEP);
       }
     }
-    if (S.running && !S.finished && (S.kind === 'course' || isMission())) S.t += dt;
+    if (S.running && !S.finished && !S.brief && (S.kind === 'course' || isMission())) S.t += dt;
     S.flyT += dt;
     if (S.running && !REC_T0_SET && REC) { REC.t0 = S.flyT; REC_T0_SET = true; }
     if (!S.running) REC_T0_SET = false;
