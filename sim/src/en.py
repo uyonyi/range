@@ -484,4 +484,5 @@ EN.update({
 '<button id="bCred">데이터 출처</button>': '<button id="bCred">Data sources</button>',
 '<h2>데이터 출처 · 이 시뮬레이터에 쓰인 자료</h2>': '<h2>Data used in this simulator</h2>',
 '무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span>': 'Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span>',
+'<button id="bLayout">화면 배치 편집</button>': '<button id="bLayout">Edit HUD layout</button>',
 })

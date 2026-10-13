@@ -2963,7 +2963,8 @@ function renderBelly() {
     el.style.top = top + 'px'; el.style.width = Math.min(430, Math.round(h * 4 / 3)) + 'px';
   } else {
     el.style.width = '';
-    if (!IS_TOUCH) { const ob = ui.osd.getBoundingClientRect(); el.style.top = Math.max(140, Math.round(ob.bottom + 10)) + 'px'; } else el.style.top = '';
+    if (LY.d.belly && LY.d.belly.x !== undefined) { }   // 사용자가 옮긴 위치 유지
+    else if (!IS_TOUCH) { const ob = ui.osd.getBoundingClientRect(); el.style.top = Math.max(140, Math.round(ob.bottom + 10)) + 'px'; } else el.style.top = '';
   }
   const r = el.getBoundingClientRect(); if (r.width < 10) return;
   const fwd = new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
@@ -4186,6 +4187,20 @@ function speakify(t) {
 const COMM = { q: [], busy: 0, voice: null };
 function pickVoice() { try { const V = speechSynthesis.getVoices(); COMM.voice = V.find(v => /en-US/.test(v.lang) && /Male|David|Guy|Daniel|Alex/i.test(v.name)) || V.find(v => /^en/.test(v.lang)) || null; } catch (e) { } }
 try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) { }
+// 말하는 동안 무전 잡음 (대역 제한 잡음 + 흔들림 + 지직거림)
+function commStatic(on, dur) {
+  const ctx = AU.ctx; if (!ctx || !AU.master) return;
+  if (COMM.st) { try { COMM.st.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.05); COMM.st.s.stop(ctx.currentTime + 0.3); } catch (e) { } COMM.st = null; }
+  if (!on) return;
+  const t = ctx.currentTime, s = ctx.createBufferSource(); s.buffer = AU.noise; s.loop = true;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 420; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 0.55;
+  const g = ctx.createGain(); g.gain.value = 0.0001; s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(AU.master); s.start(t);
+  const T = Math.min(dur || 6, 20);
+  for (let k = 0; k < T * 12; k++) { const tt = t + k / 12; g.gain.setValueAtTime(0.045 + 0.05 * Math.random() * Math.random(), tt); }
+  for (let k = 0; k < T * 3; k++) { const tt = t + Math.random() * T; noiseHit(tt, 'bandpass', 2400 + Math.random() * 2000, 1.5, 0.08 + Math.random() * 0.1, 0.02 + Math.random() * 0.04, AU.master); }
+  g.gain.setValueAtTime(0.05, t + T); g.gain.exponentialRampToValueAtTime(0.0001, t + T + 0.2); s.stop(t + T + 0.3);
+  COMM.st = { s, g };
+}
 function squelch(open) {
   const ctx = AU.ctx; if (!ctx || !AU.master) return; const t = ctx.currentTime;
   noiseHit(t, 'bandpass', 1400, 0.6, open ? 0.12 : 0.09, open ? 0.12 : 0.18, AU.master);
@@ -4203,10 +4218,10 @@ function commTick(dt) {
   const m = COMM.q.shift(), el = $('radio'); if (!el) return;
   el.innerHTML = `<div class="rf">📻 ${m.from}</div><div class="re">${m.en}</div>` + (window.SIM_LANG !== 'en' && m.ko ? `<div class="rk">${m.ko}</div>` : '');
   el.classList.add('show'); const dur = Math.max(3.5, m.en.length / 14); radioT = dur + 1; COMM.busy = dur + 0.6;
-  squelch(true);
+  squelch(true); commStatic(true, dur + 0.4);
   if (SET.voice !== false && window.speechSynthesis) {
-    try { const u = new SpeechSynthesisUtterance(speakify(m.en)); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice; u.rate = 1.08; u.pitch = 0.85; u.volume = 0.9;
-      u.onend = () => squelch(false); if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.35, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
+    try { const u = new SpeechSynthesisUtterance(speakify(m.en)); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice; u.rate = 1.12; u.pitch = 0.8; u.volume = 0.75;
+      u.onend = () => { commStatic(false); squelch(false); }; if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.35, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
       speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { }
   } else setTimeout(() => squelch(false), dur * 900);
 }
@@ -4241,6 +4256,64 @@ function commAck(o, kind) {   // 목표 하나 끝났을 때
   }
 }
 
+// =====================================================================
+//  화면 배치 편집 (창 위치·크기·숨기기). 기기 종류별(터치/PC)로 따로 저장
+// =====================================================================
+const LY_ITEMS = [
+  ['osd', '비행 정보', 'Flight data'], ['obj', '다음 과제', 'Next task'], ['list', '과제 목록', 'Task list'], ['map', '지도', 'Map'], ['belly', '아래 카메라', 'Belly cam'],
+  ['radio', '무전', 'Radio'], ['guide', '안내 문구', 'Guide'], ['bottom', '상태 표시', 'Status'], ['scope', '투하 조준', 'Drop scope'],
+  ['tbBoost', 'BST', 'BST'], ['tbDrop', 'DROP', 'DROP'], ['tbCam', 'CAM', 'CAM'], ['tbReset', '⟲', '⟲'], ['tbBelly', '↓CAM', '↓CAM'], ['tbIR', 'IR', 'IR'], ['tbAssist', 'AST', 'AST'], ['tbZoom', 'ZM', 'ZM'], ['tbGuide', 'GD', 'GD'], ['tbFull', '⛶', '⛶'], ['tbPause', '❚❚', '❚❚']
+];
+const LY = { key: 'fpvsim_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
+try { LY.d = JSON.parse(localStorage.getItem(LY.key) || '{}'); } catch (e) { }
+function lySave() { try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
+function lyApply() {
+  for (const [id] of LY_ITEMS) {
+    const el = $(id); if (!el) continue; const c = LY.d[id];
+    if (!c) { el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.transform = el.style.transformOrigin = ''; el.classList.remove('lyHide'); continue; }
+    if (c.x !== undefined) { el.style.left = Math.round(clamp(c.x, 0, 0.97) * innerWidth) + 'px'; el.style.top = Math.round(clamp(c.y, 0, 0.95) * innerHeight) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
+    el.style.transformOrigin = 'top left'; el.style.transform = c.x !== undefined || c.s ? `scale(${c.s || 1})` : '';
+    el.classList.toggle('lyHide', !!c.h);
+  }
+}
+addEventListener('resize', () => setTimeout(lyApply, 50));
+function lyName(id) { const it = LY_ITEMS.find(x => x[0] === id); return it ? (window.SIM_LANG === 'en' ? it[2] : it[1]) : id; }
+function lyBar() {
+  const b = $('lyBar'), sel = LY.sel, c = sel ? (LY.d[sel] || {}) : null;
+  b.innerHTML = `<span class="ln">${sel ? lyName(sel) : L2('창을 끌어서 옮기기 · 눌러서 고르기', 'Drag to move · tap to select')}</span>` +
+    (sel ? `<button data-a="m">−</button><span class="sz">${Math.round((c.s || 1) * 100)}%</span><button data-a="p">+</button><button data-a="h">${c.h ? L2('보이기', 'Show') : L2('숨기기', 'Hide')}</button><button data-a="r1">${L2('이 창 원래대로', 'Reset item')}</button>` : '') +
+    `<button data-a="ra">${L2('전체 초기화', 'Reset all')}</button><button class="primary" data-a="ok">${L2('완료', 'Done')}</button>`;
+  b.querySelectorAll('button').forEach(x => x.onclick = e => { e.stopPropagation(); const a = x.dataset.a, d = sel && (LY.d[sel] = LY.d[sel] || {});
+    if (a === 'm') d.s = Math.max(0.5, Math.round(((d.s || 1) - 0.1) * 10) / 10); if (a === 'p') d.s = Math.min(1.8, Math.round(((d.s || 1) + 0.1) * 10) / 10);
+    if (a === 'h') d.h = !d.h; if (a === 'r1') delete LY.d[sel]; if (a === 'ra') { LY.d = {}; LY.sel = null; }
+    if (a === 'ok') return lyEdit(false);
+    lySave(); lyApply(); lyBar(); });
+}
+function lyEdit(on) {
+  LY.edit = on; document.body.classList.toggle('lyEditing', on); $('lyBar').classList.toggle('hidden', !on);
+  const r = $('radio'); if (on && r && !r.classList.contains('show')) { r.innerHTML = '<div class="rf">📻 CONTROL</div><div class="re">EAGLE ONE, CONTROL. Radio check. Over.</div>'; r.classList.add('show'); radioT = 1e9; } else if (!on && r) { radioT = 0; }
+  if (on) { ui.pause.classList.add('hidden'); ui.hud.classList.remove('hidden'); LY.sel = null; lyBar(); }
+  else { lySave(); if (S.state === 'pause') ui.pause.classList.remove('hidden'); }
+}
+// 끌기
+(function () {
+  let drag = null;
+  addEventListener('pointerdown', e => {
+    if (!LY.edit || (e.target.closest && e.target.closest('#lyBar'))) return;
+    // 손가락 아래에 있는 창 (맨 위 것부터) — 터치 조작 영역이 위에 덮여 있어도 찾음
+    let el = null; for (let i = LY_ITEMS.length - 1; i >= 0 && !el; i--) { const c = $(LY_ITEMS[i][0]); if (!c) continue; const r = c.getBoundingClientRect(); if (r.width > 2 && r.height > 2 && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom && getComputedStyle(c).display !== 'none') el = c; }
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation(); const r = el.getBoundingClientRect(); drag = { el, id: el.id, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false }; LY.sel = el.id; lyBar();
+  }, true);
+  addEventListener('pointermove', e => {
+    if (!drag) return; e.preventDefault(); drag.moved = true; const d = LY.d[drag.id] = LY.d[drag.id] || {};
+    d.x = (e.clientX - drag.dx) / innerWidth; d.y = (e.clientY - drag.dy) / innerHeight; lyApply();
+  }, true);
+  addEventListener('pointerup', () => { if (drag) { lySave(); drag = null; } }, true);
+})();
+$('bLayout').onclick = () => lyEdit(true);
+lyApply();
+
 // ---------------- 데이터 출처 ----------------
 const EN_ = window.SIM_LANG === 'en';
 const CRED_AF = [
@@ -4267,5 +4340,5 @@ $('credClose').onclick = () => $('credPanel').classList.add('hidden');
 
 document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle('on', (b.dataset.v === '1') === (SET.voice !== false)); b.addEventListener('click', () => { SET.voice = b.dataset.v === '1'; saveSet(); document.querySelectorAll('#segVoice button').forEach(x => x.classList.toggle('on', x === b)); if (!SET.voice) try { speechSynthesis.cancel(); } catch (e) { } }); });
 setAirframe(SET.af); afUI();
-Object.assign(window.__sim, { comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
