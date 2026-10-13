@@ -124,7 +124,7 @@ function updateGuide(subj) {
     steer();
     if (!lines.length) lines.push([`정렬 OK · 전진 (${K('fwd')})`, 'ok']);
   }
-  if (boostZone() && S.kind === 'course') lines.unshift([S.boosting ? 'BOOST ▲▲ 고속 복귀 중' : `BOOST ZONE · ${K('boost')} 누른 채 고속 복귀`, 'warn']);
+  if (S.boosting) lines.unshift(['BOOST ▲▲', 'warn']);
   const el = $('guide'); el.classList.remove('hidden');
   el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join('');
 }

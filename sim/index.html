@@ -112,7 +112,7 @@ body.touch .panel{touch-action:pan-y}
 .tz .base.on{opacity:1}.tz .knob{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;background:rgba(255,200,40,.75);transform:translate(-50%,-50%)}
 .tz .lbl{position:absolute;bottom:14px;font:600 11px "SF Mono",Menlo,monospace;color:rgba(255,255,255,.45);pointer-events:none}#tzL .lbl{left:16px}#tzR .lbl{right:16px}
 .tb{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;background:rgba(10,13,16,.6);border:2px solid rgba(255,255,255,.3);color:#fff;font:700 13px "SF Mono",Menlo,monospace;display:flex;align-items:center;justify-content:center}
-.tb.down{background:rgba(255,200,40,.6)}
+.tb.down{background:rgba(255,200,40,.6)}#tbBoost.on{background:#ff9a40;color:#111;box-shadow:0 0 14px rgba(255,154,64,.7)}
 #tbDrop{right:calc(14px + env(safe-area-inset-right));bottom:46%;width:78px;height:78px;border-color:var(--amber);color:var(--amber)}
 #tbCam,#tbReset,#tbAssist,#tbPause{width:46px;height:46px;font-size:12px}
 #tbPause{right:calc(14px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
@@ -153,7 +153,8 @@ body.touch #guide{bottom:16px;top:auto;font-size:13px}
 button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .btns.big button{font-size:16px;padding:13px 20px}
 .pickLbl{margin:14px 0 6px;font-size:13px;letter-spacing:.08em;color:var(--mute);text-transform:uppercase}.pickLbl small{text-transform:none;letter-spacing:0;margin-left:8px;opacity:.8}
-.afcards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.afcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:760px){.afcards{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}}
 .afc{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}
 .afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
 .afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
@@ -163,7 +164,6 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
-@media (max-width:1000px){.afcards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-height:520px) and (pointer:coarse){.afcards{display:flex;overflow-x:auto}.afc{flex:0 0 118px;padding:6px 8px}.afc svg{width:34px;height:26px;margin:0}.afc small,.afc .nt{display:none}.afc .spec{font-size:11px}.msgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.msgrid button{padding:6px 9px}.msgrid button small{display:none}.pickLbl{margin:8px 0 4px}}
 @media (max-width:760px){.msgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.afcards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.afc{flex:0 0 136px;scroll-snap-align:start}}
 
@@ -258,7 +258,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="touchOnly">
       <h3>터치 조작</h3>
       <div class="thumbs"><div><b>왼쪽 엄지</b>화면 왼쪽을 누르고 끌기<br>↕ 상승·하강 · ↔ 회전</div><div><b>오른쪽 엄지</b>화면 오른쪽을 누르고 끌기<br>↕ 전진·후진 · ↔ 좌우 이동</div></div>
-      <div class="note">DROP 투하 · BST 부스트(고속 복귀 구간) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 가이드 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지</div>
+      <div class="note">DROP 투하 · BST 부스트(켜기/끄기) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 가이드 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지</div>
     </div>
     <div class="note">속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.</div>
   </div>
@@ -331,7 +331,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
           <tr><td>왼쪽 스틱</td><td>위아래 = 상승·하강, 좌우 = 회전</td></tr>
           <tr><td>오른쪽 스틱</td><td>위아래 = 전진·후진, 좌우 = 좌우 이동</td></tr>
           <tr><td>A · RT</td><td>탑재물 투하</td></tr>
-          <tr><td>LT</td><td>부스트 (고속 복귀 구간)</td></tr>
+          <tr><td>LT</td><td>부스트 (누르는 동안)</td></tr>
           <tr><td>B · LB / RB</td><td>카메라 전환</td></tr>
           <tr><td>Y · X</td><td>다시 · 비행 보조</td></tr>
           <tr><td>십자키 ↑/↓ · ← · View</td><td>FPV 카메라 기울기 · 아래 카메라 · 고스트</td></tr>
@@ -428,7 +428,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=e3589f06"></script><script>window.SIM_LANG='ko';</script>
-<script src="js/app.ko.js?v=e3589f06"></script>
+<script src="sites/yeongin.js?v=9b1876e3"></script><script>window.SIM_LANG='ko';</script>
+<script src="js/app.ko.js?v=9b1876e3"></script>
 </body>
 </html>

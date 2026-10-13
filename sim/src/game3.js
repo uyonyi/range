@@ -33,7 +33,7 @@ function startRun(kind) {
   enterFull();
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
   S.objState = OBJS.map(() => 0); S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
-  S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null;
+  S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
@@ -185,8 +185,7 @@ function stepDrone(dt) {
     DR.v.x += (FWD.x * af + RGT.x * ar - k * (DR.v.x - wv.x)) * dt;
     DR.v.z += (FWD.z * af + RGT.z * ar - k * (DR.v.z - wv.z)) * dt;
     // 브레이크 (스틱을 놓으면 멈춤)
-    if (boost && ip > 0) { DR.v.x += FWD.x * 7 * ip * dt; DR.v.z += FWD.z * 7 * ip * dt; }
-    if (md.brake > 0 && !boost && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
+    if (md.brake > 0 && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
     // 통과 보조: 열린 곳 가운데로 살짝 끌어당김
     if (assistOn && o) {
       const op = openingOf(o);
@@ -317,7 +316,11 @@ function refundPayload(msg) {
   if (S.kind === 'course') { S.payloads = Math.min(3, S.payloads + 1); const c = droneM.cans.find(c => !c.visible); if (c) c.visible = true; }
   showMsg(msg, '#ffc828', 1.8); sfx('bad');
 }
-function boostZone() {
+// 부스트: 켜기/끄기 (어디서나 사용). 켜면 기체 최고 속도까지
+const BOOST = { on: false };
+function boostToggle(v) { BOOST.on = v === undefined ? !BOOST.on : !!v; const b = $('tbBoost'); if (b) b.classList.toggle('on', BOOST.on); if (S.state === 'run') showMsg(BOOST.on ? 'BOOST ON' : 'BOOST OFF', BOOST.on ? '#ff9a40' : '#9aa6ad', 0.8); }
+function boostZone() { return true; }
+function boostZoneOld() {
   if (S.kind === 'free') return true;
   const o = curObj(); if (!o || o.kind !== 'pass' || !o.b.pass || o.b.pass.kind !== 'tunnel') return false;
   return o.b.world(0, -o.b.pass.L / 2, o.b.pass.zc).distanceTo(DR.p) > 25;
@@ -660,6 +663,7 @@ function handleKeys() {
     const k = pressed.shift();
     if (RCUI.open) continue;
     if (k === 'KeyF') { toggleFull(); continue; }
+    if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }

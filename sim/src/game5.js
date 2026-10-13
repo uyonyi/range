@@ -3,14 +3,16 @@
 //  속도·크기는 공개 제원 수준의 근사값 (기체 이름은 형상 참고용)
 // =====================================================================
 const AF = {
-  x2d: { tag: 'X2D', name: '정찰 쿼드', sub: 'X2D형 · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 7.5, easy: 10, sport: 13.9 }, tilt: { train: 20, easy: 28, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
+  x2d: { tag: 'X2D', name: 'Skydio X2D', sub: '정찰 쿼드 · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 7.5, easy: 10, sport: 13.9 }, tilt: { train: 20, easy: 28, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
     note: '자세 안정 · 정지 비행 · 투하 장치' },
-  anafi: { tag: 'ANAFI', name: '소형 정찰 쿼드', sub: 'ANAFI USA형 · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 7.5, easy: 11, sport: 14.7 }, tilt: { train: 20, easy: 30, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
+  anafi: { tag: 'ANAFI', name: 'Parrot ANAFI USA', sub: '소형 정찰 쿼드 · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 7.5, easy: 11, sport: 14.7 }, tilt: { train: 20, easy: 30, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
     note: '32배 줌 · 먼 거리 정찰 · IP53' },
   fpv: { tag: 'FPV', name: 'FPV 레이싱', sub: '5인치 · 0.65 kg', cls: 'quad', top: 39, vmax: { train: 12, easy: 24, sport: 39 }, tilt: { train: 30, easy: 50, sport: 72 }, climb: 15, sink: 9, yaw: 320, tw: 3.5, R: 0.13, endur: 5, acro: true,
     note: '매우 빠름 · 스포츠에서 수동(Acro) 선택' },
-  fw: { tag: 'FW', name: '고정익 정찰기', sub: '손 투척형 · 날개 1.4 m', cls: 'wing', cruise: 15, top: 25, stall: 9, span: 1.4, R: 0.45, endur: 60, bank: 50, nmax: 1.8, minAgl: 26, prate: 70, rrate: 160,
+  fw: { tag: 'RAVEN', name: 'RQ-11B Raven', sub: '고정익 정찰 · 손 투척 · 날개 1.37 m · 2.1 kg', cls: 'wing', cruise: 13, top: 22.6, stall: 8.7, span: 1.37, R: 0.45, endur: '60~90', bank: 50, nmax: 1.8, minAgl: 26, prate: 70, rrate: 160,
     note: '정지 불가 · 선회로 방향 전환 · 실속 주의' },
+  puma: { tag: 'PUMA', name: 'RQ-20B Puma', sub: '고정익 정찰 · 날개 2.8 m · 6.1 kg', cls: 'wing', cruise: 14, top: 23, stall: 10.3, span: 2.8, R: 0.9, endur: 210, bank: 45, nmax: 1.6, minAgl: 30, prate: 50, rrate: 90, reconD: 600,
+    note: '3.5시간 체공 · 큰 날개로 안정적 · 선회 반경 큼' },
   kfpv: { tag: 'K-FPV', name: '자폭 FPV', sub: '7인치 · 탄두 모형 · 1.6 kg', cls: 'quad', top: 30, vmax: { train: 12, easy: 20, sport: 30 }, tilt: { train: 30, easy: 45, sport: 65 }, climb: 10, sink: 8, yaw: 240, tw: 2.2, R: 0.17, endur: 8, acro: true, kam: true,
     note: '부딪히면 기폭 · 표적에 직접 돌입' },
   kfw: { tag: 'K-FW', name: '자폭 고정익', sub: '배회형 · 날개 0.7 m', cls: 'wing', cruise: 26, top: 44, stall: 15, span: 0.7, R: 0.3, endur: 15, bank: 60, nmax: 2.6, minAgl: 10, prate: 90, rrate: 220, kam: true,
@@ -18,7 +20,7 @@ const AF = {
 };
 const AF_IDS = Object.keys(AF);
 AF_IDS.forEach(k => AF[k].id = k);
-const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: ['x2d', 'anafi', 'fpv', 'fw', 'kfw'], recon: ['x2d', 'anafi', 'fw'], fire: ['x2d', 'anafi', 'fw'], sar: ['x2d', 'anafi', 'fw'], track: ['x2d', 'anafi', 'fw'], ridge: ['x2d', 'anafi', 'fpv', 'fw'], strike: ['kfpv', 'kfw'], free: AF_IDS, tutorial: ['x2d'], demo: ['x2d'] };
+const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: ['x2d', 'anafi', 'fpv', 'fw', 'puma', 'kfw'], recon: ['x2d', 'anafi', 'fw', 'puma'], fire: ['x2d', 'anafi', 'fw', 'puma'], sar: ['x2d', 'anafi', 'fw', 'puma'], track: ['x2d', 'anafi', 'fw', 'puma'], ridge: ['x2d', 'anafi', 'fpv', 'fw', 'puma'], strike: ['kfpv', 'kfw'], free: AF_IDS, tutorial: ['x2d'], demo: ['x2d'] };
 if (!AF[SET.af]) SET.af = 'x2d';
 const MS_NAME = { forest: '숲길 통과', race: '타임 레이스', recon: '정찰', strike: '타격', fire: '산불 감시', sar: '수색·구조', track: '차량 추적', ridge: '능선 종주' };
 function AFc() { return AF[SET.af] || AF.x2d; }
@@ -95,6 +97,7 @@ function makeModel(id, ghost) {
   if (id === 'fpv') return makeQuadFPV(ghost, false);
   if (id === 'kfpv') return makeQuadFPV(ghost, true);
   if (id === 'fw') return makeWing(ghost, false);
+  if (id === 'puma') { const w = makeWing(ghost, false); w.g.scale.setScalar(2.0); return w; }
   if (id === 'anafi') {   // X2D 형상을 줄이고 투하 장치·안테나는 뗌
     const d = makeDrone(ghost); d.g.scale.setScalar(0.56); d.cans.forEach(c => d.g.remove(c)); d.g.children.filter(c => c.geometry === UCYL6).forEach(c => d.g.remove(c)); d.cans = []; return d;
   }
@@ -133,7 +136,8 @@ function stepWing(dt) {
     if (DR.p.y - ahead < a.minAgl && !a.kam) { gt = Math.max(gt, 0.25 + (a.minAgl - (DR.p.y - ahead)) * 0.03); DR.altT = Math.max(DR.altT, ahead + a.minAgl); }
     DR.pitch += (gt - DR.pitch) * (1 - Math.exp(-dt * 2.2));
     DR.roll += (ir * a.bank * DEG - DR.roll) * (1 - Math.exp(-dt * 2.8));
-    const vt = IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
+    S.boosting = !!IN.boost;
+    const vt = IN.boost ? a.top : IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
     V += clamp(vt - V, -4, 4) * dt * 0.9;
   } else {
     DR.pitch += -ip * a.prate * DEG * dt; DR.roll += ir * a.rrate * DEG * dt;
@@ -347,6 +351,7 @@ const AF_ICON = {
   fw: '<rect x="29" y="4" width="6" height="40" rx="3" fill="currentColor"/><rect x="4" y="14" width="56" height="6" rx="2" fill="currentColor"/><rect x="20" y="38" width="24" height="4" fill="currentColor"/>',
   kfpv: '<path d="M18 12l28 24M46 12L18 36" stroke="currentColor" stroke-width="3"/><circle cx="16" cy="10" r="8" fill="none" stroke="currentColor"/><circle cx="48" cy="10" r="8" fill="none" stroke="currentColor"/><circle cx="16" cy="38" r="8" fill="none" stroke="currentColor"/><circle cx="48" cy="38" r="8" fill="none" stroke="currentColor"/><rect x="28" y="8" width="8" height="32" rx="4" fill="#ff6a3d"/>',
   anafi: '<path d="M24 18l-10-7M40 18l10-7M24 30l-10 7M40 30l10 7" stroke="currentColor" stroke-width="3"/><circle cx="14" cy="11" r="6" fill="none" stroke="currentColor"/><circle cx="50" cy="11" r="6" fill="none" stroke="currentColor"/><circle cx="14" cy="37" r="6" fill="none" stroke="currentColor"/><circle cx="50" cy="37" r="6" fill="none" stroke="currentColor"/><rect x="26" y="12" width="12" height="24" rx="5" fill="currentColor"/>',
+  puma: '<rect x="29" y="6" width="6" height="36" rx="3" fill="currentColor"/><rect x="1" y="15" width="62" height="5" rx="2" fill="currentColor"/><rect x="22" y="37" width="20" height="4" fill="currentColor"/>',
   kfw: '<rect x="29" y="4" width="6" height="40" rx="3" fill="#ff6a3d"/><rect x="10" y="12" width="44" height="4" rx="2" fill="currentColor"/><rect x="14" y="32" width="36" height="4" rx="2" fill="currentColor"/>'
 };
 function afUI() {
