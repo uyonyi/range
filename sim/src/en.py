@@ -372,4 +372,5 @@ EN.update({
 'GeoTIFF 해석기가 없습니다': 'GeoTIFF reader missing', 'ASCII Grid 머리글을 읽지 못했습니다': 'Could not read the ASCII Grid header',
 'proj4 없음': 'proj4 missing', '읽는 중… ': 'Reading… ', '실패: ': 'Failed: ',
 '<br>지형지물 — 건물 ': '<br>Features — buildings ', '동 · 도로 ': ' · roads ', ' · 소로 ': ' · trails ', ' · 하천 ': ' · streams ', ' · 경지 ': ' · fields ',
+'현장 정사영상 불러오는 중…': 'Loading site orthoimage…', '정사영상 없음 (기본 바닥)': 'No orthoimage (default ground)',
 })
