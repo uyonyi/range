@@ -467,7 +467,7 @@ groundMat.onBeforeCompile = sh => {
     ' diffuseColor.rgb *= mix(vec3(1.0), (dA * 0.55 + 0.45) * (dB * 0.45 + 0.55) * 1.12, detailK);');
 };
 const TER = { n: 241, step: GSZ / 240, h: SITE_L.dec ? SITE_L.dec.inner : null };   // 코스 주변 고해상도 지형 (5 m)
-if (TER.h) { scene.fog.near = 400; scene.fog.far = 9000; camera.far = 9000; camera.updateProjectionMatrix(); }
+if (TER.h) { scene.fog.near = 180; scene.fog.far = 6500; camera.far = 9000; camera.updateProjectionMatrix(); }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(GSZ, GSZ, 240, 240), groundMat);
 ground.rotation.x = -Math.PI / 2; ground.position.set((GS0 + GS1) / 2, 0, -(GD0 + GD1) / 2);
 ground.receiveShadow = true; scene.add(ground);
@@ -489,6 +489,7 @@ function applyTerrain(h) {
       const ix = i % n, iy = (i / n) | 0, side = GS0 + ix * TER.step, down = GD1 - iy * TER.step;
       const slope = 1 - nr.getY(i), pi = CRS_C && pathInfo(down, side), corr = pi ? pi.dist < 25 : (down > -80 && down < 385 && side > -80 && side < 30);
       let f = smooth01(0.015, 0.06, slope) * (corr ? 0.15 : 1);
+      if (SITE.trees && !corr) f = Math.max(f, 0.45);
       f *= 0.75 + 0.25 * Math.sin(side * 0.05 + Math.cos(down * 0.043) * 2);
       col[i * 3] = 1 - f * 0.62; col[i * 3 + 1] = 1 - f * 0.42; col[i * 3 + 2] = 1 - f * 0.6;
     }
@@ -514,7 +515,7 @@ const FAR = (function farTerrain() {
     // 낮은 곳 = 논밭 녹색, 높은 곳·급경사 = 짙은 숲/바위
     const nz = Math.sin(pos[i * 3] * 0.013) * Math.cos(pos[i * 3 + 2] * 0.011) * 0.5 + 0.5;   // 숲·밭 얼룩
     let r = 0.36 - t * 0.14 - nz * 0.05, g = 0.40 - t * 0.12 - nz * 0.03, b = 0.22 - t * 0.08;
-    const f = Math.min(1, slope * 4.0); r = r * (1 - f) + 0.13 * f; g = g * (1 - f) + 0.20 * f; b = b * (1 - f) + 0.10 * f;
+    const f = Math.min(1, slope * (SITE.trees ? 9 : 4.0) + (SITE.trees ? t * 0.8 : 0)); r = r * (1 - f) + 0.13 * f; g = g * (1 - f) + 0.20 * f; b = b * (1 - f) + 0.10 * f;
     col[i * 3] = Math.pow(r, 2.2); col[i * 3 + 1] = Math.pow(g, 2.2); col[i * 3 + 2] = Math.pow(b, 2.2);   // sRGB -> 선형
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -537,12 +538,12 @@ const GRASS = (function grass() {
   let i = 0;
   while (i < N) {
     let d = -14 + rr() * 350, s = -78 + rr() * 125;
-    if (CRS_C) { const P = CRS_C.path, q = P[Math.floor(rr() * P.length)]; d = q[0] + (rr() - 0.5) * 120; s = q[1] + (rr() - 0.5) * 120; const pd = W(10, -5, 0); if (Math.hypot(s - pd.x, -d - pd.z) < 9) continue; }
+    if (CRS_C) { const P = CRS_C.path, q = P[Math.floor(rr() * P.length)]; const sp = SITE.trees ? 26 : 120; d = q[0] + (rr() - 0.5) * sp; s = q[1] + (rr() - 0.5) * sp; const pd = W(10, -5, 0); if (Math.hypot(s - pd.x, -d - pd.z) < 9) continue; }
     else if (d > -16 && d < 14 && s > -9 && s < 9) continue;          // 출발 구역(패드·로고) 제외
     const sc = 0.6 + rr() * 0.9;
     q.setFromAxisAngle(new V3(0, 1, 0), rr() * 6.28);
     m4.compose(W(d, s, 0), q, new V3(sc, sc * (0.6 + rr() * 0.9), sc)); im.setMatrixAt(i, m4);
-    c.setHSL(0.13 + rr() * 0.08, 0.28 + rr() * 0.2, 0.17 + rr() * 0.12); im.setColorAt(i, c); i++;
+    if (SITE.trees) c.setHSL(0.17 + rr() * 0.1, 0.3 + rr() * 0.2, 0.13 + rr() * 0.1); else c.setHSL(0.13 + rr() * 0.08, 0.28 + rr() * 0.2, 0.17 + rr() * 0.12); im.setColorAt(i, c); i++;
   }
   im.receiveShadow = true; scene.add(im); return im;
 })();
@@ -1070,42 +1071,166 @@ const SITE_BLD = (function siteBuildings() {
   }
   return n;
 })();
+// 나무: Site 패키지의 trees (정사영상 수관 검출) 를 구역별 InstancedMesh 로 세움 + Impacts 격자
+const STREES = (function siteTrees() {
+  const T = SITE.trees; if (!T || !T.n) return { n: 0, col() { return null; } };
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const i16 = new Int16Array(b64(T.i16).buffer), u8 = b64(T.u8), n = T.n;
+  // 형상: 단위 높이 1, 수관 반지름 1 (인스턴스에서 [반지름, 높이, 반지름] 으로 늘림). 꼭짓점 색 = 아래 어둡고 위 밝게 (그늘 흉내)
+  const hsh = (x, y, z) => { const s = Math.sin(x * 12.99 + y * 78.23 + z * 37.72) * 43758.5; return s - Math.floor(s); };
+  function shade(geo, trunkTop) {
+    const p = geo.attributes.position, c = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i), tr = y < trunkTop && Math.hypot(p.getX(i), p.getZ(i)) < 0.09;
+      const k = tr ? 0.42 : (0.5 + 0.62 * Math.max(0, Math.min(1, (y - trunkTop) / (1 - trunkTop)))) * (0.84 + 0.3 * hsh(p.getX(i) * 5, y * 9, p.getZ(i) * 5));
+      c[i * 3] = tr ? k * 1.1 : k; c[i * 3 + 1] = tr ? k * 0.85 : k; c[i * 3 + 2] = tr ? k * 0.7 : k;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(c, 3)); return geo;
+  }
+  function merge(parts) {
+    parts = parts.map(g => g.index ? g.toNonIndexed() : g);
+    let nv = 0; parts.forEach(g => nv += g.attributes.position.count);
+    const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3); let o = 0;
+    for (const g of parts) { P.set(g.attributes.position.array, o * 3); N.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P.subarray(0, o * 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(N.subarray(0, o * 3), 3)); return g;
+  }
+  const trunk = h => { const g = new THREE.CylinderGeometry(0.04, 0.065, h, 6, 1, true); g.translate(0, h / 2, 0); return g; };
+  // 활엽수: 울퉁불퉁한 공 두 개
+  const _n = new V3();
+  let BD = 2;
+  const blob = (r, ry, x, y, z, seed) => { const g = new THREE.IcosahedronGeometry(1, BD), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i), k = 1 + 0.16 * (hsh(vx * 3 + seed, vy * 3, vz * 3) - 0.5) + 0.1 * Math.sin(vx * 7 + seed) * Math.cos(vz * 6);
+      p.setXYZ(i, vx * r * k + x, vy * ry * k + y, vz * r * k + z); }
+    // 부드러운 노멀: 타원체 법선 (단위 높이로 늘어날 것을 감안해 세로를 조금 키움)
+    const nm = g.attributes.normal; for (let i = 0; i < p.count; i++) { _n.set((p.getX(i) - x) / r, (p.getY(i) - y) / ry * 1.6, (p.getZ(i) - z) / r).normalize(); nm.setXYZ(i, _n.x, _n.y, _n.z); }
+    return g; };
+  // Zoom별 3단계 (가까이: 덩이 3개 세밀 / 중간: 덜 세밀 / 멀리: 덩이 1개)
+  const decG = () => shade(merge([trunk(0.5), blob(1.0, 0.3, 0, 0.64, 0, 1), blob(0.66, 0.22, 0.3, 0.82, -0.2, 2), blob(0.6, 0.2, -0.35, 0.58, 0.25, 7)]), 0.38);
+  const conG = () => shade(merge([trunk(0.66), blob(0.82, 0.15, 0.05, 0.84, 0, 3), blob(0.55, 0.12, 0.38, 0.93, 0.25, 4), blob(0.5, 0.12, -0.34, 0.76, -0.28, 5), blob(0.42, 0.1, -0.1, 0.66, 0.4, 6)]), 0.62);
+  const GEO = [[], [], []];
+  for (const bd of LOWQ ? [1, 1, 0] : [2, 1, 0]) { BD = bd; GEO[0].push(decG()); GEO[1].push(conG()); GEO[2].push(shade(merge([blob(1, 0.5, 0, 0.45, 0, 8), blob(0.7, 0.4, 0.4, 0.4, 0.3, 9)]), 0)); }
+  BD = 0; GEO[0][2] = shade(merge([trunk(0.5), blob(1.05, 0.34, 0, 0.66, 0, 1)]), 0.38); GEO[1][2] = shade(merge([trunk(0.66), blob(0.9, 0.17, 0, 0.83, 0, 3)]), 0.62);
+  // 소나무: 곧은 줄기 위에 납작하고 불규칙한 수관 덩이 (한국 산지 소나무 형태)
+  const mt = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 });
+  // 구역(120 m) 별로 나눠 화면 밖 구역은 그리지 않음
+  const CH = 120, groups = new Map(), GRID = new Map(), GC = 10, CHUNKS = [];
+  for (let i = 0; i < n; i++) {
+    const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, key = Math.floor(d / CH) + ',' + Math.floor(s / CH) + ',' + u8[i * 4 + 3];
+    if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
+  }
+  const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new V3(0, 1, 0), SCV = new V3(), col = new THREE.Color();
+  const pos = new Float32Array(n * 3), dim = new Float32Array(n * 2), _a = new V3();
+  for (const [key, ids] of groups) {
+    const kind = +key.split(',')[2];
+    const view = G0 => { const g = new THREE.BufferGeometry(); for (const a in G0.attributes) g.setAttribute(a, G0.attributes[a]); return g; };   // 꼭짓점 버퍼는 공유, 경계 구만 구역별
+    const geos = GEO[kind].map(view), geo = geos[2];
+    const im = new THREE.InstancedMesh(geo, mt, ids.length), bb = new THREE.Box3();
+    ids.forEach((i, k) => {
+      const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
+      const w = W(d, s, 0); w.y = Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2;
+      Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.3 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.3 * (0.9 + 0.2 * hsh(d, d, 3)));
+      M4.compose(w, Q, SCV); im.setMatrixAt(k, M4);
+      col.setRGB(u8[i * 4] / 255 * 0.92, u8[i * 4 + 1] / 255 * 0.86, u8[i * 4 + 2] / 255 * 0.8).convertSRGBToLinear(); im.setColorAt(k, col);
+      bb.expandByPoint(w); bb.expandByPoint(_a.set(w.x, w.y + h, w.z));
+      pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z; dim[i * 2] = h; dim[i * 2 + 1] = r * 1.15;
+      const gk = Math.floor(w.x / GC) + ',' + Math.floor(w.z / GC); if (!GRID.has(gk)) GRID.set(gk, []); GRID.get(gk).push(i | (kind << 24));
+    });
+    bb.expandByScalar(4); const sph = bb.getBoundingSphere(new THREE.Sphere()); geos.forEach(g => { g.boundingSphere = sph; g.boundingBox = bb; });
+    CHUNKS.push({ im, geos, c: sph.center, r: sph.radius, lod: 2 });
+    im.castShadow = !LOWQ; im.receiveShadow = !LOWQ; im.frustumCulled = true; scene.add(im);
+  }
+  // Impacts: 줄기(캡슐) + 수관(세로 캡슐, 침엽수는 원뿔이라 위로 갈수록 가늘게)
+  function col1(p, Rr) {
+    const gx = Math.floor(p.x / GC), gz = Math.floor(p.z / GC); let best = null;
+    for (let ix = gx - 1; ix <= gx + 1; ix++) for (let iz = gz - 1; iz <= gz + 1; iz++) {
+      const L = GRID.get(ix + ',' + iz); if (!L) continue;
+      for (const v of L) {
+        const i = v & 0xffffff, kind = v >> 24, x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2], h = dim[i * 2], r = dim[i * 2 + 1];
+        if (p.y > y + h + Rr || p.y < y - Rr) continue;
+        const dx = p.x - x, dz = p.z - z, hd = Math.hypot(dx, dz); if (hd > r + Rr) continue;
+        // 높이별 반지름
+        const t = (p.y - y) / h;
+        const c0 = kind === 1 ? 0.82 : kind === 2 ? 0.45 : 0.66, hh = kind === 1 ? 0.2 : kind === 2 ? 0.5 : 0.36;   // 수관 중심 높이 · 반높이 (비율)
+        const rr = Math.max(t < c0 ? 0.12 : 0, r * Math.sqrt(Math.max(0, 1 - Math.pow((t - c0) / hh, 2))));
+        const pen = rr + Rr - hd; if (pen <= 0) continue;
+        if (!best || pen > best.pen) best = { pen, n: hd > 1e-4 ? new V3(dx / hd, 0, dz / hd) : new V3(1, 0, 0), tag: 'tree' };
+      }
+    }
+    return best;
+  }
+  // Camera distance로 세밀도 바꿈 (0.3 초마다)
+  function lod(cam) {
+    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < 90 ? 0 : d < 300 ? 1 : 2;
+      if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
+  }
+  setInterval(() => lod(camera.position), 300);
+  return { n, col: col1, lod };
+})();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }
 
 // =====================================================================
-//  drone model
+//  drone model — Skydio X2D 형상 (펼친 크기 66 x 57 x 21 cm, 1.3 kg)
+//  앞 = -z. 접이식 팔 4개(앞 팔은 프로펠러 위, 뒤 팔은 거꾸로 달린 모터),
+//  기수 아래 짐벌(컬러 + 열상 2안), 위·아래 내비게이션 어안 Camera 6개, 뒤쪽 멀티밴드 안테나
 // =====================================================================
+const USPH = new THREE.SphereGeometry(1, 20, 12), UCAP = new THREE.CapsuleGeometry(1, 1, 6, 16);
 function makeDrone(ghost) {
   const g = new THREE.Group();
   const gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
   const m = c => gm || c;
-  const carbon = m(mat(0x1d1f22, { roughness: 0.5 })), camo = m(mat(0xffffff, { map: TX.droneCamo })), mot = m(mat(0x9ea3a8, { roughness: 0.35, metalness: 0.7 }));
-  const add = (geo, mt, x, y, z, sx, sy, sz) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; g.add(me); return me; };
-  add(UBOX, camo, 0, 0.01, 0, 0.12, 0.055, 0.22);
-  add(UBOX, carbon, 0, -0.025, 0, 0.16, 0.012, 0.26);
-  for (const a of [45, 135, 225, 315]) {
-    const r = a * DEG, me = add(UBOX, carbon, Math.sin(r) * 0.115, -0.02, -Math.cos(r) * 0.115, 0.03, 0.012, 0.23);
-    me.rotation.y = -r;
+  const shell = m(mat(0x34383d, { roughness: 0.55, metalness: 0.15 })), shellD = m(mat(0x22252a, { roughness: 0.6 }));
+  const carbon = m(mat(0x1b1d20, { roughness: 0.42, metalness: 0.25 })), batt = m(mat(0x55595f, { roughness: 0.5 }));
+  const mot = m(mat(0x8d9297, { roughness: 0.3, metalness: 0.8 })), glass = m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 }));
+  const lensRing = m(mat(0x101215, { roughness: 0.3, metalness: 0.4 })), accent = m(mat(0xc8ccd0, { roughness: 0.4, metalness: 0.3 }));
+  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
+  // 몸통: 길쭉한 유선형 (캡슐을 납작하게) + 아래 판
+  const body = add(UCAP, shell, 0, 0, 0, 0.056, 0.105, 0.034); body.rotation.x = Math.PI / 2;
+  add(UBOX, shellD, 0, -0.022, 0.01, 0.1, 0.022, 0.25);
+  // 배터리 (뒤 위쪽, 밝은 색) + 걸쇠
+  add(UBOX, batt, 0, 0.03, 0.065, 0.085, 0.03, 0.13);
+  add(UBOX, accent, 0, 0.046, 0.12, 0.05, 0.006, 0.014);
+  // 기수 짐벌: 둥근 하우징 + 두 렌즈 (컬러 · 열상)
+  const gim = new THREE.Group(); gim.position.set(0, -0.03, -0.165); g.add(gim);
+  add(USPH, shellD, 0, 0, 0, 0.034, 0.03, 0.03, gim);
+  add(UCYL, lensRing, -0.012, 0, -0.026, 0.011, 0.012, 0.011, gim).rotation.x = Math.PI / 2;
+  add(UCYL, glass, -0.012, 0, -0.033, 0.008, 0.004, 0.008, gim).rotation.x = Math.PI / 2;
+  add(UCYL, lensRing, 0.013, 0, -0.025, 0.008, 0.012, 0.008, gim).rotation.x = Math.PI / 2;
+  add(UCYL, m(mat(0x1a1408, { roughness: 0.1, metalness: 0.7 })), 0.013, 0, -0.031, 0.006, 0.004, 0.006, gim).rotation.x = Math.PI / 2;
+  // 내비게이션 어안 Camera 6개 (위 3 · 아래 3)
+  for (const [x, y, z] of [[0, 0.034, -0.12], [-0.035, 0.05, 0.12], [0.035, 0.05, 0.12], [0, -0.036, -0.1], [-0.04, -0.036, 0.1], [0.04, -0.036, 0.1]]) {
+    add(UCYL, lensRing, x, y, z, 0.011, 0.008, 0.011);
+    add(USPH, glass, x, y + Math.sign(y) * 0.004, z, 0.008, 0.005, 0.008);
   }
-  const props = [];
-  const pm = gm || new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
-  const bladeM = m(mat(0x30343a, { roughness: 0.4 }));
-  for (const [x, z] of [[0.163, -0.163], [-0.163, -0.163], [0.163, 0.163], [-0.163, 0.163]]) {
-    add(UCYL, mot, x, -0.005, z, 0.022, 0.03, 0.022);
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.115, 24), pm); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.016, z); g.add(disc);
-    const bl = add(UBOX, bladeM, x, 0.017, z, 0.23, 0.004, 0.018); props.push(bl);
+  // 팔 + 모터 + 프로펠러 (앞: 위로, 뒤: 아래로)
+  const props = [], blur = gm || new THREE.MeshBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const bladeM = m(mat(0x26292d, { roughness: 0.45 })), PR = 0.092;
+  const ARMS = [[0.24, -0.17, -0.04, 1], [-0.24, -0.17, -0.04, 1], [0.235, 0.19, -0.02, -1], [-0.235, 0.19, -0.02, -1]];
+  for (const [x, z, root, up] of ARMS) {
+    const rx = Math.sign(x) * 0.045, rz = Math.sign(z) * 0.07, dx = x - rx, dz = z - rz, L = Math.hypot(dx, dz);
+    const arm = add(UBOX, carbon, (x + rx) / 2, root, (z + rz) / 2, 0.026, 0.016, L); arm.rotation.y = Math.atan2(dx, dz);
+    add(UCYL, carbon, rx, root, rz, 0.018, 0.02, 0.018);                       // 접힘 힌지
+    const my = root + up * 0.017;
+    add(UCYL, mot, x, my, z, 0.021, 0.026, 0.021);
+    add(UCYL, carbon, x, root, z, 0.026, 0.012, 0.026);
+    const py = my + up * 0.016;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(PR, 28), blur); disc.rotation.x = -Math.PI / 2; disc.position.set(x, py, z); g.add(disc);
+    const hub = new THREE.Group(); hub.position.set(x, py, z); g.add(hub);
+    for (const s of [1, -1]) { const b = add(UBOX, bladeM, s * PR * 0.5, 0, 0, PR, 0.003, 0.019, hub); b.rotation.x = s * 0.18; }
+    add(UCYL, accent, 0, up * 0.004, 0, 0.007, 0.008, 0.007, hub);
+    props.push(hub);
   }
-  add(UBOX, carbon, 0, 0.012, -0.125, 0.035, 0.035, 0.03);
-  add(UCYL, m(mat(0x0c1a2a, { roughness: 0.1, metalness: 0.5 })), 0, 0.012, -0.142, 0.011, 0.01, 0.011).rotation.x = Math.PI / 2;
-  add(UBOX, m(mat(0x2b8a4a)), -0.04, 0.045, 0.05, 0.04, 0.03, 0.06);
-  for (const sx of [-1, 1]) add(UCYL6, carbon, sx * 0.04, 0.07, 0.1, 0.004, 0.07, 0.004).rotation.x = -0.4;
-  add(UBOX, carbon, 0, -0.045, 0, 0.13, 0.008, 0.08);
-  const cans = [];
-  const canM = m(mat(0x7c8288, { roughness: 0.45, metalness: 0.5 }));
-  for (const x of [-0.045, 0, 0.045]) { const c = add(UCYL, canM, x, -0.075, 0.0, 0.019, 0.12, 0.019); c.rotation.x = Math.PI / 2; cans.push(c); }
-  const ledG = add(UBOX, gm || new THREE.MeshBasicMaterial({ color: 0x30ff60 }), 0.06, -0.02, 0.13, 0.012, 0.012, 0.012);
-  const ledR = add(UBOX, gm || new THREE.MeshBasicMaterial({ color: 0xff3030 }), -0.06, -0.02, 0.13, 0.012, 0.012, 0.012);
+  // 멀티밴드 안테나 2개 (뒤)
+  for (const sx of [-1, 1]) { const a = add(UCYL6, shellD, sx * 0.03, 0.07, 0.15, 0.0035, 0.07, 0.0035); a.rotation.x = -0.35; }
+  // Drop 모듈 (훈련용 부가장치) — 배 아래 3발
+  add(UBOX, carbon, 0, -0.04, 0.02, 0.11, 0.008, 0.07);
+  const cans = [], canM = m(mat(0x7c8288, { roughness: 0.45, metalness: 0.5 }));
+  for (const x of [-0.036, 0, 0.036]) { const c = add(UCYL, canM, x, -0.06, 0.02, 0.015, 0.09, 0.015); c.rotation.x = Math.PI / 2; cans.push(c); }
+  // 항법등: 앞 팔 끝 녹/적, 뒤 흰색 섬광
+  const LM = c => gm || new THREE.MeshBasicMaterial({ color: c });
+  const ledG = add(USPH, LM(0x30ff60), 0.24, -0.052, -0.17, 0.008, 0.008, 0.008);
+  const ledR = add(USPH, LM(0xff3030), -0.24, -0.052, -0.17, 0.008, 0.008, 0.008);
+  add(USPH, LM(0xffffff), 0, 0.018, 0.168, 0.007, 0.007, 0.007);
   return { g, props, cans, leds: [ledG, ledR] };
 }
 const droneM = makeDrone(false); scene.add(droneM.g);
@@ -1451,8 +1576,8 @@ function rumble(strong, weak, ms) {
 // =====================================================================
 const MODES = {
   train: { name: 'TRAINING', maxTilt: 20 * DEG, vmax: 7.5, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
-  easy: { name: 'EASY', maxTilt: 28 * DEG, vmax: 11, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
-  sport: { name: 'SPORT', maxTilt: 55 * DEG, vmax: 27, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
+  easy: { name: 'EASY', maxTilt: 28 * DEG, vmax: 10, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
+  sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true };
@@ -1460,7 +1585,7 @@ try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}');
 if (!MODES[SET.diff]) SET.diff = 'train';
 function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull })); } catch (e) { } }
 
-const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.16, alive: true };
+const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
   state: 'menu', kind: 'course', t: 0, running: false, finished: false, objIdx: 0, objState: [], pen: 0, impacts: 0, payloads: 3,
   cam: 1, respawn: null, scan: 0, wasInside: false, landT: 0, simT: 0, ghostT: 0, demoEvents: 0, hits: 0, misses: 0,
@@ -1662,7 +1787,7 @@ function stepDrone(dt) {
   if (DR.p.y > gh + 120) { DR.p.y = gh + 120; DR.v.y = Math.min(DR.v.y, 0); }   // 지면 위 120 m 제한
   // 장애물
   for (let it = 0; it < 2; it++) {
-    const hit = collide(DR.p, DR.R); if (!hit) break;
+    const hit = collide(DR.p, DR.R) || STREES.col(DR.p, DR.R); if (!hit) break;
     const vn = DR.v.dot(hit.n);
     DR.p.addScaledVector(hit.n, hit.pen + 0.003);
     if (vn < -2.5) impact(hit.n, vn);
@@ -3064,5 +3189,5 @@ let fakeNow = 0;
 function advance(sec, step, skipRender) { step = step || 1 / 60; const n = Math.max(1, Math.round(sec / step)); if (!fakeNow) fakeNow = last; for (let i = 0; i < n; i++) { fakeNow += step * 1000; frame(fakeNow, skipRender || i < n - 1); } }
 
 // 시험용 핸들
-window.__sim = { advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on }) };
+window.__sim = { STREES, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on }) };
 })();

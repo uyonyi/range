@@ -1,37 +1,66 @@
 
 // =====================================================================
-//  drone model
+//  drone model — Skydio X2D 형상 (펼친 크기 66 x 57 x 21 cm, 1.3 kg)
+//  앞 = -z. 접이식 팔 4개(앞 팔은 프로펠러 위, 뒤 팔은 거꾸로 달린 모터),
+//  기수 아래 짐벌(컬러 + 열상 2안), 위·아래 내비게이션 어안 카메라 6개, 뒤쪽 멀티밴드 안테나
 // =====================================================================
+const USPH = new THREE.SphereGeometry(1, 20, 12), UCAP = new THREE.CapsuleGeometry(1, 1, 6, 16);
 function makeDrone(ghost) {
   const g = new THREE.Group();
   const gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
   const m = c => gm || c;
-  const carbon = m(mat(0x1d1f22, { roughness: 0.5 })), camo = m(mat(0xffffff, { map: TX.droneCamo })), mot = m(mat(0x9ea3a8, { roughness: 0.35, metalness: 0.7 }));
-  const add = (geo, mt, x, y, z, sx, sy, sz) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; g.add(me); return me; };
-  add(UBOX, camo, 0, 0.01, 0, 0.12, 0.055, 0.22);
-  add(UBOX, carbon, 0, -0.025, 0, 0.16, 0.012, 0.26);
-  for (const a of [45, 135, 225, 315]) {
-    const r = a * DEG, me = add(UBOX, carbon, Math.sin(r) * 0.115, -0.02, -Math.cos(r) * 0.115, 0.03, 0.012, 0.23);
-    me.rotation.y = -r;
+  const shell = m(mat(0x34383d, { roughness: 0.55, metalness: 0.15 })), shellD = m(mat(0x22252a, { roughness: 0.6 }));
+  const carbon = m(mat(0x1b1d20, { roughness: 0.42, metalness: 0.25 })), batt = m(mat(0x55595f, { roughness: 0.5 }));
+  const mot = m(mat(0x8d9297, { roughness: 0.3, metalness: 0.8 })), glass = m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 }));
+  const lensRing = m(mat(0x101215, { roughness: 0.3, metalness: 0.4 })), accent = m(mat(0xc8ccd0, { roughness: 0.4, metalness: 0.3 }));
+  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
+  // 몸통: 길쭉한 유선형 (캡슐을 납작하게) + 아래 판
+  const body = add(UCAP, shell, 0, 0, 0, 0.056, 0.105, 0.034); body.rotation.x = Math.PI / 2;
+  add(UBOX, shellD, 0, -0.022, 0.01, 0.1, 0.022, 0.25);
+  // 배터리 (뒤 위쪽, 밝은 회색) + 걸쇠
+  add(UBOX, batt, 0, 0.03, 0.065, 0.085, 0.03, 0.13);
+  add(UBOX, accent, 0, 0.046, 0.12, 0.05, 0.006, 0.014);
+  // 기수 짐벌: 둥근 하우징 + 두 렌즈 (컬러 · 열상)
+  const gim = new THREE.Group(); gim.position.set(0, -0.03, -0.165); g.add(gim);
+  add(USPH, shellD, 0, 0, 0, 0.034, 0.03, 0.03, gim);
+  add(UCYL, lensRing, -0.012, 0, -0.026, 0.011, 0.012, 0.011, gim).rotation.x = Math.PI / 2;
+  add(UCYL, glass, -0.012, 0, -0.033, 0.008, 0.004, 0.008, gim).rotation.x = Math.PI / 2;
+  add(UCYL, lensRing, 0.013, 0, -0.025, 0.008, 0.012, 0.008, gim).rotation.x = Math.PI / 2;
+  add(UCYL, m(mat(0x1a1408, { roughness: 0.1, metalness: 0.7 })), 0.013, 0, -0.031, 0.006, 0.004, 0.006, gim).rotation.x = Math.PI / 2;
+  // 내비게이션 어안 카메라 6개 (위 3 · 아래 3)
+  for (const [x, y, z] of [[0, 0.034, -0.12], [-0.035, 0.05, 0.12], [0.035, 0.05, 0.12], [0, -0.036, -0.1], [-0.04, -0.036, 0.1], [0.04, -0.036, 0.1]]) {
+    add(UCYL, lensRing, x, y, z, 0.011, 0.008, 0.011);
+    add(USPH, glass, x, y + Math.sign(y) * 0.004, z, 0.008, 0.005, 0.008);
   }
-  const props = [];
-  const pm = gm || new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
-  const bladeM = m(mat(0x30343a, { roughness: 0.4 }));
-  for (const [x, z] of [[0.163, -0.163], [-0.163, -0.163], [0.163, 0.163], [-0.163, 0.163]]) {
-    add(UCYL, mot, x, -0.005, z, 0.022, 0.03, 0.022);
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.115, 24), pm); disc.rotation.x = -Math.PI / 2; disc.position.set(x, 0.016, z); g.add(disc);
-    const bl = add(UBOX, bladeM, x, 0.017, z, 0.23, 0.004, 0.018); props.push(bl);
+  // 팔 + 모터 + 프로펠러 (앞: 위로, 뒤: 아래로)
+  const props = [], blur = gm || new THREE.MeshBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const bladeM = m(mat(0x26292d, { roughness: 0.45 })), PR = 0.092;
+  const ARMS = [[0.24, -0.17, -0.04, 1], [-0.24, -0.17, -0.04, 1], [0.235, 0.19, -0.02, -1], [-0.235, 0.19, -0.02, -1]];
+  for (const [x, z, root, up] of ARMS) {
+    const rx = Math.sign(x) * 0.045, rz = Math.sign(z) * 0.07, dx = x - rx, dz = z - rz, L = Math.hypot(dx, dz);
+    const arm = add(UBOX, carbon, (x + rx) / 2, root, (z + rz) / 2, 0.026, 0.016, L); arm.rotation.y = Math.atan2(dx, dz);
+    add(UCYL, carbon, rx, root, rz, 0.018, 0.02, 0.018);                       // 접힘 힌지
+    const my = root + up * 0.017;
+    add(UCYL, mot, x, my, z, 0.021, 0.026, 0.021);
+    add(UCYL, carbon, x, root, z, 0.026, 0.012, 0.026);
+    const py = my + up * 0.016;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(PR, 28), blur); disc.rotation.x = -Math.PI / 2; disc.position.set(x, py, z); g.add(disc);
+    const hub = new THREE.Group(); hub.position.set(x, py, z); g.add(hub);
+    for (const s of [1, -1]) { const b = add(UBOX, bladeM, s * PR * 0.5, 0, 0, PR, 0.003, 0.019, hub); b.rotation.x = s * 0.18; }
+    add(UCYL, accent, 0, up * 0.004, 0, 0.007, 0.008, 0.007, hub);
+    props.push(hub);
   }
-  add(UBOX, carbon, 0, 0.012, -0.125, 0.035, 0.035, 0.03);
-  add(UCYL, m(mat(0x0c1a2a, { roughness: 0.1, metalness: 0.5 })), 0, 0.012, -0.142, 0.011, 0.01, 0.011).rotation.x = Math.PI / 2;
-  add(UBOX, m(mat(0x2b8a4a)), -0.04, 0.045, 0.05, 0.04, 0.03, 0.06);
-  for (const sx of [-1, 1]) add(UCYL6, carbon, sx * 0.04, 0.07, 0.1, 0.004, 0.07, 0.004).rotation.x = -0.4;
-  add(UBOX, carbon, 0, -0.045, 0, 0.13, 0.008, 0.08);
-  const cans = [];
-  const canM = m(mat(0x7c8288, { roughness: 0.45, metalness: 0.5 }));
-  for (const x of [-0.045, 0, 0.045]) { const c = add(UCYL, canM, x, -0.075, 0.0, 0.019, 0.12, 0.019); c.rotation.x = Math.PI / 2; cans.push(c); }
-  const ledG = add(UBOX, gm || new THREE.MeshBasicMaterial({ color: 0x30ff60 }), 0.06, -0.02, 0.13, 0.012, 0.012, 0.012);
-  const ledR = add(UBOX, gm || new THREE.MeshBasicMaterial({ color: 0xff3030 }), -0.06, -0.02, 0.13, 0.012, 0.012, 0.012);
+  // 멀티밴드 안테나 2개 (뒤)
+  for (const sx of [-1, 1]) { const a = add(UCYL6, shellD, sx * 0.03, 0.07, 0.15, 0.0035, 0.07, 0.0035); a.rotation.x = -0.35; }
+  // 투하 모듈 (훈련용 부가장치) — 배 아래 3발
+  add(UBOX, carbon, 0, -0.04, 0.02, 0.11, 0.008, 0.07);
+  const cans = [], canM = m(mat(0x7c8288, { roughness: 0.45, metalness: 0.5 }));
+  for (const x of [-0.036, 0, 0.036]) { const c = add(UCYL, canM, x, -0.06, 0.02, 0.015, 0.09, 0.015); c.rotation.x = Math.PI / 2; cans.push(c); }
+  // 항법등: 앞 팔 끝 녹/적, 뒤 흰색 섬광
+  const LM = c => gm || new THREE.MeshBasicMaterial({ color: c });
+  const ledG = add(USPH, LM(0x30ff60), 0.24, -0.052, -0.17, 0.008, 0.008, 0.008);
+  const ledR = add(USPH, LM(0xff3030), -0.24, -0.052, -0.17, 0.008, 0.008, 0.008);
+  add(USPH, LM(0xffffff), 0, 0.018, 0.168, 0.007, 0.007, 0.007);
   return { g, props, cans, leds: [ledG, ledR] };
 }
 const droneM = makeDrone(false); scene.add(droneM.g);

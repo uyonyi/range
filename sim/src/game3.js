@@ -4,8 +4,8 @@
 // =====================================================================
 const MODES = {
   train: { name: 'TRAINING', maxTilt: 20 * DEG, vmax: 7.5, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
-  easy: { name: 'EASY', maxTilt: 28 * DEG, vmax: 11, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
-  sport: { name: 'SPORT', maxTilt: 55 * DEG, vmax: 27, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
+  easy: { name: 'EASY', maxTilt: 28 * DEG, vmax: 10, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
+  sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true };
@@ -13,7 +13,7 @@ try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); O
 if (!MODES[SET.diff]) SET.diff = 'train';
 function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull })); } catch (e) { } }
 
-const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.16, alive: true };
+const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
   state: 'menu', kind: 'course', t: 0, running: false, finished: false, objIdx: 0, objState: [], pen: 0, impacts: 0, payloads: 3,
   cam: 1, respawn: null, scan: 0, wasInside: false, landT: 0, simT: 0, ghostT: 0, demoEvents: 0, hits: 0, misses: 0,
@@ -215,7 +215,7 @@ function stepDrone(dt) {
   if (DR.p.y > gh + 120) { DR.p.y = gh + 120; DR.v.y = Math.min(DR.v.y, 0); }   // 지면 위 120 m 제한
   // 장애물
   for (let it = 0; it < 2; it++) {
-    const hit = collide(DR.p, DR.R); if (!hit) break;
+    const hit = collide(DR.p, DR.R) || STREES.col(DR.p, DR.R); if (!hit) break;
     const vn = DR.v.dot(hit.n);
     DR.p.addScaledVector(hit.n, hit.pen + 0.003);
     if (vn < -2.5) impact(hit.n, vn);
