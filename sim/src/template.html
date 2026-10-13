@@ -160,6 +160,8 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
 .langtog{position:absolute;top:14px;right:14px;display:flex;border:1px solid rgba(255,255,255,.18);border-radius:8px;overflow:hidden}.langtog button{border:0;border-radius:0;padding:6px 10px;font-size:12px;background:transparent;color:#9aa6ad}.langtog button.on{background:#ffc828;color:#111}
 .sitepick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sitepick.hidden{display:none}.stc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}.stc b{font-size:15px}.stc small{font-size:11px;opacity:.75}.stc.on{border-color:#4fe3ff;background:rgba(79,227,255,.1)}
+#attrib{position:fixed;left:calc(8px + env(safe-area-inset-left));bottom:4px;font-size:10px;color:rgba(255,255,255,.55);pointer-events:none;z-index:5;text-shadow:0 0 3px #000;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cred table{width:100%;border-collapse:collapse;font-size:13px}.cred td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}.cred td:first-child{color:#ffc828;white-space:nowrap;width:1%}.cred h3{margin:16px 0 6px}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -241,7 +243,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <button data-start="demo" data-ms="demo"><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
     </div>
     <div class="btns small" style="margin-top:10px">
-      <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>
+      <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bCred">데이터 출처</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>
       <span id="padStatus"></span>
     </div>
     <div class="opt" style="margin-top:16px">
@@ -263,6 +265,14 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   </div>
 </div>
 
+<div id="credPanel" class="panel hidden">
+  <div class="card" style="max-width:760px">
+    <h1>DATA SOURCES</h1><h2>데이터 출처 · 이 시뮬레이터에 쓰인 자료</h2>
+    <div id="credBody" class="cred"></div>
+    <div class="btns" style="margin-top:18px"><button class="primary" id="credClose">닫기</button></div>
+  </div>
+</div>
+<div id="attrib"></div>
 <div id="setPanel" class="panel hidden">
   <div class="card" style="max-width:760px">
     <h1>SETTINGS</h1><h2>설정 · 바꾼 값은 이 브라우저에 저장됩니다</h2>
