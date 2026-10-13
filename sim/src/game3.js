@@ -8,10 +8,10 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false };
 try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -36,22 +36,25 @@ function startRun(kind) {
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null;
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
-  resetDrone(startPos(), startHead());
+  resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
+  if (isMission(kind)) msStart(kind);
+  else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
   S._fromDemo = kind === 'demo';
   OBJS.forEach(o => { if (o.hint) o.hint.visible = false; });
   ui.menu.classList.add('hidden'); ui.pause.classList.add('hidden'); ui.result.classList.add('hidden'); ui.hud.classList.remove('hidden');
-  ui.list.classList.toggle('hidden', kind !== 'course');
+  ui.list.classList.toggle('hidden', kind !== 'course' && !isMission(kind));
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
   if (kind === 'course' || kind === 'free') recStart(); else REC = null;
-  showMsg(kind === 'course' ? (IS_TOUCH ? 'READY · 왼쪽 스틱 위로 이륙' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT' : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
+  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? (IS_TOUCH ? 'READY · 왼쪽 스틱 위로 이륙' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
 }
 function curObj() {
   if (S.state === 'menu' || S.state === 'replay' || S.state === 'result') return null;
   if (S.kind === 'course') return OBJS[S.objIdx];
   if (S.kind === 'tutorial') return tutObj();
+  if (isMission()) return msObj();
   return null;
 }
 function completeObj(status, msg, col) {
@@ -88,16 +91,25 @@ function fmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s
 // ---------------- 충돌 = 벌점 + 튕김 (게임은 계속) ----------------
 function impact(n, vn) {
   DR.v.addScaledVector(n, -vn * 1.4); DR.v.multiplyScalar(0.45);
+  if (AFc().kam && S.state === 'run') { lostDrone('impact'); return; }   // 자폭기: 부딪히면 기폭
   if (S.hitCD > 0) return;
   S.hitCD = 0.8; S.impacts++; S.stun = 0.45; shake = 0.07;
   const pen = MODES[SET.diff].hitPen;
-  if (S.kind === 'course' && S.running) S.pen += pen;
+  if ((S.kind === 'course' || isMission()) && S.running) S.pen += pen;
   spawnImpact(DR.p.clone(), false, true); sfx('crash'); rumble(0.9, 0.6, 230);
   ui.flash.style.opacity = 0.3; setTimeout(() => { ui.flash.style.opacity = 0; }, 110);
-  showMsg('IMPACT' + (S.kind === 'course' && S.running ? ` +${pen}s` : ''), '#ff5050', 1.1);
+  showMsg('IMPACT' + ((S.kind === 'course' || isMission()) && S.running ? ` +${pen}s` : ''), '#ff5050', 1.1);
 }
 function respawn() {
   if (S.kind === 'tutorial' && S.tut) { const st = S.tut.startPose; const p = st.p.clone(); if (!st.landed) p.y = Math.max(p.y, groundAt(p.x, p.z) + 1.0); resetDrone(p, st.h); if (st.landed) DR.landed = true; S.scanned = false; S.scan = 0; S.wasInside = false; S.tut.hold = 0; if (LESSONS[S.tut.i].custom) S.tut.step = 0; else S.objIdx = LESSONS[S.tut.i].range[0]; PAY.forEach(p => scene.remove(p.m)); PAY.length = 0; droneM.cans.forEach(c => c.visible = true); tutRender(); return; }
+  if (isMission() || AFc().cls === 'wing') {
+    let p, h; const o = curObj();
+    if (S.kind === 'strike' || !S.respawn) { p = (MS.launch ? MS.launch.p : startPos()).clone(); h = MS.launch ? MS.launch.h : startHead(); }
+    else { p = S.respawn.p.clone(); h = S.respawn.h; }
+    if (o && o.mk) { const d = o.mk.clone().sub(p); h = Math.atan2(d.x, -d.z); }
+    if (AFc().cls === 'wing') { if (!MS.launch || S.respawn) p.y += 12; wingAir(p, h); } else { p.y = Math.max(p.y, groundAt(p.x, p.z) + 1.2); resetDrone(p, h); }
+    DR.alive = true; droneM.g.visible = true; return;
+  }
   let p, h;
   if (S.respawn) { p = S.respawn.p.clone(); h = S.respawn.h; p.y = Math.max(p.y, groundAt(p.x, p.z) + 1.2); }
   else { p = startPos(); h = startHead(); }
@@ -134,17 +146,23 @@ function openingOf(o) {
 const FWD = new V3(), RGT = new V3(), _ax = new V3(), _ay = new V3();
 function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 function stepDrone(dt) {
-  const md = MODES[SET.diff];
+  if (!DR.alive) { deadTick(dt); return; }
+  if (AFc().cls === 'wing') { stepWing(dt); return; }
+  const md = effMode(), afc = AFc();
   const grounded = DR.landed && IN.thr <= 0.05;
   const boost = !!IN.boost && !grounded && boostZone(); S.boosting = boost;
-  const vmaxB = boost ? Math.max(md.vmax * 2.2, 22) : md.vmax, tiltB = md.maxTilt + (boost ? 15 * DEG : 0);
+  const vmaxB = boost ? Math.max(md.vmax, afc.top) : md.vmax, tiltB = md.maxTilt + (boost ? 15 * DEG : 0);
   const k = G * Math.tan(tiltB) / vmaxB;
   const a = 1 - Math.exp(-dt / 0.11);
   const stun = S.stun > 0 ? 0.25 : 1;
   let ip = IN.pitch * stun, ir = IN.roll * stun, iy = IN.yaw * stun;
   if (S.stun > 0) { ir += Math.sin(S.simT * 40) * 0.35; S.stun -= dt; }
-  DR.pitch += ((grounded ? 0 : ip * tiltB) - DR.pitch) * a;
-  DR.roll += ((grounded ? 0 : ir * md.maxTilt) - DR.roll) * a;
+  if (md.acro && !grounded) {   // 수동(Acro): 스틱 = 기울기 속도, 놓아도 수평으로 돌아오지 않음
+    DR.pitch = clamp(DR.pitch + ip * 210 * DEG * dt, -80 * DEG, 80 * DEG); DR.roll = clamp(DR.roll + ir * 210 * DEG * dt, -80 * DEG, 80 * DEG);
+  } else {
+    DR.pitch += ((grounded ? 0 : ip * tiltB) - DR.pitch) * a;
+    DR.roll += ((grounded ? 0 : ir * md.maxTilt) - DR.roll) * a;
+  }
   const o = curObj(), assistOn = SET.assist && md.assist > 0;
   if (!grounded) {
     DR.h += iy * md.yawRate * dt;
@@ -187,7 +205,7 @@ function stepDrone(dt) {
     }
   }
   if (md.althold) {
-    let tv = IN.thr > 0 ? IN.thr * 4.5 : IN.thr * 3.2;
+    let tv = IN.thr > 0 ? IN.thr * afc.climb : IN.thr * afc.sink;
     if (Math.abs(IN.thr) < 0.05) tv += vyAssist;
     // 지형 추종 (입문: 지면 위 높이 유지 / 쉬움: 오르막에서 부딪히지 않게만)
     if (TER.h && assistOn && Math.abs(IN.thr) < 0.05 && !grounded && vyAssist === 0) {   // 게이트 통과 보조 중엔 끔
@@ -198,7 +216,7 @@ function stepDrone(dt) {
     DR.thrust = clamp(0.5 + IN.thr * 0.35 + Math.hypot(DR.pitch, DR.roll) * 0.4, 0, 1);
     if (grounded) { DR.v.y = Math.min(DR.v.y, 0); DR.thrust = 0.08; }
   } else {
-    const T = G * (1 + IN.thr * 1.15);
+    const T = G * (1 + IN.thr * afc.tw);
     const ay = (grounded ? 0 : T * Math.cos(DR.pitch) * Math.cos(DR.roll) - G) - 0.35 * DR.v.y;
     DR.v.y += ay * dt; DR.thrust = grounded ? 0.08 : clamp(0.5 + IN.thr * 0.45, 0.05, 1);
     if (grounded) DR.v.y = Math.min(DR.v.y, 0);
@@ -233,6 +251,7 @@ S.msgCD = 0;
 
 // ---------------- payloads ----------------
 function dropPayload(fromPos, fromVel, ghost) {
+  if (!ghost && !AFc().drop) return;
   const meshes = ghost && ghost !== 'demo' && ghost !== 'replay' ? ghostM.cans : droneM.cans;
   if (!ghost && S.kind === 'course' && S.payloads <= 0) { showMsg('NO PAYLOAD', '#ff6060', 1); sfx('bad'); return; }
   const can = meshes.find(c => c.visible); if (can) can.visible = false;
@@ -393,7 +412,7 @@ function updateCamera(dt, subj) {
       want = b.world(clamp(lw.lx, -n.x + 0.18, n.x - 0.18), clamp(lw.ly, n.y0 + 0.18, n.y1 - 0.18), clamp(lw.lz, 0.4, n.z - 0.2));
       camPos.lerp(want, 1 - Math.exp(-dt * 12));
     } else {
-      const Z = ZOOMS[SET.zoom] || ZOOMS[1]; want = subj.p.clone().addScaledVector(fwd, -Z.d).add(new V3(0, Z.h, 0));
+      const Z = ZOOMS[SET.zoom] || ZOOMS[1]; want = subj.p.clone().addScaledVector(fwd, -Z.d * camK()).add(new V3(0, Z.h * camK(), 0));
       want.y = Math.max(want.y, groundAt(want.x, want.z) + 0.35);
       camPos.lerp(want, 1 - Math.exp(-dt * 5.5));
     }
@@ -427,6 +446,7 @@ const ui = {
 let msgTimer = 0;
 function showMsg(t, col, dur) { if (t && REC) recEvent({ k: 'msg', text: t, col }); ui.objMsg.textContent = t; ui.objMsg.style.color = col || '#fff'; ui.objMsg.classList.add('show'); msgTimer = dur || 1.2; }
 function renderList() {
+  if (isMission()) { ui.list.innerHTML = msListHTML(); return; }
   if (S.kind !== 'course') { ui.list.innerHTML = ''; return; }
   let html = ''; const sl = OBJS.map((o, i) => o.kind === 'slalom' ? i : -1).filter(i => i >= 0);
   OBJS.forEach((o, i) => {
@@ -443,7 +463,7 @@ function renderList() {
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
-  ui.modeTag.textContent = S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : '') + (SET.ghost && S.kind === 'course' ? ' · GHOST' : '');
+  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : '') + (SET.ghost && S.kind === 'course' ? ' · GHOST' : ''));
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
@@ -576,18 +596,20 @@ function updateHUD(dt, subj) {
   const spd = subj.v ? subj.v.length() * 3.6 : 0;
   const o = curObj();
   const dist = o && o.mk ? o.mk.distanceTo(subj.p) : null;
-  const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : S.kind === 'course' ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
-  ui.osd.innerHTML = `<div class="big">${fmt(tm)}${S.kind === 'course' && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
+  const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : (S.kind === 'course' || isMission()) ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
+  ui.osd.innerHTML = `<div class="big">${fmt(tm)}${(S.kind === 'course' || isMission()) && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
     `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span style="color:#9aa6ad;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
     (dist !== null ? `<div><b>DIST</b>${dist.toFixed(0)} m</div>` : '') +
     (S.kind === 'course' ? `<div><b>HIT</b>${S.impacts}</div>` : '') +
     (o && o.kind === 'orbit' ? `<div style="color:#4fe3ff">ORBIT ${Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0)}%</div>` : '') +
+    (S.state === 'run' && (isMission() || AFc().cls === 'wing') ? msOsd() : '') +
     (S.boosting ? '<div style="color:#ff9a40">BOOST ▲▲</div>' : '') +
     (S.state !== 'demo' && insideBunker(subj.p) ? `<div style="color:#5dff9a">SCAN ${Math.min(100, S.scan / 1.5 * 100).toFixed(0)}%</div>` : '');
   if (S.kind === 'course') {
     ui.objNext.style.display = '';
     ui.objNext.innerHTML = o ? `NEXT ▸ ${o.label}<small>${S.objIdx + 1}/${OBJS.length}</small>` : 'COURSE COMPLETE';
-  } else if (S.kind === 'tutorial' && S.tut) { ui.objNext.style.display = ''; ui.objNext.innerHTML = `LESSON ${S.tut.i + 1} ▸ ${o ? o.label : 'COMPLETE'}`; }
+  } else if (isMission() && S.state !== 'replay') { ui.objNext.style.display = ''; ui.objNext.innerHTML = o ? `NEXT ▸ ${o.label}<small>${MS.idx + 1}/${MS.list.length}</small>` : 'MISSION COMPLETE'; }
+  else if (S.kind === 'tutorial' && S.tut) { ui.objNext.style.display = ''; ui.objNext.innerHTML = `LESSON ${S.tut.i + 1} ▸ ${o ? o.label : 'COMPLETE'}`; }
   else if (S.state === 'replay') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REPLAY <small>${RP.rec.kind === 'course' ? MODES[RP.rec.diff] ? MODES[RP.rec.diff].name : '' : 'FREE'} ×${RP.speed}</small>`; }
   else if (S.kind === 'demo') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REFERENCE FLIGHT <small>${fmt(S.ghostT)} / ${fmt(GH.total)}</small>`; }
   else ui.objNext.style.display = 'none';
@@ -634,6 +656,7 @@ function handleKeys() {
     const k = pressed.shift();
     if (RCUI.open) continue;
     if (k === 'KeyF') { toggleFull(); continue; }
+    if (k === 'KeyT') { irSet(!ENV.ir); continue; }
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }
     if (S.state === 'menu') {
@@ -664,6 +687,7 @@ function handleKeys() {
     if (S.tut && S.tut.st !== 'fly') continue;
     if (k === 'Space' && DR.alive) dropPayload(DR.p, DR.v, false);
     else if (k === 'KeyR') respawn();
+    else if (k === 'KeyN' && isMission() && S.running && msObj()) { S.pen += 20; msNext('SKIPPED +20s', '#ff9a40'); }
     else if (k === 'KeyN' && S.kind === 'course' && S.running && curObj() && curObj().kind !== 'land') { S.pen += 20; completeObj(2, 'SKIPPED +20s', '#ff9a40'); }
   }
 }
@@ -697,10 +721,10 @@ function frame(now, noRender) {
       acc += dt;
       while (acc >= STEP) {
         acc -= STEP; _prevP.copy(DR.p); stepDrone(STEP); S.bumpT -= STEP; S.hitCD -= STEP;
-        if (S.kind === 'course' || S.kind === 'tutorial') checkObjectives(_prevP, DR.p, STEP);
+        if (S.kind === 'course' || S.kind === 'tutorial') checkObjectives(_prevP, DR.p, STEP); else if (isMission()) msStep(_prevP, DR.p, STEP);
       }
     }
-    if (S.running && !S.finished && S.kind === 'course') S.t += dt;
+    if (S.running && !S.finished && (S.kind === 'course' || isMission())) S.t += dt;
     S.flyT += dt;
     if (S.running && !REC_T0_SET && REC) { REC.t0 = S.flyT; REC_T0_SET = true; }
     if (!S.running) REC_T0_SET = false;
@@ -733,8 +757,8 @@ function frame(now, noRender) {
   const subjPos = subj.p;
   const inB = S.state !== 'menu' && insideBunker(subjPos);
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;
-  hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : 0.5, 1 - Math.exp(-dt * 5));
-  spot.intensity = lerp(spot.intensity, (SET.light || inB || nearB) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
+  hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : envHemi(), 1 - Math.exp(-dt * 5));
+  spot.intensity = lerp(spot.intensity, (SET.light || inB || nearB || (ENV.night && !ENV.ir)) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
   { eul.set(-subj.pitch, -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
@@ -743,12 +767,12 @@ function frame(now, noRender) {
   } else updateCamera(dt, subj);
   camera.updateMatrixWorld();
   updateGuide(subj);
-  droneM.g.visible = !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));
+  droneM.g.visible = (DR.alive || S.state !== 'run') && !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));
   $('vig').classList.toggle('hidden', !(CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay') && !(tutHold && S.tut.st === 'intro')));
   const focus = S.state === 'menu' ? (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)) : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt);
+  updateFX(dt); envTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (!noRender) { renderer.render(scene, camera); renderBelly(); }

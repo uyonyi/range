@@ -323,7 +323,7 @@ const GRASS = (function grass() {
     m4.compose(W(d, s, 0), q, new V3(sc, sc * (0.6 + rr() * 0.9), sc)); im.setMatrixAt(i, m4);
     if (SITE.trees) c.setHSL(0.17 + rr() * 0.1, 0.3 + rr() * 0.2, 0.13 + rr() * 0.1); else c.setHSL(0.13 + rr() * 0.08, 0.28 + rr() * 0.2, 0.17 + rr() * 0.12); im.setColorAt(i, c); i++;
   }
-  im.receiveShadow = true; scene.add(im); return im;
+  im.receiveShadow = true; im.userData.irBase = 0.25; scene.add(im); return im;
 })();
 // 지형을 고친 뒤 풀 높이 다시 맞춤
 function grassRefit() { const a = GRASS.instanceMatrix.array; for (let i = 0; i < GRASS.count; i++) a[i * 16 + 13] = terrainAt(a[i * 16 + 12], a[i * 16 + 14]); GRASS.instanceMatrix.needsUpdate = true; }
@@ -444,6 +444,7 @@ const UBOX = new THREE.BoxGeometry(1, 1, 1);
 const UCYL = new THREE.CylinderGeometry(1, 1, 1, 12);
 const UCYL6 = new THREE.CylinderGeometry(1, 1, 1, 7);
 const UCYL40 = new THREE.CylinderGeometry(1, 1, 1, 40);
+const USPH = new THREE.SphereGeometry(1, 20, 12), UCAP = new THREE.CapsuleGeometry(1, 1, 6, 16);
 const OBJ = {};
 class Obj {
   constructor(o, tag) {
@@ -849,6 +850,73 @@ const SITE_BLD = (function siteBuildings() {
   }
   return n;
 })();
+// 숲길 (나무 사이 좁은 길): 주 경로에서 옆으로 떨어진 숲 속 길. 길 위 나무는 비우고, 게이트·쓰러진 나무·좁은 틈을 둠
+const FLANE = (function forestLane() {
+  if (!CRS_C || !SITE.trees) return null;
+  const P = CRS_C.path, OFF = 34;
+  // 경로를 2 m 간격으로 다시 찍고, 왼쪽(+side) 으로 OFF 만큼 평행 이동 후 이동평균으로 다듬음
+  const rs = []; let acc = 0;
+  for (let i = 0; i < P.length - 1; i++) {
+    const a = P[i], b = P[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    for (let t = acc; t < L; t += 2) { const u = t / L; rs.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]); }
+    acc = Math.max(0, (Math.ceil((L - acc) / 2) * 2 + acc) - L);
+  }
+  let lane = rs.map((p, i) => { const q = rs[Math.min(rs.length - 1, i + 1)], o = rs[Math.max(0, i - 1)], dd = q[0] - o[0], ds = q[1] - o[1], l = Math.hypot(dd, ds) || 1; return [p[0] - ds / l * OFF, p[1] + dd / l * OFF]; });
+  lane = lane.slice(Math.floor(lane.length * 0.06), Math.floor(lane.length * 0.94));
+  for (let it = 0; it < 3; it++) lane = lane.map((p, i) => { let sd = 0, ss = 0, n = 0; for (let k = -8; k <= 8; k++) { const q = lane[Math.max(0, Math.min(lane.length - 1, i + k))]; sd += q[0]; ss += q[1]; n++; } return [sd / n, ss / n]; });
+  // 누적 거리
+  const cum = [0]; for (let i = 1; i < lane.length; i++) cum.push(cum[i - 1] + Math.hypot(lane[i][0] - lane[i - 1][0], lane[i][1] - lane[i - 1][1]));
+  const total = cum[cum.length - 1];
+  const at = s => { let i = 1; while (i < cum.length - 1 && cum[i] < s) i++; const u = (s - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]), a = lane[i - 1], b = lane[i];
+    const d = a[0] + (b[0] - a[0]) * u, sd = a[1] + (b[1] - a[1]) * u, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return { d, s: sd, td: (b[0] - a[0]) / l, ts: (b[1] - a[1]) / l }; };
+  // 시설물
+  const G = new THREE.Group(); scene.add(G);
+  const gateM = mat(0xff7a1a, { roughness: 0.6 }), barkM = mat(0x4a3a2c, { roughness: 1 }), leafM = mat(0x3c5634, { roughness: 1 }), tapeM = mat(0xf2e14c, { roughness: 0.7 });
+  const cps = [];
+  // 코스 좌표 (down, side, agl) + 길 방향 기준 오프셋 -> world
+  const wpt = (q, lat, up) => W(q.d - q.ts * lat, q.s + q.td * lat, up);
+  const box = (a, b, w, col, tag) => { const m = new THREE.Mesh(UBOX, col); m.position.copy(a).add(b).multiplyScalar(0.5); const L = a.distanceTo(b); m.scale.set(w, w, L); m.lookAt(b); m.castShadow = true; G.add(m); if (tag) boxCol(m, tag); return m; };
+  const cyl = (a, b, r, col, tag) => { const m = new THREE.Mesh(UCYL, col); m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(r, a.distanceTo(b), r); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), b.clone().sub(a).normalize()); m.castShadow = true; m.receiveShadow = true; G.add(m); if (tag) capCol(a.clone(), b.clone(), r, tag); return m; };
+  const yaw = q => Math.atan2(q.ts, q.td);   // 길 방향 (코스 좌표 각)
+  function gate(s, label, w, h) {
+    const q = at(s), hw = w / 2;
+    const l0 = wpt(q, -hw - 0.1, 0), l1 = wpt(q, -hw - 0.1, h + 0.1), r0 = wpt(q, hw + 0.1, 0), r1 = wpt(q, hw + 0.1, h + 0.1);
+    box(l0, l1, 0.16, gateM, 'fgate'); box(r0, r1, 0.16, gateM, 'fgate'); box(l1, r1, 0.16, gateM, 'fgate');
+    cps.push({ s, q, label, hw, y0: 0.2, y1: h });
+  }
+  function lowLog(s) {   // 쓰러진 나무: 위로 넘기
+    const q = at(s), a = wpt(q, -6, 0.75), b = wpt(q, 6.5, 0.55);
+    cyl(a, b, 0.32, barkM, 'log');
+    for (const k of [-0.3, 0.1, 0.4]) { const p = a.clone().lerp(b, 0.5 + k); box(p, p.clone().add(new V3(0, 0.9, 0.3)), 0.07, barkM); }   // 부러진 가지
+    cps.push({ s, q, label: '쓰러진 나무 넘기', hw: 2.6, y0: 1.25, y1: 4.2 });
+  }
+  function arch(s) {   // 기울어진 나무: 아래로 지나기
+    const q = at(s), a = wpt(q, -7, 0.1), b = wpt(q, 6, 4.9);
+    cyl(a, b, 0.28, barkM, 'log');
+    const crown = new THREE.Mesh(USPH, leafM); crown.position.copy(b).add(new V3(0, 0.6, 0)); crown.scale.set(2.6, 1.6, 2.6); crown.castShadow = true; G.add(crown);
+    const yc = 0.1 + (7 / 13) * 4.8;   // 길 가운데 높이
+    cps.push({ s, q, label: '기운 나무 아래로', hw: 2.4, y0: 0.25, y1: yc - 0.45 });
+  }
+  function gap(s) {   // 좁은 나무 틈
+    const q = at(s);
+    for (const lat of [-1.35, 1.35]) {
+      const a = wpt(q, lat, -0.3), b = wpt(q, lat, 11);
+      cyl(a, b, 0.3, barkM, 'trunk');
+      const c = new THREE.Mesh(USPH, leafM); c.position.copy(wpt(q, lat * 1.8, 9.5)); c.scale.set(2.4, 2.8, 2.4); c.castShadow = true; G.add(c);
+    }
+    const t0 = wpt(q, -1.05, 2.2), t1 = wpt(q, 1.05, 2.2); box(t0, t1, 0.04, tapeM);   // 표시 띠
+    cps.push({ s, q, label: '좁은 틈 (2.1 m)', hw: 1.05, y0: 0.2, y1: 6 });
+  }
+  const plan = [[18, 'g'], [52, 'n'], [86, 'g'], [118, 'l'], [150, 'g'], [182, 'a'], [214, 'g'], [246, 'n'], [278, 'l'], [310, 'a'], [342, 'g'], [374, 'n'], [total - 14, 'f']];
+  let gi = 0;
+  for (const [s, k] of plan) {
+    if (s > total - 10 && k !== 'f') continue;
+    if (k === 'g') gate(s, '숲 게이트 ' + (++gi), 3.0, 2.6); else if (k === 'l') lowLog(s); else if (k === 'a') arch(s); else if (k === 'n') gap(s); else gate(s, '숲길 결승', 3.6, 3.2);
+  }
+  // 나무 비울 곳 (코스 좌표 점 목록, 반경)
+  const clear = lane.filter((_, i) => i % 1 === 0);
+  return { lane, total, at, cps, G, clear, R: 3.0, gateM };
+})();
 // 나무: 현장 패키지의 trees (정사영상 수관 검출) 를 구역별 InstancedMesh 로 세움 + 충돌 격자
 const STREES = (function siteTrees() {
   const T = SITE.trees; if (!T || !T.n) return { n: 0, col() { return null; } };
@@ -892,7 +960,14 @@ const STREES = (function siteTrees() {
   const mt = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 });
   // 구역(120 m) 별로 나눠 화면 밖 구역은 그리지 않음
   const CH = 120, groups = new Map(), GRID = new Map(), GC = 10, CHUNKS = [];
+  // 숲길 위 나무 빼기 (격자로 빠르게)
+  const skip = new Uint8Array(n);
+  if (FLANE) { const LG = new Map(); for (const p of FLANE.clear) { const k = Math.floor(p[0] / 8) + ',' + Math.floor(p[1] / 8); if (!LG.has(k)) LG.set(k, []); LG.get(k).push(p); }
+    for (let i = 0; i < n; i++) { const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, gd = Math.floor(d / 8), gs = Math.floor(s / 8);
+      for (let a = gd - 1; a <= gd + 1 && !skip[i]; a++) for (let b = gs - 1; b <= gs + 1; b++) { const L = LG.get(a + ',' + b); if (L && L.some(p => Math.hypot(p[0] - d, p[1] - s) < FLANE.R)) { skip[i] = 1; break; } } } }
+  if (LOWQ) for (let i = 0; i < n; i++) if (hsh(i16[i * 4], i16[i * 4 + 1], 9) < 0.35) skip[i] = 1;   // 모바일: 나무 35% 줄임
   for (let i = 0; i < n; i++) {
+    if (skip[i]) continue;
     const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, key = Math.floor(d / CH) + ',' + Math.floor(s / CH) + ',' + u8[i * 4 + 3];
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
   }
@@ -915,7 +990,7 @@ const STREES = (function siteTrees() {
     });
     bb.expandByScalar(4); const sph = bb.getBoundingSphere(new THREE.Sphere()); geos.forEach(g => { g.boundingSphere = sph; g.boundingBox = bb; });
     CHUNKS.push({ im, geos, c: sph.center, r: sph.radius, lod: 2 });
-    im.castShadow = !LOWQ; im.receiveShadow = !LOWQ; im.frustumCulled = true; scene.add(im);
+    im.castShadow = !LOWQ; im.receiveShadow = !LOWQ; im.frustumCulled = true; im.userData.irBase = 0.13; scene.add(im);
   }
   // 충돌: 줄기(캡슐) + 수관(세로 캡슐, 침엽수는 원뿔이라 위로 갈수록 가늘게)
   function col1(p, Rr) {
@@ -938,7 +1013,7 @@ const STREES = (function siteTrees() {
   }
   // 카메라 거리로 세밀도 바꿈 (0.3 초마다)
   function lod(cam) {
-    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < 90 ? 0 : d < 300 ? 1 : 2;
+    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < (LOWQ ? 50 : 90) ? 0 : d < (LOWQ ? 170 : 300) ? 1 : 2;
       if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);

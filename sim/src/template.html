@@ -119,6 +119,7 @@ body.touch .panel{touch-action:pan-y}
 #tbAssist{right:calc(70px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbBoost{width:58px;height:58px;font-size:12px;right:calc(104px + env(safe-area-inset-right));bottom:calc(46% + 78px);border-color:#ff9a40;color:#ff9a40}
 #tbBelly{width:46px;height:46px;font-size:10px;right:calc(160px + env(safe-area-inset-right));bottom:calc(46% + 16px)}
+#tbIR{width:46px;height:46px;font-size:12px;right:calc(294px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbZoom,#tbFull,#tbGuide{width:46px;height:46px;font-size:12px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 body.touch #keys,body.touch #sticks,body.touch #list{display:none!important}
 body.touch #osd{font-size:14px;left:calc(10px + env(safe-area-inset-left));top:8px}body.touch #osd .big{font-size:19px}body.touch #osd b{width:40px}
@@ -150,6 +151,19 @@ body.touch #objMsg{margin-top:36px}
 body.touch #guide{bottom:16px;top:auto;font-size:13px}
 button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .btns.big button{font-size:16px;padding:13px 20px}
+.pickLbl{margin:14px 0 6px;font-size:13px;letter-spacing:.08em;color:var(--mute);text-transform:uppercase}.pickLbl small{text-transform:none;letter-spacing:0;margin-left:8px;opacity:.8}
+.afcards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.afc{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}
+.afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
+.afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
+#irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
+.msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
+.msgrid button.off{opacity:.32;cursor:not-allowed}
+@media (max-width:1000px){.afcards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-height:520px){.afcards{display:flex;overflow-x:auto}.afc{flex:0 0 118px;padding:6px 8px}.afc svg{width:34px;height:26px;margin:0}.afc small,.afc .nt{display:none}.afc .spec{font-size:11px}.msgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.msgrid button{padding:6px 9px}.msgrid button small{display:none}.pickLbl{margin:8px 0 4px}}
+@media (max-width:760px){.msgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.afcards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.afc{flex:0 0 136px;scroll-snap-align:start}}
+
 .opt.col{flex-direction:column;align-items:flex-start;gap:10px}
 .kbd{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
 .kbd .grp{display:flex;flex-direction:column;gap:5px}.kbd .row{display:flex;gap:5px}
@@ -172,6 +186,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <body>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
+  <div id="irTag" class="hidden">IR · WHITE-HOT</div>
   <div id="vig" class="hidden"></div>
   <div id="osd"></div>
   <div id="obj"><div id="objNext"></div><div id="objMsg"></div></div>
@@ -189,7 +204,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="tz" id="tzL"><div class="base"><div class="knob"></div></div><span class="lbl">↕ 상승·하강 ↔ 회전</span></div>
     <div class="tz" id="tzR"><div class="base"><div class="knob"></div></div><span class="lbl">↕ 전진·후진 ↔ 좌우</span></div>
     <div class="tb" id="tbDrop">DROP</div><div class="tb" id="tbCam">CAM</div><div class="tb" id="tbReset">⟲</div>
-    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
+    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbIR">IR</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
   </div>
   <div id="tut" class="hidden"></div>
   <div id="rp" class="hidden"><button id="rpBack">⏪ 5s</button><button id="rpPlay">❚❚</button><button id="rpFwd">5s ⏩</button><input id="rpSeek" type="range" min="0" max="100" step="0.01"><span id="rpTime"></span><button id="rpSpd">×1</button><button id="rpCam">카메라</button><button id="rpClose">닫기</button></div>
@@ -204,11 +219,19 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   <div class="card">
     <h1>{{H1}}</h1>
     <h2>{{H2}}</h2>
-    <div class="btns big">
-      <button class="primary" data-start="course">코스 비행 시작</button>
-      <button id="bTut">튜토리얼</button>
-      <button data-start="free">자유 비행</button>
-      <button data-start="demo">기준 비행 보기</button>
+    <div class="pickLbl">기체 <small>공개 제원 기준 근사 · 속도·크기·조종 특성이 다름</small></div>
+    <div id="afCards" class="afcards"></div>
+    <div class="pickLbl">임무</div>
+    <div id="msGrid" class="msgrid">
+      <button class="primary" data-start="course" data-ms="course"><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
+      <button data-start="forest" data-ms="forest"><b>숲길 통과</b><small>나무 사이 · 쓰러진 나무 넘고 아래로</small></button>
+      <button data-start="race" data-ms="race"><b>타임 레이스</b><small>계곡 링 최단 시간</small></button>
+      <button data-start="recon" data-ms="recon"><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
+      <button data-start="strike" data-ms="strike"><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
+      <button data-start="fire" data-ms="fire"><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
+      <button data-start="free" data-ms="free"><b>자유 비행</b><small>제한 없이</small></button>
+      <button id="bTut" data-ms="tutorial"><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
+      <button data-start="demo" data-ms="demo"><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
     </div>
     <div class="btns small" style="margin-top:10px">
       <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>
@@ -216,6 +239,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     </div>
     <div class="opt" style="margin-top:16px">
       <div>조종 난이도 <span class="seg" id="segDiff"><button data-v="train" class="on">입문</button><button data-v="easy">쉬움</button><button data-v="sport">스포츠</button></span></div>
+      <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="1">밤</button></span></div>
       <div>가이드 <span class="seg" id="segGuide"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
     </div>
     <div class="deskOnly">
@@ -227,7 +251,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <div class="thumbs"><div><b>왼쪽 엄지</b>화면 왼쪽을 누르고 끌기<br>↕ 상승·하강 · ↔ 회전</div><div><b>오른쪽 엄지</b>화면 오른쪽을 누르고 끌기<br>↕ 전진·후진 · ↔ 좌우 이동</div></div>
       <div class="note">DROP 투하 · BST 부스트(고속 복귀 구간) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 가이드 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지</div>
     </div>
-    <div class="note">실제 기체의 성능·비행 특성을 재현하지 않는 훈련 개념용 간이 시뮬레이터입니다. 장애물 배치와 치수는 course_objects.csv 기준입니다.</div>
+    <div class="note">속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.</div>
   </div>
 </div>
 
@@ -236,6 +260,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <h1>SETTINGS</h1><h2>설정 · 바꾼 값은 이 브라우저에 저장됩니다</h2>
     <h3>비행</h3>
     <div class="opt col">
+      <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
       <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>

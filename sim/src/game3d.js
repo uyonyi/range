@@ -30,6 +30,7 @@ function orbitDir(c, p) {
 function guidePoints(o, p) {
   GUIDE.detour = false;
   if (!o) return null;
+  if (o.kind === 'ms') return o.pts(p);
   const up = (y) => new V3(0, y, 0);
   if (o.kind === 'takeoff') return [p.clone(), p.clone().add(up(2.5))];
   if (o.kind === 'custom') return o.mk ? [p.clone(), o.mk.clone()] : null;
@@ -136,7 +137,7 @@ function bellyMode() {
   const ov = S.bellyOv;
   if (ov && ov.val === false && ov.idx !== S.objIdx) S.bellyOv = null;          // 끈 것은 다음 과제에서 다시 자동
   const o = curObj();
-  const auto = SET.belly && o && ((o.kind === 'drop' && dropTargetPos(o).distanceTo(DR.p) < 45) || (o.kind === 'orbit' && o.b.world(0, 0, 0).distanceTo(DR.p) < 30));
+  const auto = SET.belly && o && ((o.kind === 'drop' && dropTargetPos(o).distanceTo(DR.p) < 45) || (o.kind === 'orbit' && o.b.world(0, 0, 0).distanceTo(DR.p) < 30) || ((o.t === 'recon' || o.t === 'fire') && Math.hypot(o.tp.x - DR.p.x, o.tp.z - DR.p.z) < 140));
   if (S.bellyOv && S.bellyOv.val === false) return null;
   if (auto) return 'big';
   if (S.bellyOv && S.bellyOv.val === true) return 'small';
