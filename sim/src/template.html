@@ -173,6 +173,13 @@ body.lyEditing #osd,body.lyEditing #obj,body.lyEditing #list,body.lyEditing #map
 body.lyEditing #belly,body.lyEditing #scope,body.lyEditing #guide{display:block!important;min-width:120px;min-height:40px}body.lyEditing #radio{opacity:1}
 body.lyEditing #guide:empty::after{content:'GUIDE'}
 #lyBar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:60;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(10,13,16,.92);border:1px solid #ffc828;border-radius:10px;padding:6px 8px;font-size:12px;max-width:96vw}#lyBar.hidden{display:none}#lyBar .ln{color:#ffc828;font-weight:600;margin-right:4px}#lyBar button{padding:5px 9px;font-size:12px}#lyBar .sz{min-width:40px;text-align:center}
+.msgrid button{--cc:#4fe3ff;border-left:3px solid var(--cc)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 12%,transparent),transparent 70%)}
+.msgrid button[data-cat=recon]{--cc:#5dff9a}.msgrid button[data-cat=rescue]{--cc:#ffaa4d}.msgrid button[data-cat=strike]{--cc:#ff5d5d}
+.msgrid button .cat{font-style:normal;font-size:10px;letter-spacing:.06em;color:var(--cc);opacity:.95}
+.msgrid button:not(.off):hover{background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 24%,transparent),transparent 80%)}
+.afc{--cc:#5aa9ff;border-top:3px solid var(--cc)!important}.afc[data-cat=fpv]{--cc:#b48cff}.afc[data-cat=wing]{--cc:#4fe3c0}.afc[data-cat=kam]{--cc:#ff6a5d}
+.afc .cat{font-style:normal;font-size:10px;letter-spacing:.06em;color:var(--cc)}.afc svg{color:var(--cc)!important;opacity:.85}
+.afc.on{border-color:var(--cc)!important;background:color-mix(in srgb,var(--cc) 14%,transparent)!important}.afc.on svg{opacity:1}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -240,18 +247,18 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div id="afCards" class="afcards"></div>
     <div class="pickLbl">임무</div>
     <div id="msGrid" class="msgrid">
-      <button class="primary" data-start="course" data-ms="course"><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
-      <button data-start="forest" data-ms="forest"><b>숲길 통과</b><small>나무 사이 · 쓰러진 나무 넘고 아래로</small></button>
-      <button data-start="race" data-ms="race"><b>타임 레이스</b><small>계곡 링 최단 시간</small></button>
-      <button data-start="recon" data-ms="recon"><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
-      <button data-start="strike" data-ms="strike"><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
-      <button data-start="fire" data-ms="fire"><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
-      <button data-start="sar" data-ms="sar"><b>수색·구조</b><small>숲 속 실종자 찾고 구조 키트 투하 · 복귀</small></button>
-      <button data-start="track" data-ms="track"><b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small></button>
-      <button data-start="ridge" data-ms="ridge"><b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small></button>
-      <button data-start="free" data-ms="free"><b>자유 비행</b><small>제한 없이</small></button>
-      <button id="bTut" data-ms="tutorial"><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
-      <button data-start="demo" data-ms="demo"><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
+      <button data-cat="train" data-start="course" data-ms="course"><i class="cat">비행 훈련</i><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
+      <button data-cat="train" data-start="forest" data-ms="forest"><i class="cat">비행 훈련</i><b>숲길 통과</b><small>나무 사이 · 쓰러진 나무 넘고 아래로</small></button>
+      <button data-cat="train" data-start="race" data-ms="race"><i class="cat">비행 훈련</i><b>타임 레이스</b><small>계곡 링 최단 시간</small></button>
+      <button data-cat="train" data-start="ridge" data-ms="ridge"><i class="cat">비행 훈련</i><b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small></button>
+      <button data-cat="train" id="bTut" data-ms="tutorial"><i class="cat">비행 훈련</i><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
+      <button data-cat="train" data-start="free" data-ms="free"><i class="cat">비행 훈련</i><b>자유 비행</b><small>제한 없이</small></button>
+      <button data-cat="train" data-start="demo" data-ms="demo"><i class="cat">비행 훈련</i><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
+      <button data-cat="recon" data-start="recon" data-ms="recon"><i class="cat">정찰·감시</i><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
+      <button data-cat="recon" data-start="track" data-ms="track"><i class="cat">정찰·감시</i><b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small></button>
+      <button data-cat="rescue" data-start="fire" data-ms="fire"><i class="cat">재난·구조</i><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
+      <button data-cat="rescue" data-start="sar" data-ms="sar"><i class="cat">재난·구조</i><b>수색·구조</b><small>숲 속 실종자 찾고 구조 키트 투하 · 복귀</small></button>
+      <button data-cat="strike" data-start="strike" data-ms="strike"><i class="cat">타격</i><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
     </div>
     <div class="btns small" style="margin-top:10px">
       <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bCred">데이터 출처</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>

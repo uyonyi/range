@@ -174,6 +174,13 @@ body.lyEditing #osd,body.lyEditing #obj,body.lyEditing #list,body.lyEditing #map
 body.lyEditing #belly,body.lyEditing #scope,body.lyEditing #guide{display:block!important;min-width:120px;min-height:40px}body.lyEditing #radio{opacity:1}
 body.lyEditing #guide:empty::after{content:'GUIDE'}
 #lyBar{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);z-index:60;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;background:rgba(10,13,16,.92);border:1px solid #ffc828;border-radius:10px;padding:6px 8px;font-size:12px;max-width:96vw}#lyBar.hidden{display:none}#lyBar .ln{color:#ffc828;font-weight:600;margin-right:4px}#lyBar button{padding:5px 9px;font-size:12px}#lyBar .sz{min-width:40px;text-align:center}
+.msgrid button{--cc:#4fe3ff;border-left:3px solid var(--cc)!important;background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 12%,transparent),transparent 70%)}
+.msgrid button[data-cat=recon]{--cc:#5dff9a}.msgrid button[data-cat=rescue]{--cc:#ffaa4d}.msgrid button[data-cat=strike]{--cc:#ff5d5d}
+.msgrid button .cat{font-style:normal;font-size:10px;letter-spacing:.06em;color:var(--cc);opacity:.95}
+.msgrid button:not(.off):hover{background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 24%,transparent),transparent 80%)}
+.afc{--cc:#5aa9ff;border-top:3px solid var(--cc)!important}.afc[data-cat=fpv]{--cc:#b48cff}.afc[data-cat=wing]{--cc:#4fe3c0}.afc[data-cat=kam]{--cc:#ff6a5d}
+.afc .cat{font-style:normal;font-size:10px;letter-spacing:.06em;color:var(--cc)}.afc svg{color:var(--cc)!important;opacity:.85}
+.afc.on{border-color:var(--cc)!important;background:color-mix(in srgb,var(--cc) 14%,transparent)!important}.afc.on svg{opacity:1}
 .msgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .msgrid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 12px}.msgrid button b{font-size:15px}.msgrid button small{font-size:11px;opacity:.75;line-height:1.3}
 .msgrid button.off{opacity:.32;cursor:not-allowed}
@@ -241,18 +248,18 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div id="afCards" class="afcards"></div>
     <div class="pickLbl">Mission</div>
     <div id="msGrid" class="msgrid">
-      <button class="primary" data-start="course" data-ms="course"><b>Obstacle course</b><small>Gates · slalom · drops · landing</small></button>
-      <button data-start="forest" data-ms="forest"><b>Forest trail</b><small>Between trees · over and under fallen trunks</small></button>
-      <button data-start="race" data-ms="race"><b>Time race</b><small>Fastest run through the valley rings</small></button>
-      <button data-start="recon" data-ms="recon"><b>Recon</b><small>Find real buildings and frame them</small></button>
-      <button data-start="strike" data-ms="strike"><b>Strike</b><small>Dive into target vehicles · hit error</small></button>
-      <button data-start="fire" data-ms="fire"><b>Wildfire watch</b><small>Find hotspots with thermal (T) and report coordinates</small></button>
-      <button data-start="sar" data-ms="sar"><b>Search &amp; rescue</b><small>Find a hiker in the forest, drop a kit, return</small></button>
-      <button data-start="track" data-ms="track"><b>Vehicle tracking</b><small>Keep a car on a real road in view for 60 s</small></button>
-      <button data-start="ridge" data-ms="ridge"><b>Ridge run</b><small>Summit and back along a DEM-derived ridge path</small></button>
-      <button data-start="free" data-ms="free"><b>Free flight</b><small>No limits</small></button>
-      <button id="bTut" data-ms="tutorial"><b>Tutorial</b><small>Step-by-step lessons (recon quad)</small></button>
-      <button data-start="demo" data-ms="demo"><b>Reference flight</b><small>Replay the model flight</small></button>
+      <button data-cat="train" data-start="course" data-ms="course"><i class="cat">FLIGHT TRAINING</i><b>Obstacle course</b><small>Gates · slalom · drops · landing</small></button>
+      <button data-cat="train" data-start="forest" data-ms="forest"><i class="cat">FLIGHT TRAINING</i><b>Forest trail</b><small>Between trees · over and under fallen trunks</small></button>
+      <button data-cat="train" data-start="race" data-ms="race"><i class="cat">FLIGHT TRAINING</i><b>Time race</b><small>Fastest run through the valley rings</small></button>
+      <button data-cat="train" data-start="ridge" data-ms="ridge"><i class="cat">FLIGHT TRAINING</i><b>Ridge run</b><small>Summit and back along a DEM-derived ridge path</small></button>
+      <button data-cat="train" id="bTut" data-ms="tutorial"><i class="cat">FLIGHT TRAINING</i><b>Tutorial</b><small>Step-by-step lessons (recon quad)</small></button>
+      <button data-cat="train" data-start="free" data-ms="free"><i class="cat">FLIGHT TRAINING</i><b>Free flight</b><small>No limits</small></button>
+      <button data-cat="train" data-start="demo" data-ms="demo"><i class="cat">FLIGHT TRAINING</i><b>Reference flight</b><small>Replay the model flight</small></button>
+      <button data-cat="recon" data-start="recon" data-ms="recon"><i class="cat">RECON</i><b>Recon</b><small>Find real buildings and frame them</small></button>
+      <button data-cat="recon" data-start="track" data-ms="track"><i class="cat">RECON</i><b>Vehicle tracking</b><small>Keep a car on a real road in view for 60 s</small></button>
+      <button data-cat="rescue" data-start="fire" data-ms="fire"><i class="cat">DISASTER · RESCUE</i><b>Wildfire watch</b><small>Find hotspots with thermal (T) and report coordinates</small></button>
+      <button data-cat="rescue" data-start="sar" data-ms="sar"><i class="cat">DISASTER · RESCUE</i><b>Search &amp; rescue</b><small>Find a hiker in the forest, drop a kit, return</small></button>
+      <button data-cat="strike" data-start="strike" data-ms="strike"><i class="cat">STRIKE</i><b>Strike</b><small>Dive into target vehicles · hit error</small></button>
     </div>
     <div class="btns small" style="margin-top:10px">
       <button id="bRec">Records · Replay</button><button id="bSet">SETTINGS</button><button id="bHelp">Controls</button><button id="bCred">Data sources</button><button id="bRC">Controller setup</button><button id="bFull">Full screen</button>
@@ -453,7 +460,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=dacaab42"></script><script>window.SIM_LANG='en';</script>
-<script src="js/app.en.js?v=dacaab42"></script>
+<script src="sites/yeongin.js?v=f737f7f9"></script><script>window.SIM_LANG='en';</script>
+<script src="js/app.en.js?v=f737f7f9"></script>
 </body>
 </html>
