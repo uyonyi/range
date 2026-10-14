@@ -42,7 +42,7 @@ function startRun(kind) {
   if (kind === 'demo') S.cam = 1;
   S._fromDemo = kind === 'demo';
   OBJS.forEach(o => { if (o.hint) o.hint.visible = false; });
-  ui.menu.classList.add('hidden'); ui.pause.classList.add('hidden'); ui.result.classList.add('hidden'); ui.hud.classList.remove('hidden');
+  ui.menu.classList.add('hidden'); ui.pause.classList.add('hidden'); ui.result.classList.add('hidden'); ui.hud.classList.remove('hidden'); lyApply();
   ui.list.classList.toggle('hidden', kind !== 'course' && !isMission(kind));
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');

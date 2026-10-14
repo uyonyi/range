@@ -907,22 +907,34 @@ const LY_ITEMS = [
 ];
 const LY = { key: 'hroc_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
 try { LY.d = JSON.parse(localStorage.getItem(LY.key) || '{}'); } catch (e) { }
+// 버튼 기본 배치가 바뀌었으니 예전에 저장한 버튼 위치는 한 번 지움 (다른 창 위치는 유지)
+if (!LY.d.__v3) { for (const k of Object.keys(LY.d)) if (/^tb/.test(k)) delete LY.d[k]; LY.d.__v3 = 1; try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
 // 휴대폰 기본 배치 (사용자가 정해 준 배치 기준). x,y = 왼쪽 위 / cx,cy = 가운데 (화면 비율)
 LY.def = IS_TOUCH ? {
   osd: { x: 0.045, y: 0.016 }, obj: { x: 0.257, y: 0.016 }, bottom: { x: 0.262, y: 0.112, s: 0.55 }, map: { x: 0.046, y: 0.327 }, belly: { x: 0.046, y: 0.679 }, scope: { x: 0.194, y: 0.699 }, radio: { x: 0.335, y: 0.789 },
-  tbIR: { x: 0.56, y: 0.03 }, tbCam: { x: 0.621, y: 0.016 }, tbBelly: { x: 0.559, y: 0.168 }, tbZoom: { x: 0.616, y: 0.173 }, tbFull: { x: 0.684, y: 0.092 },
-  tbGuide: { x: 0.76, y: 0.024 }, tbAssist: { x: 0.816, y: 0.024 }, tbPause: { x: 0.91, y: 0.035 }, tbReset: { x: 0.927, y: 0.162, h: true }, tbBoost: { x: 0.774, y: 0.269 }, tbDrop: { x: 0.8225, y: 0.341 }
+  // 버튼: 오른쪽 위 한 줄 (간격 54 px, 오른쪽 끝 기준) + 그 아래 BST·DROP 가운데 높이 맞춤
+  // 4개씩 두 줄, 오른쪽 끝 정렬: [GD AST ⛶ ❚❚] / [IR CAM ↓CAM ZM], 그 아래 BST·DROP 가운데 높이 맞춤
+  tbGuide: { r: 174, t: 10 }, tbAssist: { r: 120, t: 10 }, tbFull: { r: 66, t: 10 }, tbPause: { r: 12, t: 10 },
+  tbIR: { r: 174, t: 64 }, tbCam: { r: 120, t: 64 }, tbBelly: { r: 66, t: 64 }, tbZoom: { r: 12, t: 64 },
+  tbDrop: { r: 12, t: 122 }, tbBoost: { r: 102, t: 132 }, tbReset: { r: 172, t: 138, h: true }
 } : {};
 function lySave() { try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
 function lyApply() {
   for (const [id] of LY_ITEMS) {
     const el = $(id); if (!el) continue; const c = LY.d[id] || LY.def[id];
     if (!c) { el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.transform = el.style.transformOrigin = ''; el.classList.remove('lyHide'); continue; }
-    const s = c.s || 1;
+    const cs = getComputedStyle(el), s = c.s || 1, W = innerWidth, H = innerHeight, w = (el.offsetWidth || parseFloat(cs.width) || 46) * s, h = (el.offsetHeight || parseFloat(cs.height) || 46) * s;   // 숨겨진 동안엔 CSS 크기로
     if (id === 'obj') el.style.textAlign = 'left';   // 옮긴 경우 왼쪽 정렬 (가운데 정렬이면 상자가 밀림)
-    if (c.cx !== undefined) { const w = el.offsetWidth || 46, h = el.offsetHeight || 46; el.style.left = Math.round(clamp(c.cx * innerWidth - w * s / 2, 0, innerWidth - w * s)) + 'px'; el.style.top = Math.round(clamp(c.cy * innerHeight - h * s / 2, 0, innerHeight - h * s)) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
-    else if (c.x !== undefined) { const w = el.offsetWidth * s, h = el.offsetHeight * s; el.style.left = Math.round(clamp(c.x * innerWidth, 0, Math.max(0, innerWidth - Math.min(w, innerWidth * 0.3)))) + 'px'; el.style.top = Math.round(clamp(c.y * innerHeight, 0, Math.max(0, innerHeight - Math.min(h || 40, innerHeight * 0.3)))) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
-    el.style.transformOrigin = 'top left'; el.style.transform = c.x !== undefined || c.cx !== undefined || c.s ? `scale(${s})` : '';
+    let L = null, T = null;   // 화면 기준 위치
+    if (c.r !== undefined) { L = W - c.r - w; T = c.t; }
+    else if (c.cx !== undefined) { L = c.cx * W - w / 2; T = c.cy * H - h / 2; }
+    else if (c.x !== undefined) { L = c.x * W; T = c.y * H; }
+    if (L !== null) {
+      L = clamp(L, 0, Math.max(0, W - w)); T = clamp(T, 0, Math.max(0, H - h));
+      const op = el.offsetParent, pr = op ? op.getBoundingClientRect() : { left: 0, top: 0 };   // 부모 상자 기준으로 바꿈
+      el.style.left = Math.round(L - pr.left) + 'px'; el.style.top = Math.round(T - pr.top) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto';
+    }
+    el.style.transformOrigin = 'top left'; el.style.transform = L !== null || c.s ? `scale(${s})` : '';
     el.classList.toggle('lyHide', !!c.h);
   }
 }
@@ -935,7 +947,7 @@ function lyBar() {
     `<button data-a="ra">${L2('전체 초기화', 'Reset all')}</button><button class="primary" data-a="ok">${L2('완료', 'Done')}</button>`;
   b.querySelectorAll('button').forEach(x => x.onclick = e => { e.stopPropagation(); const a = x.dataset.a, d = sel && (LY.d[sel] = LY.d[sel] || Object.assign({}, LY.def[sel] || {}));
     if (a === 'm') d.s = Math.max(0.5, Math.round(((d.s || 1) - 0.1) * 10) / 10); if (a === 'p') d.s = Math.min(1.8, Math.round(((d.s || 1) + 0.1) * 10) / 10);
-    if (a === 'h') d.h = !d.h; if (a === 'r1') delete LY.d[sel]; if (a === 'ra') { LY.d = {}; LY.sel = null; }
+    if (a === 'h') d.h = !d.h; if (a === 'r1') delete LY.d[sel]; if (a === 'ra') { LY.d = { __v3: 1 }; LY.sel = null; }
     if (a === 'ok') return lyEdit(false);
     lySave(); lyApply(); lyBar(); });
 }
@@ -957,7 +969,7 @@ function lyEdit(on) {
   }, true);
   addEventListener('pointermove', e => {
     if (!drag) return; e.preventDefault(); drag.moved = true; const d = LY.d[drag.id] = LY.d[drag.id] || Object.assign({}, LY.def[drag.id] || {});
-    delete d.cx; delete d.cy; d.x = (e.clientX - drag.dx) / innerWidth; d.y = (e.clientY - drag.dy) / innerHeight; lyApply();
+    delete d.cx; delete d.cy; delete d.r; delete d.t; d.x = (e.clientX - drag.dx) / innerWidth; d.y = (e.clientY - drag.dy) / innerHeight; lyApply();
   }, true);
   addEventListener('pointerup', () => { if (drag) { lySave(); drag = null; } }, true);
 })();
