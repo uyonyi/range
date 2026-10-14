@@ -4275,7 +4275,7 @@ function grid(d, s) {
 }
 // 음성용: 격자 글자는 음성 문자, 숫자는 한 자리씩
 function speakify(t) {
-  return t.replace(/(\d+)S ([A-Z])([A-Z]) (\d{4}) (\d{4})/g, (m, z, a, b, x, y) => `grid ${PHON[a]} ${PHON[b]}, ${x.split('').map(d => DIG[+d]).join(' ')}, ${y.split('').map(d => DIG[+d]).join(' ')}`)
+  return t.replace(/(?:grid )?(\d+)S ([A-Z])([A-Z]) (\d{4}) (\d{4})/gi, (m, z, a, b, x, y) => `grid ${PHON[a]} ${PHON[b]}, ${x.split('').map(d => DIG[+d]).join(' ')}, ${y.split('').map(d => DIG[+d]).join(' ')}`)
     .replace(/\bEAGLE ONE\b/g, 'Eagle One').replace(/\bCONTROL\b/g, 'Control').replace(/\bRTB\b/g, 'R T B');
 }
 const COMM = { q: [], busy: 0, voice: null };
@@ -4306,18 +4306,46 @@ function comm(en, ko, from) {
   if (S.state !== 'run' && S.state !== 'result') return;
   COMM.q.push({ en, ko, from: from || 'CONTROL' }); if (COMM.q.length > 4) COMM.q.shift();
 }
+// 음성: 실제 발화가 끝날 때까지 다음 교신을 기다림 (글자 수 추정으로 끊기지 않게)
+COMM.sp = false; COMM.spT = 0; COMM.ok = false;
+function voiceUnlock() { // 첫 터치/클릭에서 음성 엔진 깨우기 (브라우저 자동재생 정책)
+  if (COMM.ok || !window.speechSynthesis) return; COMM.ok = true;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); pickVoice(); } catch (e) { }
+}
+['pointerdown', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, voiceUnlock, { once: true, passive: true }));
+function commSpeechDone() { COMM.sp = false; COMM.busy = Math.min(COMM.busy, 0.5); radioT = Math.min(radioT, 1.2); commStatic(false); squelch(false); if (MUS.bus && AU.ctx) musicSetLevel(); }
+function commSpeak(text, est) {
+  const done = () => { if (COMM.cur === myId) commSpeechDone(); };
+  const myId = (COMM.cur = (COMM.cur || 0) + 1);
+  COMM.sp = true; COMM.spT = est;
+  const parts = text.match(/[^.!?]+[.!?]*/g) || [text]; let i = 0, started = false;
+  const next = () => {
+    if (COMM.cur !== myId) return;
+    if (i >= parts.length) return done();
+    const t = parts[i++].trim(); if (!t) return next();
+    const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice;
+    u.rate = 1.0; u.pitch = 0.9; u.volume = 1;
+    u.onstart = () => { started = true; }; u.onend = next; u.onerror = (e) => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; if (!started && i === 1) COMM.err = (COMM.err || 0) + 1; next(); };
+    (COMM.keep = COMM.keep || []).push(u); if (COMM.keep.length > 8) COMM.keep.shift(); // GC 방지
+    try { speechSynthesis.speak(u); } catch (e) { next(); }
+  };
+  try { if (speechSynthesis.speaking || speechSynthesis.pending) { speechSynthesis.cancel(); setTimeout(next, 120); } else next(); } catch (e) { done(); }
+  // 안전장치: 음성이 전혀 시작되지 않으면(차단/미지원) 자막 시간 후 해제
+  setTimeout(() => { if (COMM.cur === myId && !started) done(); }, 2500);
+  setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(8, est * 1.8) * 1000);
+}
 function commTick(dt) {
-  COMM.busy -= dt; radioT -= dt;
-  if (radioT <= 0) { const el = $('radio'); if (el) el.classList.remove('show'); }
+  if (!COMM.sp) COMM.busy -= dt; radioT -= dt;
+  if (radioT <= 0 && !COMM.sp) { const el = $('radio'); if (el) el.classList.remove('show'); }
   if (COMM.busy > 0 || !COMM.q.length) return;
   const m = COMM.q.shift(), el = $('radio'); if (!el) return;
   el.innerHTML = `<div class="rf">📻 ${m.from}</div><div class="re">${m.en}</div>` + (window.SIM_LANG !== 'en' && m.ko ? `<div class="rk">${m.ko}</div>` : '');
-  el.classList.add('show'); const dur = Math.max(3.5, m.en.length / 14); radioT = dur + 1; COMM.busy = dur + 0.6;
+  const sp = speakify(m.en), dur = Math.max(3.5, sp.length / 13);
+  el.classList.add('show'); radioT = dur + 1; COMM.busy = dur + 0.6;
   squelch(true); commStatic(true, dur + 0.4);
   if (SET.voice !== false && window.speechSynthesis) {
-    try { const u = new SpeechSynthesisUtterance(speakify(m.en)); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice; u.rate = 1.08; u.pitch = 0.8; u.volume = 1;
-      u.onend = () => { commStatic(false); squelch(false); }; if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.25, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
-      speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { }
+    if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetAtTime(musicLevel() * 0.25, AU.ctx.currentTime, 0.1);
+    COMM.busy = 999; radioT = 999; commSpeak(sp, dur);
   } else setTimeout(() => squelch(false), dur * 900);
 }
 // 임무 시작 교신
