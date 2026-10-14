@@ -32,7 +32,7 @@ function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0);
 function startRun(kind) {
   enterFull();
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
-  S.objState = OBJS.map(() => 0); S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
+  S.objState = OBJS.map(() => 0); S.objNear = -1; S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
@@ -341,7 +341,6 @@ function predictImpact(p, v) {
 
 // ---------------- objectives check ----------------
 const _prevP = new V3();
-const SKIP_PEN = 10;   // 장애물을 건너뛰면 벌점 (초)
 // 통과형 과제(게이트·슬라롬): 이번 프레임에 면을 지났는지 -> { inside, fwd, x } 또는 null
 function passTest(o, prev, cur, mg) {
     const a = o.b.local(prev), b = o.b.local(cur);
@@ -366,17 +365,28 @@ function checkObjectives(prev, cur, dt) {
   const mg = MODES[SET.diff].margin;
   if (o.kind === 'custom') { tutCustomCheck(cur, dt); return; }
   if (o.kind === 'takeoff') { if (cur.y > groundAt(cur.x, cur.z) + 0.8) { S.running = true; completeObj(1, 'GO!', '#ffc828'); } return; }
-  // 놓치고 지나감: 다음(또는 그다음) 게이트를 제대로 통과하면 지금 과제는 실패 처리하고 넘어감
+  // 놓치고 지나감 -> 그 과제만 실패(✗)로 두고 다음 목표로 (벌점 없음)
+  //  ① 다음·그다음 게이트를 제대로 통과했거나 ② 지금 과제 근처(20 m)에 왔다가 다음 과제까지 구간의 절반을 넘어감
   if (S.kind === 'course' && o.kind !== 'takeoff' && o.kind !== 'land') {
     for (let j = S.objIdx + 1; j <= Math.min(S.objIdx + 2, OBJS.length - 1); j++) {
       const q = OBJS[j]; if (q.kind !== 'pass' && q.kind !== 'slalom') continue;
       const r = passTest(q, prev, cur, mg); if (!(r && r.inside && r.fwd)) continue;
       const missed = [];
-      for (let k = S.objIdx; k < j; k++) { S.objState[k] = 2; if (OBJS[k].hint) OBJS[k].hint.visible = false; S.pen += SKIP_PEN; missed.push(OBJS[k].label); }
+      for (let k = S.objIdx; k < j; k++) { S.objState[k] = 2; if (OBJS[k].hint) OBJS[k].hint.visible = false; missed.push(OBJS[k].label); }
       S.objIdx = j; S.scan = 0; S.wasInside = false; S.scanned = false; S.orbSum = 0; S.orbA = null;
-      comm(`${CS}, CONTROL. You skipped ${missed.length > 1 ? 'two obstacles' : 'an obstacle'}. Penalty applied, continue.`, `${missed.join(', ')} 놓침 · +${SKIP_PEN * missed.length}초 · 계속 진행`);
-      completeObj(1, `${missed.join(' · ')} ✗ +${SKIP_PEN * missed.length}s → ${q.label} ✓`, '#ff9a40');
+      comm(`${CS}, CONTROL. You missed ${missed.length > 1 ? 'two obstacles' : 'one'}. Press on.`, `${missed.join(', ')} 실패 · 계속 진행`);
+      completeObj(1, `${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40');
       return;
+    }
+    const nx = OBJS[S.objIdx + 1];
+    if (nx && o.mk && nx.mk && !(o.kind === 'drop' && PAY.some(p => p.course))) {
+      const A = o.mk, dx = nx.mk.x - A.x, dz = nx.mk.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
+      if (dA < 20) S.objNear = S.objIdx;
+      const u = L2 > 1 ? ((cur.x - A.x) * dx + (cur.z - A.z) * dz) / L2 : 0;
+      if (S.objNear === S.objIdx && u > 0.5 && !(o.kind === 'orbit' && dA < 26)) {
+        comm(`${CS}, CONTROL. You missed that one. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
+        completeObj(2, `${o.label} ✗ → NEXT`, '#ff9a40'); return;
+      }
     }
   }
   if (o.kind === 'pass' || o.kind === 'slalom') {
