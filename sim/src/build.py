@@ -61,7 +61,14 @@ def build_public(outdir, site_ids=('yeongin',)):
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
-        s = all_sites[sid]
+        s = dict(all_sites[sid])
+        if s.get('ortho') and not s['ortho'].startswith('data:'):   # 정사영상: 같은 폴더로 복사 + 바뀌면 새로 받게 ?v=
+            import hashlib
+            src = '/home/claude/range/sim/' + s['ortho'].split('?')[0]
+            if os.path.exists(src):
+                dst = f"{outdir}/{s['ortho'].split('?')[0]}"
+                if os.path.abspath(src) != os.path.abspath(dst): shutil.copy(src, dst)
+                s['ortho'] = s['ortho'].split('?')[0] + '?v=' + hashlib.md5(open(src, 'rb').read()).hexdigest()[:8]
         data = {'objs': s['course']['objs'], 'wp': s['course']['wp']}
         js = '// 현장 데이터 (자동 생성: tools/)\nwindow.SIM_NOFLAT=true;\nwindow.SIM_SITES=(window.SIM_SITES||[]).concat([' + json.dumps(s, ensure_ascii=False) + ']);\n'
         js += 'window.SIM_DATA=window.SIM_DATA||' + json.dumps(data, ensure_ascii=False) + ';\n'

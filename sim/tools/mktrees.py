@@ -25,6 +25,8 @@ for o in C['objs']:
     r = {'pad': 9, 'tank': 16, 'bunker': 14, 'tunnel': 12}.get(o['type'], 10)
     keep.append(Point(o['down'], o['side']).buffer(r))
 if C.get('path'): keep.append(LineString(C['path']).buffer(7))
+for dm in S.get('dams', []):   # 사방댐 둑과 물웅덩이
+    keep.append(LineString([dm['a'], dm['b']]).buffer(3)); keep.append(Polygon(dm['pool']).buffer(1.5))
 CLEAR = prep(unary_union(keep))
 V = S.get('vec', {}); avoid = []
 for k, w in (('road', 4), ('trail', 2), ('stream', 3)):
@@ -45,24 +47,53 @@ a = r.read(out_shape=(3, h, w), resampling=Resampling.average).astype(np.float32
 L0, T0 = r.bounds.left, r.bounds.top
 R_, G_, B_ = a; Y = 0.3 * R_ + 0.59 * G_ + 0.11 * B_
 exg = 2 * G_ - R_ - B_
-forest = (Y < 120) & (exg > 6) & ~((B_ > G_ * 0.95) & (Y < 45))        # 어둡고 녹색, 물(푸른 어둠) 제외
-forest = nd.binary_opening(forest, iterations=2); forest = nd.binary_closing(forest, iterations=2)
+forest = (nd.gaussian_filter(Y, 1.5) < 66) & (exg > 6) & ~((B_ > G_ * 0.95) & (Y < 45))   # 수관은 풀밭보다 어두움, 물(푸른 어둠) 제외
+forest = nd.binary_opening(forest, iterations=2); forest = nd.binary_closing(forest, iterations=3)
 Ys = nd.gaussian_filter(Y, 2.2)                                     # 수관 크기 (약 1 m) 로 흐림
 mx = nd.maximum_filter(Ys, size=7)                                 # 3.5 m 안의 최대점
 peaks = np.argwhere((Ys >= mx - 1e-3) & forest & (Ys > nd.uniform_filter(Ys, 15) - 1))
 dist = nd.distance_transform_edt(forest) * RES
-Rs, Gs, Bs = (nd.uniform_filter(c, 5) for c in (R_, G_, B_))
-GAIN = 1.3
+# 색은 색 보정한 정사영상(있으면)에서, 수관(숲 마스크) 픽셀만 평균 -> 길·풀밭 색이 섞여 허옇게 되는 것 방지
+rc = rasterio.open(sys.argv[5]) if len(sys.argv) > 5 else r
+ac = rc.read(out_shape=(3, h, w), resampling=Resampling.average).astype(np.float32)
+fm = forest.astype(np.float32); den = np.maximum(nd.uniform_filter(fm, 5), 1e-3)
+Rs, Gs, Bs = (nd.uniform_filter(c * fm, 5) / den for c in ac)
+Ro, Go = (nd.uniform_filter(c * fm, 5) / den for c in (R_, G_))
+ff = nd.uniform_filter(fm, 31)                                      # 주변 15 m 숲 비율 (풀밭에 드문드문 선 나무 구분)
+from scipy.spatial import cKDTree
+pk = np.array(peaks, float); nnd = cKDTree(pk).query(pk, k=2)[0][:, 1] * RES if len(pk) > 1 else np.full(len(pk), 4.0)
+GAIN = 1.12
 inside = []
-for (j, i) in peaks:
+for n_, (j, i) in enumerate(peaks):
     x, y = L0 + (i + 0.5) * RES, T0 - (j + 0.5) * RES
     d, s = ds(x, y)
     if CLEAR.contains(Point(d, s)): continue
     rr, gg, bb = Rs[j, i], Gs[j, i], Bs[j, i]
-    conifer = gg > rr * 1.35 and Y[j, i] < 75                       # 짙은 녹색 = 소나무류
-    cr = float(np.clip(1.6 + dist[j, i] * 0.35 + rng.normal(0, 0.3), 1.6, 3.4))
-    hh = float(np.clip((11 if conifer else 12.5) + cr * 1.4 + rng.normal(0, 1.8), 7, 20))
-    T.append([d, s, hh, cr, min(255, rr * GAIN), min(255, gg * GAIN), min(255, bb * GAIN), 1 if conifer else 0])
+    rgr = Ro[j, i] / max(Go[j, i], 1)
+    nn = float(nnd[n_])
+    if ff[j, i] < 0.45:                                             # 풀밭 속 외딴 나무 · 덤불: 작고 낮게
+        kind = 1 if rgr < 0.6 else 0
+        cr = float(np.clip(min(nn * 0.55, 0.9 + dist[j, i] * 0.5) + rng.normal(0, 0.2), 1.0, 2.6))
+        hh = float(np.clip(3.5 + cr * 2.0 + rng.normal(0, 1.0), 3.5, 10))
+    else:                                                           # 숲: 이웃 수관과 맞닿게 (닫힌 숲 지붕)
+        kind = (3 if rng.random() < 0.7 else 1) if rgr < 0.56 else 0   # 짙은 청록 = 침엽수 (조림지는 원뿔형, 일부 소나무)
+        cr = float(np.clip(nn * 0.62 + rng.normal(0, 0.15), 1.5, 3.8))
+        hh = float(np.clip((13 if kind else 12) + cr * 1.2 + rng.normal(0, 1.5), 9, 19))
+    T.append([d, s, hh, cr, min(255, rr * GAIN * 0.82), min(255, gg * GAIN * 1.02), min(255, bb * GAIN * 0.86), kind])   # 잎 색은 조금 더 푸르게
+# 풀밭 속 작은 덤불·어린 소나무 (숲 마스크에서 빠진 작은 어두운 덩이)
+small = (nd.gaussian_filter(Y, 1.0) < 62) & (exg > 4) & (ff < 0.5)
+lab, nl = nd.label(small); nclump = 0
+for k, sl in enumerate(nd.find_objects(lab), 1):
+    if sl is None: continue
+    area = (lab[sl] == k).sum() * RES * RES
+    if area < 1.5 or area > 60: continue
+    cy, cx = nd.center_of_mass(lab[sl] == k); j, i = int(sl[0].start + cy), int(sl[1].start + cx)
+    x, y = L0 + (i + 0.5) * RES, T0 - (j + 0.5) * RES; d, s = ds(x, y)
+    if CLEAR.contains(Point(d, s)): continue
+    cr = float(np.clip(math.sqrt(area / math.pi) * 1.05, 0.8, 3.0)); big = area > 12
+    rr, gg, bb = (float(c[j, i]) for c in ac)
+    T.append([d, s, float(np.clip((4.5 if big else 1.6) + cr * (1.6 if big else 0.6) + rng.normal(0, 0.6), 1.2, 9)), cr, rr * 1.05, gg * 1.05, bb * 1.05, 1 if big else 2]); nclump += 1
+print('clumps', nclump)
 nin = len(T)
 # ---------- 정사영상 밖 (절차적) ----------
 obox = Polygon([ds(x, y) for x, y in [(r.bounds.left, r.bounds.bottom), (r.bounds.right, r.bounds.bottom), (r.bounds.right, r.bounds.top), (r.bounds.left, r.bounds.top)]])
@@ -76,15 +107,17 @@ for d in np.arange(-400, 800, SP):
         if pd > 380 or OB.contains(P) or CLEAR.contains(P) or (AVOID and AVOID.contains(P)): continue
         if rng.random() < 0.18 + pd / 900: continue                  # 멀수록 성기게 (먼 나무는 원경 색으로 대신)
         c = PAL[rng.integers(len(PAL))]; j = rng.normal(0, 8)
-        cr = float(rng.uniform(1.8, 3.2)); hh = float(np.clip(11 + cr * 1.4 + rng.normal(0, 2), 7, 19))
-        T.append([dd, ss, hh, cr, c[0] + j, c[1] + j, c[2] + j, c[3]])
+        cr = float(rng.uniform(2.0, 3.4)); hh = float(np.clip(11 + cr * 1.4 + rng.normal(0, 2), 7, 19))
+        T.append([dd, ss, hh, cr, c[0] + j, c[1] + j, c[2] + j, (3 if rng.random() < 0.6 else 1) if c[3] else 0])
 # ---------- 숲 가장자리 덤불 (비운 통로와 숲 사이) ----------
 CLR = unary_union(keep); band = prep(CLR.buffer(10).difference(CLR))
 bx0, by0, bx1, by1 = CLR.buffer(10).bounds; nsh = 0
 for d in np.arange(bx0, bx1, 2.6):
     for s in np.arange(by0, by1, 2.6):
         dd, ss = d + rng.uniform(-1, 1), s + rng.uniform(-1, 1)
-        if not band.contains(Point(dd, ss)) or (AVOID and AVOID.contains(Point(dd, ss))) or rng.random() < 0.35: continue
+        if not band.contains(Point(dd, ss)) or (AVOID and AVOID.contains(Point(dd, ss))) or rng.random() < 0.6: continue
+        x_, y_ = xy(dd, ss); pi, pj = int((x_ - L0) / RES), int((T0 - y_) / RES)
+        if 0 <= pj < ff.shape[0] and 0 <= pi < ff.shape[1] and ff[pj, pi] < 0.5: continue   # 풀밭(열린 곳)에는 줄지은 덤불을 두지 않음
         c = PAL[rng.integers(2, len(PAL))]; j = rng.normal(0, 10)
         T.append([dd, ss, float(rng.uniform(1.2, 2.8)), float(rng.uniform(0.8, 1.6)), c[0] * 0.7 + j, c[1] * 0.85 + j, c[2] * 0.65 + j, 2]); nsh += 1
 print('shrubs', nsh)
@@ -98,10 +131,10 @@ json.dump(sites, open(sys.argv[1], 'w', encoding='utf-8'), ensure_ascii=False)
 print('kb', (len(S['trees']['i16']) + len(S['trees']['u8'])) // 1024)
 # 검증 그림: 검출 수관을 정사영상 위에 표시
 from PIL import Image, ImageDraw
-im = Image.fromarray(np.clip(a.transpose(1, 2, 0) * GAIN, 0, 255).astype(np.uint8)); dr = ImageDraw.Draw(im)
+im = Image.fromarray(np.clip(ac.transpose(1, 2, 0) * 1.3, 0, 255).astype(np.uint8)); dr = ImageDraw.Draw(im)
 for t in T[:nin]:
     x, y = xy(float(t[0]), float(t[1])); px, py = (x - L0) / RES, (T0 - y) / RES; rp = t[3] / RES
-    dr.ellipse([px - rp, py - rp, px + rp, py + rp], outline=(255, 60, 60) if t[7] else (255, 230, 0))
+    dr.ellipse([px - rp, py - rp, px + rp, py + rp], outline=[(255, 230, 0), (255, 60, 60), (200, 200, 200), (60, 160, 255)][int(t[7])])
 for line in [wp]:
     dr.line([((xy(d, s)[0] - L0) / RES, (T0 - xy(d, s)[1]) / RES) for d, s in line.coords], fill=(0, 220, 255), width=2)
 im.save(sys.argv[4] if len(sys.argv) > 4 else 'trees_check.png')
