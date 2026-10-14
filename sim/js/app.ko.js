@@ -1150,7 +1150,7 @@ const STREES = (function siteTrees() {
     const p = geo.attributes.position, c = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++) {
       const y = p.getY(i), tr = y < trunkTop && Math.hypot(p.getX(i), p.getZ(i)) < 0.09;
-      const k = tr ? 0.42 : (0.5 + 0.62 * Math.max(0, Math.min(1, (y - trunkTop) / (1 - trunkTop)))) * (0.84 + 0.3 * hsh(p.getX(i) * 5, y * 9, p.getZ(i) * 5));
+      const k = tr ? 0.42 : (0.6 + 0.55 * Math.max(0, Math.min(1, (y - trunkTop) / (1 - trunkTop)))) * (0.84 + 0.3 * hsh(p.getX(i) * 5, y * 9, p.getZ(i) * 5));
       c[i * 3] = tr ? k * 1.1 : k; c[i * 3 + 1] = tr ? k * 0.85 : k; c[i * 3 + 2] = tr ? k * 0.7 : k;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(c, 3)); return geo;
