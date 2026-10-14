@@ -405,11 +405,11 @@ const camPos = new V3(), camLook = new V3(), qBody = new THREE.Quaternion(), qTi
 let shake = 0, topH = 0;
 function updateCamera(dt, subj) {
   const mode = CAMS[S.cam];
-  eul.set(-subj.pitch, -subj.h, -subj.roll); qBody.setFromEuler(eul);
+  eul.set(-visPitch(subj), -subj.h, -subj.roll); qBody.setFromEuler(eul);
   const fwd = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h));
   camera.up.set(0, 1, 0);
   if (mode === 'FPV') {
-    qTilt.setFromAxisAngle(new V3(1, 0, 0), SET.tilt * DEG);
+    qTilt.setFromAxisAngle(new V3(1, 0, 0), (AFc().cls === 'wing' ? 0 : SET.tilt) * DEG);
     camera.quaternion.copy(qBody).multiply(qTilt);
     camera.position.copy(subj.p).add(new V3(0, 0.02, -0.12).applyQuaternion(qBody));
     camera.fov = 82 + (S.boosting ? 8 : 0); camera.near = 0.03;
@@ -657,7 +657,9 @@ function updateGhost(t, dt) {
   ghostS.pitch = lerp(ghostS.pitch, clamp(hs * 0.028, 0, 0.5), 1 - Math.exp(-dt * 4));
   ghostS.v.copy(vel); ghostS.p.copy(_gp);
 }
-function placeModel(mdl, st) { mdl.g.position.copy(st.p); eul.set(-st.pitch, -st.h, -st.roll); mdl.g.quaternion.setFromEuler(eul); }
+// 고정익의 pitch 는 '상승각'(+ 위), 쿼드는 '앞으로 숙임'(+ 아래) -> 그릴 때 부호를 맞춤
+function visPitch(st) { return st !== ghostS && AFc().cls === 'wing' ? -st.pitch : st.pitch; }
+function placeModel(mdl, st) { mdl.g.position.copy(st.p); eul.set(-visPitch(st), -st.h, -st.roll); mdl.g.quaternion.setFromEuler(eul); }
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
 function handleKeys() {
@@ -770,7 +772,7 @@ function frame(now, noRender) {
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;
   hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : envHemi(), 1 - Math.exp(-dt * 5));
   spot.intensity = lerp(spot.intensity, (SET.light || inB || nearB || (ENV.night && !ENV.ir)) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
-  { eul.set(-subj.pitch, -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
+  { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
   else if (S.state === 'menu') menuCam(dt);

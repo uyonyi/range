@@ -134,15 +134,20 @@ function stepWing(dt) {
     const ahead = Math.max(terrainAt(DR.p.x, DR.p.z), terrainAt(DR.p.x + DR.v.x * 2.5, DR.p.z + DR.v.z * 2.5), terrainAt(DR.p.x + DR.v.x * 5, DR.p.z + DR.v.z * 5));
     let gt = Math.abs(ip) > 0.05 ? -ip * 28 * DEG : clamp((DR.altT - DR.p.y) * 0.06, -0.3, 0.3);
     if (DR.p.y - ahead < a.minAgl && !a.kam) { gt = Math.max(gt, 0.25 + (a.minAgl - (DR.p.y - ahead)) * 0.03); DR.altT = Math.max(DR.altT, ahead + a.minAgl); }
+    // 실속 보호: 속도가 실속 속도 가까이 떨어지면 상승각을 줄임
+    const mg = (V - a.stall * 1.12) / (a.stall * 0.35); if (mg < 1) gt = Math.min(gt, Math.max(-0.15, mg) * 28 * DEG);
     DR.pitch += (gt - DR.pitch) * (1 - Math.exp(-dt * 2.2));
     DR.roll += (ir * a.bank * DEG - DR.roll) * (1 - Math.exp(-dt * 2.8));
     S.boosting = !!IN.boost;
     const vt = IN.boost ? a.top : IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
     V += clamp(vt - V, -4, 4) * dt * 0.9;
   } else {
-    DR.pitch += -ip * a.prate * DEG * dt; DR.roll += ir * a.rrate * DEG * dt;
-    DR.pitch = clamp(DR.pitch, -75 * DEG, 75 * DEG); DR.roll = clamp(DR.roll, -85 * DEG, 85 * DEG);
-    const thr = clamp(0.55 + IN.thr * 0.45, 0, 1), thrust = thr * a.top * 0.42, drag = 0.42 * a.top * (V / a.top) * (V / a.top);
+    // 수동(자세 안정): 스틱 = 기울기·상승각, 놓으면 수평으로 돌아옴 (고도 유지·지면 회피 없음, 실속 가능)
+    const gt = -ip * 40 * DEG, rt = ir * Math.min(70, a.bank * 1.3) * DEG;
+    DR.pitch += clamp(gt - DR.pitch, -a.prate * DEG * dt, a.prate * DEG * dt);
+    DR.roll += clamp(rt - DR.roll, -a.rrate * DEG * dt, a.rrate * DEG * dt);
+    S.boosting = !!IN.boost;
+    const thr = IN.boost ? 1 : clamp(0.55 + IN.thr * 0.45, 0, 1), thrust = thr * a.top * 0.42, drag = 0.42 * a.top * (V / a.top) * (V / a.top);
     V += (thrust - drag) * dt;
   }
   // 오르면 느려지고 내려가면 빨라짐 (에너지)
