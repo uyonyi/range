@@ -257,7 +257,7 @@ function msStart(kind) {
   if (kind === 'fire') L = firePick();
   if (kind === 'strike') L = strikePick();
   const SC = scenStart(kind, a); if (SC) L = SC;
-  L.forEach(o => o.done = false); MS.list = L; MS.kind = kind; MS.t0 = 0; MS.events = []; S.decoyHit = 0;
+  L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; MS.list = L; MS.kind = kind; MS.t0 = 0; MS.events = []; S.decoyHit = 0;
   // 시작 위치: 고정익·자폭 고정익은 공중에서
   const p0 = startPos(), o = msObj(); let h = startHead();
   if (o) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
@@ -283,15 +283,34 @@ function passCross(o, prev, cur) {
   if (o.ring) return x.distanceTo(o.c) <= o.ring - DR.R * 0.5;
   const h = x.y - terrainAt(x.x, x.z); return Math.abs(lat) <= o.hw && h >= o.y0 && h <= o.y1;
 }
+// 통과점 하나만 실패로 두고 다음 목표로
+function msSkip() {
+  const o = msObj(); if (!o) return;
+  o.done = true; o.miss = true; sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
+  comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
+  MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
+  S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
+  if (MS.idx >= MS.list.length) msFinish();
+}
 function msStep(prev, cur, dt) {
   const o = msObj(); if (!o || !DR.alive) return;
   if (o.t === 'pass') {
-    // 숲길·능선: 다음 통과점을 제대로 지나면 놓친 통과점은 실패(+10초)로 넘김 (레이스는 되돌아와야 함)
-    if (S.kind !== 'race') for (let j = MS.idx + 1; j <= Math.min(MS.idx + 2, MS.list.length - 1); j++) {
-      const q = MS.list[j]; if (q.t !== 'pass' || passCross(q, prev, cur) !== true) continue;
-      const missed = []; for (let k = MS.idx; k < j; k++) if (!MS.list[k].done) { MS.list[k].done = true; MS.list[k].miss = true; S.pen += 10; missed.push(MS.list[k].label); }
-      MS.idx = j; comm(`${CS}, CONTROL. You skipped a checkpoint. Penalty applied, continue.`, `${missed.join(', ')} 놓침 · +${10 * missed.length}초 · 계속 진행`);
-      msNext(`${missed.join(' · ')} ✗ +${10 * missed.length}s → ${q.label} ✓`, '#ff9a40'); return;
+    // 숲길·능선: 놓치고 지나가면 그 통과점만 실패(✗)로 두고 다음으로 (레이스는 되돌아와야 함)
+    if (S.kind !== 'race') {
+      for (let j = MS.idx + 1; j <= Math.min(MS.idx + 2, MS.list.length - 1); j++) {
+        const q = MS.list[j]; if (q.t !== 'pass' || passCross(q, prev, cur) !== true) continue;
+        const missed = []; for (let k = MS.idx; k < j; k++) if (!MS.list[k].done) { MS.list[k].miss = true; missed.push(MS.list[k].label); }
+        for (let k = MS.idx; k < j; k++) MS.list[k].done = true;
+        MS.idx = j; comm(`${CS}, CONTROL. You missed a checkpoint. Press on.`, `${missed.join(', ')} 실패 · 계속 진행`);
+        msNext(`${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40'); return;
+      }
+      const nx = MS.list[MS.idx + 1];
+      if (nx && nx.c) {
+        const A = o.c, dx = nx.c.x - A.x, dz = nx.c.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
+        if (dA < 20) S.msNear = o;
+        const u = L2 > 1 ? ((cur.x - A.x) * dx + (cur.z - A.z) * dz) / L2 : 0;
+        if (S.msNear === o && u > 0.5) { msSkip(); return; }
+      }
     }
     const r = passCross(o, prev, cur);
     if (r === true) msNext(); else if (r === false && S.bumpT <= 0) { showMsg(L2('MISS · 다시 통과', 'MISS · fly through again'), '#ff9a40', 1); sfx('bad'); S.bumpT = 0.6; }
@@ -853,15 +872,15 @@ function commStatic(on, dur) {
   const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3200; const bp = ctx.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 7000; bp.Q.value = 0.5;
   const g = ctx.createGain(); g.gain.value = 0.0001; s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(AU.master); s.start(t);
   const T = Math.min(dur || 6, 20);
-  for (let k = 0; k < T * 12; k++) { const tt = t + k / 12; g.gain.setValueAtTime(0.008 + 0.01 * Math.random() * Math.random(), tt); }
-  for (let k = 0; k < T * 0.8; k++) { const tt = t + 0.4 + Math.random() * T; noiseHit(tt, 'bandpass', 3500 + Math.random() * 2500, 1.5, 0.025 + Math.random() * 0.025, 0.015 + Math.random() * 0.02, AU.master); }
-  g.gain.setValueAtTime(0.012, t + T); g.gain.exponentialRampToValueAtTime(0.0001, t + T + 0.2); s.stop(t + T + 0.3);
+  // 아주 옅은 쉬 소리만 (말소리를 가리지 않게)
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.0035, t + 0.15);
+  g.gain.setValueAtTime(0.0035, t + T); g.gain.exponentialRampToValueAtTime(0.0001, t + T + 0.2); s.stop(t + T + 0.3);
   COMM.st = { s, g };
 }
 function squelch(open) {
   const ctx = AU.ctx; if (!ctx || !AU.master) return; const t = ctx.currentTime;
-  noiseHit(t, 'bandpass', 1400, 0.6, open ? 0.12 : 0.09, open ? 0.12 : 0.18, AU.master);
-  const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = open ? 1300 : 900; g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + 0.1);
+  noiseHit(t, 'bandpass', 2600, 0.8, open ? 0.035 : 0.03, open ? 0.08 : 0.12, AU.master);
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = open ? 1300 : 900; g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + 0.1);
 }
 // en: 영어 교신, ko: 한국어 자막 (한국어 화면에서만)
 function comm(en, ko, from) {
@@ -878,7 +897,7 @@ function commTick(dt) {
   squelch(true); commStatic(true, dur + 0.4);
   if (SET.voice !== false && window.speechSynthesis) {
     try { const u = new SpeechSynthesisUtterance(speakify(m.en)); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice; u.rate = 1.08; u.pitch = 0.8; u.volume = 1;
-      u.onend = () => { commStatic(false); squelch(false); }; if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.35, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
+      u.onend = () => { commStatic(false); squelch(false); }; if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * 0.25, AU.ctx.currentTime, 0.1); setTimeout(() => musicSetLevel(), dur * 1000); }
       speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { }
   } else setTimeout(() => squelch(false), dur * 900);
 }
