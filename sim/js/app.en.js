@@ -497,10 +497,10 @@ function applyTerrain(h) {
   }
 }
 if (TER.h) applyTerrain(TER.h);
-// 원경 지형 (주변 12 km, 60 m 격자) — 고해상도 구역은 구멍으로 비움
+// 원경 지형 (주변 12 km, Site별 격자 · 기본 60 m) — 고해상도 구역은 구멍으로 비움
 const FAR = (function farTerrain() {
   if (!SITE_L.dec) return null;
-  const G = TGRID, n = G.farN, H = SITE_L.dec.far, pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
+  const G = Object.assign({}, TGRID, SITE.farGrid || {}), n = G.farN, H = SITE_L.dec.far, pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
   for (let iy = 0; iy < n; iy++) for (let ix = 0; ix < n; ix++) { const i = iy * n + ix; pos[i * 3] = G.fs0 + ix * G.farStep; pos[i * 3 + 1] = H[i]; pos[i * 3 + 2] = -(G.fd1 - iy * G.farStep); }
   const i0x = (GS0 - G.fs0) / G.farStep, i1x = (GS1 - G.fs0) / G.farStep, i0y = (G.fd1 - GD1) / G.farStep, i1y = (G.fd1 - GD0) / G.farStep;
   const idx = [];
@@ -4449,7 +4449,7 @@ function credHTML() {
 $('bCred').onclick = () => { $('credBody').innerHTML = credHTML(); $('credPanel').classList.remove('hidden'); };
 $('credClose').onclick = () => $('credPanel').classList.add('hidden');
 // 화면 아래 작은 출처 (Site 자료가 있을 때)
-(function () { const el = $('attrib'); if (!el) return; el.textContent = SITE.credits ? (EN_ ? 'Map data © NGII Korea · 1:5,000 topo map · orthoimage 2025' : '지도 자료 © 국토지리정보원 · 수치지형도 1:5,000 · 정사영상 2025') : ''; })();
+(function () { const el = $('attrib'); if (!el) return; el.textContent = SITE.credits ? (EN_ ? 'Map data © NGII Korea · 1:5,000 topo map · orthoimage 2025 · Copernicus DEM GLO-30' : '지도 자료 © 국토지리정보원 · 수치지형도 1:5,000 · 정사영상 2025 · Copernicus DEM GLO-30') : ''; })();
 
 document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle('on', (b.dataset.v === '1') === (SET.voice !== false)); b.addEventListener('click', () => { SET.voice = b.dataset.v === '1'; saveSet(); document.querySelectorAll('#segVoice button').forEach(x => x.classList.toggle('on', x === b)); if (!SET.voice) try { speechSynthesis.cancel(); } catch (e) { } }); });
 
