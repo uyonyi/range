@@ -485,4 +485,8 @@ EN.update({
 '<h2>데이터 출처 · 이 시뮬레이터에 쓰인 자료</h2>': '<h2>Data used in this simulator</h2>',
 '무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span>': 'Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span>',
 '<button id="bLayout">화면 배치 편집</button>': '<button id="bLayout">Edit HUD layout</button>',
+'<i class="cat">비행 훈련</i>': '<i class="cat">FLIGHT TRAINING</i>',
+'<i class="cat">정찰·감시</i>': '<i class="cat">RECON</i>',
+'<i class="cat">재난·구조</i>': '<i class="cat">DISASTER · RESCUE</i>',
+'<i class="cat">타격</i>': '<i class="cat">STRIKE</i>',
 })

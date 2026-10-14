@@ -156,7 +156,7 @@ function renderBelly() {
     el.style.top = top + 'px'; el.style.width = Math.min(430, Math.round(h * 4 / 3)) + 'px';
   } else {
     el.style.width = '';
-    if (LY.d.belly && LY.d.belly.x !== undefined) { }   // 사용자가 옮긴 위치 유지
+    if ((LY.d.belly || LY.def.belly) && (LY.d.belly || LY.def.belly).x !== undefined) { }   // 사용자가 옮긴 위치 유지
     else if (!IS_TOUCH) { const ob = ui.osd.getBoundingClientRect(); el.style.top = Math.max(140, Math.round(ob.bottom + 10)) + 'px'; } else el.style.top = '';
   }
   const r = el.getBoundingClientRect(); if (r.width < 10) return;

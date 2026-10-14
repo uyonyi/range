@@ -2963,7 +2963,7 @@ function renderBelly() {
     el.style.top = top + 'px'; el.style.width = Math.min(430, Math.round(h * 4 / 3)) + 'px';
   } else {
     el.style.width = '';
-    if (LY.d.belly && LY.d.belly.x !== undefined) { }   // 사용자가 옮긴 위치 유지
+    if ((LY.d.belly || LY.def.belly) && (LY.d.belly || LY.def.belly).x !== undefined) { }   // 사용자가 옮긴 위치 유지
     else if (!IS_TOUCH) { const ob = ui.osd.getBoundingClientRect(); el.style.top = Math.max(140, Math.round(ob.bottom + 10)) + 'px'; } else el.style.top = '';
   }
   const r = el.getBoundingClientRect(); if (r.width < 10) return;
@@ -3732,7 +3732,9 @@ function afUI() {
   const box = $('afCards'); if (!box) return; box.innerHTML = '';
   for (const id of AF_IDS) {
     const a = AF[id], b = document.createElement('button'); b.className = 'afc' + (id === SET.af ? ' on' : ''); b.dataset.af = id;
-    b.innerHTML = `<svg viewBox="0 0 64 48" aria-hidden="true">${AF_ICON[id]}</svg><b>${a.name}</b><small>${a.sub}</small>` +
+    const cat = a.kam ? 'kam' : a.cls === 'wing' ? 'wing' : id === 'fpv' ? 'fpv' : 'quad'; b.dataset.cat = cat;
+    const catN = { quad: L2('정찰 쿼드', 'Recon quad'), fpv: L2('FPV', 'FPV'), wing: L2('고정익', 'Fixed-wing'), kam: L2('자폭', 'Loitering') }[cat];
+    b.innerHTML = `<svg viewBox="0 0 64 48" aria-hidden="true">${AF_ICON[id]}</svg><i class="cat">${catN}</i><b>${a.name}</b><small>${a.sub}</small>` +
       `<span class="spec">최고 ${Math.round(a.top * 3.6)} km/h · ${a.endur}분</span><span class="nt">${a.note}</span>`;
     b.onclick = () => { setAirframe(id); afUI(); };
     box.appendChild(b);
@@ -4266,24 +4268,33 @@ const LY_ITEMS = [
 ];
 const LY = { key: 'fpvsim_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
 try { LY.d = JSON.parse(localStorage.getItem(LY.key) || '{}'); } catch (e) { }
+// 휴대폰 기본 배치 (사용자가 정해 준 배치 기준). x,y = 왼쪽 위 / cx,cy = 가운데 (화면 비율)
+LY.def = IS_TOUCH ? {
+  osd: { x: 0.045, y: 0.016 }, obj: { x: 0.257, y: 0.016 }, bottom: { x: 0.262, y: 0.112, s: 0.55 }, map: { x: 0.046, y: 0.327 }, belly: { x: 0.046, y: 0.679 }, scope: { x: 0.194, y: 0.699 }, radio: { x: 0.335, y: 0.789 },
+  tbIR: { x: 0.56, y: 0.03 }, tbCam: { x: 0.621, y: 0.016 }, tbBelly: { x: 0.559, y: 0.168 }, tbZoom: { x: 0.616, y: 0.173 }, tbFull: { x: 0.684, y: 0.092 },
+  tbGuide: { x: 0.76, y: 0.024 }, tbAssist: { x: 0.816, y: 0.024 }, tbPause: { x: 0.91, y: 0.035 }, tbReset: { x: 0.927, y: 0.162, h: true }, tbBoost: { x: 0.774, y: 0.269 }, tbDrop: { x: 0.8225, y: 0.341 }
+} : {};
 function lySave() { try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
 function lyApply() {
   for (const [id] of LY_ITEMS) {
-    const el = $(id); if (!el) continue; const c = LY.d[id];
+    const el = $(id); if (!el) continue; const c = LY.d[id] || LY.def[id];
     if (!c) { el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.transform = el.style.transformOrigin = ''; el.classList.remove('lyHide'); continue; }
-    if (c.x !== undefined) { el.style.left = Math.round(clamp(c.x, 0, 0.97) * innerWidth) + 'px'; el.style.top = Math.round(clamp(c.y, 0, 0.95) * innerHeight) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
-    el.style.transformOrigin = 'top left'; el.style.transform = c.x !== undefined || c.s ? `scale(${c.s || 1})` : '';
+    const s = c.s || 1;
+    if (id === 'obj') el.style.textAlign = 'left';   // 옮긴 경우 왼쪽 정렬 (가운데 정렬이면 상자가 밀림)
+    if (c.cx !== undefined) { const w = el.offsetWidth || 46, h = el.offsetHeight || 46; el.style.left = Math.round(clamp(c.cx * innerWidth - w * s / 2, 0, innerWidth - w * s)) + 'px'; el.style.top = Math.round(clamp(c.cy * innerHeight - h * s / 2, 0, innerHeight - h * s)) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
+    else if (c.x !== undefined) { const w = el.offsetWidth * s, h = el.offsetHeight * s; el.style.left = Math.round(clamp(c.x * innerWidth, 0, Math.max(0, innerWidth - Math.min(w, innerWidth * 0.3)))) + 'px'; el.style.top = Math.round(clamp(c.y * innerHeight, 0, Math.max(0, innerHeight - Math.min(h || 40, innerHeight * 0.3)))) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; }
+    el.style.transformOrigin = 'top left'; el.style.transform = c.x !== undefined || c.cx !== undefined || c.s ? `scale(${s})` : '';
     el.classList.toggle('lyHide', !!c.h);
   }
 }
 addEventListener('resize', () => setTimeout(lyApply, 50));
 function lyName(id) { const it = LY_ITEMS.find(x => x[0] === id); return it ? (window.SIM_LANG === 'en' ? it[2] : it[1]) : id; }
 function lyBar() {
-  const b = $('lyBar'), sel = LY.sel, c = sel ? (LY.d[sel] || {}) : null;
+  const b = $('lyBar'), sel = LY.sel, c = sel ? (LY.d[sel] || LY.def[sel] || {}) : null;
   b.innerHTML = `<span class="ln">${sel ? lyName(sel) : L2('창을 끌어서 옮기기 · 눌러서 고르기', 'Drag to move · tap to select')}</span>` +
     (sel ? `<button data-a="m">−</button><span class="sz">${Math.round((c.s || 1) * 100)}%</span><button data-a="p">+</button><button data-a="h">${c.h ? L2('보이기', 'Show') : L2('숨기기', 'Hide')}</button><button data-a="r1">${L2('이 창 원래대로', 'Reset item')}</button>` : '') +
     `<button data-a="ra">${L2('전체 초기화', 'Reset all')}</button><button class="primary" data-a="ok">${L2('완료', 'Done')}</button>`;
-  b.querySelectorAll('button').forEach(x => x.onclick = e => { e.stopPropagation(); const a = x.dataset.a, d = sel && (LY.d[sel] = LY.d[sel] || {});
+  b.querySelectorAll('button').forEach(x => x.onclick = e => { e.stopPropagation(); const a = x.dataset.a, d = sel && (LY.d[sel] = LY.d[sel] || Object.assign({}, LY.def[sel] || {}));
     if (a === 'm') d.s = Math.max(0.5, Math.round(((d.s || 1) - 0.1) * 10) / 10); if (a === 'p') d.s = Math.min(1.8, Math.round(((d.s || 1) + 0.1) * 10) / 10);
     if (a === 'h') d.h = !d.h; if (a === 'r1') delete LY.d[sel]; if (a === 'ra') { LY.d = {}; LY.sel = null; }
     if (a === 'ok') return lyEdit(false);
@@ -4306,8 +4317,8 @@ function lyEdit(on) {
     e.preventDefault(); e.stopPropagation(); const r = el.getBoundingClientRect(); drag = { el, id: el.id, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false }; LY.sel = el.id; lyBar();
   }, true);
   addEventListener('pointermove', e => {
-    if (!drag) return; e.preventDefault(); drag.moved = true; const d = LY.d[drag.id] = LY.d[drag.id] || {};
-    d.x = (e.clientX - drag.dx) / innerWidth; d.y = (e.clientY - drag.dy) / innerHeight; lyApply();
+    if (!drag) return; e.preventDefault(); drag.moved = true; const d = LY.d[drag.id] = LY.d[drag.id] || Object.assign({}, LY.def[drag.id] || {});
+    delete d.cx; delete d.cy; d.x = (e.clientX - drag.dx) / innerWidth; d.y = (e.clientY - drag.dy) / innerHeight; lyApply();
   }, true);
   addEventListener('pointerup', () => { if (drag) { lySave(); drag = null; } }, true);
 })();
