@@ -951,11 +951,16 @@ const STREES = (function siteTrees() {
     const nm = g.attributes.normal; for (let i = 0; i < p.count; i++) { _n.set((p.getX(i) - x) / r, (p.getY(i) - y) / ry * 1.6, (p.getZ(i) - z) / r).normalize(); nm.setXYZ(i, _n.x, _n.y, _n.z); }
     return g; };
   // 거리별 3단계 (가까이: 덩이 3개 세밀 / 중간: 덜 세밀 / 멀리: 덩이 1개)
-  const decG = () => shade(merge([trunk(0.5), blob(1.0, 0.3, 0, 0.64, 0, 1), blob(0.66, 0.22, 0.3, 0.82, -0.2, 2), blob(0.6, 0.2, -0.35, 0.58, 0.25, 7)]), 0.38);
+  const decG = () => shade(merge([trunk(0.42), blob(1.0, 0.36, 0, 0.62, 0, 1), blob(0.7, 0.26, 0.3, 0.82, -0.2, 2), blob(0.66, 0.24, -0.35, 0.56, 0.25, 7)]), 0.32);
   const conG = () => shade(merge([trunk(0.66), blob(0.82, 0.15, 0.05, 0.84, 0, 3), blob(0.55, 0.12, 0.38, 0.93, 0.25, 4), blob(0.5, 0.12, -0.34, 0.76, -0.28, 5), blob(0.42, 0.1, -0.1, 0.66, 0.4, 6)]), 0.62);
-  const GEO = [[], [], []];
-  for (const bd of LOWQ ? [1, 1, 0] : [2, 1, 0]) { BD = bd; GEO[0].push(decG()); GEO[1].push(conG()); GEO[2].push(shade(merge([blob(1, 0.5, 0, 0.45, 0, 8), blob(0.7, 0.4, 0.4, 0.4, 0.3, 9)]), 0)); }
-  BD = 0; GEO[0][2] = shade(merge([trunk(0.5), blob(1.05, 0.34, 0, 0.66, 0, 1)]), 0.38); GEO[1][2] = shade(merge([trunk(0.66), blob(0.9, 0.17, 0, 0.83, 0, 3)]), 0.62);
+  // 조림지 침엽수 (낙엽송·리기다소나무 등): 층층이 쌓인 뾰족한 원뿔
+  const cone = (r, y0, y1, seg, seed) => { const g = new THREE.ConeGeometry(r, y1 - y0, seg, 2, true), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const vx = p.getX(i), vz = p.getZ(i), k = 1 + 0.22 * (hsh(vx * 4 + seed, p.getY(i) * 5, vz * 4) - 0.5); p.setX(i, vx * k); p.setZ(i, vz * k); }
+    g.translate(0, (y0 + y1) / 2, 0); g.computeVertexNormals(); return g; };
+  const conifG = seg => shade(merge([trunk(0.32), cone(0.95, 0.22, 0.62, seg, 1), cone(0.72, 0.42, 0.82, seg, 2), cone(0.46, 0.62, 1.0, seg, 3)]), 0.24);
+  const GEO = [[], [], [], []];
+  for (const bd of LOWQ ? [1, 1, 0] : [2, 1, 0]) { BD = bd; GEO[0].push(decG()); GEO[1].push(conG()); GEO[2].push(shade(merge([blob(1, 0.5, 0, 0.45, 0, 8), blob(0.7, 0.4, 0.4, 0.4, 0.3, 9)]), 0)); GEO[3].push(conifG(bd === 2 ? 10 : bd === 1 ? 7 : 5)); }
+  BD = 0; GEO[0][2] = shade(merge([trunk(0.42), blob(1.05, 0.38, 0, 0.64, 0, 1)]), 0.32); GEO[1][2] = shade(merge([trunk(0.66), blob(0.9, 0.17, 0, 0.83, 0, 3)]), 0.62);
   // 소나무: 곧은 줄기 위에 납작하고 불규칙한 수관 덩이 (한국 산지 소나무 형태)
   const mt = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 });
   // 구역(120 m) 별로 나눠 화면 밖 구역은 그리지 않음
@@ -981,11 +986,11 @@ const STREES = (function siteTrees() {
     ids.forEach((i, k) => {
       const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
       const w = W(d, s, 0); w.y = Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2;
-      Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.3 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.3 * (0.9 + 0.2 * hsh(d, d, 3)));
+      Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.4 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.4 * (0.9 + 0.2 * hsh(d, d, 3)));
       M4.compose(w, Q, SCV); im.setMatrixAt(k, M4);
       col.setRGB(u8[i * 4] / 255 * 0.92, u8[i * 4 + 1] / 255 * 0.86, u8[i * 4 + 2] / 255 * 0.8).convertSRGBToLinear(); im.setColorAt(k, col);
       bb.expandByPoint(w); bb.expandByPoint(_a.set(w.x, w.y + h, w.z));
-      pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z; dim[i * 2] = h; dim[i * 2 + 1] = r * 1.15;
+      pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z; dim[i * 2] = h; dim[i * 2 + 1] = r * 1.24;
       const gk = Math.floor(w.x / GC) + ',' + Math.floor(w.z / GC); if (!GRID.has(gk)) GRID.set(gk, []); GRID.get(gk).push(i | (kind << 24));
     });
     bb.expandByScalar(4); const sph = bb.getBoundingSphere(new THREE.Sphere()); geos.forEach(g => { g.boundingSphere = sph; g.boundingBox = bb; });
@@ -1003,8 +1008,9 @@ const STREES = (function siteTrees() {
         const dx = p.x - x, dz = p.z - z, hd = Math.hypot(dx, dz); if (hd > r + Rr) continue;
         // 높이별 반지름
         const t = (p.y - y) / h;
-        const c0 = kind === 1 ? 0.82 : kind === 2 ? 0.45 : 0.66, hh = kind === 1 ? 0.2 : kind === 2 ? 0.5 : 0.36;   // 수관 중심 높이 · 반높이 (비율)
-        const rr = Math.max(t < c0 ? 0.12 : 0, r * Math.sqrt(Math.max(0, 1 - Math.pow((t - c0) / hh, 2))));
+        const c0 = kind === 1 ? 0.82 : kind === 2 ? 0.45 : 0.62, hh = kind === 1 ? 0.2 : kind === 2 ? 0.5 : 0.38;   // 수관 중심 높이 · 반높이 (비율)
+        const rr = kind === 3 ? Math.max(t < 0.22 ? 0.12 : 0, t >= 0.22 && t <= 1 ? r * 0.95 * (1 - (t - 0.22) / 0.78) : 0)   // 원뿔
+          : Math.max(t < c0 ? 0.12 : 0, r * Math.sqrt(Math.max(0, 1 - Math.pow((t - c0) / hh, 2))));
         const pen = rr + Rr - hd; if (pen <= 0) continue;
         if (!best || pen > best.pen) best = { pen, n: hd > 1e-4 ? new V3(dx / hd, 0, dz / hd) : new V3(1, 0, 0), tag: 'tree' };
       }
