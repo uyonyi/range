@@ -1,4 +1,7 @@
 EN = {
+'<div class="pickLbl">기체 <small>공개 제원 기준 근사</small></div>': '<div class="pickLbl">Airframe <small>approximated from public specs</small></div>',
+'<div class="pickLbl">임무 <small>눌러서 미리 보기 · 두 번 누르면 바로 출격</small></div>': '<div class="pickLbl">Mission <small>tap to preview · tap twice to launch</small></div>',
+'<button id="msGo" class="primary go">출격 ▶</button>': '<button id="msGo" class="primary go">Launch ▶</button>',
 'W/S 상승·하강 &nbsp;A/D 회전 &nbsp;방향키 이동': 'W/S climb·descend &nbsp;A/D yaw &nbsp;Arrows move',
 'Space 투하 &nbsp;C 카메라 &nbsp;H 보조 &nbsp;B 음악 &nbsp;Esc 일시정지': 'Space drop &nbsp;C camera &nbsp;H assist &nbsp;B music &nbsp;Esc pause',
 '↕ 상승·하강 ↔ 회전': '↕ climb·descend ↔ yaw',

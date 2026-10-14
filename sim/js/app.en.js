@@ -2381,7 +2381,7 @@ function handleKeys() {
     if (S.state === 'menu') {
       if (k === 'Escape') { closePanels(); continue; }
       if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel'].some(p => !$(p).classList.contains('hidden'))) continue;
-      if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyT') openTutMenu(); continue;
+      if (k === 'Enter' || k === 'PadA') menuGo(); else if (k === 'KeyT') openTutMenu(); continue;
     }
     if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
     if (k === 'Escape') { togglePause(); continue; }
@@ -2481,20 +2481,19 @@ function frame(now, noRender) {
   { eul.set(-subj.pitch, -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
-  else if (S.state === 'menu') {
-    const a = S.simT * 0.05, c0 = CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0).add(new V3(0, 0, 0)) : W(60, 0, 0), R0 = TER.h ? 70 : 38; camera.position.set(c0.x + Math.sin(a) * R0 + 2, Math.max(c0.y + (TER.h ? 28 : 16), terrainAt(c0.x + Math.sin(a) * R0 + 2, c0.z + Math.cos(a) * R0) + 8), c0.z + Math.cos(a) * R0); camera.up.set(0, 1, 0); camera.lookAt(c0.x, c0.y + 2, c0.z); camera.fov = 60; camera.updateProjectionMatrix();
-  } else updateCamera(dt, subj);
+  else if (S.state === 'menu') menuCam(dt);
+  else updateCamera(dt, subj);
   camera.updateMatrixWorld();
   updateGuide(subj);
   droneM.g.visible = (DR.alive || S.state !== 'run') && !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));
   $('vig').classList.toggle('hidden', !(CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay') && !(tutHold && S.tut.st === 'intro')));
-  const focus = S.state === 'menu' ? (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)) : subjPos;
+  const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
   updateFX(dt); envTick(dt); scenTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
-  if (!noRender) { renderer.render(scene, camera); renderBelly(); }
+  if (!noRender) { const mn = S.state === 'menu'; if (mn) menuRenderPre(dt); renderer.render(scene, camera); renderBelly(); if (mn) menuRenderPost(); }
 }
 
 // =====================================================================
@@ -3278,7 +3277,7 @@ $('bPauseRp').onclick = () => { if (REC) { LAST_REC = recFinish(); } ui.pause.cl
 $('bReplay').onclick = () => replayStart(LAST_REC, 'result');
 $('bBestRp').onclick = () => replayStart(BEST[SET.diff], 'menu');
 $('bLastRp').onclick = () => { closePanels(); replayStart(LAST_REC, 'menu'); };
-$('bTut').onclick = openTutMenu; $('tutClose').onclick = () => $('tutMenu').classList.add('hidden');
+$('tutClose').onclick = () => $('tutMenu').classList.add('hidden');
 $('rpPlay').onclick = () => replayKey('Space'); $('rpBack').onclick = () => replayKey('ArrowLeft'); $('rpFwd').onclick = () => replayKey('ArrowRight');
 $('rpSpd').onclick = () => { RP.speed = RP.speed >= 4 ? 0.5 : RP.speed * 2; replayUI(); };
 $('rpCam').onclick = () => replayKey('KeyC'); $('rpClose').onclick = () => replayEnd();
@@ -3741,8 +3740,8 @@ function afUI() {
   }
   const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
   document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
-    const site = HAS[b.dataset.ms] !== false, ok = (MS_OK[b.dataset.ms] || []).includes(SET.af) && site; b.disabled = !ok; b.classList.toggle('off', !ok);
-    b.title = ok ? '' : !site ? 'Not available at this site' : 'Not available for this airframe';
+    const site = HAS[b.dataset.ms] !== false, ok = (MS_OK[b.dataset.ms] || []).includes(SET.af) && site; b.classList.toggle('off', !ok);
+    b.title = ok ? '' : !site ? L2('Not available at this site', 'Not available at this site') : L2('Not available for this airframe', 'Not possible with this airframe');
   });
   // 훈련장 고르기 (두 곳 이상일 때만)
   const sp = $('sitePick'), L = sitesAll();
@@ -3750,6 +3749,7 @@ function afUI() {
     for (const st of L) { const b = document.createElement('button'); b.className = 'stc' + (st.id === SITE.id ? ' on' : ''); b.innerHTML = `<b>${stName(st)}</b><small>${st.flat ? 'Flat · standard obstacle course' : 'Real terrain · ' + (st.course ? 'course laid along a route' : 'DEM')}</small>`;
       b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; sp.appendChild(b); } }
   const segA = $('segAcro'); if (segA) segA.querySelectorAll('button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.acro));
+  if (typeof MENU !== 'undefined' && $('msDetail')) { menuAfPanel(); menuDetail(); }
 }
 document.querySelectorAll('#segAcro button').forEach(b => b.addEventListener('click', () => { SET.acro = b.dataset.v === '1'; saveSet(); afUI(); }));
 
@@ -4362,6 +4362,193 @@ $('credClose').onclick = () => $('credPanel').classList.add('hidden');
 (function () { const el = $('attrib'); if (!el) return; el.textContent = SITE.credits ? (EN_ ? 'Map data © NGII Korea · 1:5,000 topo map · orthoimage 2025' : '지도 자료 © 국토지리정보원 · 수치지형도 1:5,000 · 정사영상 2025') : ''; })();
 
 document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle('on', (b.dataset.v === '1') === (SET.voice !== false)); b.addEventListener('click', () => { SET.voice = b.dataset.v === '1'; saveSet(); document.querySelectorAll('#segVoice button').forEach(x => x.classList.toggle('on', x === b)); if (!SET.voice) try { speechSynthesis.cancel(); } catch (e) { } }); });
-setAirframe(SET.af); afUI();
-Object.assign(window.__sim, { LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+
+// =====================================================================
+//  시작 화면: 격납고(기체 yaw 미리 보기) · 임무 트리맵 · 임무 Site 미리 보기
+// =====================================================================
+const MENU = { ms: 'course', cf: null, cR: 60, cH: 20, a: 0, ri: 0, tt: 0, models: {}, dbl: 0 };
+try { const v = localStorage.getItem('fpvsim_menu_ms'); if (v) MENU.ms = v; } catch (e) { }
+const MS_CAT = { course: 'train', forest: 'train', race: 'train', ridge: 'train', tutorial: 'train', free: 'train', demo: 'train', recon: 'recon', track: 'recon', fire: 'rescue', sar: 'rescue', strike: 'strike' };
+const CAT_C = { train: '#4fe3ff', recon: '#5dff9a', rescue: '#ffaa4d', strike: '#ff5d5d' };
+const AF_C = { quad: '#5aa9ff', fpv: '#b48cff', wing: '#4fe3c0', kam: '#ff6a5d' };
+const CAT_N = () => ({ train: L2('FLIGHT 훈련', 'FLIGHT TRAINING'), recon: L2('정찰·감시', 'RECON · SURVEILLANCE'), rescue: L2('재난·구조', 'DISASTER · RESCUE'), strike: L2('타격', 'STRIKE') });
+const MDESC = () => ({
+  course: [L2('장애물 코스', 'Obstacle course'), L2('게이트 · 슬라롬 · 벙커 · 정찰 · Drop · 정밀 착륙까지 이어지는 기본 훈련 코스.', 'The core course: gates, slalom, bunker, recon, payload drops and a precision landing.'), L2('Training Difficulty와 Guide로 익힌 뒤 Sport에서 기록 단축.', 'Learn it on Training with the guide on, then chase your time on Sport.')],
+  tutorial: [L2('Tutorial', 'Tutorial'), L2('장애물 하나씩 설명을 보고 연습. 처음이라면 여기부터.', 'Practice one obstacle at a time with explanations. Start here if you are new.'), L2('Recon quad(X2D)로만 진행.', 'Flown with the recon quad (X2D) only.')],
+  free: [L2('Free Flight', 'Free flight'), L2('시간·목표 없이 지형과 기체를 익히는 FLIGHT.', 'No timer, no objectives: get to know the terrain and the airframe.'), L2('모든 기체 사용 가능. 열화상(T)·밤·바람도 시험해 보기.', 'Every airframe allowed. Try thermal (T), night and wind.')],
+  demo: [L2('Watch Reference Flight', 'Reference flight'), L2('장애물 코스를 모범 FLIGHT으로 자동 재생.', 'Watch an automatic reference run through the obstacle course.'), L2('경로와 고도를 눈에 익혀 두기.', 'Memorize the line and the altitudes.')]
+});
+function msInfo(k) { const b = BRIEF[k] || MDESC()[k] || [k, '', '']; return { t: b[0], d: b[1], tip: b[2] }; }
+function msAvail(k) {
+  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
+  const site = HAS[k] !== false, af = (MS_OK[k] || []).includes(SET.af);
+  return { ok: site && af, site, af, why: !site ? L2('Not available at this site', 'Not available at this site') : !af ? L2('선택한 기체로는 할 수 없는 임무 · 아래 추천 기체를 고르세요', 'Not possible with this airframe · pick a recommended one below') : '' };
+}
+function afCat(a) { return a.kam ? 'kam' : a.cls === 'wing' ? 'wing' : a.id === 'fpv' ? 'fpv' : 'quad'; }
+// RPG 식 능력치 (공개 제원 근사값을 0~1 로)
+function afStats(a) {
+  const e = typeof a.endur === 'string' ? parseFloat(a.endur.split('~').pop()) : a.endur, top = a.top * 3.6;
+  const agi = a.cls === 'wing' ? a.rrate / 230 : clamp(a.yaw / 330 * 0.5 + a.tw / 3.6 * 0.5, 0, 1);
+  const stb = a.cls === 'wing' ? clamp(0.4 + a.span * 0.17, 0, 1) : clamp(1 - (a.tilt.sport - 38) / 55, 0.2, 1);
+  return [
+    [L2('속도', 'SPD'), top / 160, Math.round(top) + ' km/h'],
+    [L2('체공', 'END'), Math.log(e) / Math.log(210), (typeof a.endur === 'string' ? a.endur : e) + L2('분', ' min')],
+    [L2('기동', 'AGI'), agi, a.cls === 'wing' ? L2('선', 'bank ') + a.bank + '°' : a.yaw + '°/s'],
+    [L2('안정', 'STB'), stb, a.cls === 'wing' ? L2('실속 ', 'stall ') + Math.round(a.stall * 3.6) : L2('기울기 ', 'tilt ') + a.tilt.sport + '°'],
+    [L2('센서', 'SNS'), (a.reconD || 260) / 600, (a.reconD || 260) + ' m']
+  ];
+}
+function afTags(a) {
+  const t = [];
+  if (a.cls === 'wing') t.push(L2('Pause 불가', 'No hover')); else t.push(L2('Pause FLIGHT', 'Hover'));
+  if (a.drop) t.push(L2('Drop 장치', 'Payload drop'));
+  if (a.acro) t.push('Acro');
+  if (a.id === 'anafi') t.push(L2('32배 줌', '32× zoom'));
+  if (a.id === 'puma' || a.id === 'fw') t.push(L2('손 투척', 'Hand launch'));
+  if (a.kam) t.push(L2('탄두 · 1용', 'Warhead · expendable'));
+  return t;
+}
+function menuAfPanel() {
+  const a = AFc(), cat = afCat(a), col = AF_C[cat];
+  const catN = { quad: L2('Recon quad', 'RECON QUAD'), fpv: 'FPV', wing: L2('고정익', 'FIXED-WING'), kam: L2('자폭', 'LOITERING') }[cat];
+  const w = document.querySelector('.afStageW'); if (w) w.style.setProperty('--cc', col);
+  const inf = $('afInfo'); if (inf) inf.innerHTML = `<i class="cat">${catN}</i><b>${a.name}</b><small>${a.sub}</small><div class="tags">${afTags(a).map(x => `<span>${x}</span>`).join('')}</div>`;
+  const st = $('afStats'); if (st) { st.style.setProperty('--cc', col); st.innerHTML = afStats(a).map(r => `<span class="k">${r[0]}</span><span class="sbar"><i style="width:${Math.round(clamp(r[1], 0.04, 1) * 100)}%"></i></span><span class="v">${r[2]}</span>`).join('') + `<span class="note2">${a.note}</span>`; }
+}
+function menuBest(k) {
+  let key = k === 'course' ? 'fpvsim_fpv_best_' + SET.diff + SITE_KEY : isMission(k) ? 'fpvsim_ms_best_' + k + '_' + SET.af + '_' + SET.diff + SITE_KEY : null, b = null;
+  if (key) try { b = parseFloat(localStorage.getItem(key)); } catch (e) { }
+  return b > 0 ? b : null;
+}
+function menuDetail() {
+  const k = MENU.ms, cat = MS_CAT[k] || 'train', inf = msInfo(k), av = msAvail(k), col = CAT_C[cat];
+  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('sel', b.dataset.ms === k));
+  const box = $('msDetail'); if (!box) return; box.style.setProperty('--cc', col);
+  document.querySelector('.msStageW').style.setProperty('--cc', col);
+  $('mdCat').textContent = CAT_N()[cat]; $('mdTitle').textContent = inf.t; $('mdDesc').textContent = inf.d; $('mdTip').textContent = inf.tip;
+  const ok = MS_OK[k] || [];
+  $('mdAf').innerHTML = (ok.length === AF_IDS.length ? '' : ok.map(id => `<button data-af="${id}" class="${id === SET.af ? 'on' : ''}">${AF[id].name}</button>`).join(''));
+  $('mdAf').querySelectorAll('button').forEach(b => b.onclick = () => { setAirframe(b.dataset.af); afUI(); });
+  const best = menuBest(k), meta = [];
+  if (isMission(k)) meta.push(L2('기준 ', 'Par ') + fmt(msPar(k, [1, 2, 3, 4])));
+  if (best) meta.push(L2('내 최고 ', 'Best ') + `<b>${fmt(best)}</b>`);
+  meta.push(AFc().name + ' · ' + { train: L2('Training', 'Training'), easy: L2('Easy', 'Easy'), sport: L2('Sport', 'Sport') }[SET.diff]);
+  $('mdMeta').innerHTML = meta.join(' · ');
+  $('msGo').disabled = !av.ok; $('msGo').textContent = k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
+  $('mdWhy').textContent = av.why;
+  const no = $('msStageNo'); if (no) { no.classList.toggle('on', !av.site); no.textContent = av.site ? '' : L2('이 훈련장에는 없는 임무입니다', 'This mission is not available at this site'); }
+  menuShow(k);
+}
+function menuSel(k, go) {
+  if (!document.querySelector(`#msGrid [data-ms="${k}"]`)) k = 'course';
+  MENU.ms = k; try { localStorage.setItem('fpvsim_menu_ms', k); } catch (e) { }
+  menuDetail(); if (go) menuGo();
+}
+function menuGo() {
+  const k = MENU.ms; if (!msAvail(k).ok) return;
+  if (k === 'tutorial') openTutMenu(); else startRun(k);
+}
+document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
+  b.addEventListener('click', () => { const now = performance.now(), again = MENU.ms === b.dataset.ms && now - MENU.dbl < 450; MENU.dbl = now; if (again) menuGo(); else menuSel(b.dataset.ms); });
+});
+$('msGo').onclick = menuGo;
+// ---- 임무 Site 미리 보기 (Menu 뒤 Camera) ----
+function menuShow(k) {
+  Object.values(MSG).forEach(g => g.visible = false);
+  const a = AFc(), kw = a.cls === 'wing' ? 2.2 : 1;
+  if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt)); }); }
+  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 15); r.mesh.position.copy(c); r.mesh.scale.setScalar(4 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
+  if (k === 'fire' && FIRE.length) { MSG.fire.visible = true; FIRE.forEach((f, i) => { f.on = f.active = i < 3; f.g.visible = i < 3; f.g.scale.setScalar(1); }); }
+  if (k === 'sar' && SAR) MSG.sar.visible = true;
+  if (k === 'track' && TRACK) { MSG.track.visible = true; if (!(TRACK.s > 0)) TRACK.s = TRACK.total * 0.2; }
+  if (k === 'strike' && STRIKE.length) { MSG.strike.visible = true; STRIKE.forEach(t => { t.dead = false; if (t.hull.userData.m0) t.hull.material = t.hull.userData.m0; t.g.visible = true; }); }
+}
+function menuPrev(k) {
+  const pd = CRS_C ? BY.pad_start.down : 60, ps = CRS_C ? BY.pad_start.side : 0, T = !!TER.h;
+  const P = (d, s, y, R, h, spd) => ({ f: W(d, s, y), d, s, R, h, spd: spd || 0.06 });
+  if (k === 'forest' && FLANE) { const q = FLANE.at(FLANE.total * 0.2); return P(q.d, q.s, 3, 16, 9, 0.05); }
+  if (k === 'race' && RACE.length) { const r = RACE[4]; return P(r.q.d, r.q.s, r.alt, 34, 8); }
+  if (k === 'ridge' && RIDGE) { const t = RIDGE.list.find(c => c.top) || RIDGE.list[0]; return P(t.q.d, t.q.s, 15, 80, 30, 0.035); }
+  if (k === 'recon' && RECON.length) { const r = RECON[MENU.ri % RECON.length]; return P(r.d, r.s, 6, 60, 34, 0.05); }
+  if (k === 'fire' && FIRE.length) { const f = FIRE[0]; return P(f.d, f.s, 5, 50, 26, 0.05); }
+  if (k === 'sar' && SAR) return P(SAR.d, SAR.s, 1, 20, 26, 0.07);
+  if (k === 'strike' && STRIKE.length && PATHL) { const q = PATHL.at(235); return P(q.d, q.s, 2, 30, 22, 0.05); }
+  if (k === 'track' && TRACK) return { f: TRACK.g.position.clone().add(new V3(0, 1, 0)), R: 34, h: 26, spd: 0.08, dyn: true };
+  if (k === 'tutorial') return P(pd, ps, 1, 13, 5, 0.08);
+  if (k === 'free') return P(pd, ps, 0, T ? 170 : 70, T ? 75 : 30, 0.025);
+  return P(pd, ps, 0, T ? 48 : 38, T ? 24 : 16, k === 'demo' ? 0.09 : 0.05);
+}
+function menuCam(dt) {
+  const pv = menuPrev(MENU.ms);
+  if (MENU.ms === 'track' && TRACK && MSG.track.visible) {
+    TRACK.s = (TRACK.s + 9 * dt) % Math.max(1, TRACK.total - 5); const vp = trackPose(TRACK.s); TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h;
+    pv.f.copy(vp.p).add(new V3(0, 1, 0));
+  }
+  const k = 1 - Math.exp(-dt * 3.5);
+  if (!MENU.cf) { MENU.cf = pv.f.clone(); MENU.cR = pv.R; MENU.cH = pv.h; }
+  MENU.cf.lerp(pv.f, pv.dyn ? 1 - Math.exp(-dt * 8) : k); MENU.cR += (pv.R - MENU.cR) * k; MENU.cH += (pv.h - MENU.cH) * k;
+  MENU.a += dt * pv.spd; MENU.tt += dt;
+  if (MENU.ms === 'recon' && MENU.tt > 9) { MENU.tt = 0; MENU.ri++; }
+  const c = MENU.cf, x = c.x + Math.sin(MENU.a) * MENU.cR, z = c.z + Math.cos(MENU.a) * MENU.cR;
+  camera.position.set(x, Math.max(c.y + MENU.cH, terrainAt(x, z) + (SITE.trees && MENU.ms !== 'forest' ? 20 : 6)), z); camera.up.set(0, 1, 0); camera.lookAt(c.x, c.y + 1, c.z);
+  camera.fov = 55; camera.updateProjectionMatrix();
+  const tag = $('msStageTag');
+  if (tag && (MENU._tagT = (MENU._tagT || 0) - dt) <= 0) { MENU._tagT = 0.5; let g = ''; if (pv.d !== undefined && !SITE.flat) try { g = grid(pv.d, pv.s); } catch (e) { } tag.innerHTML = `<b>●</b> LIVE · ${stName(SITE)}${g ? ' · ' + g : ''}`; }
+}
+function menuFocus() { return MENU.cf || (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)); }
+// ---- 격납고 yaw 무대 (같은 렌더러로 그려 2D 캔버스에 복사) ----
+const HG = (function () {
+  const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 4 / 3, 0.05, 100);
+  sc.add(new THREE.HemisphereLight(0xcfe3ff, 0x1a1e22, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 4); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x7fc8ff, 1.1); rim.position.set(-4, 2, -5); sc.add(rim);
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0x0f161b, transparent: true, opacity: 0.85 })); pad.rotation.x = -Math.PI / 2; sc.add(pad);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.7 })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.002; sc.add(ring);
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.61, 64), new THREE.MeshBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.35 })); ring2.rotation.x = -Math.PI / 2; ring2.position.y = 0.002; sc.add(ring2);
+  return { sc, cam, pad, ring, ring2, cur: null, id: null, sz: 1, a: 0.6 };
+})();
+function hgModel() {
+  const id = SET.af; if (HG.id === id) return;
+  if (HG.cur) HG.sc.remove(HG.cur);
+  if (!MENU.models[id]) { const m = makeModel(id, false), g = m.g; g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); MENU.models[id] = g; }
+  const g = MENU.models[id]; g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(g), s = bb.getSize(new V3()), c = bb.getCenter(new V3());
+  const r = Math.max(s.x, s.z, s.y * 1.6) * 0.5;
+  HG.sz = r; HG.lift = -bb.min.y + r * 0.12; HG.cx = c.x; HG.cz = c.z;
+  HG.pad.scale.setScalar(r * 1.05); HG.ring.scale.setScalar(r * 1.05); HG.ring2.scale.setScalar(r * 1.05);
+  const col = new THREE.Color(AF_C[afCat(AFc())]); HG.ring.material.color.copy(col); HG.ring2.material.color.copy(col);
+  HG.sc.add(g); HG.cur = g; HG.id = id;
+}
+const _hv = new THREE.Vector2();
+function menuStage(cv) { const r = cv.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return null; const dpr = renderer.getPixelRatio(), w = Math.round(r.width * dpr), h = Math.round(r.height * dpr); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } return { w, h, cw: r.width, ch: r.height }; }
+function menuRenderPre(dt) {
+  const cv = $('afStage'); if (!cv || ui.menu.classList.contains('hidden')) return;
+  const st = menuStage(cv); if (!st) return;
+  hgModel(); renderer.getSize(_hv);
+  const cw = Math.min(st.cw, _hv.x), ch = Math.min(st.ch, _hv.y);
+  HG.a += (dt || 0.016) * 0.45; const g = HG.cur; g.rotation.y = HG.a; g.position.set(-HG.cx, HG.lift + Math.sin(HG.a * 2.2) * HG.sz * 0.03, -HG.cz);
+  if (g.userData.props) g.userData.props.forEach(p => p.rotation.y += 0.6);
+  HG.cam.aspect = cw / ch; HG.cam.position.set(0, HG.sz * 1.05, HG.sz * 2.9); HG.cam.lookAt(0, HG.sz * 0.3, 0); HG.cam.updateProjectionMatrix();
+  renderer.setViewport(0, 0, cw, ch); renderer.setScissor(0, 0, cw, ch); renderer.setScissorTest(true);
+  renderer.setClearColor(0x0b1116, 1); renderer.clear(); renderer.render(HG.sc, HG.cam);
+  const x2 = cv.getContext('2d'), dpr = renderer.getPixelRatio(), H = renderer.domElement.height;
+  x2.clearRect(0, 0, st.w, st.h); x2.drawImage(renderer.domElement, 0, H - ch * dpr, cw * dpr, ch * dpr, 0, 0, st.w, st.h);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, _hv.x, _hv.y); renderer.setClearColor(0x000000, 1);
+}
+function menuRenderPost() {
+  const cv = $('msStage'); if (!cv || ui.menu.classList.contains('hidden')) return;
+  const st = menuStage(cv); if (!st) return;
+  const src = renderer.domElement, W0 = src.width, H0 = src.height, ar = st.w / st.h;
+  let sw = W0, sh = W0 / ar; if (sh > H0) { sh = H0; sw = H0 * ar; }
+  const x2 = cv.getContext('2d'); x2.drawImage(src, (W0 - sw) / 2, (H0 - sh) / 2, sw, sh, 0, 0, st.w, st.h);
+}
+document.addEventListener('keydown', e => {
+  if (S.state !== 'menu' || ui.menu.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) return;
+  if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
+  const L = [...document.querySelectorAll('#msGrid [data-ms]')].map(b => b.dataset.ms), i = L.indexOf(MENU.ms), d = e.code === 'ArrowLeft' || e.code === 'ArrowUp' ? -1 : 1;
+  menuSel(L[(i + d + L.length) % L.length]); e.preventDefault();
+});
+
+setAirframe(SET.af); afUI(); menuSel(MENU.ms);
+Object.assign(window.__sim, { MENU, menuSel, menuGo, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
