@@ -341,14 +341,11 @@ function predictImpact(p, v) {
 
 // ---------------- objectives check ----------------
 const _prevP = new V3();
-function checkObjectives(prev, cur, dt) {
-  const o = curObj(); if (!o || !DR.alive) return;
-  const mg = MODES[SET.diff].margin;
-  if (o.kind === 'custom') { tutCustomCheck(cur, dt); return; }
-  if (o.kind === 'takeoff') { if (cur.y > groundAt(cur.x, cur.z) + 0.8) { S.running = true; completeObj(1, 'GO!', '#ffc828'); } return; }
-  if (o.kind === 'pass' || o.kind === 'slalom') {
+const SKIP_PEN = 10;   // 장애물을 건너뛰면 벌점 (초)
+// 통과형 과제(게이트·슬라롬): 이번 프레임에 면을 지났는지 -> { inside, fwd, x } 또는 null
+function passTest(o, prev, cur, mg) {
     const a = o.b.local(prev), b = o.b.local(cur);
-    if ((a.ly < 0) === (b.ly < 0)) return;
+    if ((a.ly < 0) === (b.ly < 0)) return null;
     const f = a.ly / (a.ly - b.ly), x = lerp(a.lx, b.lx, f), z = lerp(a.lz, b.lz, f), fwd = a.ly < 0;
     let inside = false;
     if (o.kind === 'slalom') inside = o.sg > 0 ? (x > 0.15 - mg && x < 6) : (x < -0.15 + mg && x > -6);
@@ -362,6 +359,29 @@ function checkObjectives(prev, cur, dt) {
         if (!inside && mg > 0) { const cx = 0, cz = p.A[1] + (p.C[1] - p.A[1]) / 3; inside = Math.hypot(x - cx, z - cz) < (p.B[0] - p.A[0]) / (2 * Math.sqrt(3)) + mg; }
       }
     }
+    return { inside, fwd, x };
+}
+function checkObjectives(prev, cur, dt) {
+  const o = curObj(); if (!o || !DR.alive) return;
+  const mg = MODES[SET.diff].margin;
+  if (o.kind === 'custom') { tutCustomCheck(cur, dt); return; }
+  if (o.kind === 'takeoff') { if (cur.y > groundAt(cur.x, cur.z) + 0.8) { S.running = true; completeObj(1, 'GO!', '#ffc828'); } return; }
+  // 놓치고 지나감: 다음(또는 그다음) 게이트를 제대로 통과하면 지금 과제는 실패 처리하고 넘어감
+  if (S.kind === 'course' && o.kind !== 'takeoff' && o.kind !== 'land') {
+    for (let j = S.objIdx + 1; j <= Math.min(S.objIdx + 2, OBJS.length - 1); j++) {
+      const q = OBJS[j]; if (q.kind !== 'pass' && q.kind !== 'slalom') continue;
+      const r = passTest(q, prev, cur, mg); if (!(r && r.inside && r.fwd)) continue;
+      const missed = [];
+      for (let k = S.objIdx; k < j; k++) { S.objState[k] = 2; if (OBJS[k].hint) OBJS[k].hint.visible = false; S.pen += SKIP_PEN; missed.push(OBJS[k].label); }
+      S.objIdx = j; S.scan = 0; S.wasInside = false; S.scanned = false; S.orbSum = 0; S.orbA = null;
+      comm(`${CS}, CONTROL. You skipped ${missed.length > 1 ? 'two obstacles' : 'an obstacle'}. Penalty applied, continue.`, `${missed.join(', ')} 놓침 · +${SKIP_PEN * missed.length}초 · 계속 진행`);
+      completeObj(1, `${missed.join(' · ')} ✗ +${SKIP_PEN * missed.length}s → ${q.label} ✓`, '#ff9a40');
+      return;
+    }
+  }
+  if (o.kind === 'pass' || o.kind === 'slalom') {
+    const r = passTest(o, prev, cur, mg); if (!r) return;
+    const { inside, fwd, x } = r;
     if (inside && fwd) completeObj(1);
     else if (inside && !fwd) { showMsg('WRONG WAY', '#ff6060', 1); sfx('bad'); }
     else if (o.kind === 'slalom' && fwd && Math.abs(x) < 6) { showMsg(`WRONG SIDE · ${o.sg > 0 ? 'RIGHT' : 'LEFT'}`, '#ff6060', 1.2); sfx('bad'); }
