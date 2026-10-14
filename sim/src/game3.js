@@ -673,7 +673,7 @@ function handleKeys() {
     if (S.state === 'menu') {
       if (k === 'Escape') { closePanels(); continue; }
       if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel'].some(p => !$(p).classList.contains('hidden'))) continue;
-      if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyT') openTutMenu(); continue;
+      if (k === 'Enter' || k === 'PadA') menuGo(); else if (k === 'KeyT') openTutMenu(); continue;
     }
     if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
     if (k === 'Escape') { togglePause(); continue; }
@@ -773,18 +773,17 @@ function frame(now, noRender) {
   { eul.set(-subj.pitch, -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
-  else if (S.state === 'menu') {
-    const a = S.simT * 0.05, c0 = CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0).add(new V3(0, 0, 0)) : W(60, 0, 0), R0 = TER.h ? 70 : 38; camera.position.set(c0.x + Math.sin(a) * R0 + 2, Math.max(c0.y + (TER.h ? 28 : 16), terrainAt(c0.x + Math.sin(a) * R0 + 2, c0.z + Math.cos(a) * R0) + 8), c0.z + Math.cos(a) * R0); camera.up.set(0, 1, 0); camera.lookAt(c0.x, c0.y + 2, c0.z); camera.fov = 60; camera.updateProjectionMatrix();
-  } else updateCamera(dt, subj);
+  else if (S.state === 'menu') menuCam(dt);
+  else updateCamera(dt, subj);
   camera.updateMatrixWorld();
   updateGuide(subj);
   droneM.g.visible = (DR.alive || S.state !== 'run') && !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));
   $('vig').classList.toggle('hidden', !(CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay') && !(tutHold && S.tut.st === 'intro')));
-  const focus = S.state === 'menu' ? (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)) : subjPos;
+  const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
   updateFX(dt); envTick(dt); scenTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
-  if (!noRender) { renderer.render(scene, camera); renderBelly(); }
+  if (!noRender) { const mn = S.state === 'menu'; if (mn) menuRenderPre(dt); renderer.render(scene, camera); renderBelly(); if (mn) menuRenderPost(); }
 }

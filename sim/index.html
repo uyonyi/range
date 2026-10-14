@@ -44,6 +44,7 @@ canvas#c{display:block;width:100vw;height:100vh}
 #segSite button{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:760px){.demGrid{grid-template-columns:1fr}}
 .card{margin:auto;background:rgba(14,18,22,.94);border:1px solid var(--line);border-top:3px solid var(--amber);max-width:880px;width:100%;padding:26px 28px}
+#menu>.card{max-width:1220px}
 .card h1{margin:0;font:700 28px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.05em}
 .card h2{margin:4px 0 18px;font-size:14px;font-weight:500;color:var(--mute)}
 .card h3{margin:20px 0 8px;font-size:13px;color:var(--amber);letter-spacing:.06em}
@@ -204,6 +205,58 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 @media (min-width:1700px) and (min-height:950px){#osd{font-size:18px}#osd b{width:62px}#osd .big{font-size:31px}#list{font-size:14px;min-width:230px}#objNext{font-size:17px}#objMsg{font-size:34px}#bottom{font-size:15px}#guide{font-size:17px}#map{transform:scale(1.15);transform-origin:right bottom}#scope{transform:scale(1.15);transform-origin:left bottom}}
 @media (max-height:760px){#map{width:126px;height:210px}#list{font-size:11px;line-height:1.4}}
 @media (max-width:760px){.cols{grid-template-columns:1fr}#list{display:none}}
+
+/* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
+.mmain{display:grid;grid-template-columns:minmax(280px,350px) minmax(0,1fr);gap:18px;align-items:start}
+.hangar,.ops{min-width:0}
+.afStageW{--cc:#5aa9ff;position:relative;border:1px solid color-mix(in srgb,var(--cc) 40%,transparent);border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 50% 78%,color-mix(in srgb,var(--cc) 22%,#121a20),#080b0e 72%);aspect-ratio:4/3}
+#afStage,#msStage{display:block;width:100%;height:100%}
+.afinfo{position:absolute;left:12px;top:10px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}
+.afinfo .cat{font-style:normal;font-size:10px;letter-spacing:.08em;color:var(--cc)}.afinfo b{display:block;font-size:19px;margin-top:1px}.afinfo small{font-size:11px;opacity:.75}
+.afinfo .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.afinfo .tags span,.mdaf button{font-size:10px;padding:2px 7px;border-radius:9px;border:1px solid color-mix(in srgb,var(--cc) 60%,transparent);color:var(--cc);background:rgba(0,0,0,.35)}
+.afstats{--cc:#5aa9ff;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:5px 8px;align-items:center;margin:10px 2px 10px;font-size:12px}
+.afstats .k{color:var(--mute);letter-spacing:.04em}.afstats .v{font:600 11px "SF Mono",Menlo,Consolas,monospace;color:#dfe6ea;text-align:right}
+.afstats .sbar{height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;position:relative}.afstats .sbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 55%,transparent),var(--cc));border-radius:4px;transition:width .35s}
+.afstats .note2{grid-column:1/-1;font-size:11px;opacity:.7;margin-top:2px}
+.hangar .afcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.hangar .afc{padding:6px 4px;align-items:center;text-align:center;flex:none}.hangar .afc svg{width:38px;height:28px;margin:0}.hangar .afc small,.hangar .afc .spec,.hangar .afc .nt,.hangar .afc .cat{display:none}.hangar .afc b{font-size:11px;line-height:1.2;font-weight:600}
+.msgrid.tm{grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:70px;grid-template-areas:"co co fo fo rc rc" "co co ra ra tr tr" "co co ri ri fi sa" "tu tu fr de st st";gap:6px}
+.msgrid.tm button{position:relative;overflow:hidden;border-radius:8px;justify-content:flex-end;padding:7px 10px;min-width:0;margin:0}
+.msgrid.tm button::after{content:attr(data-ic);position:absolute;right:8px;top:2px;font-size:30px;line-height:1;color:var(--cc);opacity:.22;pointer-events:none}
+.msgrid.tm button.big::after{font-size:76px;top:10px;right:14px}
+.msgrid.tm button.big b{font-size:22px}.msgrid.tm button.big small{white-space:normal}
+.msgrid.tm button b{position:relative;z-index:1}.msgrid.tm button small{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msgrid.tm button.off{opacity:.38;cursor:pointer}
+.msgrid.tm button.sel{outline:2px solid var(--cc);outline-offset:-2px;background:linear-gradient(135deg,color-mix(in srgb,var(--cc) 34%,transparent),color-mix(in srgb,var(--cc) 8%,transparent))!important;opacity:1}
+.msgrid.tm button.sel::before{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--cc)}
+.msdetail{--cc:#4fe3ff;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;margin-top:10px;padding:12px;border:1px solid color-mix(in srgb,var(--cc) 45%,transparent);border-radius:12px;background:linear-gradient(135deg,color-mix(in srgb,var(--cc) 12%,transparent),transparent 60%)}
+.msStageW{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0a0e12;align-self:start}
+.msStageW .scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px);box-shadow:inset 0 0 40px rgba(0,0,0,.55)}
+.msStageW .scan::before,.msStageW .scan::after{content:"";position:absolute;width:18px;height:18px;border:2px solid var(--cc);opacity:.8}
+.msStageW .scan::before{left:8px;top:8px;border-right:0;border-bottom:0}.msStageW .scan::after{right:8px;bottom:8px;border-left:0;border-top:0}
+.stag{position:absolute;left:12px;bottom:8px;font:600 10px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em;color:#fff;text-shadow:0 1px 2px #000;opacity:.9}.stag b{color:#ff4d4d}
+.sno{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:12px;color:var(--mute);text-align:center;padding:10px}.sno.on{display:flex}
+.msinfo{min-width:0;display:flex;flex-direction:column}
+.msinfo .cat{font-style:normal;font-size:10px;letter-spacing:.08em;color:var(--cc)}
+.msinfo h3{margin:2px 0 6px;font-size:20px;color:#fff;letter-spacing:0}
+.msinfo p{margin:0 0 6px;font-size:13px;line-height:1.45;opacity:.9}.msinfo p.tip{font-size:12px;opacity:.65}
+.mdaf{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 6px}.mdaf button{cursor:pointer;padding:3px 8px}.mdaf button.on{background:var(--cc);color:#071016;font-weight:700}
+.mdmeta{font:11px "SF Mono",Menlo,Consolas,monospace;color:var(--mute)}.mdmeta b{color:#ffc828}
+.msinfo .go{margin-top:auto;padding:12px;font-size:16px;letter-spacing:.06em;width:100%}
+.msinfo .go:disabled{opacity:.4;cursor:not-allowed}
+.why{font-size:11px;color:#ff9a7a;margin-top:4px;min-height:1em}
+@media (max-width:900px){.mmain{grid-template-columns:minmax(0,1fr)}.afStageW{aspect-ratio:16/9}}
+@media (max-width:620px){.msdetail{grid-template-columns:minmax(0,1fr)}.msgrid.tm button.big::after{font-size:48px}}
+@media (max-height:520px) and (pointer:coarse){
+  .mmain{grid-template-columns:210px minmax(0,1fr);gap:10px}
+  .afStageW{aspect-ratio:16/11}.afinfo b{font-size:14px}.afinfo small{display:none}.afinfo .tags{display:none}
+  .afstats{font-size:10px;gap:2px 6px;margin:5px 0}.afstats .sbar{height:5px}.afstats .note2{display:none}
+  .hangar .afc{padding:3px 2px}.hangar .afc svg{width:28px;height:20px}.hangar .afc b{font-size:9px}
+  .msgrid.tm{grid-auto-rows:38px;gap:4px}.msgrid.tm button{padding:4px 7px}.msgrid.tm button b{font-size:12px}.msgrid.tm button.big b{font-size:16px}
+  .msgrid.tm button small,.msgrid.tm button .cat{display:none}.msgrid.tm button::after{font-size:20px}.msgrid.tm button.big::after{font-size:44px}
+  .msdetail{gap:8px;padding:8px;margin-top:6px}.msinfo h3{font-size:15px;margin:0 0 3px}.msinfo p{font-size:11px;margin:0 0 3px}.msinfo p.tip{display:none}.msinfo .go{padding:9px;font-size:14px}
+}
 </style>
 </head>
 <body>
@@ -244,22 +297,34 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)</h2>
     <div id="sitePickWrap"><div class="pickLbl">훈련장</div><div id="sitePick" class="sitepick"></div></div>
-    <div class="pickLbl">기체 <small>공개 제원 기준 근사 · 속도·크기·조종 특성이 다름</small></div>
-    <div id="afCards" class="afcards"></div>
-    <div class="pickLbl">임무</div>
-    <div id="msGrid" class="msgrid">
-      <button data-cat="train" data-start="course" data-ms="course"><i class="cat">비행 훈련</i><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
-      <button data-cat="train" data-start="forest" data-ms="forest"><i class="cat">비행 훈련</i><b>숲길 통과</b><small>나무 사이 · 쓰러진 나무 넘고 아래로</small></button>
-      <button data-cat="train" data-start="race" data-ms="race"><i class="cat">비행 훈련</i><b>타임 레이스</b><small>계곡 링 최단 시간</small></button>
-      <button data-cat="train" data-start="ridge" data-ms="ridge"><i class="cat">비행 훈련</i><b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small></button>
-      <button data-cat="train" id="bTut" data-ms="tutorial"><i class="cat">비행 훈련</i><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
-      <button data-cat="train" data-start="free" data-ms="free"><i class="cat">비행 훈련</i><b>자유 비행</b><small>제한 없이</small></button>
-      <button data-cat="train" data-start="demo" data-ms="demo"><i class="cat">비행 훈련</i><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
-      <button data-cat="recon" data-start="recon" data-ms="recon"><i class="cat">정찰·감시</i><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
-      <button data-cat="recon" data-start="track" data-ms="track"><i class="cat">정찰·감시</i><b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small></button>
-      <button data-cat="rescue" data-start="fire" data-ms="fire"><i class="cat">재난·구조</i><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
-      <button data-cat="rescue" data-start="sar" data-ms="sar"><i class="cat">재난·구조</i><b>수색·구조</b><small>숲 속 실종자 찾고 구조 키트 투하 · 복귀</small></button>
-      <button data-cat="strike" data-start="strike" data-ms="strike"><i class="cat">타격</i><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
+    <div class="mmain">
+      <section class="hangar">
+        <div class="pickLbl">기체 <small>공개 제원 기준 근사</small></div>
+        <div class="afStageW"><canvas id="afStage"></canvas><div id="afInfo" class="afinfo"></div></div>
+        <div id="afStats" class="afstats"></div>
+        <div id="afCards" class="afcards"></div>
+      </section>
+      <section class="ops">
+        <div class="pickLbl">임무 <small>눌러서 미리 보기 · 두 번 누르면 바로 출격</small></div>
+        <div id="msGrid" class="msgrid tm">
+          <button data-cat="train" data-ms="course" data-ic="◎" class="big" style="grid-area:co"><i class="cat">비행 훈련</i><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
+          <button data-cat="train" data-ms="forest" data-ic="♣" style="grid-area:fo"><i class="cat">비행 훈련</i><b>숲길 통과</b><small>나무 사이 · 쓰러진 나무 넘고 아래로</small></button>
+          <button data-cat="train" data-ms="race" data-ic="◌" style="grid-area:ra"><i class="cat">비행 훈련</i><b>타임 레이스</b><small>계곡 링 최단 시간</small></button>
+          <button data-cat="train" data-ms="ridge" data-ic="▲" style="grid-area:ri"><i class="cat">비행 훈련</i><b>능선 종주</b><small>DEM 분석 능선 경로로 정상 왕복</small></button>
+          <button data-cat="train" id="bTut" data-ms="tutorial" data-ic="?" style="grid-area:tu"><i class="cat">비행 훈련</i><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
+          <button data-cat="train" data-ms="free" data-ic="∞" style="grid-area:fr"><i class="cat">비행 훈련</i><b>자유 비행</b><small>제한 없이</small></button>
+          <button data-cat="train" data-ms="demo" data-ic="▶" style="grid-area:de"><i class="cat">비행 훈련</i><b>기준 비행 보기</b><small>모범 비행 재생</small></button>
+          <button data-cat="recon" data-ms="recon" data-ic="◉" class="wide" style="grid-area:rc"><i class="cat">정찰·감시</i><b>정찰</b><small>실제 건물 찾아 화면 가운데에 담기</small></button>
+          <button data-cat="recon" data-ms="track" data-ic="➤" class="wide" style="grid-area:tr"><i class="cat">정찰·감시</i><b>차량 추적</b><small>실제 도로를 달리는 차량을 60초 시야 유지</small></button>
+          <button data-cat="rescue" data-ms="fire" data-ic="♨" style="grid-area:fi"><i class="cat">재난·구조</i><b>산불 감시</b><small>열화상(T)으로 불씨 찾아 좌표 보고</small></button>
+          <button data-cat="rescue" data-ms="sar" data-ic="✚" style="grid-area:sa"><i class="cat">재난·구조</i><b>수색·구조</b><small>숲 속 실종자 찾고 구조 키트 투하 · 복귀</small></button>
+          <button data-cat="strike" data-ms="strike" data-ic="✕" class="wide" style="grid-area:st"><i class="cat">타격</i><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
+        </div>
+        <div id="msDetail" class="msdetail">
+          <div class="msStageW"><canvas id="msStage"></canvas><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
+          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">출격 ▶</button><div id="mdWhy" class="why"></div></div>
+        </div>
+      </section>
     </div>
     <div class="btns small" style="margin-top:10px">
       <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bCred">데이터 출처</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>
@@ -460,7 +525,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=94d466f4"></script><script>window.SIM_LANG='ko';</script>
-<script src="js/app.ko.js?v=94d466f4"></script>
+<script src="sites/yeongin.js?v=613951c8"></script><script>window.SIM_LANG='ko';</script>
+<script src="js/app.ko.js?v=613951c8"></script>
 </body>
 </html>

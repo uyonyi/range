@@ -298,7 +298,7 @@ $('bPauseRp').onclick = () => { if (REC) { LAST_REC = recFinish(); } ui.pause.cl
 $('bReplay').onclick = () => replayStart(LAST_REC, 'result');
 $('bBestRp').onclick = () => replayStart(BEST[SET.diff], 'menu');
 $('bLastRp').onclick = () => { closePanels(); replayStart(LAST_REC, 'menu'); };
-$('bTut').onclick = openTutMenu; $('tutClose').onclick = () => $('tutMenu').classList.add('hidden');
+$('tutClose').onclick = () => $('tutMenu').classList.add('hidden');
 $('rpPlay').onclick = () => replayKey('Space'); $('rpBack').onclick = () => replayKey('ArrowLeft'); $('rpFwd').onclick = () => replayKey('ArrowRight');
 $('rpSpd').onclick = () => { RP.speed = RP.speed >= 4 ? 0.5 : RP.speed * 2; replayUI(); };
 $('rpCam').onclick = () => replayKey('KeyC'); $('rpClose').onclick = () => replayEnd();
