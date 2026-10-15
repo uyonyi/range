@@ -507,3 +507,4 @@ EN.update({
 EN.update({
 '<b id="vrBackT">FPV 드론 VR</b><p id="vrBackD">Quest 컨트롤러로 조종하는 FPV 고글 화면 시뮬레이터입니다. 버튼을 누르면 VR 안 메뉴에서 시작합니다.</p><button id="vrBackGo" class="primary">VR 시작</button><a id="vrPC" href="../">PC·휴대폰 버전으로</a>': '<b id="vrBackT">FPV drone VR</b><p id="vrBackD">An FPV goggle-view simulator flown with Quest controllers. Press the button to start in the in-VR menu.</p><button id="vrBackGo" class="primary">Start VR</button><a id="vrPC" href="../en.html">PC / phone version</a>',
 })
+EN.update({'<button id="rpVid">⬇ 영상 저장</button>': '<button id="rpVid">⬇ Save video</button>'})
