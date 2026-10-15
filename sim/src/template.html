@@ -245,6 +245,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .mdmeta{font:11px "SF Mono",Menlo,Consolas,monospace;color:var(--mute)}.mdmeta b{color:#ffc828}
 .msinfo .go{margin-top:auto;padding:12px;font-size:16px;letter-spacing:.06em;width:100%}
 .msinfo .go:disabled{opacity:.4;cursor:not-allowed}
+.msinfo .vrgo{margin-top:6px;padding:9px;font-size:14px;background:#1d2a33;border:1px solid #4fe3ff;color:#4fe3ff}.msinfo .vrgo.hidden{display:none}
 .why{font-size:11px;color:#ff9a7a;margin-top:4px;min-height:1em}
 @media (max-width:900px){.mmain{grid-template-columns:minmax(0,1fr)}.afStageW{aspect-ratio:16/9}}
 @media (max-width:620px){.msdetail{grid-template-columns:minmax(0,1fr)}.msgrid.tm button.big::after{font-size:48px}}
@@ -324,7 +325,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
         </div>
         <div id="msDetail" class="msdetail">
           <div class="msStageW"><canvas id="msStage"></canvas><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
-          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">출격 ▶</button><div id="mdWhy" class="why"></div></div>
+          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">출격 ▶</button><button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
     </div>
@@ -369,6 +370,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="opt col">
       <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
       <div>무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+      <div>VR 조종 방식 <span class="seg" id="segVRMode"><button data-v="2" class="on">모드 2 (왼쪽 스틱 상승·회전)</button><button data-v="1">모드 1 (오른쪽 스틱 상승)</button></span></div>
       <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>

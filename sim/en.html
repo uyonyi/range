@@ -246,6 +246,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .mdmeta{font:11px "SF Mono",Menlo,Consolas,monospace;color:var(--mute)}.mdmeta b{color:#ffc828}
 .msinfo .go{margin-top:auto;padding:12px;font-size:16px;letter-spacing:.06em;width:100%}
 .msinfo .go:disabled{opacity:.4;cursor:not-allowed}
+.msinfo .vrgo{margin-top:6px;padding:9px;font-size:14px;background:#1d2a33;border:1px solid #4fe3ff;color:#4fe3ff}.msinfo .vrgo.hidden{display:none}
 .why{font-size:11px;color:#ff9a7a;margin-top:4px;min-height:1em}
 @media (max-width:900px){.mmain{grid-template-columns:minmax(0,1fr)}.afStageW{aspect-ratio:16/9}}
 @media (max-width:620px){.msdetail{grid-template-columns:minmax(0,1fr)}.msgrid.tm button.big::after{font-size:48px}}
@@ -325,7 +326,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
         </div>
         <div id="msDetail" class="msdetail">
           <div class="msStageW"><canvas id="msStage"></canvas><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
-          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><div id="mdWhy" class="why"></div></div>
+          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
     </div>
@@ -370,6 +371,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="opt col">
       <div>FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span></div>
       <div>Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+      <div>VR stick mode <span class="seg" id="segVRMode"><button data-v="2" class="on">Mode 2 (left stick: throttle · yaw)</button><button data-v="1">Mode 1 (right stick: throttle)</button></span></div>
       <div>Flight assist <span class="seg" id="segAssist"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
@@ -528,7 +530,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=6a681cea"></script><script>window.SIM_LANG='en';</script>
-<script src="js/app.en.js?v=6a681cea"></script>
+<script src="sites/yeongin.js?v=4777c173"></script><script>window.SIM_LANG='en';</script>
+<script src="js/app.en.js?v=4777c173"></script>
 </body>
 </html>

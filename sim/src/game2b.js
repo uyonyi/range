@@ -221,6 +221,7 @@ function readInput(dt) {
       for (const k in ex) { const bt = gp.buttons[ex[k][0]]; const s = !!(bt && (bt.pressed || bt.value > 0.5)); if (s && !padPrevBtn['x' + k]) pressed.push(ex[k][1]); padPrevBtn['x' + k] = s; }
     }
   }
+  if (XR_ON) xrInput(dt);   // VR 컨트롤러 스틱
 }
 const RCUI = { open: false };
 function rumble(strong, weak, ms) {

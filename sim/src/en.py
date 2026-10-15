@@ -500,3 +500,7 @@ EN.update({
 '<button data-g="mission">실전 임무<small>정찰 · 구조 · 타격</small></button>': '<button data-g="mission">Missions<small>Recon · rescue · strike</small></button>',
 '<em class="rec">처음이라면 여기부터</em>': '<em class="rec">New? Start here</em>',
 })
+EN.update({
+'<button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button>': '<button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button>',
+'<div>VR 조종 방식 <span class="seg" id="segVRMode"><button data-v="2" class="on">모드 2 (왼쪽 스틱 상승·회전)</button><button data-v="1">모드 1 (오른쪽 스틱 상승)</button></span></div>': '<div>VR stick mode <span class="seg" id="segVRMode"><button data-v="2" class="on">Mode 2 (left stick: throttle · yaw)</button><button data-v="1">Mode 1 (right stick: throttle)</button></span></div>',
+})
