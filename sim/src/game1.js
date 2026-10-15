@@ -173,7 +173,7 @@ const silDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPack
 
 // ---------------- ground ----------------
 const GD0 = -400, GD1 = 800, GS0 = -600, GS1 = 600, GSZ = 1200, GPX = 2048, GK = GPX / GSZ;
-const SITE_L = SITE_PRE, SITE = SITE_L.site, SITE_KEY = SITE.flat ? '' : '@' + SITE.id;          // 현재 지형(현장)
+const SITE_L = SITE_PRE, SITE = SITE_L.site, SITE_KEY0 = SITE.flat ? '' : '@' + SITE.id, SITE_KEY = SITE_KEY0 + (!SITE.flat && SITE.course && SITE.course.v > 1 ? 'v' + SITE.course.v : '');   // 코스 배치가 바뀌면 기록 따로          // 현재 지형(현장)
 const VEC = SITE.vec || null;
 const CRS_C = SITE.course || null;   // 경로 따라 배치한 전용 코스   // 수치지형도 벡터 (도로·하천·경지·건물)
 function gpx(down, side) { return [(side - GS0) * GK, (GD1 - down) * GK]; }
@@ -907,7 +907,10 @@ const FLANE = (function forestLane() {
     const t0 = wpt(q, -1.05, 2.2), t1 = wpt(q, 1.05, 2.2); box(t0, t1, 0.04, tapeM);   // 표시 띠
     cps.push({ s, q, label: '좁은 틈 (2.1 m)', hw: 1.05, y0: 0.2, y1: 6 });
   }
-  const plan = [[18, 'g'], [52, 'n'], [86, 'g'], [118, 'l'], [150, 'g'], [182, 'a'], [214, 'g'], [246, 'n'], [278, 'l'], [310, 'a'], [342, 'g'], [374, 'n'], [total - 14, 'f']];
+  // 약 17 m 마다 하나씩 (게이트·틈·넘기·아래로 섞어서)
+  const PAT = ['g', 'n', 'g', 'l', 'g', 'a', 'n', 'g', 'l', 'g', 'a', 'n'], plan = [];
+  for (let s = 16, i = 0; s < total - 30; s += 17, i++) plan.push([s, PAT[i % PAT.length]]);
+  plan.push([total - 14, 'f']);
   let gi = 0;
   for (const [s, k] of plan) {
     if (s > total - 10 && k !== 'f') continue;

@@ -3,8 +3,8 @@
 //  game state
 // =====================================================================
 const MODES = {
-  train: { name: 'TRAINING', maxTilt: 20 * DEG, vmax: 7.5, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
-  easy: { name: 'EASY', maxTilt: 28 * DEG, vmax: 10, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
+  train: { name: 'TRAINING', maxTilt: 25 * DEG, vmax: 9, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
+  easy: { name: 'EASY', maxTilt: 32 * DEG, vmax: 12, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
@@ -155,6 +155,8 @@ function stepDrone(dt) {
   const boost = !!IN.boost && !grounded && boostZone(); S.boosting = boost;
   const vmaxB = boost ? Math.max(md.vmax, afc.top) : md.vmax, tiltB = md.maxTilt + (boost ? 15 * DEG : 0);
   const k = G * Math.tan(tiltB) / vmaxB;
+  // 반응: 실제 기체처럼 1초 안팎에 속도가 붙고 멈추도록 (최고 속도는 그대로, 가속·감속만 빠르게)
+  const kk = Math.max(k, 1 / (SET.diff === 'train' ? 1.25 : SET.diff === 'easy' ? 1.0 : 0.85)), ksc = kk / k;
   const a = 1 - Math.exp(-dt / 0.11);
   const stun = S.stun > 0 ? 0.25 : 1;
   let ip = IN.pitch * stun, ir = IN.roll * stun, iy = IN.yaw * stun;
@@ -184,8 +186,8 @@ function stepDrone(dt) {
   if (!grounded) {
     const af = G * Math.tan(DR.pitch), ar = G * Math.tan(DR.roll);
     const wv = windAt(DR.p);   // 바람: 공기에 대한 속도로 저항
-    DR.v.x += (FWD.x * af + RGT.x * ar - k * (DR.v.x - wv.x)) * dt;
-    DR.v.z += (FWD.z * af + RGT.z * ar - k * (DR.v.z - wv.z)) * dt;
+    DR.v.x += ((FWD.x * af + RGT.x * ar) * ksc - kk * (DR.v.x - wv.x)) * dt;
+    DR.v.z += ((FWD.z * af + RGT.z * ar) * ksc - kk * (DR.v.z - wv.z)) * dt;
     // 브레이크 (스틱을 놓으면 멈춤)
     if (md.brake > 0 && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
     // 통과 보조: 열린 곳 가운데로 살짝 끌어당김

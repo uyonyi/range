@@ -114,7 +114,40 @@ function passObj(id, label) {
   } else if (p.kind === 'tunnel') { hint = addHint(b, new THREE.CircleGeometry(p.r, 40), 0, -p.L / 2 - 0.02, p.zc); mk = b.world(0, -p.L / 2, p.zc + p.r + 1.2); }
   OBJS.push({ kind: 'pass', b, label, hint, mk });
 }
+// 현장 전용 코스: course.order 순서대로 과제 생성 (영인산 등)
+function buildObjectivesOrder(order) {
+  const ringGeo = new THREE.RingGeometry(1.2, 1.45, 40);
+  const ringHint = (pos) => { const me = new THREE.Mesh(ringGeo, hintMat()); me.material.opacity = 0.55; me.rotation.x = -Math.PI / 2; me.position.copy(pos).setY(groundAt(pos.x, pos.z) + 0.05); me.visible = false; scene.add(me); return me; };
+  const ps = BY.pad_start;
+  for (const st of order) {
+    if (st.t === 'takeoff') OBJS.push({ kind: 'takeoff', label: 'TAKEOFF', mk: W(ps.down, ps.side, 2.4) });
+    else if (st.t === 'pass' && OBJ[st.id]) passObj(st.id, st.label);
+    else if (st.t === 'slalom' && OBJ[st.id]) {
+      const b = OBJ[st.id], sg = st.sg, hint = addHint(b, new THREE.PlaneGeometry(1.1, 3.2), sg * 0.85, 0, 1.9);
+      OBJS.push({ kind: 'slalom', b, sg, label: st.label, hint, mk: b.world(sg * 0.85, 0, 4.0) });
+    } else if (st.t === 'drop') {
+      if (st.target === 'ivan') { const iv = OBJ.ivan_grp1; OBJS.push({ kind: 'drop', target: 'ivan', label: st.label, hint: ringHint(iv.world(0, 0, 0)), mk: iv.world(0, 0, 4.2) }); }
+      else if (st.target === 'mit') { const mit = OBJ.mit; OBJS.push({ kind: 'drop', target: 'mit', label: st.label, hint: ringHint(mit.world(0, 0, 0)), mk: mit.world(0, 0, 4.2), follow: true }); }
+      else if (st.target === 'tank') { const tk = OBJ.tank, th = ringHint(tk.world(0, 0, 0)); th.scale.set(4, 4, 4); OBJS.push({ kind: 'drop', target: 'tank', label: st.label, hint: th, mk: tk.world(0, 0, 5.5) }); }
+    } else if (st.t === 'orbit') {
+      const tk = OBJ[st.id], R = st.R || 12, oh = new THREE.Mesh(new THREE.RingGeometry(R - 0.7, R + 0.7, 96), hintMat()); oh.material.opacity = 0.35; oh.rotation.x = -Math.PI / 2;
+      oh.position.copy(tk.world(0, 0, 0)).add(new V3(0, 0.06, 0)); oh.visible = false; scene.add(oh);
+      OBJS.push({ kind: 'orbit', b: tk, R, label: st.label, hint: oh, mk: tk.world(0, 0, 8) });
+    } else if (st.t === 'bunker') {
+      const bk = OBJ[st.id], wn = bk.win, w2 = bk.win2;
+      const bh = addHint(bk, new THREE.PlaneGeometry(wn.x1 - wn.x0, wn.z1 - wn.z0), wn.xc, wn.y - 0.02, wn.zc);
+      const bh2 = addHint(bk, new THREE.PlaneGeometry(w2.y1 - w2.y0, w2.z1 - w2.z0), w2.x - 0.02, 0, w2.zc); bh2.rotation.y = Math.PI / 2;
+      OBJS.push({ kind: 'bunker', b: bk, label: st.label, hint: bh, hint1: bh, hint2: bh2, mk: bk.world(wn.xc, wn.y, bk.dims.h + 1.4),
+        mk1: bk.world(wn.xc, wn.y, bk.dims.h + 1.4), mk2: bk.world(w2.x - 0.6, 0, bk.dims.h + 1.4) });
+    } else if (st.t === 'land') {
+      const pl = OBJ[st.id]; const lh = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.78, 40), hintMat()); lh.material.opacity = 0.7;
+      lh.rotation.x = -Math.PI / 2; lh.position.copy(pl.world(0, 0, 0.18)); lh.visible = false; scene.add(lh);
+      OBJS.push({ kind: 'land', b: pl, label: st.label, hint: lh, mk: pl.world(0, 0, 1.8) });
+    }
+  }
+}
 function buildObjectives() {
+  if (CRS_C && CRS_C.order) return buildObjectivesOrder(CRS_C.order);
   const ps = BY.pad_start;
   OBJS.push({ kind: 'takeoff', label: 'TAKEOFF', mk: W(ps.down, ps.side, 2.4) });
   passObj('ring_a', 'RING');

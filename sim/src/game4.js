@@ -88,7 +88,7 @@ async function loadOrthoFile(file, opt) {
   applyGroundCanvas(cv);
   const pct = Math.round(cover / (ORTHO_N * ORTHO_N) * 100);
   setOrthoStatus(`위성사진 적용됨 (${(rx * step * mk).toFixed(2)} m/px, 바닥의 ${pct}%)`, '#5dff9a');
-  if (!(opt && opt.nosave)) cv.toBlob(bl => { if (bl) IDB.put('ortho' + SITE_KEY, bl); }, 'image/jpeg', 0.9);
+  if (!(opt && opt.nosave)) cv.toBlob(bl => { if (bl) IDB.put('ortho' + SITE_KEY0, bl); }, 'image/jpeg', 0.9);
   return { res: rx * step * mk, cover: pct, srcRes: res0 };
 }
 // 현장 기본 정사영상 (sites/*.tif, 현장 데이터의 ortho 항목) — 사용자가 올린 사진이 없을 때 자동으로 입힘
@@ -106,7 +106,7 @@ async function autoOrtho() {
 }
 function setOrthoStatusTxt() { const el = $('orthoStatus'); return el ? el.textContent : ''; }
 async function restoreOrtho() {
-  const bl = await IDB.get('ortho' + SITE_KEY); if (!bl) { autoOrtho(); return; }
+  const bl = await IDB.get('ortho' + SITE_KEY0); if (!bl) { autoOrtho(); return; }
   try {
     const im = await createImageBitmap(bl); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; cv.getContext('2d').drawImage(im, 0, 0);
     applyGroundCanvas(cv); setOrthoStatus('저장된 위성사진 사용 중', '#5dff9a');
@@ -366,7 +366,7 @@ $('orthoFile').addEventListener('change', async e => {
 });
 $('bDem').onclick = () => $('demFile').click();
 $('demFile').addEventListener('change', e => { const f = e.target.files[0]; if (f) { window.__lastDemFile = f; demOpen(f); } e.target.value = ''; });
-$('bOrthoReset').onclick = () => { resetGround(); IDB.del('ortho' + SITE_KEY); setOrthoStatus('기본 바닥 사용 중', ''); };
+$('bOrthoReset').onclick = () => { resetGround(); IDB.del('ortho' + SITE_KEY0); setOrthoStatus('기본 바닥 사용 중', ''); };
 function refreshBest() {
   $('bLastRp').disabled = !LAST_REC;
   let b = null; try { b = parseFloat(localStorage.getItem('hroc_fpv_best_' + SET.diff)); } catch (e) { }

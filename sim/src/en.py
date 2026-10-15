@@ -493,3 +493,10 @@ EN.update({
 '<i class="cat">재난·구조</i>': '<i class="cat">DISASTER · RESCUE</i>',
 '<i class="cat">타격</i>': '<i class="cat">STRIKE</i>',
 })
+EN.update({
+'<div class="pickLbl">임무 <small>종류를 고르고 → 임무를 눌러 미리 보기 → 출격 (두 번 누르면 바로 출격)</small></div>': '<div class="pickLbl">Mission <small>pick a group → tap a mission to preview → launch (tap twice to launch now)</small></div>',
+'<button data-g="basic">처음 시작<small>튜토리얼 · 기본 코스</small></button>': '<button data-g="basic">Getting started<small>Tutorial · core course</small></button>',
+'<button data-g="skill">비행 기술<small>숲길 · 레이스 · 능선</small></button>': '<button data-g="skill">Flying skills<small>Forest · race · ridge</small></button>',
+'<button data-g="mission">실전 임무<small>정찰 · 구조 · 타격</small></button>': '<button data-g="mission">Missions<small>Recon · rescue · strike</small></button>',
+'<em class="rec">처음이라면 여기부터</em>': '<em class="rec">New? Start here</em>',
+})
