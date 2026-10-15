@@ -4355,7 +4355,34 @@ function voiceUnlock() { // 첫 터치/클릭에서 음성 엔진 깨우기 (브
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, voiceUnlock, { once: true, passive: true }));
 function commSpeechDone() { COMM.sp = false; COMM.busy = Math.min(COMM.busy, 0.5); radioT = Math.min(radioT, 1.2); commStatic(false); squelch(false); if (MUS.bus && AU.ctx) musicSetLevel(); }
+// 기기에 영어 음성이 없으면(예: Quest 브라우저) 내장 합성기를 별도 작업 스레드에서 돌려 SOUND를 만듦 (GPL 구성 요소, 이때만 불러옴)
+const TTSW = { w: null, ok: null, id: 0, cb: {} };
+function ttsWorker() {
+  if (TTSW.w || TTSW.ok === false) return TTSW.w;
+  try { const w = new Worker((window.SIM_BASE || '') + 'lib/tts-worker.js'); w.onmessage = e => { const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = () => { TTSW.ok = false; TTSW.w = null; }; TTSW.w = w; } catch (e) { TTSW.ok = false; }
+  return TTSW.w;
+}
+function needFallbackVoice() { try { return !speechSynthesis.getVoices().some(v => /^en/i.test(v.lang)); } catch (e) { return true; } }
+setTimeout(() => { if (SET.voice !== false && needFallbackVoice()) ttsWorker(); }, 3000);   // 미리 불러 둠
+function commSpeakFallback(text, est) {
+  const myId = (COMM.cur = (COMM.cur || 0) + 1); COMM.sp = true;
+  const done = () => { if (COMM.cur === myId) commSpeechDone(); };
+  if (COMM.src) { try { COMM.src.stop(); } catch (e) { } COMM.src = null; }
+  const w = ttsWorker(), id = ++TTSW.id;
+  if (!w || !AU.ctx) { setTimeout(done, est * 900); return; }
+  TTSW.cb[id] = d => {
+    if (COMM.cur !== myId || !d.buf) return done();
+    AU.ctx.decodeAudioData(d.buf).then(b => {
+      if (COMM.cur !== myId) return; const c = AU.ctx, s = c.createBufferSource(); s.buffer = b;
+      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400;
+      const g = c.createGain(); g.gain.value = 1.5; s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(AU.master); s.onended = done; s.start(); COMM.src = s; COMM.fbOk = true;
+    }).catch(done);
+  };
+  w.postMessage({ id, text });
+  setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(10, est * 2.2) * 1000);
+}
 function commSpeak(text, est) {
+  if (needFallbackVoice() && TTSW.ok !== false && ttsWorker()) return commSpeakFallback(text, est);
   const done = () => { if (COMM.cur === myId) commSpeechDone(); };
   const myId = (COMM.cur = (COMM.cur || 0) + 1);
   COMM.sp = true; COMM.spT = est;
@@ -4881,7 +4908,7 @@ function vrMenuDraw() {
   g.fillText(L2('R트리거 Drop · L트리거 Boost · A 확인 · B Menu · X Restart', 'R-trigger drop · L-trigger boost · A ok · B menu · X reset'), 36, yH + 28);
   g.fillText(L2('Y 하부 Camera · Left stick 누르기 Switch camera · Right stick 누르기 열화상', 'Y lower cam · L-stick click camera · R-stick click thermal'), 36, yH + 56);
   const vi = voiceInfo(); g.fillStyle = vi.en ? 'rgba(93,255,154,.8)' : 'rgba(255,154,122,.9)';
-  g.fillText(vi.en ? L2('무전 음성: ', 'Radio voice: ') + vi.name : L2('무전 음성: 이 기기에 영어 음성이 없어 자막으로만 나옵니다 (음성 ' + vi.n + '개)', 'Radio voice: no English voice on this device, subtitles only (' + vi.n + ' voices)'), 36, yH + 84);
+  g.fillStyle = vi.en || TTSW.w ? 'rgba(93,255,154,.8)' : 'rgba(255,154,122,.9)'; g.fillText(vi.en ? L2('무전 음성: ', 'Radio voice: ') + vi.name : TTSW.w ? L2('무전 음성: 내장 합성기 (기기에 영어 음성 None)', 'Radio voice: built-in synthesizer (no English voice on device)') + (COMM.fbOk ? ' ✓' : '') : L2('무전 음성: 이 기기에 영어 음성이 없어 자막으로만 나옵니다', 'Radio voice: no English voice on this device, subtitles only'), 36, yH + 84);
   btn('exit', W2 - 280, H2 - 88, 244, 60, L2('VR 끝내기', 'Exit VR'), false);
   g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR4', 36, H2 - 30);
   P.tex.needsUpdate = true;
@@ -5000,5 +5027,5 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();

@@ -59,6 +59,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     """공개판: 라이브러리·현장 데이터·앱을 따로 둔 여러 파일 구조"""
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
+    if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
         s = dict(all_sites[sid])
