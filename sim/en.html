@@ -206,7 +206,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 @media (max-height:760px){#map{width:126px;height:210px}#list{font-size:11px;line-height:1.4}}
 @media (max-width:760px){.cols{grid-template-columns:1fr}#list{display:none}}
 
-#vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:20px;color:#fff;text-align:center}#vrBack button{padding:16px;font-size:20px}
+#vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:24px;color:#fff;text-align:center}#vrBack p{margin:0;max-width:420px;font-size:15px;line-height:1.5;color:#cfd6da;text-align:center}#vrBack a{color:#4fe3ff;text-align:center;font-size:15px}#vrBack button:disabled{opacity:.4}#vrBack button{padding:16px;font-size:20px}
 /* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
 .mmain{display:grid;grid-template-columns:minmax(280px,350px) minmax(0,1fr);gap:18px;align-items:start}
 .hangar,.ops{min-width:0}
@@ -293,7 +293,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   <div id="scope" class="hidden"><div class="t">DROP SCOPE · predicted impact</div><canvas id="scopeC" width="170" height="170" style="width:150px;height:150px"></canvas><div id="scopeTxt"></div><div class="gauge"><div id="scopeBar"></div></div></div>
 </div>
 
-<div id="vrBack" class="hidden"><div class="vb"><b id="vrBackT">VR was interrupted</b><button id="vrBackGo" class="primary">Back to VR</button><button id="vrBack2D">Continue in 2D</button></div></div>
+<div id="vrBack" class="hidden"><div class="vb"><b id="vrBackT">FPV drone VR</b><p id="vrBackD">An FPV goggle-view simulator flown with Quest controllers. Press the button to start in the in-VR menu.</p><button id="vrBackGo" class="primary">Start VR</button><a id="vrPC" href="../en.html">PC / phone version</a></div></div>
 <div id="rot" class="hidden"><div class="ph"></div><div>Please rotate your phone to landscape</div></div>
 
 <div id="menu" class="panel">
@@ -373,7 +373,6 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="opt col">
       <div>FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span></div>
       <div>Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>VR stick mode <span class="seg" id="segVRMode"><button data-v="2" class="on">Mode 2 (left stick: throttle · yaw)</button><button data-v="1">Mode 1 (right stick: throttle)</button></span></div>
       <div>Flight assist <span class="seg" id="segAssist"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
@@ -532,7 +531,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=f66e554f"></script><script>window.SIM_LANG='en';</script>
-<script src="js/app.en.js?v=f66e554f"></script>
+<script src="sites/yeongin.js?v=a8229848"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=a8229848"></script>
 </body>
 </html>

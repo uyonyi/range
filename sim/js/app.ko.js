@@ -1759,10 +1759,10 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrView: 'pilot' };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrScreen: 'head' };
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrView: SET.vrView })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -2558,13 +2558,12 @@ function frame(now, noRender) {
   spot.intensity = lerp(spot.intensity, (SET.light || inB || nearB || (ENV.night && !ENV.ir)) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
   { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
-  if (XR_ON) { /* VR: 머리 위치는 헤드셋이 정함 */ }
-  else if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
+  if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
   else if (S.state === 'menu') menuCam(dt);
   else updateCamera(dt, subj);
   camera.updateMatrixWorld();
   updateGuide(subj);
-  droneM.g.visible = (DR.alive || S.state !== 'run') && (XR_ON || !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro')));
+  droneM.g.visible = (DR.alive || S.state !== 'run') && !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));
   $('vig').classList.toggle('hidden', !(CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay') && !(tutHold && S.tut.st === 'intro')));
   const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
@@ -2572,8 +2571,8 @@ function frame(now, noRender) {
   updateFX(dt); envTick(dt); scenTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
-  if (XR_ON) xrTick(dt);
-  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); renderer.render(scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
+  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
 }
 
 // =====================================================================
@@ -3159,7 +3158,7 @@ async function autoOrtho() {
     if (SITE.ortho.startsWith('data:')) {   // 파일 안에 넣은 사진: fetch 없이 직접 풀기 (fetch 가 막힌 곳 대비)
       const b64 = SITE.ortho.slice(SITE.ortho.indexOf(',') + 1), bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
       bl = new Blob([u], { type: 'image/tiff' });
-    } else { const r = await fetch(SITE.ortho); if (!r.ok) throw new Error('HTTP ' + r.status); bl = await r.blob(); } await loadOrthoFile(bl, { nosave: true });
+    } else { const r = await fetch((/^(https?:|\/)/.test(SITE.ortho) ? '' : (window.SIM_BASE || '')) + SITE.ortho); if (!r.ok) throw new Error('HTTP ' + r.status); bl = await r.blob(); } await loadOrthoFile(bl, { nosave: true });
     setOrthoStatus(setOrthoStatusTxt() + ' · ' + ((window.SIM_LANG === 'en' && SITE.orthoSrc_en) || SITE.orthoSrc || ''), '#5dff9a'); return true;
   } catch (e) { setOrthoStatus('정사영상 없음 (기본 바닥)', ''); return false; }
 }
@@ -4599,7 +4598,7 @@ function menuDetail() {
   $('mdMeta').innerHTML = meta.join(' · ');
   $('msGo').disabled = !av.ok; $('msGo').textContent = k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
   $('mdWhy').textContent = av.why || MENU.afNote || '';
-  if (typeof vrBtnUpdate === 'function' && typeof VR_OK !== 'undefined') vrBtnUpdate();
+  if (typeof vrBtnUpdate === 'function' && VR_OK) vrBtnUpdate();
   const no = $('msStageNo'); if (no) { no.classList.toggle('on', !av.site); no.textContent = av.site ? '' : L2('이 훈련장에는 없는 임무입니다', 'This mission is not available at this site'); }
   menuShow(k);
 }
@@ -4735,140 +4734,81 @@ document.addEventListener('keydown', e => {
 });
 
 // =====================================================================
-//  VR (WebXR · Quest 브라우저) — 지상 조종사 시점 v2
-//  · 따라가기: 내 위치가 드론 뒤 약 10 m 를 부드럽게 따라감 (몸 방향은 그대로, 드론이 옆·뒤로 가면 화면 어둡게 하고 돌려 줌)
-//  · VR 안 메뉴: 컨트롤러로 가리켜 트리거로 선택
-//  · 메타 버튼 등으로 VR 이 끊기면 2D 화면에 'VR 로 돌아가기'
+//  VR 판 (sim/vr · Quest 브라우저) — FPV 고글 화면
+//  지형·드론은 드론 카메라로 한 번만 그려 화면 텍스처에 담고, 헤드셋에는 어두운 방 + 큰 화면 + 메뉴만 그림.
+//  (머리 움직임으로 세상이 흔들리지 않아 멀미가 적고, 장면을 두 번 그리지 않아 빠름)
 //  모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우   모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우
-//  오른쪽 트리거 투하 · 왼쪽 트리거 부스트 · A 확인 · B 메뉴 · X 다시 · Y 드론 쪽으로
+//  오른쪽 트리거 투하 · 왼쪽 트리거 부스트 · A 확인 · B 메뉴 · X 다시 · Y 화면 앞으로 · 왼쪽 스틱 누르기 화면 고정 방식
 // =====================================================================
-const XR = { sess: null, base: null, rig: new THREE.Matrix4(), prev: {}, fade: 0, fadeDir: 0, fadeCb: null, hudT: 0, floor: true, menu: false, userExit: false, offT: 0, back: null, ctl: [], hover: null, src: null };
-function xrPanel(w, h, cw, ch) {
-  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const tex = new THREE.CanvasTexture(cv);
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, side: THREE.DoubleSide }));
-  m.renderOrder = 2000; m.visible = false; m.frustumCulled = false; scene.add(m); return { cv, tex, m, yaw: 0, init: false };
+const IS_VR = !!window.SIM_VR;
+const XR = { sess: null, prev: {}, menu: false, userExit: false, ctl: [], hover: null, src: null, osdT: 0, mT: 0, frames: 0 };
+const VRS = new THREE.Scene(); VRS.background = new THREE.Color(0x06090c);
+{ const gr = new THREE.GridHelper(30, 30, 0x1f4a57, 0x0e1c22); VRS.add(gr); VRS.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1)); }
+const VR_HEAD = new THREE.Group(), VR_SPACE = new THREE.Group(); VRS.add(VR_HEAD); VRS.add(VR_SPACE);
+const VR_RT = new THREE.WebGLRenderTarget(1280, 720, { samples: 4 }); VR_RT.texture.encoding = renderer.outputEncoding;
+function vrPlane(w, h, cw, ch, opt) {
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial(Object.assign({ map: tex, transparent: true, depthWrite: false, toneMapped: false }, opt || {})));
+  m.renderOrder = 10; return { cv, tex, m };
 }
-const XR_HUD = xrPanel(0.96, 0.375, 1024, 400);
-const XR_MENU = xrPanel(1.3, 0.975, 1024, 768); XR_MENU.btns = [];
-const XR_FADE = (function () {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 12), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
-  m.renderOrder = 3000; m.visible = false; m.frustumCulled = false; scene.add(m); return m;
-})();
-const XR_HALO = (function () {
-  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
-  g.strokeStyle = '#ffc828'; g.lineWidth = 5; g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2); g.stroke();
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, depthWrite: false, fog: false, opacity: 0.85 }));
-  s.renderOrder = 1500; s.visible = false; scene.add(s); return s;
-})();
-// FPV 고글 화면: 드론 카메라 영상을 눈앞 큰 화면에 (주변은 어둡게)
-const XR_FPV = (function () {
-  const rt = new THREE.WebGLRenderTarget(1024, 576); rt.texture.encoding = renderer.outputEncoding;
-  const cam = new THREE.PerspectiveCamera(82, 16 / 9, 0.03, camera.far);
-  const scr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), new THREE.MeshBasicMaterial({ map: rt.texture, depthTest: false, depthWrite: false, fog: false }));
-  scr.renderOrder = 1800; scr.visible = false; scr.frustumCulled = false; scene.add(scr);
-  const dim = new THREE.Mesh(new THREE.SphereGeometry(5, 24, 16), new THREE.MeshBasicMaterial({ color: 0x05080a, transparent: true, opacity: 0.9, side: THREE.BackSide, depthTest: false, depthWrite: false, fog: false }));
-  dim.renderOrder = 1700; dim.visible = false; dim.frustumCulled = false; scene.add(dim);
-  return { rt, cam, scr, dim, yaw: 0, pitch: 0, init: false };
-})();
-const _qT = new THREE.Quaternion(), _eF = new THREE.Euler(0, 0, 0, 'YXZ');
-function xrFpvRender() {
-  const F = XR_FPV, sb = xrSubj(), c = F.cam;
-  _eF.set(-visPitch(sb), -sb.h, -sb.roll); c.quaternion.setFromEuler(_eF);
-  _qT.setFromAxisAngle(new V3(1, 0, 0), (AFc().cls === 'wing' ? 0 : SET.tilt) * DEG); c.quaternion.multiply(_qT);
-  c.position.copy(sb.p).add(new V3(0, 0.02, -0.12).applyQuaternion(c.quaternion)); c.fov = 82 + (S.boosting ? 8 : 0); c.updateProjectionMatrix(); c.updateMatrixWorld();
-  const hide = [F.scr, F.dim, XR_HUD.m, XR_HALO, XR_MENU.m, XR_FADE, droneM.g].map(m => [m, m.visible]); hide.forEach(([m]) => m.visible = false);
-  XR.ctl.forEach(k => k.visible = false);
-  const cur = renderer.getRenderTarget(), xe = renderer.xr.enabled; renderer.xr.enabled = false;
-  renderer.setRenderTarget(F.rt); renderer.clear(); renderer.render(scene, c); renderer.setRenderTarget(cur); renderer.xr.enabled = xe;
-  hide.forEach(([m, v]) => m.visible = v); XR.ctl.forEach(k => k.visible = true);
-}
-function xrFpvPlace(dt, head, hy) {
-  const F = XR_FPV, fw = new V3(0, 0, -1).applyQuaternion(camera.quaternion), hp = Math.asin(clamp(fw.y, -1, 1));
-  if (!F.init) { F.yaw = hy; F.pitch = 0; F.init = true; }
-  let dy = hy - F.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
-  if (Math.abs(dy) > 0.35) F.yaw += dy * (1 - Math.exp(-dt * 3));
-  const tp = clamp(hp, -0.5, 0.5); if (Math.abs(tp - F.pitch) > 0.25) F.pitch += (tp - F.pitch) * (1 - Math.exp(-dt * 3));
-  const D = 2.0, cp = Math.cos(F.pitch);
-  F.scr.position.set(head.x - Math.sin(F.yaw) * D * cp, head.y + Math.sin(F.pitch) * D, head.z - Math.cos(F.yaw) * D * cp); F.scr.rotation.set(F.pitch, F.yaw, 0, 'YXZ');
-  F.dim.position.copy(head);
-}
-function xrViewSet(v) { SET.vrView = v; saveSet(); XR_FPV.init = false; XR_HUD.init = false; showMsg(v === 'fpv' ? L2('FPV 고글 화면', 'FPV goggle view') : L2('지상 조종사 시점', 'Ground pilot view'), '#4fe3ff', 1.2); }
-// 컨트롤러 광선 (메뉴용)
+const VR_SCR = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), new THREE.MeshBasicMaterial({ map: VR_RT.texture }));
+const VR_OSD = vrPlane(2.4, 1.35, 1280, 720); VR_OSD.m.position.z = 0.003; VR_SCR.add(VR_OSD.m);
+const VR_FRAME = new THREE.Mesh(new THREE.PlaneGeometry(2.48, 1.43), new THREE.MeshBasicMaterial({ color: 0x0b1116 })); VR_FRAME.position.z = -0.003; VR_SCR.add(VR_FRAME);
+const VR_MENU = vrPlane(1.3, 0.975, 1024, 768); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
+// 컨트롤러 광선
 for (let i = 0; i < 2; i++) {
-  const c = renderer.xr.getController(i); scene.add(c);
-  const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(0, 0, 0), new V3(0, 0, -4)]), new THREE.LineBasicMaterial({ color: 0x4fe3ff, transparent: true, opacity: 0.8, depthTest: false, fog: false }));
-  ln.renderOrder = 2500; ln.visible = false; c.add(ln); c.userData.ln = ln;
-  c.addEventListener('connected', e => { c.userData.hand = e.data && e.data.handedness; c.userData.src = e.data; });
-  c.addEventListener('disconnected', () => { c.userData.hand = null; c.userData.src = null; });
+  const c = renderer.xr.getController(i); VRS.add(c);
+  const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(0, 0, 0), new V3(0, 0, -4)]), new THREE.LineBasicMaterial({ color: 0x4fe3ff, transparent: true, opacity: 0.8 }));
+  ln.visible = false; c.add(ln); c.userData.ln = ln;
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 8), new THREE.MeshBasicMaterial({ color: 0x4fe3ff })); c.add(tip);
+  c.addEventListener('connected', e => { c.userData.hand = e.data && e.data.handedness; });
+  c.addEventListener('disconnected', () => { c.userData.hand = null; });
   XR.ctl.push(c);
 }
-const _xm = new THREE.Matrix4(), _xp = new V3(), _xq = new THREE.Quaternion(), _xs = new V3(), _xv = new V3(), _xray = new THREE.Raycaster();
-const yawOf = (x, z) => Math.atan2(-x, -z);
-function xrSetRig(px, py, pz, yaw) {
-  XR.rig.compose(_xp.set(px, py, pz), _xq.setFromAxisAngle(new V3(0, 1, 0), yaw), _xs.set(1, 1, 1)); XR.rigYaw = yaw;
-  _xm.copy(XR.rig).invert(); _xm.decompose(_xp, _xq, _xs);
-  renderer.xr.setReferenceSpace(XR.base.getOffsetReferenceSpace(new XRRigidTransform({ x: _xp.x, y: _xp.y, z: _xp.z, w: 1 }, { x: _xq.x, y: _xq.y, z: _xq.z, w: _xq.w })));
+// 머리 고정 화면: XR 이 머리 위치를 갱신한 직후(그리기 바로 전)에 따라 붙임 -> 흔들림 없음
+XR.headP = new V3(0, 1.6, 0); XR.headQ = new THREE.Quaternion();
+VRS.onBeforeRender = () => { XR.headP.copy(camera.position); XR.headQ.copy(camera.quaternion); VR_HEAD.position.copy(camera.position); VR_HEAD.quaternion.copy(camera.quaternion); VR_HEAD.updateMatrixWorld(true); };
+// XR 이 게임 카메라에 머리 위치를 덮어쓰므로, 그린 뒤 드론 카메라 위치로 되돌림
+VRS.onAfterRender = () => { if (XR.camP) { camera.position.copy(XR.camP); camera.quaternion.copy(XR.camQ); camera.updateMatrixWorld(); } };
+function vrScreenMode(m) {
+  SET.vrScreen = m === 'space' ? 'space' : 'head'; saveSet();
+  (SET.vrScreen === 'head' ? VR_HEAD : VR_SPACE).add(VR_SCR); VR_SCR.position.set(0, SET.vrScreen === 'head' ? 0 : 0, -2.0); VR_SCR.rotation.set(0, 0, 0);
+  if (SET.vrScreen === 'space') vrRecenter();
 }
-function xrSubj() { return S.state === 'demo' || (S.state === 'pause' && S.prevState === 'demo') ? ghostS : DR; }
-function xrFree(x, z) { const g = groundAt(x, z); return !(STREES.col(new V3(x, g + 1.6, z), 0.6) || collide(new V3(x, g + 1.6, z), 0.6) || STREES.col(new V3(x, g + 0.6, z), 0.6)); }
-// 조종사가 설 곳: 드론 뒤(다음 목표 반대편), 나무·시설물 피해서
-function xrPilotSpot(backs) {
-  const sb = xrSubj(), d = sb.p, hh = sb.h || 0, o = S.state === 'demo' ? null : isMission() ? msObj() : curObj();
-  let dir = o && o.mk ? _xv.set(o.mk.x - d.x, 0, o.mk.z - d.z) : sb.v && Math.hypot(sb.v.x, sb.v.z) > 1 ? _xv.set(sb.v.x, 0, sb.v.z) : _xv.set(Math.sin(hh), 0, -Math.cos(hh));
-  if (dir.lengthSq() < 1) dir.set(Math.sin(hh), 0, -Math.cos(hh)); dir.normalize();
-  const side = new V3(-dir.z, 0, dir.x);
-  for (const [back, lat] of backs || [[10, 3], [10, -3], [13, 0], [7, 4], [7, -4], [16, 0], [4, 2], [4, -2]]) {
-    const x = d.x - dir.x * back + side.x * lat, z = d.z - dir.z * back + side.z * lat;
-    if (xrFree(x, z)) return { x, y: groundAt(x, z), z, yaw: yawOf(d.x - x, d.z - z) };
-  }
-  return { x: d.x - dir.x * 3, y: groundAt(d.x, d.z), z: d.z - dir.z * 3, yaw: yawOf(dir.x, dir.z) };
+function vrRecenter() {   // 공간 고정: 지금 바라보는 쪽 앞에 화면을 놓음
+  const fw = new V3(0, 0, -1).applyQuaternion(XR.headQ); const yaw = Math.atan2(-fw.x, -fw.z);
+  VR_SPACE.position.set(XR.headP.x, XR.headP.y || 1.6, XR.headP.z); VR_SPACE.rotation.set(0, yaw, 0);
 }
-// 지금 머리 위치·방향 기준으로, 새 자리에서 원하는 쪽을 바라보게 이동 (회전 포함 -> 화면 어둡게 해서 씀)
-function xrMoveTo(sp) {
-  _xm.copy(XR.rig).invert(); const hb = camera.position.clone().applyMatrix4(_xm);
-  const fw = new V3(0, 0, -1).applyQuaternion(camera.quaternion).transformDirection(_xm);
-  const hy = yawOf(fw.x, fw.z), ry = sp.yaw - hy, c = Math.cos(ry), s = Math.sin(ry);
-  const ox = hb.x * c + hb.z * s, oz = -hb.x * s + hb.z * c;
-  xrSetRig(sp.x - ox, sp.y + (XR.floor ? 0 : 1.6), sp.z - oz, ry);
-}
-// 회전 없이 몸만 옮김 (따라가기)
-function xrShift(dx, dy, dz) { _xp.setFromMatrixPosition(XR.rig); xrSetRig(_xp.x + dx, _xp.y + dy, _xp.z + dz, XR.rigYaw || 0); }
-function xrFadeDo(cb) { if (XR.fadeDir) return; XR.fadeDir = 1; XR.fadeCb = cb; }
-function xrRelocate() { const sp = xrPilotSpot(); xrFadeDo(() => { xrMoveTo(sp); XR.ft = null; }); }
 // ---- 세션 ----
-async function vrStart(kind) {
+async function vrStart() {
   if (!navigator.xr || XR.sess) return;
-  let sess; try { sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] }); } catch (e) { showMsg(L2('VR을 시작할 수 없습니다', 'Could not start VR'), '#ff6060', 2); return; }
-  XR.sess = sess; XR.floor = true; XR.userExit = false; renderer.xr.enabled = true;
-  renderer.xr.setFramebufferScaleFactor(window.XR_FB || 0.9); renderer.xr.setReferenceSpaceType('local-floor');
+  let sess; try { sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] }); } catch (e) { vrOverlay(L2('VR을 시작할 수 없습니다. 다시 눌러 주세요.', 'Could not start VR. Please try again.')); return; }
+  XR.sess = sess; XR.userExit = false; renderer.xr.enabled = true;
+  renderer.xr.setFramebufferScaleFactor(window.XR_FB || 1.0); renderer.xr.setReferenceSpaceType('local-floor');
   try { await renderer.xr.setSession(sess); }
-  catch (e) { XR.floor = false; try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
+  catch (e) { try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
   try { renderer.xr.setFoveation(1); } catch (e) { }
-  XR.base = renderer.xr.getReferenceSpace();
-  XR.shadowAU = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false; XR.shN = 0;
-  XR_ON = true; XR.prev = {}; XR.fade = 0; XR.fadeDir = 0; XR_HUD.init = false; XR.ft = null; XR.offT = 0;
+  XR_ON = true; XR.prev = {}; S.cam = CAMS.indexOf('FPV');
   sess.addEventListener('end', vrEnded);
   sess.addEventListener('visibilitychange', () => { if (sess.visibilityState !== 'visible' && (S.state === 'run' || S.state === 'demo')) { togglePause(); XR.autoPaused = true; } else if (sess.visibilityState === 'visible' && XR.autoPaused && S.state === 'pause') { togglePause(); XR.autoPaused = false; } });
-  $('vrBack') && $('vrBack').classList.add('hidden');
-  if (kind === 'menu') xrMenuOpen();
-  else if (kind) { XR.menu = false; startRun(kind); }
-  else if (S.state === 'pause') { XR.menu = false; togglePause(); }   // 하던 비행 이어서
-  else if (S.state === 'menu') xrMenuOpen();
-  const sp = xrPilotSpot(); XR.rig.identity(); xrSetRig(sp.x, sp.y + (XR.floor ? 0 : 1.6), sp.z, sp.yaw);
+  $('vrBack').classList.add('hidden');
+  vrScreenMode(SET.vrScreen);
+  if (S.state === 'pause') { XR.menu = false; togglePause(); } else vrMenuOpen();
+  XR.recenter = 2;   // 첫 프레임들에서 머리 위치가 잡히면 화면·메뉴 위치를 다시 맞춤
   last = performance.now();
-  renderer.setAnimationLoop((t, f) => { if (f) frame(performance.now()); });   // XR 프레임에서만
+  renderer.setAnimationLoop((t, f) => { if (f) frame(performance.now()); });
 }
 function vrStop() { XR.userExit = true; if (XR.sess) try { XR.sess.end(); } catch (e) { } }
 function vrEnded() {
   renderer.setAnimationLoop(null); XR_ON = false; XR.sess = null; renderer.xr.enabled = false;
-  renderer.shadowMap.autoUpdate = XR.shadowAU !== false;
-  [XR_HUD.m, XR_MENU.m, XR_FADE, XR_HALO, XR_FPV.scr, XR_FPV.dim].forEach(m => m.visible = false); XR.ctl.forEach(c => c.userData.ln.visible = false);
-  camera.position.set(0, 0, 0); camera.quaternion.identity();
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   last = performance.now(); if (!TEST) requestAnimationFrame(frame);
-  if (XR.userExit) { XR.menu = false; if (S.state !== 'menu') toMenu(); return; }
-  // 시스템(메타 버튼 등)이 끝낸 경우: 멈춰 두고 'VR 로 돌아가기'
   if (S.state === 'run' || S.state === 'demo') togglePause();
-  const b = $('vrBack'); if (b) b.classList.remove('hidden');
+  vrOverlay(XR.userExit ? '' : L2('VR이 멈췄습니다. 버튼을 누르면 하던 비행을 이어 갑니다.', 'VR was interrupted. Press the button to continue your flight.'), XR.userExit ? L2('VR 시작', 'Start VR') : L2('VR로 돌아가기', 'Back to VR'));
+}
+function vrOverlay(msg, btn) {
+  const o = $('vrBack'); if (!o) return; o.classList.remove('hidden');
+  if (msg) $('vrBackD').textContent = msg; if (btn) $('vrBackGo').textContent = btn;
 }
 // ---- 컨트롤러 입력 (readInput 끝에서 부름) ----
 function xrPads() {
@@ -4881,166 +4821,132 @@ function xrInput(dt) {
   const ax = (g, i) => (g && g.axes && g.axes.length > i ? g.axes[i] || 0 : 0), bt = (g, i) => !!(g && g.buttons && g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.5));
   const edge = (k, on) => { const e = on && !XR.prev[k]; XR.prev[k] = on; return e; };
   const rt = edge('rt', bt(Rg, 0)), lt = edge('lt', bt(Lg, 0)), A = edge('a', bt(Rg, 4)), B = edge('b', bt(Rg, 5)), X = edge('x', bt(Lg, 4)), Y = edge('y', bt(Lg, 5)), LS = edge('ls', bt(Lg, 3));
-  if (XR.menu) { if (rt) xrMenuClick('right'); if (lt) xrMenuClick('left'); if (A) xrMenuClick('right'); return; }
+  if (XR.menu) { if (rt || A) vrMenuClick('right'); if (lt) vrMenuClick('left'); return; }
   const lx = ax(Lg, 2), ly = -ax(Lg, 3), rx = ax(Rg, 2), ry = -ax(Rg, 3);
   const st = SET.vrMode === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
   let any = false;
-  for (const k in st) { const v = shape(st[k], 0.12); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
+  for (const k in st) { const v = shape(st[k], 0.1); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
   if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4) IN.boost = true;
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }
-  if (B) xrMenuOpen();
+  if (B) vrMenuOpen();
   if (X) pressed.push('KeyR');
-  if (Y) xrRelocate();
-  if (LS) xrViewSet(SET.vrView === 'fpv' ? 'pilot' : 'fpv');
+  if (Y) { if (SET.vrScreen === 'space') vrRecenter(); }
+  if (LS) vrScreenMode(SET.vrScreen === 'head' ? 'space' : 'head');
 }
 // ---- VR 안 메뉴 ----
-const XR_MS = () => [['course', L2('장애물 코스', 'Obstacle course')], ['forest', L2('숲길 통과', 'Forest trail')], ['race', L2('타임 레이스', 'Time race')], ['ridge', L2('능선 종주', 'Ridge run')], ['free', L2('자유 비행', 'Free flight')], ['demo', L2('기준 비행 보기', 'Reference flight')]];
-function xrMenuOpen() {
-  if (S.state !== 'menu') toMenu();
-  XR.menu = true; XR.menuPlace = true; XR.hover = null;
-}
-function xrMenuDraw() {
-  const P = XR_MENU, g = P.cv.getContext('2d'), W2 = P.cv.width, H2 = P.cv.height; P.btns = [];
-  g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(8,12,16,.86)'; g.beginPath(); g.roundRect ? g.roundRect(0, 0, W2, H2, 30) : g.rect(0, 0, W2, H2); g.fill();
-  g.fillStyle = '#ffc828'; g.font = '800 46px system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(L2('VR 비행 · ', 'VR flight · ') + stName(SITE), 36, 28);
-  g.fillStyle = 'rgba(255,255,255,.6)'; g.font = '500 24px system-ui, sans-serif'; g.fillText(L2('컨트롤러로 가리키고 트리거로 선택', 'Point with a controller, pull the trigger'), 36, 86);
+const VR_MS = () => [['course', L2('장애물 코스', 'Obstacle course')], ['forest', L2('숲길 통과', 'Forest trail')], ['race', L2('타임 레이스', 'Time race')], ['ridge', L2('능선 종주', 'Ridge run')], ['free', L2('자유 비행', 'Free flight')], ['demo', L2('기준 비행 보기', 'Reference flight')]];
+const VR_AF = ['x2d', 'anafi', 'fpv'];
+function vrMenuOpen() { if (S.state !== 'menu') toMenu(); XR.menu = true; XR.menuPlace = true; XR.hover = null; }
+function vrRR(g, x, y, w, h, r) { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); }
+function vrMenuDraw() {
+  const P = VR_MENU, g = P.cv.getContext('2d'), W2 = P.cv.width, H2 = P.cv.height; P.btns = [];
+  g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(10,15,19,.94)'; vrRR(g, 0, 0, W2, H2, 30); g.fill();
+  g.textBaseline = 'top'; g.fillStyle = '#ffc828'; g.font = '800 44px system-ui, sans-serif'; g.fillText('FPV VR · ' + stName(SITE), 36, 26);
+  g.fillStyle = 'rgba(255,255,255,.6)'; g.font = '500 22px system-ui, sans-serif'; g.fillText(L2('컨트롤러로 가리키고 트리거로 선택', 'Point with a controller, pull the trigger'), 36, 80);
   const btn = (id, x, y, w, h, label, on, dis) => {
     const hv = XR.hover === id && !dis; g.fillStyle = dis ? 'rgba(255,255,255,.04)' : on ? '#4fe3ff' : hv ? 'rgba(79,227,255,.35)' : 'rgba(255,255,255,.09)';
-    g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, 14) : g.rect(x, y, w, h); g.fill();
-    if (hv) { g.strokeStyle = '#4fe3ff'; g.lineWidth = 4; g.stroke(); }
-    g.fillStyle = dis ? 'rgba(255,255,255,.3)' : on ? '#071016' : '#e8eef2'; g.font = `700 ${h > 80 ? 34 : 26}px system-ui, sans-serif`; g.textBaseline = 'middle';
+    vrRR(g, x, y, w, h, 12); g.fill(); if (hv) { g.strokeStyle = '#4fe3ff'; g.lineWidth = 4; g.stroke(); }
+    g.fillStyle = dis ? 'rgba(255,255,255,.3)' : on ? '#071016' : '#e8eef2'; g.font = `700 ${h > 80 ? 32 : 24}px system-ui, sans-serif`; g.textBaseline = 'middle';
     const tw = g.measureText(label).width; g.fillText(label, x + (w - tw) / 2, y + h / 2); g.textBaseline = 'top';
     if (!dis) P.btns.push({ id, x, y, w, h });
   };
-  const L = XR_MS(); L.forEach(([k, n], i) => { const av = msAvail(k).site !== false; btn('ms:' + k, 36 + (i % 3) * 320, 136 + Math.floor(i / 3) * 124, 300, 108, n, false, !av); });
-  g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 26px system-ui, sans-serif';
-  g.fillText(L2('시점', 'View'), 36, 362);
-  [['pilot', L2('지상 조종사', 'Ground pilot')], ['fpv', L2('FPV 고글', 'FPV goggles')]].forEach(([v, n], i) => btn('view:' + v, 200 + i * 300, 350, 286, 58, n, (SET.vrView || 'pilot') === v));
-  g.fillText(L2('난이도', 'Difficulty'), 36, 432);
-  [['train', L2('입문', 'Training')], ['easy', L2('쉬움', 'Easy')], ['sport', L2('스포츠', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 200 + i * 200, 420, 186, 58, n, SET.diff === v));
-  g.fillText(L2('스틱', 'Sticks'), 36, 502);
-  [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')]].forEach(([v, n], i) => btn('mode:' + v, 200 + i * 200, 490, 186, 58, n, (SET.vrMode || 2) === v));
-  g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '500 22px system-ui, sans-serif';
-  g.fillText((SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side'), 36, 562);
-  g.fillText(L2('비행 중: R트리거 투하 · L트리거 부스트 · A 확인 · B 이 메뉴 · X 다시 · Y 드론 쪽으로 · 왼쪽 스틱 누르기 시점', 'In flight: R-trig drop · L-trig boost · A ok · B menu · X reset · Y to drone · L-stick click view'), 36, 594);
-  btn('exit', 36, 650, 300, 84, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.35)'; g.font = '500 18px monospace'; g.fillText('VR2', W2 - 70, H2 - 34);
+  VR_MS().forEach(([k, n], i) => btn('ms:' + k, 36 + (i % 3) * 320, 122 + Math.floor(i / 3) * 112, 300, 96, n, false, msAvail(k).site === false));
+  g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 24px system-ui, sans-serif';
+  const row = (y, lbl) => { g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 24px system-ui, sans-serif'; g.fillText(lbl, 36, y + 16); };
+  row(360, L2('기체', 'Drone')); VR_AF.forEach((id, i) => btn('af:' + id, 200 + i * 260, 360, 246, 56, AF[id].tag === 'X2D' ? 'Skydio X2D' : AF[id].tag === 'ANAFI' ? 'ANAFI' : 'FPV ' + L2('레이싱', 'racer'), SET.af === id));
+  row(428, L2('난이도', 'Difficulty')); [['train', L2('입문', 'Training')], ['easy', L2('쉬움', 'Easy')], ['sport', L2('스포츠', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 200 + i * 260, 428, 246, 56, n, SET.diff === v));
+  row(496, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')]].forEach(([v, n], i) => btn('mode:' + v, 200 + i * 260, 496, 246, 56, n, (SET.vrMode || 2) === v));
+  row(564, L2('화면', 'Screen')); [['head', L2('머리 고정 (고글)', 'Head-locked (goggles)')], ['space', L2('공간 고정', 'Fixed in space')]].forEach(([v, n], i) => btn('scr:' + v, 200 + i * 390, 564, 376, 56, n, SET.vrScreen === v));
+  g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '500 20px system-ui, sans-serif';
+  g.fillText((SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side'), 36, 636);
+  g.fillText(L2('비행 중: R트리거 투하 · L트리거 부스트 · A 확인 · B 메뉴 · X 다시 · 왼쪽 스틱 누르기 화면 방식', 'In flight: R-trig drop · L-trig boost · A ok · B menu · X reset · L-stick click screen mode'), 36, 664);
+  btn('exit', W2 - 280, 690, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR3', 36, H2 - 30);
   P.tex.needsUpdate = true;
 }
-function xrMenuHit(c) {
-  if (!c || !XR_MENU.m.visible) return null;
-  _xp.setFromMatrixPosition(c.matrixWorld); _xq.setFromRotationMatrix(c.matrixWorld);
-  _xray.set(_xp.clone(), new V3(0, 0, -1).applyQuaternion(_xq));
-  const h = _xray.intersectObject(XR_MENU.m, false)[0]; if (!h || !h.uv) return null;
-  const x = h.uv.x * XR_MENU.cv.width, y = (1 - h.uv.y) * XR_MENU.cv.height;
-  const b = XR_MENU.btns.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h); return { b, dist: h.distance };
+const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
+function vrMenuHit(c) {
+  if (!c || !VR_MENU.m.visible) return null;
+  _vp.setFromMatrixPosition(c.matrixWorld); _vq.setFromRotationMatrix(c.matrixWorld);
+  _vr.set(_vp.clone(), new V3(0, 0, -1).applyQuaternion(_vq));
+  const h = _vr.intersectObject(VR_MENU.m, false)[0]; if (!h || !h.uv) return null;
+  const x = h.uv.x * VR_MENU.cv.width, y = (1 - h.uv.y) * VR_MENU.cv.height;
+  return { b: VR_MENU.btns.find(b => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h), dist: h.distance };
 }
-function xrCtl(hand) { return XR.ctl.find(c => c.userData.hand === hand) || null; }
-function xrMenuClick(hand) {
-  const r = xrMenuHit(xrCtl(hand)) || xrMenuHit(xrCtl(hand === 'right' ? 'left' : 'right')); if (!r || !r.b) return;
-  const id = r.b.id; sfx('good');
+function vrCtl(hand) { return XR.ctl.find(c => c.userData.hand === hand) || null; }
+function vrMenuClick(hand) {
+  const r = vrMenuHit(vrCtl(hand)) || vrMenuHit(vrCtl(hand === 'right' ? 'left' : 'right')); if (!r || !r.b) return;
+  const id = r.b.id; sfx('good'); XR.mT = 0;
   if (id === 'exit') { vrStop(); return; }
-  if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); document.querySelectorAll('#segDiff button').forEach(x => x.classList.toggle('on', x.dataset.v === SET.diff)); return; }
-  if (id.startsWith('view:')) { xrViewSet(id.slice(5)); return; }
-  if (id.startsWith('mode:')) { SET.vrMode = +id.slice(5); saveSet(); document.querySelectorAll('#segVRMode button').forEach(x => x.classList.toggle('on', +x.dataset.v === SET.vrMode)); return; }
-  if (id.startsWith('ms:')) {
-    const k = id.slice(3); menuSel(k); if (!msAvail(k).ok) return;
-    XR.menu = false; startRun(k); xrFadeDo(() => { xrMoveTo(xrPilotSpot()); XR.ft = null; });
-  }
+  if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); return; }
+  if (id.startsWith('mode:')) { SET.vrMode = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
+  if (id.startsWith('af:')) { setAirframe(id.slice(3)); afUI(); return; }
+  if (id.startsWith('ms:')) { const k = id.slice(3); menuSel(k); if (!msAvail(k).ok) return; XR.menu = false; startRun(k); S.cam = CAMS.indexOf('FPV'); }
 }
-function xrHudDraw() {
-  const { cv, tex } = XR_HUD, g = cv.getContext('2d'), W2 = cv.width, H2 = cv.height;
-  g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(8,12,16,.72)'; g.beginPath(); g.roundRect ? g.roundRect(0, 0, W2, H2, 28) : g.rect(0, 0, W2, H2); g.fill();
-  const txt = id => { const e = $(id); return e ? e.textContent.trim() : ''; };
-  const on = id => { const e = $(id); return e && !e.classList.contains('hidden') && getComputedStyle(e).display !== 'none'; };
-  let t1 = '', t2 = '', t3 = '', col = '#ffc828';
-  if (S.brief) { const b = $('brief'); t1 = 'BRIEFING · ' + (b && b.querySelector('h3') ? b.querySelector('h3').textContent : ''); t2 = b && b.querySelector('p') ? b.querySelector('p').textContent : ''; t3 = L2('A 버튼: 시작', 'A button: start'); col = '#4fe3ff'; }
-  else if (S.state === 'result') { t1 = txt('resTitle'); t2 = txt('resSub'); t3 = L2('A 다시 · B 메뉴', 'A again · B menu'); col = '#5dff9a'; }
-  else if (S.state === 'pause') { t1 = L2('일시 정지', 'PAUSED'); t3 = L2('B: 메뉴', 'B: menu'); }
-  else {
-    const o = isMission() ? msObj() : curObj(); t1 = o ? (o.label || '') : (S.state === 'demo' ? L2('기준 비행', 'Reference flight') : L2('자유 비행', 'Free flight'));
-    const sb = xrSubj(), gh = groundAt(sb.p.x, sb.p.z), dist = camera.position.distanceTo(sb.p), sp = sb.v ? sb.v.length() : 0;
-    t2 = `${fmt(S.t || 0)}   ${Math.round(sp * 3.6)} km/h   ${L2('고도', 'AGL')} ${(sb.p.y - gh).toFixed(1)} m   ${L2('거리', 'dist')} ${Math.round(dist)} m`;
-    const r = $('radio'); t3 = r && r.classList.contains('show') ? (r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent) : (on('objMsg') ? txt('objMsg') : '');
-  }
-  const fit = (s, sz, w) => { g.font = `700 ${sz}px system-ui, sans-serif`; while (sz > 18 && g.measureText(s).width > w) { sz -= 2; g.font = `700 ${sz}px system-ui, sans-serif`; } return s; };
-  g.textBaseline = 'top'; g.fillStyle = col; fit(t1, 54, W2 - 60); g.fillText(t1, 30, 26);
-  g.fillStyle = '#e8eef2'; fit(t2, 38, W2 - 60); g.fillText(t2, 30, 108);
-  g.fillStyle = '#9fe9ff'; g.font = '500 30px system-ui, sans-serif';
-  const words = t3.split(' '); let line = '', y = 180; for (const w of words) { const tl = line ? line + ' ' + w : w; if (g.measureText(tl).width > W2 - 60 && line) { g.fillText(line, 30, y); y += 38; line = w; if (y > 260) break; } else line = tl; } if (line && y <= 260) g.fillText(line, 30, y);
-  g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 24px system-ui, sans-serif';
-  g.fillText(L2('R트리거 투하 · L트리거 부스트 · A 확인 · B 메뉴 · X 다시 · Y 드론 쪽으로', 'R-trig drop · L-trig boost · A ok · B menu · X reset · Y move to drone'), 30, H2 - 46);
-  tex.needsUpdate = true;
+// ---- 화면 위 OSD (실제 FPV 고글처럼 영상 위에 글자) ----
+function vrOsdDraw() {
+  const { cv, tex } = VR_OSD, g = cv.getContext('2d'), W2 = cv.width, H2 = cv.height; g.clearRect(0, 0, W2, H2);
+  const sh = (t, x, y, sz, col, al) => { g.font = `700 ${sz}px system-ui, sans-serif`; g.textAlign = al || 'left'; g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(t, x, y); g.fillStyle = col || '#fff'; g.fillText(t, x, y); };
+  g.textBaseline = 'top';
+  const box = (lines, col) => { g.fillStyle = 'rgba(6,10,14,.82)'; vrRR(g, 190, 190, 900, 340, 22); g.fill(); g.strokeStyle = col; g.lineWidth = 3; g.stroke(); let y = 220; lines.forEach(([t, sz, c]) => { const ws = String(t).split(' '); let ln = ''; g.font = `700 ${sz}px system-ui, sans-serif`; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 840 && ln) { sh(ln, 220, y, sz, c); y += sz * 1.25; ln = w; } else ln = tl; } if (ln) { sh(ln, 220, y, sz, c); y += sz * 1.35; } }); };
+  if (S.brief) { const b = $('brief'); box([['BRIEFING', 30, '#4fe3ff'], [b && b.querySelector('h3') ? b.querySelector('h3').textContent : '', 40, '#fff'], [b && b.querySelector('p') ? b.querySelector('p').textContent : '', 26, '#cfd6da'], [L2('A 버튼: 시작', 'A button: start'), 30, '#ffc828']], '#4fe3ff'); tex.needsUpdate = true; return; }
+  if (S.state === 'result') { box([[($('resTitle') || {}).textContent || '', 44, '#5dff9a'], [($('resSub') || {}).textContent || '', 28, '#e8eef2'], [L2('A 다시 · B 메뉴', 'A again · B menu'), 30, '#ffc828']], '#5dff9a'); tex.needsUpdate = true; return; }
+  if (S.state === 'pause') { box([[L2('일시 정지', 'PAUSED'), 44, '#ffc828'], [L2('B: 메뉴', 'B: menu'), 30, '#e8eef2']], '#ffc828'); tex.needsUpdate = true; return; }
+  if (S.state === 'menu') { tex.needsUpdate = true; return; }
+  const sb = S.state === 'demo' ? ghostS : DR, gh = groundAt(sb.p.x, sb.p.z), sp = sb.v ? sb.v.length() : 0;
+  sh(fmt(S.t || 0), 40, 30, 46, '#fff');
+  sh(`${Math.round(sp * 3.6)} km/h`, W2 - 40, 30, 40, '#fff', 'right'); sh(`ALT ${(sb.p.y - gh).toFixed(1)} m`, W2 - 40, 80, 32, '#e8eef2', 'right');
+  const o = isMission() ? msObj() : curObj(); if (o) sh('▸ ' + (o.label || ''), W2 / 2, 30, 36, '#ffc828', 'center');
+  if (S.state === 'demo') sh(L2('기준 비행', 'REFERENCE FLIGHT'), W2 / 2, 30, 34, '#4fe3ff', 'center');
+  if (!isMission() && S.kind === 'course') sh('M84 ' + '●'.repeat(Math.max(0, S.payloads || 0)), 40, H2 - 70, 30, '#ffc828');
+  const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 26px system-ui, sans-serif'; const ws = t.split(' '); let ln = '', y = H2 - 120; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 900 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2, H2 - 110 + i * 34, 26, '#9fe9ff', 'center')); }
+  const m = $('objMsg'); if (m && m.textContent.trim() && getComputedStyle(m).opacity !== '0' && !m.classList.contains('hidden')) sh(m.textContent.trim(), W2 / 2, H2 / 2 + 80, 40, m.style.color || '#5dff9a', 'center');
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3; g.beginPath(); g.moveTo(W2 / 2 - 18, H2 / 2); g.lineTo(W2 / 2 - 6, H2 / 2); g.moveTo(W2 / 2 + 6, H2 / 2); g.lineTo(W2 / 2 + 18, H2 / 2); g.stroke();
+  g.textAlign = 'left'; tex.needsUpdate = true;
 }
-// ---- 매 프레임 (렌더 직전) ----
+// ---- 매 프레임 (그리기 직전): 드론 카메라 영상을 화면 텍스처로 ----
 function xrTick(dt) {
-  const head = camera.position, fw = new V3(0, 0, -1).applyQuaternion(camera.quaternion), hy = yawOf(fw.x, fw.z);
-  if (S.state === 'menu' && !XR.menu) xrMenuOpen();
-  // 메뉴 판: 열 때 눈앞 1.6 m 에 고정
-  XR_MENU.m.visible = XR.menu; XR_HUD.m.visible = !XR.menu;
+  XR.frames++;
+  if (S.state === 'menu' && !XR.menu) vrMenuOpen();
+  if (XR.recenter > 0 && XR.headP.y > 0.3 && XR.frames > 2) { XR.recenter--; if (SET.vrScreen === 'space') vrRecenter(); XR.menuPlace = true; }
+  // 메뉴 판: 열 때 눈앞 1.5 m (화면보다 앞)
+  VR_MENU.m.visible = XR.menu;
   if (XR.menu) {
-    if (XR.menuPlace && head.lengthSq() > 0) { XR.menuPlace = false; XR_MENU.m.position.set(head.x - Math.sin(hy) * 1.6, head.y - 0.1, head.z - Math.cos(hy) * 1.6); XR_MENU.m.rotation.set(0, hy, 0); }
-    let hv = null; for (const c of XR.ctl) { const r = xrMenuHit(c); c.userData.ln.visible = !!c.userData.hand; if (r && r.b) hv = r.b.id; }
-    if (hv !== XR.hover || (XR.mT = (XR.mT || 0) - dt) <= 0) { XR.hover = hv; XR.mT = 0.25; xrMenuDraw(); }
-  } else XR.ctl.forEach(c => c.userData.ln.visible = S.state === 'result');
-  // 안내판: 눈 아래쪽, 고개를 많이 돌리면 천천히 따라옴
-  const H = XR_HUD;
-  if (!H.init) { H.yaw = hy; H.init = true; }
-  let dy = hy - H.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
-  if (Math.abs(dy) > 0.45) H.yaw += dy * (1 - Math.exp(-dt * 3));
-  H.m.position.set(head.x - Math.sin(H.yaw) * 1.15, head.y - 0.5, head.z - Math.cos(H.yaw) * 1.15); H.m.rotation.set(-0.35, H.yaw, 0, 'YXZ');
-  if (!XR.menu) { XR.hudT -= dt; if (XR.hudT <= 0) { XR.hudT = 0.12; xrHudDraw(); } }
-  if (++XR.shN % 3 === 0) renderer.shadowMap.needsUpdate = true; XR.frames = (XR.frames || 0) + 1;
-  const flying = S.state === 'run' || S.state === 'demo';
-  const fpv = SET.vrView === 'fpv' && !XR.menu && S.state !== 'result';
-  XR_FPV.scr.visible = XR_FPV.dim.visible = fpv;
-  if (fpv) { xrFpvPlace(dt, head, hy); xrFpvRender(); H.m.position.set(XR_FPV.scr.position.x, XR_FPV.scr.position.y - 0.95, XR_FPV.scr.position.z); H.m.rotation.set(-0.2, XR_FPV.yaw, 0, 'YXZ'); }
-  const sb = xrSubj(), P = sb.p, d = head.distanceTo(P);
-  XR_HALO.visible = !fpv && !XR.menu && d > 12 && S.state !== 'result'; if (XR_HALO.visible) { XR_HALO.position.copy(P); XR_HALO.scale.setScalar(d * 0.035); }
-  if (flying && !XR.fadeDir && head.lengthSq() > 0) {
-    // 따라가기: 드론 뒤 약 10 m (진행 방향 기준), 회전 없이 몸만 부드럽게 이동
-    const v = sb.v || _xv.set(0, 0, 0), hs = Math.hypot(v.x, v.z);
-    if (!XR.fdir) XR.fdir = new V3(head.x - P.x, 0, head.z - P.z).normalize();
-    if (hs > 1.5) { const k = 1 - Math.exp(-dt * 0.8); XR.fdir.x += (-v.x / hs - XR.fdir.x) * k; XR.fdir.z += (-v.z / hs - XR.fdir.z) * k; XR.fdir.normalize(); }
-    let tx = P.x + XR.fdir.x * 10, tz = P.z + XR.fdir.z * 10;
-    if (!xrFree(tx, tz)) { const sx = -XR.fdir.z, sz = XR.fdir.x; for (const l of [3, -3, 6, -6]) if (xrFree(tx + sx * l, tz + sz * l)) { tx += sx * l; tz += sz * l; break; } }
-    const hd = Math.hypot(P.x - head.x, P.z - head.z);
-    if (hd > 45 || P.y - head.y > 40) xrRelocate();
-    else if (Math.hypot(tx - head.x, tz - head.z) > 2.5) {
-      _xp.setFromMatrixPosition(XR.rig); const headBaseY = head.y - _xp.y;
-      const k = 1 - Math.exp(-dt * 1.1); let mx = (tx - head.x) * k, mz = (tz - head.z) * k; const ml = Math.hypot(mx, mz), lim = 16 * dt; if (ml > lim) { mx *= lim / ml; mz *= lim / ml; }
-      const gy = groundAt(head.x + mx, head.z + mz) + (XR.floor ? 0 : 1.6), my = (gy + headBaseY - head.y) * Math.min(1, dt * 4);
-      xrShift(mx, my, mz);
-    }
-    // 드론이 옆·뒤로 오래 벗어나면 화면 어둡게 하고 드론 쪽으로 돌려 줌
-    const ay = yawOf(P.x - head.x, P.z - head.z); let off = ay - hy; while (off > Math.PI) off -= 2 * Math.PI; while (off < -Math.PI) off += 2 * Math.PI;
-    XR.offT = !fpv && Math.abs(off) > 1.6 && hd > 4 ? XR.offT + dt : 0;
-    if (XR.offT > 2.5) { XR.offT = 0; xrRelocate(); }
+    if (XR.menuPlace) { XR.menuPlace = false; const H = XR.headP, fw = new V3(0, 0, -1).applyQuaternion(XR.headQ), yaw = Math.atan2(-fw.x, -fw.z); VR_MENU.m.position.set(H.x - Math.sin(yaw) * 1.5, H.y - 0.15, H.z - Math.cos(yaw) * 1.5); VR_MENU.m.rotation.set(0, yaw, 0); VR_MENU.m.updateMatrixWorld(true); }
+    let hv = null; for (const c of XR.ctl) { const r = vrMenuHit(c); if (r && r.b) hv = r.b.id; }
+    if (hv !== XR.hover || (XR.mT -= dt) <= 0) { XR.hover = hv; XR.mT = 0.3; vrMenuDraw(); }
   }
-  // 화면 어둡게 -> 이동 -> 밝게
-  if (XR.fadeDir) {
-    XR.fade = clamp(XR.fade + XR.fadeDir * dt / 0.18, 0, 1);
-    if (XR.fade >= 1 && XR.fadeDir > 0) { if (XR.fadeCb) XR.fadeCb(); XR.fadeCb = null; XR.fadeDir = -1; XR.fdir = null; }
-    else if (XR.fade <= 0 && XR.fadeDir < 0) XR.fadeDir = 0;
-  }
-  XR_FADE.visible = XR.fade > 0.001; XR_FADE.material.opacity = XR.fade; XR_FADE.position.copy(head);
+  XR.ctl.forEach(c => c.userData.ln.visible = !!c.userData.hand && (XR.menu || S.state === 'result'));
+  VR_SCR.visible = true;
+  XR.osdT -= dt; if (XR.osdT <= 0) { XR.osdT = 0.1; vrOsdDraw(); }
+  // 지형 장면을 드론 카메라(게임 카메라)로 화면 텍스처에 그림
+  camera.aspect = 16 / 9; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+  const cur = renderer.getRenderTarget(); renderer.xr.enabled = false;
+  renderer.setRenderTarget(VR_RT); renderer.clear(); renderer.render(scene, camera);
+  renderer.setRenderTarget(cur); renderer.xr.enabled = true;
+  (XR.camP = XR.camP || new V3()).copy(camera.position); (XR.camQ = XR.camQ || new THREE.Quaternion()).copy(camera.quaternion);
 }
-// ---- 2D 쪽: 버튼 ----
+// ---- 2D 쪽 ----
 var VR_OK = { ok: false };
-if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => { VR_OK.ok = !!ok; vrBtnUpdate(); if (ok && /[?&]vr\b/.test(location.search) && $('vrBack')) { $('vrBackT').textContent = L2('VR 비행 시작', 'Start VR flight'); $('vrBack').classList.remove('hidden'); } }).catch(() => { });
-function vrBtnUpdate() {
-  const b = $('msGoVR'); if (!b) return; const k = MENU.ms;
-  b.classList.toggle('hidden', !VR_OK.ok || k === 'tutorial');
-  b.disabled = !msAvail(k).ok;
-  b.textContent = k === 'demo' ? L2('VR로 보기 (Quest)', 'Watch in VR (Quest)') : L2('VR로 출격 (Quest)', 'Launch in VR (Quest)');
+if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => { VR_OK.ok = !!ok; vrBtnUpdate(); vrPageInit(); }).catch(() => vrPageInit());
+else setTimeout(vrPageInit, 0);
+function vrPageInit() {
+  if (!IS_VR) return;
+  ui.menu.classList.add('hidden');
+  vrOverlay(VR_OK.ok ? '' : L2('이 기기·브라우저는 VR을 지원하지 않습니다. Quest 브라우저에서 열어 주세요.', 'This device or browser does not support VR. Open this page in the Quest browser.'));
+  $('vrBackGo').disabled = !VR_OK.ok;
 }
-if ($('msGoVR')) $('msGoVR').onclick = () => { if (msAvail(MENU.ms).ok) vrStart(MENU.ms); };
-if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart(S.state === 'menu' ? 'menu' : null);
-if ($('vrBack2D')) $('vrBack2D').onclick = () => { $('vrBack').classList.add('hidden'); };
-document.querySelectorAll('#segVRMode button').forEach(b => { b.classList.toggle('on', +b.dataset.v === (SET.vrMode || 2)); b.addEventListener('click', () => { SET.vrMode = +b.dataset.v; saveSet(); document.querySelectorAll('#segVRMode button').forEach(x => x.classList.toggle('on', x === b)); }); });
+function vrBtnUpdate() {   // PC 판: VR 기기에서 열면 VR 판으로 가는 버튼
+  const b = $('msGoVR'); if (!b) return;
+  b.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL);
+  b.textContent = L2('Quest VR 버전 열기', 'Open the Quest VR version');
+}
+if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
+if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { XR_FPV, XR, XR_HUD, XR_MENU, xrMenuClick, xrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
