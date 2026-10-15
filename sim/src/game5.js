@@ -3,9 +3,9 @@
 //  속도·크기는 공개 제원 수준의 근사값 (기체 이름은 형상 참고용)
 // =====================================================================
 const AF = {
-  x2d: { tag: 'X2D', name: 'Skydio X2D', sub: '정찰 쿼드 · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 7.5, easy: 10, sport: 13.9 }, tilt: { train: 20, easy: 28, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
+  x2d: { tag: 'X2D', name: 'Skydio X2D', sub: '정찰 쿼드 · 66 cm · 1.3 kg', cls: 'quad', top: 13.9, vmax: { train: 9, easy: 12, sport: 13.9 }, tilt: { train: 25, easy: 32, sport: 38 }, climb: 6, sink: 4, yaw: 120, tw: 1.15, R: 0.24, endur: 35, drop: true,
     note: '자세 안정 · 정지 비행 · 투하 장치' },
-  anafi: { tag: 'ANAFI', name: 'Parrot ANAFI USA', sub: '소형 정찰 쿼드 · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 7.5, easy: 11, sport: 14.7 }, tilt: { train: 20, easy: 30, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
+  anafi: { tag: 'ANAFI', name: 'Parrot ANAFI USA', sub: '소형 정찰 쿼드 · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 9, easy: 12, sport: 14.7 }, tilt: { train: 25, easy: 32, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
     note: '32배 줌 · 먼 거리 정찰 · IP53' },
   fpv: { tag: 'FPV', name: 'FPV 레이싱', sub: '5인치 · 0.65 kg', cls: 'quad', top: 39, vmax: { train: 12, easy: 24, sport: 39 }, tilt: { train: 30, easy: 50, sport: 72 }, climb: 15, sink: 9, yaw: 320, tw: 3.5, R: 0.13, endur: 5, acro: true,
     note: '매우 빠름 · 스포츠에서 수동(Acro) 선택' },
@@ -228,9 +228,11 @@ function passCP(label, q, hw, y0, y1, ring) {
 // 레이스 링
 const RACE = (function () {
   if (!PATHL) return [];
-  const L = [], alts = [4, 7, 12, 6, 16, 9, 5, 14, 22, 8, 5];
+  // 링 20개: 높이·좌우를 바꿔 가며 약 27 m 간격
+  const L = [], alts = [4, 6, 9, 5, 12, 16, 8, 4, 7, 14, 20, 11, 6, 4, 9, 15, 22, 10, 6, 5], lats = [0, 3, -3, 2, -2, 0, 3, -3, 1.5, -1.5, 0, 3, -3, 2, -2, 0, 1.5, -1.5, 2.5, 0];
   for (let i = 0; i < alts.length; i++) {
-    const s = 30 + i * (PATHL.total - 50) / (alts.length - 1), q = PATHL.at(s), cp = passCP('RING ' + (i + 1), q, 0, alts[i], alts[i], 3.2);
+    const s = 30 + i * (PATHL.total - 50) / (alts.length - 1), q0 = PATHL.at(s), la = lats[i];
+    const q = Object.assign({}, q0, { d: q0.d - q0.ts * la, s: q0.s + q0.td * la }), cp = passCP('RING ' + (i + 1), q, 0, alts[i], alts[i], 3.2);
     cp.q = q; cp.alt = alts[i]; cp.mk = W(q.d, q.s, alts[i]); cp.c = cp.mk.clone(); const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), mat(i === alts.length - 1 ? 0x5dff9a : 0xffc828, { emissive: 0x332200, roughness: 0.4 }));
     tor.position.copy(cp.c); tor.lookAt(cp.c.clone().add(cp.n)); MSG.race.add(tor); cp.mesh = tor; L.push(cp);
   }
@@ -426,14 +428,12 @@ function afUI() {
     const catN = { quad: L2('정찰 쿼드', 'Recon quad'), fpv: L2('FPV', 'FPV'), wing: L2('고정익', 'Fixed-wing'), kam: L2('자폭', 'Loitering') }[cat];
     b.innerHTML = `<svg viewBox="0 0 64 48" aria-hidden="true">${AF_ICON[id]}</svg><i class="cat">${catN}</i><b>${a.name}</b><small>${a.sub}</small>` +
       `<span class="spec">최고 ${Math.round(a.top * 3.6)} km/h · ${a.endur}분</span><span class="nt">${a.note}</span>`;
-    b.onclick = () => { setAirframe(id); afUI(); };
+    b.onclick = () => { MENU.afNote = ''; setAirframe(id); afUI(); };
     box.appendChild(b);
   }
   const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
-  document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
-    const site = HAS[b.dataset.ms] !== false, ok = (MS_OK[b.dataset.ms] || []).includes(SET.af) && site; b.classList.toggle('off', !ok);
-    b.title = ok ? '' : !site ? L2('이 훈련장에는 없는 임무', 'Not available at this site') : L2('이 기체로는 할 수 없는 임무', 'Not possible with this airframe');
-  });
+  document.querySelectorAll('#msGrid [data-ms]').forEach(b => { b.dataset.site = HAS[b.dataset.ms] !== false ? '1' : '0'; b.classList.remove('off'); b.title = ''; });
+  if (typeof msVis === 'function') msVis();
   // 훈련장 고르기 (두 곳 이상일 때만)
   const sp = $('sitePick'), L = sitesAll();
   if (sp) { $('sitePickWrap').style.display = L.length < 2 ? 'none' : ''; sp.innerHTML = '';
@@ -1148,22 +1148,41 @@ function menuDetail() {
   $('mdCat').textContent = CAT_N()[cat]; $('mdTitle').textContent = inf.t; $('mdDesc').textContent = inf.d; $('mdTip').textContent = inf.tip;
   const ok = MS_OK[k] || [];
   $('mdAf').innerHTML = (ok.length === AF_IDS.length ? '' : ok.map(id => `<button data-af="${id}" class="${id === SET.af ? 'on' : ''}">${AF[id].name}</button>`).join(''));
-  $('mdAf').querySelectorAll('button').forEach(b => b.onclick = () => { setAirframe(b.dataset.af); afUI(); });
+  $('mdAf').querySelectorAll('button').forEach(b => b.onclick = () => { MENU.afNote = ''; setAirframe(b.dataset.af); afUI(); });
   const best = menuBest(k), meta = [];
   if (isMission(k)) meta.push(L2('기준 ', 'Par ') + fmt(msPar(k, [1, 2, 3, 4])));
   if (best) meta.push(L2('내 최고 ', 'Best ') + `<b>${fmt(best)}</b>`);
   meta.push(AFc().name + ' · ' + { train: L2('입문', 'Training'), easy: L2('쉬움', 'Easy'), sport: L2('스포츠', 'Sport') }[SET.diff]);
   $('mdMeta').innerHTML = meta.join(' · ');
   $('msGo').disabled = !av.ok; $('msGo').textContent = k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
-  $('mdWhy').textContent = av.why;
+  $('mdWhy').textContent = av.why || MENU.afNote || '';
   const no = $('msStageNo'); if (no) { no.classList.toggle('on', !av.site); no.textContent = av.site ? '' : L2('이 훈련장에는 없는 임무입니다', 'This mission is not available at this site'); }
   menuShow(k);
 }
-function menuSel(k, go) {
-  if (!document.querySelector(`#msGrid [data-ms="${k}"]`)) k = 'course';
-  MENU.ms = k; try { localStorage.setItem('hroc_menu_ms', k); } catch (e) { }
-  menuDetail(); if (go) menuGo();
+// 임무 종류 탭: 고른 종류의 임무만 보여 줌 (이 훈련장에 없는 임무는 숨김)
+const MS_GRP = ['basic', 'skill', 'mission'];
+function msTile(k) { return document.querySelector(`#msGrid [data-ms="${k}"]`); }
+function msVis() {
+  const g = MENU.g || 'basic';
+  document.querySelectorAll('#msTabs [data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === g));
+  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0'));
 }
+function msInGrp(g) { return [...document.querySelectorAll(`#msGrid [data-g="${g}"]`)].filter(b => b.dataset.site !== '0').map(b => b.dataset.ms); }
+function menuTab(g) {
+  const L = msInGrp(g); if (!L.length) return;
+  const last = (MENU.lastIn || {})[g]; menuSel(L.includes(last) ? last : L[0]);
+}
+function menuSel(k, go) {
+  const t = msTile(k); if (!t || t.dataset.site === '0') k = 'course';
+  MENU.ms = k; MENU.g = msTile(k).dataset.g; (MENU.lastIn = MENU.lastIn || {})[MENU.g] = k;
+  try { localStorage.setItem('hroc_menu_ms', k); } catch (e) { }
+  // 고른 기체로 못 하는 임무면 알맞은 기체로 바꿔 줌
+  const ok = MS_OK[k] || [];
+  if (ok.length && !ok.includes(SET.af)) { const prev = AFc().name; MENU.afNote = L2(`${prev} 로는 할 수 없어 ${AF[ok[0]].name} 로 바꿨습니다`, `Switched from ${prev} to ${AF[ok[0]].name} for this mission`); setAirframe(ok[0]); afUI(); }
+  else if (k !== MENU.prevMs) MENU.afNote = '';
+  MENU.prevMs = k; msVis(); menuDetail(); if (go) menuGo();
+}
+document.querySelectorAll('#msTabs [data-g]').forEach(b => b.addEventListener('click', () => menuTab(b.dataset.g)));
 function menuGo() {
   const k = MENU.ms; if (!msAvail(k).ok) return;
   if (k === 'tutorial') openTutMenu(); else startRun(k);
@@ -1265,10 +1284,12 @@ function menuRenderPost() {
 document.addEventListener('keydown', e => {
   if (S.state !== 'menu' || ui.menu.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) return;
   if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
-  const L = [...document.querySelectorAll('#msGrid [data-ms]')].map(b => b.dataset.ms), i = L.indexOf(MENU.ms), d = e.code === 'ArrowLeft' || e.code === 'ArrowUp' ? -1 : 1;
+  // 좌우: 같은 종류 안에서 · 위아래: 종류 바꾸기
+  if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { const gi = MS_GRP.indexOf(MENU.g || 'basic'), d = e.code === 'ArrowUp' ? -1 : 1; menuTab(MS_GRP[(gi + d + MS_GRP.length) % MS_GRP.length]); e.preventDefault(); return; }
+  const L = msInGrp(MENU.g || 'basic'), i = L.indexOf(MENU.ms), d = e.code === 'ArrowLeft' ? -1 : 1;
   menuSel(L[(i + d + L.length) % L.length]); e.preventDefault();
 });
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { DAMS, MENU, menuSel, menuGo, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
