@@ -32,7 +32,7 @@ def sources(lang, mode):
     return t, game
 
 
-def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html'):
+def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
     t, game = sources(lang, 'hroc')
     lib = {k: open(v, encoding='utf-8').read().replace('</script>', '<\\/script>') for k, v in LIBS.items()}
     data = json.load(open('data.json', encoding='utf-8'))
@@ -41,7 +41,7 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html'):
     F = PRIV['flat']; H = math.radians(F['H'])
     flat = {'name': '정규 훈련 코스' if lang == 'ko' else 'Standard training course', 'crs': F['crs'],
             'e0': F['SE'] + math.sin(H) * 170 + math.cos(H) * 25, 'n0': F['SN'] + math.cos(H) * 170 - math.sin(H) * 25, 'brg': F['H']}
-    pre = 'window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';' + ('window.SIM_MOBILE=true;' if mobile else '') + "window.SIM_LANG='" + lang + "';"
+    pre = 'window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';' + ('window.SIM_MOBILE=true;' if mobile else '') + "window.SIM_LANG='" + lang + "';" + ('window.SIM_VR=true;' if vr else '')
     pre += 'window.SIM_FLAT_SITE=' + json.dumps(flat, ensure_ascii=False) + ';'
     sites = json.load(open('sites.json', encoding='utf-8')) if os.path.exists('sites.json') else []
     sites = [s for s in sites if s['id'] == 'yeongin']
@@ -103,11 +103,11 @@ def build_pages(outdir, site_ids, vr):
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
 
 
-def build_dual(mobile=False, out='hroc_fpv_simulator.html'):
+def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False):
     """내부용 한 파일에 한국어·영어 둘 다 (첫 화면 오른쪽 위에서 바꿈, 브라우저에 기억)"""
     pages = {}
     for lang in ('ko', 'en'):
-        build(lang, mobile, '_tmp_' + lang + '.html')
+        build(lang, mobile, '_tmp_' + lang + '.html', vr)
         h = open('_tmp_' + lang + '.html', encoding='utf-8').read(); os.remove('_tmp_' + lang + '.html')
         pages[lang] = h
     def split(h):
@@ -121,6 +121,8 @@ def build_dual(mobile=False, out='hroc_fpv_simulator.html'):
     esc = lambda s: s.replace('</script>', '<\\/script>')
     o = hk + '<body>\n' + ''.join('<script>' + s + '</script>' for s in sk[:3])
     o += '<script>' + sk[3] + '</script>'   # 현장·코스 데이터는 한 번만 (언어별 차이는 이름·언어 값뿐)
+    if vr and os.path.exists('tts-worker.js'):   # VR 한 파일판: 무전 음성 합성기를 파일 안에 (GPL 구성 요소, 영어 음성 없는 기기에서만 씀)
+        o += '<script type="text/plain" id="ttsw">' + esc(open('tts-worker.js', encoding='utf-8').read()) + '</script>'
     o += '<script type="text/plain" id="g_ko">' + esc(sk[4]) + '</script><script type="text/plain" id="g_en">' + esc(se[4]) + '</script>'
     o += '<script>window.SIM_DUAL=true;window.SIM_PAGES=' + json.dumps({'ko': {'body': bk, 'title': tk}, 'en': {'body': be, 'title': te}}, ensure_ascii=False).replace('</', '<\\/') + ';' + """
 (function(){var L='ko';try{L=localStorage.getItem('fpvsim_lang')||'ko'}catch(e){}if(L!=='en')L='ko';

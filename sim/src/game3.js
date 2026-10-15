@@ -504,7 +504,7 @@ function renderList() {
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
-  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : '') + (SET.ghost && S.kind === 'course' ? ' · GHOST' : ''));
+  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : ''));
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
@@ -721,7 +721,6 @@ function handleKeys() {
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
-    else if (k === 'KeyG') { SET.ghost = !SET.ghost; saveSet(); updateTags(); syncSeg(); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyL') { SET.light = !SET.light; }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
@@ -775,7 +774,6 @@ function frame(now, noRender) {
     if (S.running && !REC_T0_SET && REC) { REC.t0 = S.flyT; REC_T0_SET = true; }
     if (!S.running) REC_T0_SET = false;
     recTick(dt);
-    if (S.kind === 'course' && S.running && SET.ghost) S.ghostT += dt;
     updatePayloads(dt);
   } else if (S.state === 'demo') {
     S.ghostT += dt; updatePayloads(dt);
@@ -784,7 +782,7 @@ function frame(now, noRender) {
     }
     if (S.ghostT > GH.total + 2.5) toMenu();
   } else if (S.state === 'replay') { replayTick(dt); subj = RP.pose; }
-  const ghostOn = S.state === 'demo' || (S.kind === 'course' && SET.ghost && (S.state === 'run' || S.state === 'pause'));
+  const ghostOn = S.state === 'demo' || (S.state === 'pause' && S.prevState === 'demo');   // 고스트 드론은 기준 비행 보기에서만
   if (ghostOn) { if (S.state === 'demo' || !bestGhostPose(S.ghostT)) updateGhost(S.ghostT, Math.max(dt, 1e-3)); placeModel(ghostM, ghostS); ghostM.g.visible = S.ghostT > 0 && ghostS.p.distanceTo(DR.p) > 2.5; }
   else ghostM.g.visible = false;
   const demoing = S.state === 'demo' || (S.state === 'pause' && S.prevState === 'demo');
