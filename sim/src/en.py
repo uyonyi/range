@@ -504,3 +504,6 @@ EN.update({
 '<button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button>': '<button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button>',
 '<div>VR 조종 방식 <span class="seg" id="segVRMode"><button data-v="2" class="on">모드 2 (왼쪽 스틱 상승·회전)</button><button data-v="1">모드 1 (오른쪽 스틱 상승)</button></span></div>': '<div>VR stick mode <span class="seg" id="segVRMode"><button data-v="2" class="on">Mode 2 (left stick: throttle · yaw)</button><button data-v="1">Mode 1 (right stick: throttle)</button></span></div>',
 })
+EN.update({
+'<b id="vrBackT">VR이 멈췄습니다</b><button id="vrBackGo" class="primary">VR로 돌아가기</button><button id="vrBack2D">2D 화면으로 계속</button>': '<b id="vrBackT">VR was interrupted</b><button id="vrBackGo" class="primary">Back to VR</button><button id="vrBack2D">Continue in 2D</button>',
+})
