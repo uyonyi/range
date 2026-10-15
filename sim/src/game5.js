@@ -917,7 +917,7 @@ function commSpeechDone() { COMM.sp = false; COMM.busy = Math.min(COMM.busy, 0.5
 const TTSW = { w: null, ok: null, id: 0, cb: {} };
 function ttsWorker() {
   if (TTSW.w || TTSW.ok === false) return TTSW.w;
-  try { const w = new Worker((window.SIM_BASE || '') + 'lib/tts-worker.js'); w.onmessage = e => { if (e.data && e.data.ready) { TTSW.ready = true; return; } const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = ev => { TTSW.ok = false; TTSW.w = null; COMM.fbErr = 'worker load: ' + (ev && ev.message || 'error'); }; TTSW.w = w; } catch (e) { TTSW.ok = false; COMM.fbErr = 'worker: ' + e.message; }
+  try { const inl = document.getElementById('ttsw'), src = inl ? URL.createObjectURL(new Blob([inl.textContent.split('<\\/script>').join('<' + '/script>')], { type: 'text/javascript' })) : (window.SIM_BASE || '') + 'lib/tts-worker.js'; const w = new Worker(src); w.onmessage = e => { if (e.data && e.data.ready) { TTSW.ready = true; return; } const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = ev => { TTSW.ok = false; TTSW.w = null; COMM.fbErr = 'worker load: ' + (ev && ev.message || 'error'); }; TTSW.w = w; } catch (e) { TTSW.ok = false; COMM.fbErr = 'worker: ' + e.message; }
   return TTSW.w;
 }
 function needFallbackVoice() { if (window.SIM_VR || COMM.webFail) return true; try { return !speechSynthesis.getVoices().some(v => /^en/i.test(v.lang)); } catch (e) { return true; } }
@@ -1655,6 +1655,12 @@ else setTimeout(vrPageInit, 0);
 function vrPageInit() {
   if (!IS_VR) return;
   ui.menu.classList.add('hidden');
+  // 한 파일판: 훈련장 고르기 버튼 (고르면 다시 불러옴) · PC 판 링크 숨김
+  const L = sitesAll(), vb = document.querySelector('#vrBack .vb');
+  if (vb && L.length > 1 && !$('vrSites')) { const d = document.createElement('div'); d.id = 'vrSites'; d.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center';
+    for (const st of L) { const b = document.createElement('button'); b.textContent = stName(st); b.className = st.id === SITE.id ? 'primary' : ''; b.style.cssText = 'padding:10px 14px;font-size:15px'; b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; d.appendChild(b); }
+    vb.insertBefore(d, $('vrBackGo')); }
+  if (!window.SIM_BASE && $('vrPC')) $('vrPC').style.display = 'none';
   vrOverlay(VR_OK.ok ? '' : L2('이 기기·브라우저는 VR을 지원하지 않습니다. Quest 브라우저에서 열어 주세요.', 'This device or browser does not support VR. Open this page in the Quest browser.'));
   $('vrBackGo').disabled = !VR_OK.ok;
 }

@@ -2255,7 +2255,7 @@ function renderList() {
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
-  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : '') + (SET.ghost && S.kind === 'course' ? ' · GHOST' : ''));
+  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : ''));
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
@@ -2472,7 +2472,6 @@ function handleKeys() {
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
-    else if (k === 'KeyG') { SET.ghost = !SET.ghost; saveSet(); updateTags(); syncSeg(); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyL') { SET.light = !SET.light; }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
@@ -2526,7 +2525,6 @@ function frame(now, noRender) {
     if (S.running && !REC_T0_SET && REC) { REC.t0 = S.flyT; REC_T0_SET = true; }
     if (!S.running) REC_T0_SET = false;
     recTick(dt);
-    if (S.kind === 'course' && S.running && SET.ghost) S.ghostT += dt;
     updatePayloads(dt);
   } else if (S.state === 'demo') {
     S.ghostT += dt; updatePayloads(dt);
@@ -2535,7 +2533,7 @@ function frame(now, noRender) {
     }
     if (S.ghostT > GH.total + 2.5) toMenu();
   } else if (S.state === 'replay') { replayTick(dt); subj = RP.pose; }
-  const ghostOn = S.state === 'demo' || (S.kind === 'course' && SET.ghost && (S.state === 'run' || S.state === 'pause'));
+  const ghostOn = S.state === 'demo' || (S.state === 'pause' && S.prevState === 'demo');   // Ghost drone은 Watch Reference Flight에서만
   if (ghostOn) { if (S.state === 'demo' || !bestGhostPose(S.ghostT)) updateGhost(S.ghostT, Math.max(dt, 1e-3)); placeModel(ghostM, ghostS); ghostM.g.visible = S.ghostT > 0 && ghostS.p.distanceTo(DR.p) > 2.5; }
   else ghostM.g.visible = false;
   const demoing = S.state === 'demo' || (S.state === 'pause' && S.prevState === 'demo');
@@ -3398,7 +3396,7 @@ $('kbClose').onclick = () => { KBCAP = null; $('kbPanel').classList.add('hidden'
 // ---- KEYBOARD 그림 ----
 const KB_SHORT = { up: 'Climb', down: 'Descend', yawL: 'Yaw L', yawR: 'Yaw R', fwd: 'Forward', back: 'Back', left: 'Left', right: 'Right', drop: 'Drop', boost: 'Boost', cam: 'Camera', zoom: 'Zoom', reset: 'Restart', assist: 'assist' };
 const KB_GROUP = { up: 'alt', down: 'alt', yawL: 'alt', yawR: 'alt', fwd: 'mov', back: 'mov', left: 'mov', right: 'mov', boost: 'bst' };
-const KB_FIXED = { KeyF: 'Full', KeyV: 'Guide', KeyX: 'Belly', KeyB: 'music', KeyG: 'Ghost', KeyN: 'Skip', KeyT: 'Thermal', KeyM: 'SOUND', KeyL: 'Light', KeyP: 'Path', Escape: 'Pause' };
+const KB_FIXED = { KeyF: 'Full', KeyV: 'Guide', KeyX: 'Belly', KeyB: 'music', KeyN: 'Skip', KeyT: 'Thermal', KeyM: 'SOUND', KeyL: 'Light', KeyP: 'Path', Escape: 'Pause' };
 function renderKbd(el) {
   if (!el) return;
   const act = {}; Object.keys(KB).forEach(k => { if (KB[k]) act[KB[k]] = k; });
@@ -4360,7 +4358,7 @@ function commSpeechDone() { COMM.sp = false; COMM.busy = Math.min(COMM.busy, 0.5
 const TTSW = { w: null, ok: null, id: 0, cb: {} };
 function ttsWorker() {
   if (TTSW.w || TTSW.ok === false) return TTSW.w;
-  try { const w = new Worker((window.SIM_BASE || '') + 'lib/tts-worker.js'); w.onmessage = e => { if (e.data && e.data.ready) { TTSW.ready = true; return; } const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = ev => { TTSW.ok = false; TTSW.w = null; COMM.fbErr = 'worker load: ' + (ev && ev.message || 'error'); }; TTSW.w = w; } catch (e) { TTSW.ok = false; COMM.fbErr = 'worker: ' + e.message; }
+  try { const inl = document.getElementById('ttsw'), src = inl ? URL.createObjectURL(new Blob([inl.textContent.split('<\\/script>').join('<' + '/script>')], { type: 'text/javascript' })) : (window.SIM_BASE || '') + 'lib/tts-worker.js'; const w = new Worker(src); w.onmessage = e => { if (e.data && e.data.ready) { TTSW.ready = true; return; } const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = ev => { TTSW.ok = false; TTSW.w = null; COMM.fbErr = 'worker load: ' + (ev && ev.message || 'error'); }; TTSW.w = w; } catch (e) { TTSW.ok = false; COMM.fbErr = 'worker: ' + e.message; }
   return TTSW.w;
 }
 function needFallbackVoice() { if (window.SIM_VR || COMM.webFail) return true; try { return !speechSynthesis.getVoices().some(v => /^en/i.test(v.lang)); } catch (e) { return true; } }
@@ -5098,6 +5096,12 @@ else setTimeout(vrPageInit, 0);
 function vrPageInit() {
   if (!IS_VR) return;
   ui.menu.classList.add('hidden');
+  // 한 파일판: 훈련장 고르기 버튼 (고르면 Restart 불러옴) · PC 판 링크 숨김
+  const L = sitesAll(), vb = document.querySelector('#vrBack .vb');
+  if (vb && L.length > 1 && !$('vrSites')) { const d = document.createElement('div'); d.id = 'vrSites'; d.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center';
+    for (const st of L) { const b = document.createElement('button'); b.textContent = stName(st); b.className = st.id === SITE.id ? 'primary' : ''; b.style.cssText = 'padding:10px 14px;font-size:15px'; b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; d.appendChild(b); }
+    vb.insertBefore(d, $('vrBackGo')); }
+  if (!window.SIM_BASE && $('vrPC')) $('vrPC').style.display = 'none';
   vrOverlay(VR_OK.ok ? '' : L2('이 기기·브라우저는 VR을 지원하지 않습니다. Quest 브라우저에서 열어 주세요.', 'This device or browser does not support VR. Open this page in the Quest browser.'));
   $('vrBackGo').disabled = !VR_OK.ok;
 }
