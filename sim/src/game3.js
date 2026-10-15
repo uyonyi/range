@@ -8,10 +8,10 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 3.0, h: 1.0, fov: 62 }, { d: 1.85, h: 0.6, fov: 55 }, { d: 1.25, h: 0.42, fov: 50 }];
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2 };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrView: 'pilot' };
 try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrView: SET.vrView })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
