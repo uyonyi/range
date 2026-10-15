@@ -97,7 +97,8 @@ function updateGuide(subj) {
     x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
   });
   // ---- 조작 안내 문구 ----
-  const T = IS_TOUCH ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'DROP', boost: 'BST' } : null;
+  const T = XR_ON && SET.vrMode === 1 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
+    : (IS_TOUCH || XR_ON) ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
   const K = a => T ? T[a] : keyName(KB[a]);
   const tgt = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
   const d = tgt.clone().sub(subj.p), fwd = new V3(Math.sin(DR.h), 0, -Math.cos(DR.h)), rgt = new V3(Math.cos(DR.h), 0, Math.sin(DR.h));

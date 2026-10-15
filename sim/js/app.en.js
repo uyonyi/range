@@ -1798,7 +1798,7 @@ function startRun(kind) {
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
   if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (Replay·영상)
-  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? (IS_TOUCH ? 'READY · left stick up to take off' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
+  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? (XR_ON && SET.vrMode === 1 ? 'READY · Right stick 위로 Takeoff' : 'READY · left stick up to take off') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
   COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 None · Takeoff 허가'), 1500);
 }
@@ -2982,7 +2982,8 @@ function updateGuide(subj) {
     x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
   });
   // ---- 조작 안내 문구 ----
-  const T = IS_TOUCH ? { up: 'left stick ↑', down: 'left stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'right stick ↑', back: 'right stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'DROP', boost: 'BST' } : null;
+  const T = XR_ON && SET.vrMode === 1 ? { up: 'right stick ↑', down: 'right stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'left stick ↑', back: 'left stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'R트리거', boost: 'L트리거' }
+    : (IS_TOUCH || XR_ON) ? { up: 'left stick ↑', down: 'left stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'right stick ↑', back: 'right stick ↓', left: 'right stick ←', right: 'right stick →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
   const K = a => T ? T[a] : keyName(KB[a]);
   const tgt = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
   const d = tgt.clone().sub(subj.p), fwd = new V3(Math.sin(DR.h), 0, -Math.cos(DR.h)), rgt = new V3(Math.cos(DR.h), 0, Math.sin(DR.h));
@@ -4359,7 +4360,7 @@ function commSpeechDone() { COMM.sp = false; COMM.busy = Math.min(COMM.busy, 0.5
 const TTSW = { w: null, ok: null, id: 0, cb: {} };
 function ttsWorker() {
   if (TTSW.w || TTSW.ok === false) return TTSW.w;
-  try { const w = new Worker((window.SIM_BASE || '') + 'lib/tts-worker.js'); w.onmessage = e => { const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = () => { TTSW.ok = false; TTSW.w = null; }; TTSW.w = w; } catch (e) { TTSW.ok = false; }
+  try { const w = new Worker((window.SIM_BASE || '') + 'lib/tts-worker.js'); w.onmessage = e => { if (e.data && e.data.ready) { TTSW.ready = true; return; } const c = TTSW.cb[e.data.id]; delete TTSW.cb[e.data.id]; if (c) c(e.data); }; w.onerror = ev => { TTSW.ok = false; TTSW.w = null; COMM.fbErr = 'worker load: ' + (ev && ev.message || 'error'); }; TTSW.w = w; } catch (e) { TTSW.ok = false; COMM.fbErr = 'worker: ' + e.message; }
   return TTSW.w;
 }
 function needFallbackVoice() { if (window.SIM_VR || COMM.webFail) return true; try { return !speechSynthesis.getVoices().some(v => /^en/i.test(v.lang)); } catch (e) { return true; } }
@@ -4375,14 +4376,15 @@ function commSpeakFallback(text, est) {
   const done = () => { if (COMM.cur === myId) commSpeechDone(); };
   if (COMM.src) { try { COMM.src.stop(); } catch (e) { } COMM.src = null; }
   const w = ttsWorker(), id = ++TTSW.id;
-  if (!w || !AU.ctx) { setTimeout(done, est * 900); return; }
-  TTSW.cb[id] = d => {
+  if (!w || !AU.ctx) { COMM.fbErr = !w ? 'worker' : 'no audio context'; setTimeout(done, est * 900); return; }
+  COMM.fbState = 'synth'; TTSW.cb[id] = d => {
+    if (d.err) COMM.fbErr = d.err; COMM.fbState = d.buf ? 'decode' : 'noaudio';
     if (COMM.cur !== myId || !d.buf) return done();
     AU.ctx.decodeAudioData(d.buf).then(b => {
       if (COMM.cur !== myId) return; const c = AU.ctx, s = c.createBufferSource(); s.buffer = b;
       const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400;
       const g = c.createGain(); g.gain.value = 1.5; s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(AU.master); s.onended = done; s.start(); COMM.src = s; COMM.fbOk = true;
-    }).catch(done);
+    }).catch(e => { COMM.fbErr = 'decode: ' + (e && e.message || e); done(); });
   };
   w.postMessage({ id, text });
   setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(10, est * 2.2) * 1000);
@@ -4791,7 +4793,7 @@ const VR_PIP = { rt: new THREE.WebGLRenderTarget(560, 315), cam: new THREE.Persp
 VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBasicMaterial({ map: VR_PIP.rt.texture })); VR_PIP.m.position.set(1.2 - 0.38, -0.675 + 0.26, 0.006); VR_SCR.add(VR_PIP.m);
 { const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.414), new THREE.MeshBasicMaterial({ color: 0xffc828 })); fr.position.z = -0.001; VR_PIP.m.add(fr); }
 const VR_MAP = (function () { const t = new THREE.CanvasTexture(ui.map); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.833), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.95, toneMapped: false }));
-  m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); VR_SCR.add(m); return { t, m }; })();
+  m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); m.visible = false; VR_SCR.add(m); return { t, m }; })();
 const VR_MENU = vrPlane(1.3, 1.3 * 1080 / 1024, 1024, 1080); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
 // 컨트롤러 광선
 for (let i = 0; i < 2; i++) {
@@ -4836,6 +4838,7 @@ async function vrStart() {
   try { renderer.xr.setFoveation(1); } catch (e) { }
   XR_ON = true; XR.prev = {}; vrApplyCam();
   sess.addEventListener('end', vrEnded);
+  const wake = () => { try { if (!AU.ctx) initAudio(); if (AU.ctx && AU.ctx.state !== 'running') AU.ctx.resume(); } catch (e) { } }; sess.addEventListener('selectstart', wake); sess.addEventListener('select', wake); sess.addEventListener('squeezestart', wake); wake();
   sess.addEventListener('visibilitychange', () => { if (sess.visibilityState !== 'visible' && (S.state === 'run' || S.state === 'demo')) { togglePause(); XR.autoPaused = true; } else if (sess.visibilityState === 'visible' && XR.autoPaused && S.state === 'pause') { togglePause(); XR.autoPaused = false; } });
   $('vrBack').classList.add('hidden');
   vrScreenMode(SET.vrScreen);
@@ -4942,7 +4945,7 @@ function vrMenuDraw() {
   g.fillText(L2('Y 하부 Camera · Left stick 누르기 Switch camera · Right stick 누르기 열화상', 'Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
   const vi = voiceInfo(), eng = commEngine(), au = AU.ctx ? AU.ctx.state : L2('None', 'none');
   g.fillStyle = eng === 'none' ? 'rgba(255,154,122,.95)' : 'rgba(93,255,154,.85)';
-  g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au, 36, y + 78);
+  g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
   g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR5', 360, H2 - 56);
@@ -5021,6 +5024,10 @@ function vrOsdDraw() {
   if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', W2 - 40, H2 - 252, 24, '#ffc828', 'right');
   const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 980 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2, H2 - 112 + i * 36, 28, '#9fe9ff', 'center')); }
   const m = $('objMsg'); if (m && m.classList.contains('show') && m.textContent.trim()) sh(m.textContent.trim(), W2 / 2, H2 / 2 + 90, 44, m.style.color || '#5dff9a', 'center');
+  // 등고선 지도 (화면 왼쪽 가운데)
+  if (SET.vrMap !== false && ui.map) { const mw = 198, mh = 330, mx = 26, my = 150; g.globalAlpha = 0.92; g.fillStyle = 'rgba(6,10,14,.75)'; g.fillRect(mx - 4, my - 4, mw + 8, mh + 8); g.filter = 'brightness(1.6) contrast(1.15)'; g.drawImage(ui.map, mx, my, mw, mh); g.filter = 'none'; g.globalAlpha = 1; g.strokeStyle = 'rgba(255,200,40,.8)'; g.lineWidth = 2; g.strokeRect(mx - 4, my - 4, mw + 8, mh + 8); }
+  // 경로 안내 문구 (예: Descend 3.2 m (left stick ↓))
+  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2, H2 - 200 + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
   if (SET.vrCam !== 'chase') { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(W2 / 2 - 22, H2 / 2); g.lineTo(W2 / 2 - 7, H2 / 2); g.moveTo(W2 / 2 + 7, H2 / 2); g.lineTo(W2 / 2 + 22, H2 / 2); g.moveTo(W2 / 2, H2 / 2 + 7); g.lineTo(W2 / 2, H2 / 2 + 16); g.stroke(); }
   g.textAlign = 'left'; tex.needsUpdate = true;
 }
@@ -5041,7 +5048,7 @@ function xrTick(dt) {
   // 지형 장면을 드론 Camera(게임 Camera)로 화면 텍스처에 그림
   renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true;   // 그림자는 2프레임에 한 번
   camera.aspect = 16 / 9; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
-  XR.osdT -= dt; if (XR.osdT <= 0) { XR.osdT = 0.1; vrOsdDraw(); VR_MAP.m.visible = SET.vrMap !== false && !XR.menu && S.state !== 'menu'; if (VR_MAP.m.visible) VR_MAP.t.needsUpdate = true; }
+  XR.osdT -= dt; if (XR.osdT <= 0) { XR.osdT = 0.1; vrOsdDraw(); }
   const cur = renderer.getRenderTarget(); renderer.xr.enabled = false;
   renderer.setRenderTarget(VR_RT); renderer.clear(); renderer.render(scene, camera);
   // 하부 Camera (각도 고정, 기체 진행 방향 기준)
