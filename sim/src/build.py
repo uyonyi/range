@@ -73,22 +73,33 @@ def build_public(outdir, site_ids=('yeongin',)):
         js = '// 현장 데이터 (자동 생성: tools/)\nwindow.SIM_NOFLAT=true;\nwindow.SIM_SITES=(window.SIM_SITES||[]).concat([' + json.dumps(s, ensure_ascii=False) + ']);\n'
         js += 'window.SIM_DATA=window.SIM_DATA||' + json.dumps(data, ensure_ascii=False) + ';\n'
         open(f'{outdir}/sites/{sid}.js', 'w', encoding='utf-8').write(js)
+    build_pages(outdir, site_ids, vr=False)
+    os.makedirs(outdir + '/vr/js', exist_ok=True)
+    build_pages(outdir + '/vr', site_ids, vr=True)
+    tot = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(outdir) for f in fs)
+    print('public build ->', outdir, tot // 1024, 'KB')
+
+
+def build_pages(outdir, site_ids, vr):
+    """PC 판(outdir) 또는 VR 판(outdir/vr: 라이브러리·현장 데이터는 한 단계 위 폴더 공유)"""
+    up = '../' if vr else ''
+    import hashlib
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
         t, game = sources(lang, 'public')
         game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(game)
-        tags = {'THREE': 'lib/three.min.js', 'GEOTIFF': 'lib/geotiff.js', 'PROJ4': 'lib/proj4.js'}
+        tags = {'THREE': up + 'lib/three.min.js', 'GEOTIFF': up + 'lib/geotiff.js', 'PROJ4': up + 'lib/proj4.js'}
         for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
         import hashlib
         ver = hashlib.md5(game.encode()).hexdigest()[:8]
-        sites = ''.join(f'<script src="sites/{sid}.js?v={ver}"></script>' for sid in site_ids)
+        sites = ''.join(f'<script src="{up}sites/{sid}.js?v={ver}"></script>' for sid in site_ids)
         other = 'index.html' if lang == 'en' else 'en.html'
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
-        t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';</script>")
+        flags = "window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';"
+        if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
+        t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
-    tot = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(outdir) for f in fs)
-    print('public build ->', outdir, tot // 1024, 'KB')
 
 
 def build_dual(mobile=False, out='hroc_fpv_simulator.html'):

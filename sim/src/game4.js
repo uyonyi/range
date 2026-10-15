@@ -100,7 +100,7 @@ async function autoOrtho() {
     if (SITE.ortho.startsWith('data:')) {   // 파일 안에 넣은 사진: fetch 없이 직접 풀기 (fetch 가 막힌 곳 대비)
       const b64 = SITE.ortho.slice(SITE.ortho.indexOf(',') + 1), bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
       bl = new Blob([u], { type: 'image/tiff' });
-    } else { const r = await fetch(SITE.ortho); if (!r.ok) throw new Error('HTTP ' + r.status); bl = await r.blob(); } await loadOrthoFile(bl, { nosave: true });
+    } else { const r = await fetch((/^(https?:|\/)/.test(SITE.ortho) ? '' : (window.SIM_BASE || '')) + SITE.ortho); if (!r.ok) throw new Error('HTTP ' + r.status); bl = await r.blob(); } await loadOrthoFile(bl, { nosave: true });
     setOrthoStatus(setOrthoStatusTxt() + ' · ' + ((window.SIM_LANG === 'en' && SITE.orthoSrc_en) || SITE.orthoSrc || ''), '#5dff9a'); return true;
   } catch (e) { setOrthoStatus('정사영상 없음 (기본 바닥)', ''); return false; }
 }

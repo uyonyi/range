@@ -505,5 +505,5 @@ EN.update({
 '<div>VR 조종 방식 <span class="seg" id="segVRMode"><button data-v="2" class="on">모드 2 (왼쪽 스틱 상승·회전)</button><button data-v="1">모드 1 (오른쪽 스틱 상승)</button></span></div>': '<div>VR stick mode <span class="seg" id="segVRMode"><button data-v="2" class="on">Mode 2 (left stick: throttle · yaw)</button><button data-v="1">Mode 1 (right stick: throttle)</button></span></div>',
 })
 EN.update({
-'<b id="vrBackT">VR이 멈췄습니다</b><button id="vrBackGo" class="primary">VR로 돌아가기</button><button id="vrBack2D">2D 화면으로 계속</button>': '<b id="vrBackT">VR was interrupted</b><button id="vrBackGo" class="primary">Back to VR</button><button id="vrBack2D">Continue in 2D</button>',
+'<b id="vrBackT">FPV 드론 VR</b><p id="vrBackD">Quest 컨트롤러로 조종하는 FPV 고글 화면 시뮬레이터입니다. 버튼을 누르면 VR 안 메뉴에서 시작합니다.</p><button id="vrBackGo" class="primary">VR 시작</button><a id="vrPC" href="../">PC·휴대폰 버전으로</a>': '<b id="vrBackT">FPV drone VR</b><p id="vrBackD">An FPV goggle-view simulator flown with Quest controllers. Press the button to start in the in-VR menu.</p><button id="vrBackGo" class="primary">Start VR</button><a id="vrPC" href="../en.html">PC / phone version</a>',
 })
