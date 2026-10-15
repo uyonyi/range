@@ -225,7 +225,7 @@ function replayTick(dt) {
     else if (e.k === 'msg' && e.text) showMsg(e.text, e.col, 1.2);
   }
   updatePayloads(dt * (RP.playing ? RP.speed : 0));
-  replayUI();
+  replayUI(); vidTick();
 }
 function replayUI() {
   const s = RP.rec.s, end = s[s.length - 1][0];

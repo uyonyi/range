@@ -46,7 +46,7 @@ function startRun(kind) {
   ui.list.classList.toggle('hidden', kind !== 'course' && !isMission(kind));
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
-  if (kind === 'course' || kind === 'free') recStart(); else REC = null;
+  if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (리플레이·영상)
   showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? (IS_TOUCH ? 'READY · 왼쪽 스틱 위로 이륙' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
   COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 없음 · 이륙 허가'), 1500);

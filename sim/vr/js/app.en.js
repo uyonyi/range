@@ -1797,7 +1797,7 @@ function startRun(kind) {
   ui.list.classList.toggle('hidden', kind !== 'course' && !isMission(kind));
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
-  if (kind === 'course' || kind === 'free') recStart(); else REC = null;
+  if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (Replay·영상)
   showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? (IS_TOUCH ? 'READY · left stick up to take off' : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
   COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 None · Takeoff 허가'), 1500);
@@ -2801,7 +2801,7 @@ function replayTick(dt) {
     else if (e.k === 'msg' && e.text) showMsg(e.text, e.col, 1.2);
   }
   updatePayloads(dt * (RP.playing ? RP.speed : 0));
-  replayUI();
+  replayUI(); vidTick();
 }
 function replayUI() {
   const s = RP.rec.s, end = s[s.length - 1][0];
@@ -3815,7 +3815,7 @@ function strikeDetonate() {
   return true;
 }
 function msFinish() {
-  S.finished = true; S.running = false;
+  S.finished = true; S.running = false; if (REC) LAST_REC = recFinish();
   comm(`Mission complete. Good work, ${CS}. CONTROL out.`, '임무 완료 · 수고했음.');
   setTimeout(() => {
     if (S.state !== 'run') return;
@@ -4849,6 +4849,11 @@ function vrEnded() {
   renderer.setAnimationLoop(null); XR_ON = false; XR.sess = null; renderer.xr.enabled = false; renderer.shadowMap.autoUpdate = true;
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   last = performance.now(); if (!TEST) requestAnimationFrame(frame);
+  if (XR.afterExit === 'video') {   // VR Menu에서 '영상 저장': 2D 화면에서 Replay를 재생하며 녹화
+    XR.afterExit = null; $('vrBack').classList.add('hidden'); S.cam = CAMS.indexOf(SET.vrCam === 'chase' ? 'CHASE' : 'FPV');
+    exportReplayVideo(LAST_REC, ok => { if (IS_VR) ui.menu.classList.add('hidden'); vrOverlay(ok ? L2('영상을 저장했습니다. 다운로드 폴더(파일 앱)에서 볼 수 있습니다.', 'Video saved to your Downloads folder.') : L2('영상을 만들지 못했습니다.', 'Could not create the video.'), L2('VR 시작', 'Start VR')); });
+    return;
+  }
   if (S.state === 'run' || S.state === 'demo') togglePause();
   vrOverlay(XR.userExit ? '' : L2('VR이 멈췄습니다. 버튼을 누르면 하던 FLIGHT을 이어 갑니다.', 'VR was interrupted. Press the button to continue your flight.'), XR.userExit ? L2('VR 시작', 'Start VR') : L2('VR로 돌아가기', 'Back to VR'));
 }
@@ -4869,6 +4874,12 @@ function xrInput(dt) {
   const rt = edge('rt', bt(Rg, 0)), lt = edge('lt', bt(Lg, 0)), A = edge('a', bt(Rg, 4)), B = edge('b', bt(Rg, 5)), X = edge('x', bt(Lg, 4)), Y = edge('y', bt(Lg, 5)), LS = edge('ls', bt(Lg, 3)), RS = edge('rs', bt(Rg, 3));
   if ((rt || lt || A || B) && AU.ctx && AU.ctx.state !== 'running') try { AU.ctx.resume(); } catch (e) { }
   if (XR.menu) { if (rt || A) vrMenuClick('right'); if (lt) vrMenuClick('left'); if (B && S.state === 'pause') vrResume(); return; }
+  if (S.state === 'replay') {   // Replay: A 재생·멈춤 · Right stick 좌우 5초 · Y 속도 · Left stick 누르기 Camera · B Menu
+    const sx = ax(Rg, 2); if (edge('sr', sx > 0.7)) replayKey('ArrowRight'); if (edge('sl', sx < -0.7)) replayKey('ArrowLeft');
+    if (A) replayKey('Space'); if (LS) replayKey('KeyC'); if (Y) { const L = [0.5, 1, 2, 4]; RP.speed = L[(L.indexOf(RP.speed) + 1) % L.length]; replayUI(); }
+    if (B) { if (VID.on) return; replayEnd(); vrMenuOpen(); }
+    return;
+  }
   const lx = ax(Lg, 2), ly = -ax(Lg, 3), rx = ax(Rg, 2), ry = -ax(Rg, 3);
   const st = SET.vrMode === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
   let any = false;
@@ -4878,7 +4889,6 @@ function xrInput(dt) {
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }
   if (B) vrMenuOpen();
-  if (X) pressed.push('KeyR');
   if (Y) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 Camera ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 Camera Off', 'Lower camera off'), '#ffc828', 1); }
   if (LS) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
   if (RS) irSet(!ENV.ir);
@@ -4907,10 +4917,12 @@ function vrMenuDraw() {
     if (!dis) P.btns.push({ id, x, y, w, h });
   };
   let y = 112;
+  const hasRec = !!(REC && REC.s.length > 1) || !!(LAST_REC && LAST_REC.s && LAST_REC.s.length > 1);
   if (paused) {
     const kn = (MS_NAME[S.kind] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('Free Flight', 'Free flight'), demo: L2('Reference', 'Reference flight') })[S.kind] || S.kind);
-    btn('resume', 36, y, 466, 80, '▶ ' + L2('Resume하기', 'Resume') + ' · ' + kn, false, false, true); btn('restart', 522, y, 466, 80, '↺ ' + L2('Restart Restart', 'Restart'), false); y += 96;
-  }
+    btn('resume', 36, y, 280, 80, '▶ ' + L2('Resume하기', 'Resume'), false, false, true); btn('restart', 328, y, 212, 80, '↺ ' + L2('Restart', 'Restart'), false);
+    btn('replay', 552, y, 212, 80, L2('Replay', 'Replay'), false, !hasRec); btn('video', 776, y, 212, 80, '⬇ ' + L2('영상 저장', 'Save video'), false, !hasRec); y += 96;
+  } else if (hasRec) { btn('replay', 36, y, 460, 70, '▶ ' + L2('Last-flight replay', 'Replay last flight'), false); btn('video', 528, y, 460, 70, '⬇ ' + L2('마지막 FLIGHT 영상 저장', 'Save last flight video'), false); y += 84; }
   const L = VR_MS().concat(VR_MS2());
   L.forEach(([k, n], i) => btn('ms:' + k, 36 + (i % 4) * 240, y + Math.floor(i / 4) * 84, 228, 74, n, !paused && false, msAvail(k).site === false));
   y += Math.ceil(L.length / 4) * 84 + 10;
@@ -4926,7 +4938,7 @@ function vrMenuDraw() {
   btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
   g.fillText(((SET.vrMode || 2) === 2 ? L2('모드 2: Left stick Climb·yaw / Right stick 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: Left stick 전후·yaw / Right stick Climb·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
-  g.fillText(L2('R트리거 Drop · L트리거 Boost · A 확인 · B Menu/Resume · X Restart', 'R-trigger drop · L-trigger boost · A ok · B menu/resume · X reset'), 36, y + 26);
+  g.fillText(L2('R트리거 Drop · L트리거 Boost · A 확인 · B Menu/Resume (Restart Restart는 Menu에서)', 'R-trigger drop · L-trigger boost · A ok · B menu/resume (restart from the menu)'), 36, y + 26);
   g.fillText(L2('Y 하부 Camera · Left stick 누르기 Switch camera · Right stick 누르기 열화상', 'Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
   const vi = voiceInfo(), eng = commEngine(), au = AU.ctx ? AU.ctx.state : L2('None', 'none');
   g.fillStyle = eng === 'none' ? 'rgba(255,154,122,.95)' : 'rgba(93,255,154,.85)';
@@ -4953,6 +4965,8 @@ function vrMenuClick(hand) {
   if (id === 'resume') { vrResume(); return; }
   if (id === 'restart') { XR.menu = false; startRun(S.kind); vrApplyCam(); if (SET.vrScreen === 'space') vrRecenter(); return; }
   if (id === 'vtest') { vrVoiceTest(); return; }
+  if (id === 'replay') { if (REC) LAST_REC = recFinish(); XR.menu = false; replayStart(LAST_REC, 'menu'); vrApplyCam(); if (SET.vrCam !== 'chase' && S.cam !== 0) S.cam = 0; return; }
+  if (id === 'video') { if (REC) LAST_REC = recFinish(); XR.afterExit = 'video'; vrStop(); return; }
   if (id === 'map') { SET.vrMap = SET.vrMap === false; saveSet(); return; }
   if (id === 'guide') { SET.guide = !SET.guide; saveSet(); return; }
   if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); return; }
@@ -4975,7 +4989,9 @@ function vrOsdDraw() {
   if (S.state === 'result') { box([[($('resTitle') || {}).textContent || '', 44, '#5dff9a'], [($('resSub') || {}).textContent || '', 28, '#e8eef2'], [L2('A Restart · B Menu', 'A again · B menu'), 30, '#ffc828']], '#5dff9a'); tex.needsUpdate = true; return; }
   if (S.state === 'pause') { box([[L2('일시 Pause', 'PAUSED'), 44, '#ffc828'], [L2('B: Menu', 'B: menu'), 30, '#e8eef2']], '#ffc828'); tex.needsUpdate = true; return; }
   if (S.state === 'menu') { tex.needsUpdate = true; return; }
-  const sb = S.state === 'demo' ? ghostS : DR, gh = groundAt(sb.p.x, sb.p.z), sp = sb.v ? sb.v.length() : 0;
+  if (S.state === 'replay' && RP.rec) { const s0 = RP.rec.s[0][0], e0 = RP.rec.s[RP.rec.s.length - 1][0]; sh(`REPLAY  ${fmt(RP.t - s0)} / ${fmt(e0 - s0)}  ×${RP.speed}${RP.playing ? '' : '  ❚❚'}`, W2 / 2, 22, 40, '#4fe3ff', 'center');
+    sh(L2('A 재생·멈춤 · right stick ←→ 5초 · Y 속도 · Left stick 누르기 Camera · B Menu', 'A play/pause · R-stick ←→ 5 s · Y speed · L-stick click camera · B menu'), W2 / 2, H2 - 60, 26, '#e8eef2', 'center'); }
+  const sb = S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, gh = groundAt(sb.p.x, sb.p.z), sp = sb.v ? sb.v.length() : 0;
   // 화면 좌표: 게임 Camera(드론 Camera·추적 Camera)로 3D 점을 투영
   const prj = p => { const q = p.clone().project(camera); return { x: (q.x + 1) / 2 * W2, y: (1 - q.y) / 2 * H2, front: q.z < 1 && q.z > -1 }; };
   // 수평선 (기울기·높낮이)
@@ -4998,7 +5014,7 @@ function vrOsdDraw() {
   sh(`${(sb.p.y - gh).toFixed(1)}`, W2 - 150, 92, 56, '#fff', 'right'); sh(L2('m 고도', 'm AGL'), W2 - 40, 108, 26, '#cfd6da', 'right');
   const vs = sb.v ? sb.v.y : 0; sh((vs > 0.15 ? '▲ ' : vs < -0.15 ? '▼ ' : '■ ') + Math.abs(vs).toFixed(1) + ' m/s', W2 - 40, 156, 30, Math.abs(vs) > 3 ? '#ff9a40' : '#e8eef2', 'right');
   { const hdg = ((((SITE.brg || 0) + (sb.h || 0) * 180 / Math.PI) % 360) + 360) % 360; sh(String(Math.round(hdg)).padStart(3, '0') + '°', W2 / 2, 76, 34, '#e8eef2', 'center'); }
-  if (o) sh('▸ ' + (o.label || MS_NAME[S.kind] || ''), W2 / 2, 22, 42, '#ffc828', 'center');
+  if (o && S.state !== 'replay') sh('▸ ' + (o.label || MS_NAME[S.kind] || ''), W2 / 2, 22, 42, '#ffc828', 'center');
   if (S.state === 'demo') sh(L2('Reference', 'REFERENCE FLIGHT'), W2 / 2, 22, 40, '#4fe3ff', 'center');
   if (ENV.ir) sh('IR', 40, 96, 34, '#ff9a40');
   if (!isMission() && S.kind === 'course') sh('M84 ' + '●'.repeat(Math.max(0, S.payloads || 0)), 40, H2 - 70, 34, '#ffc828');
@@ -5037,6 +5053,37 @@ function xrTick(dt) {
   renderer.setRenderTarget(cur); renderer.xr.enabled = true;
   (XR.camP = XR.camP || new V3()).copy(camera.position); (XR.camQ = XR.camQ || new THREE.Quaternion()).copy(camera.quaternion);
 }
+// ---- Replay를 영상(WebM/MP4)으로 저장 (PC Replay 막대·VR Menu) ----
+const VID = { mr: null, chunks: [], on: false, stopping: false, rec: null, done: null };
+function vidMime() { for (const m of ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']) try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) { } return ''; }
+function vidTag(t) { let e = $('vidTag'); if (!e) { e = document.createElement('div'); e.id = 'vidTag'; e.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:70;padding:8px 16px;border-radius:20px;background:rgba(10,13,16,.85);color:#fff;font:600 15px system-ui,sans-serif;border:1px solid #ff5050'; document.body.appendChild(e); } e.style.display = t ? '' : 'none'; if (t) e.textContent = t; }
+function exportReplayVideo(rec, onDone) {
+  if (VID.on) return;
+  if (!rec || !rec.s || rec.s.length < 2) { showMsg(L2('저장할 FLIGHT 기록이 없습니다', 'No flight to save'), '#ff6060', 1.5); if (onDone) onDone(false); return; }
+  const cv = renderer.domElement; if (typeof MediaRecorder === 'undefined' || !cv.captureStream) { showMsg(L2('이 브라우저는 영상 저장을 지원하지 않습니다', 'This browser cannot record video'), '#ff6060', 2); if (onDone) onDone(false); return; }
+  const cam = S.cam; replayStart(rec, 'menu'); S.cam = cam; replaySeek(rec.s[0][0]); RP.speed = 1; RP.playing = true;
+  const mime = vidMime(); let mr;
+  try { mr = new MediaRecorder(cv.captureStream(30), Object.assign({ videoBitsPerSecond: 6000000 }, mime ? { mimeType: mime } : {})); } catch (e) { showMsg(L2('영상을 만들 수 없습니다', 'Could not record video'), '#ff6060', 2); if (onDone) onDone(false); return; }
+  Object.assign(VID, { mr, chunks: [], on: true, stopping: false, rec, done: onDone || null });
+  mr.ondataavailable = e => { if (e.data && e.data.size) VID.chunks.push(e.data); };
+  mr.onstop = () => {
+    VID.on = false; vidTag('');
+    const type = mr.mimeType || mime || 'video/webm', ext = /mp4/.test(type) ? 'mp4' : 'webm', blob = new Blob(VID.chunks, { type });
+    const d = new Date(), z = n => String(n).padStart(2, '0'), a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `fpv_${rec.kind || 'flight'}_${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}.${ext}`;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 8000);
+    VID.blobSize = blob.size; replayEnd(); showMsg(L2('영상 저장 완료', 'Video saved'), '#5dff9a', 2);
+    const cb = VID.done; VID.done = null; if (cb) cb(true);
+  };
+  mr.start(500); vidTag('● REC 0%');
+}
+function vidTick() {
+  if (!VID.on || VID.stopping) return;
+  const s = VID.rec.s, s0 = s[0][0], end = s[s.length - 1][0], pc = Math.round(clamp((RP.t - s0) / Math.max(1e-6, end - s0), 0, 1) * 100);
+  vidTag(L2('● 영상 만드는 중 ', '● Recording video ') + pc + '%');
+  if (S.state !== 'replay' || RP.t >= end) { VID.stopping = true; setTimeout(() => { if (VID.mr && VID.mr.state !== 'inactive') VID.mr.stop(); }, 700); }
+}
+if ($('rpVid')) $('rpVid').onclick = () => { if (RP.rec) exportReplayVideo(RP.rec); };
 // ---- 2D 쪽 ----
 var VR_OK = { ok: false };
 if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-vr').then(ok => { VR_OK.ok = !!ok; vrBtnUpdate(); vrPageInit(); }).catch(() => vrPageInit());
@@ -5056,5 +5103,5 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
