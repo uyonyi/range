@@ -66,7 +66,7 @@ function completeObj(status, msg, col) {
   if (status === 1) sfx('good'); else sfx('bad');
   showMsg(msg || (o.label + (status === 1 ? ' ✓' : ' ✗')), col || (status === 1 ? '#5dff9a' : '#ff6060'), 1.4);
   S.objIdx++; S.scan = 0; S.wasInside = false; S.landT = 0; S.scanned = false; S.orbSum = 0; S.orbA = null;
-  if (S.kind === 'tutorial') tutAfterObj(); else if (S.objIdx >= OBJS.length) finishRun();
+  if (S.kind === 'tutorial') tutAfterObj(); else if (S.objIdx >= OBJS.length) finishRun(); else if (S.kind === 'course' && status === 1) courseCall(o, OBJS[S.objIdx]);
   renderList();
 }
 function finishRun() {
@@ -171,7 +171,7 @@ function stepDrone(dt) {
   if (!grounded) {
     DR.h += iy * md.yawRate * dt;
     // 자동 방향 보조 (입문): 회전 입력이 없으면 다음 과제 쪽으로 천천히 돌아감
-    if (md.autoYaw && assistOn && o && o.mk && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
+    if (md.autoYaw && assistOn && !IN.head && o && o.mk && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
       const op = openingOf(o); let tp = o.mk;
       if (op) tp = op.b.world(op.lx, op.ly - 0.0, op.lz);
       if (GUIDE.next) tp = GUIDE.next;

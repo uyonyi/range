@@ -1817,7 +1817,7 @@ function completeObj(status, msg, col) {
   if (status === 1) sfx('good'); else sfx('bad');
   showMsg(msg || (o.label + (status === 1 ? ' ✓' : ' ✗')), col || (status === 1 ? '#5dff9a' : '#ff6060'), 1.4);
   S.objIdx++; S.scan = 0; S.wasInside = false; S.landT = 0; S.scanned = false; S.orbSum = 0; S.orbA = null;
-  if (S.kind === 'tutorial') tutAfterObj(); else if (S.objIdx >= OBJS.length) finishRun();
+  if (S.kind === 'tutorial') tutAfterObj(); else if (S.objIdx >= OBJS.length) finishRun(); else if (S.kind === 'course' && status === 1) courseCall(o, OBJS[S.objIdx]);
   renderList();
 }
 function finishRun() {
@@ -1922,7 +1922,7 @@ function stepDrone(dt) {
   if (!grounded) {
     DR.h += iy * md.yawRate * dt;
     // 자동 방향 보조 (입문): 회전 입력이 없으면 다음 과제 쪽으로 천천히 돌아감
-    if (md.autoYaw && assistOn && o && o.mk && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
+    if (md.autoYaw && assistOn && !IN.head && o && o.mk && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
       const op = openingOf(o); let tp = o.mk;
       if (op) tp = op.b.world(op.lx, op.ly - 0.0, op.lz);
       if (GUIDE.next) tp = GUIDE.next;
@@ -2980,7 +2980,8 @@ function updateGuide(subj) {
     x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
   });
   // ---- 조작 안내 문구 ----
-  const T = XR_ON && SET.vrMode === 1 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
+  const T = XR_ON && SET.vrMode === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
+    : XR_ON && SET.vrMode === 1 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
     : (IS_TOUCH || XR_ON) ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
   const K = a => T ? T[a] : keyName(KB[a]);
   const tgt = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
@@ -4342,9 +4343,18 @@ function squelch(open) {
   const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = open ? 1300 : 900; g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + 0.1);
 }
 // en: 영어 교신, ko: 한국어 자막 (한국어 화면에서만)
-function comm(en, ko, from) {
+function comm(en, ko, from, tag) {
   if (S.state !== 'run' && S.state !== 'result') return;
-  COMM.q.push({ en, ko, from: from || 'CONTROL' }); if (COMM.q.length > 4) COMM.q.shift();
+  if (tag) COMM.q = COMM.q.filter(m => m.tag !== tag);   // 같은 종류(코스 안내)는 최신 것만
+  COMM.q.push({ en, ko, from: from || 'CONTROL', tag }); if (COMM.q.length > 4) COMM.q.shift();
+}
+// 코스 음성 안내: 과제를 마칠 때마다 다음 과제를 불러 줌 (슬라럼 같은 연속 과제는 처음·끝만)
+function courseCallSay(l) { return String(l).replace(/360°/g, 'three sixty').replace(/H-PAD/g, 'H pad').replace(/\s*·\s*/g, ', ').replace(/\(([^)]*)\)/g, ', $1').replace(/\b([A-Z])([A-Z]{3,})\b/g, (m, a, b) => a + b.toLowerCase()).replace(/(\d+)\/(\d+)/g, '$1 of $2'); }
+function courseCall(done, next) {
+  if (!next || !next.label) return;
+  const k = l => String(l).split(/[ ·]/)[0];
+  if (done && k(done.label) === k(next.label) && /SLALOM/.test(next.label)) return;
+  comm(`Next, ${courseCallSay(next.label)}.`, L2('다음: ', 'Next: ') + next.label, 'CONTROL', 'nav');
 }
 // 음성: 실제 발화가 끝날 때까지 다음 교신을 기다림 (글자 수 추정으로 끊기지 않게)
 COMM.sp = false; COMM.spT = 0; COMM.ok = false;
@@ -4417,7 +4427,8 @@ function commTick(dt) {
   const sp = speakify(m.en), dur = Math.max(3.5, sp.length / 13);
   el.classList.add('show'); radioT = dur + 1; COMM.busy = dur + 0.6;
   squelch(true); commStatic(true, dur + 0.4);
-  if (SET.voice !== false && window.speechSynthesis) {
+  if (SET.voice !== false && (window.speechSynthesis || (needFallbackVoice() && TTSW.ok !== false))) {
+    if (AU.ctx && AU.ctx.state !== 'running') try { AU.ctx.resume(); } catch (e) { }
     if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetAtTime(musicLevel() * 0.25, AU.ctx.currentTime, 0.1);
     COMM.busy = 999; radioT = 999; commSpeak(sp, dur);
   } else setTimeout(() => squelch(false), dur * 900);
@@ -4788,7 +4799,7 @@ const VR_SCR = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), new THREE.Mesh
 const VR_OSD = vrPlane(2.4, 1.35, 960, 540); VR_OSD.m.position.z = 0.003; VR_SCR.add(VR_OSD.m);
 const VR_FRAME = new THREE.Mesh(new THREE.PlaneGeometry(2.48, 1.43), new THREE.MeshBasicMaterial({ color: 0x0b1116 })); VR_FRAME.position.z = -0.003; VR_SCR.add(VR_FRAME);
 const VR_PIP = { rt: new THREE.WebGLRenderTarget(560, 315), cam: new THREE.PerspectiveCamera(72, 16 / 9, 0.05, 3000) }; VR_PIP.rt.texture.encoding = renderer.outputEncoding;
-VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBasicMaterial({ map: VR_PIP.rt.texture })); VR_PIP.m.position.set(1.2 - 0.38, -0.675 + 0.26, 0.006); VR_SCR.add(VR_PIP.m);
+VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBasicMaterial({ map: VR_PIP.rt.texture })); VR_PIP.m.position.set(-1.2 + 0.40, -0.675 + 0.26, 0.006); VR_SCR.add(VR_PIP.m);
 { const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.414), new THREE.MeshBasicMaterial({ color: 0xffc828 })); fr.position.z = -0.001; VR_PIP.m.add(fr); }
 const VR_MAP = (function () { const t = new THREE.CanvasTexture(ui.map); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.833), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.95, toneMapped: false }));
   m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); m.visible = false; VR_SCR.add(m); return { t, m }; })();
@@ -4882,9 +4893,11 @@ function xrInput(dt) {
     return;
   }
   const lx = ax(Lg, 2), ly = -ax(Lg, 3), rx = ax(Rg, 2), ry = -ax(Rg, 3);
-  const st = SET.vrMode === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
+  let st = SET.vrMode === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
+  if (SET.vrMode === 3) st = vrHeadSteer(dt, lx, ly, rx, ry);
+  else IN.head = false;
   let any = false;
-  for (const k in st) { const v = shape(st[k], 0.1); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
+  for (const k in st) { const v = SET.vrMode === 3 ? (k === 'roll' ? shape(st[k], 0.1) : st[k]) : shape(st[k], 0.1); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
   if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4) IN.boost = true;
   if (rt) pressed.push('Space');
@@ -4893,6 +4906,21 @@ function xrInput(dt) {
   if (Y) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 카메라 ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 카메라 끔', 'Lower camera off'), '#ffc828', 1); }
   if (LS) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
   if (RS) irSet(!ENV.ir);
+}
+// 머리 방향 모드: 고개를 돌린 쪽으로 기체가 돌고, 왼쪽 스틱 앞뒤 = 속도, 고개를 들거나 숙이면 그쪽으로 오르내림
+// 오른쪽 스틱: 좌우 = 옆으로, 위아래 = 고도 (직접), 왼쪽 스틱 좌우 = 몸을 돌리지 않고 회전
+function vrHeadSteer(dt, lx, ly, rx, ry) {
+  const fw = new V3(0, 0, -1).applyQuaternion(XR.headQ), hh = Math.atan2(fw.x, -fw.z), hp = Math.asin(clamp(fw.y, -1, 1));
+  const live = S.state === 'run' && !DR.landed;
+  if (!live || XR.hTgt == null) { XR.hTgt = DR.h; XR.hhPrev = hh; }
+  else { XR.hTgt += wrapA(hh - XR.hhPrev); XR.hhPrev = hh; XR.hTgt += shape(lx, 0.15) * 1.6 * dt; }
+  let dh = wrapA(XR.hTgt - DR.h); if (Math.abs(dh) > 100 * DEG) { XR.hTgt = DR.h + Math.sign(dh) * 100 * DEG; dh = wrapA(XR.hTgt - DR.h); }   // 너무 앞서가지 않게
+  IN.head = live;
+  const spd = shape(ly, 0.1), tilt = Math.abs(hp) < 8 * DEG ? 0 : hp - Math.sign(hp) * 8 * DEG;
+  let thr = shape(ry, 0.12);
+  if (DR.landed) thr = Math.max(thr, spd);                                   // 땅에서는 왼쪽 스틱 위 = 이륙
+  else if (spd > 0) thr = clamp(thr + spd * Math.tan(tilt) * 2.2, -1, 1);   // 보는 쪽(위·아래)으로 날아감
+  return { thr, yaw: Math.abs(dh) < 1.5 * DEG ? 0 : clamp(dh * 2.4, -1, 1), pitch: DR.landed ? 0 : spd, roll: rx };
 }
 // ---- VR 안 메뉴 ----
 const VR_MS = () => [['course', L2('장애물 코스', 'Obstacle course')], ['forest', L2('숲길 통과', 'Forest trail')], ['race', L2('타임 레이스', 'Time race')], ['ridge', L2('능선 종주', 'Ridge run')], ['free', L2('자유 비행', 'Free flight')], ['demo', L2('기준 비행 보기', 'Reference flight')]];
@@ -4931,14 +4959,14 @@ function vrMenuDraw() {
   const afN = id => ({ x2d: 'Skydio X2D', anafi: 'ANAFI', fpv: L2('FPV 레이싱', 'FPV racer'), kfpv: L2('자폭 FPV', 'Kamikaze FPV') })[id];
   row(y, L2('기체', 'Drone')); VR_AF.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
   row(y, L2('난이도', 'Difficulty')); [['train', L2('입문', 'Training')], ['easy', L2('쉬움', 'Easy')], ['sport', L2('스포츠', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
-  row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
+  row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
   row(y, L2('카메라', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('하부 카메라', 'Lower cam')); [[0, L2('끔', 'Off')], [90, '90°'], [60, '60°'], [45, '45°']].forEach(([v, n], i) => btn('pip:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrPip | 0) === v)); y += RH;
   row(y, L2('환경', 'Light')); [['day', L2('낮', 'Day'), !SET.night && !ENV.ir], ['night', L2('밤', 'Night'), !!SET.night && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
   btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
-  g.fillText(((SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
+  g.fillText((SET.vrMode === 3 ? L2('머리 방향: 보는 쪽으로 비행 · 왼쪽 스틱 앞뒤 속도 · 오른쪽 스틱 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : (SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
   g.fillText(L2('R트리거 투하 · L트리거 부스트 · A 확인 · B 메뉴/계속 (처음부터 다시는 메뉴에서)', 'R-trigger drop · L-trigger boost · A ok · B menu/resume (restart from the menu)'), 36, y + 26);
   g.fillText(L2('Y 하부 카메라 · 왼쪽 스틱 누르기 카메라 전환 · 오른쪽 스틱 누르기 열화상', 'Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
   const vi = voiceInfo(), eng = commEngine(), au = AU.ctx ? AU.ctx.state : L2('없음', 'none');
@@ -5018,14 +5046,14 @@ function vrOsdDraw() {
   if (o && S.state !== 'replay') sh('▸ ' + (o.label || MS_NAME[S.kind] || ''), W2 / 2, 22, 42, '#ffc828', 'center');
   if (S.state === 'demo') sh(L2('기준 비행', 'REFERENCE FLIGHT'), W2 / 2, 22, 40, '#4fe3ff', 'center');
   if (ENV.ir) sh('IR', 40, 96, 34, '#ff9a40');
-  if (!isMission() && S.kind === 'course') sh('M84 ' + '●'.repeat(Math.max(0, S.payloads || 0)), 40, H2 - 70, 34, '#ffc828');
-  if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', W2 - 40, H2 - 252, 24, '#ffc828', 'right');
-  const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 980 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2, H2 - 112 + i * 36, 28, '#9fe9ff', 'center')); }
+  if (!isMission() && S.kind === 'course') sh('M84 ' + '●'.repeat(Math.max(0, S.payloads || 0)), 40, SET.vrPip ? H2 - 300 : H2 - 70, 34, '#ffc828');
+  if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', 40, H2 - 252, 24, '#ffc828');
+  const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 700 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2 - 60, H2 - 112 + i * 36, 28, '#9fe9ff', 'center')); }
   const m = $('objMsg'); if (m && m.classList.contains('show') && m.textContent.trim()) sh(m.textContent.trim(), W2 / 2, H2 / 2 + 90, 44, m.style.color || '#5dff9a', 'center');
-  // 등고선 지도 (화면 왼쪽 가운데)
-  if (SET.vrMap !== false && ui.map) { const mw = 198, mh = 330, mx = 26, my = 150; g.globalAlpha = 0.92; g.fillStyle = 'rgba(6,10,14,.75)'; g.fillRect(mx - 4, my - 4, mw + 8, mh + 8); g.filter = 'brightness(1.6) contrast(1.15)'; g.drawImage(ui.map, mx, my, mw, mh); g.filter = 'none'; g.globalAlpha = 1; g.strokeStyle = 'rgba(255,200,40,.8)'; g.lineWidth = 2; g.strokeRect(mx - 4, my - 4, mw + 8, mh + 8); }
+  // 등고선 지도 (PC 화면처럼 오른쪽 아래, 가운데 쪽으로 당겨 둠)
+  if (SET.vrMap !== false && ui.map) { const mw = 198, mh = 330, mx = W2 - 410, my = H2 - mh - 34; g.globalAlpha = 0.92; g.fillStyle = 'rgba(6,10,14,.75)'; g.fillRect(mx - 4, my - 4, mw + 8, mh + 8); g.filter = 'brightness(1.6) contrast(1.15)'; g.drawImage(ui.map, mx, my, mw, mh); g.filter = 'none'; g.globalAlpha = 1; g.strokeStyle = 'rgba(255,200,40,.8)'; g.lineWidth = 2; g.strokeRect(mx - 4, my - 4, mw + 8, mh + 8); }
   // 경로 안내 문구 (예: 고도 내리기 3.2 m (왼쪽 스틱 ↓))
-  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2, H2 - 200 + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
+  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2 - 60, H2 - 200 + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
   if (SET.vrCam !== 'chase') { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(W2 / 2 - 22, H2 / 2); g.lineTo(W2 / 2 - 7, H2 / 2); g.moveTo(W2 / 2 + 7, H2 / 2); g.lineTo(W2 / 2 + 22, H2 / 2); g.moveTo(W2 / 2, H2 / 2 + 7); g.lineTo(W2 / 2, H2 / 2 + 16); g.stroke(); }
   g.textAlign = 'left'; tex.needsUpdate = true;
 }
