@@ -216,6 +216,22 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 
 #vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:24px;color:#fff;text-align:center}#vrBack p{margin:0;max-width:420px;font-size:15px;line-height:1.5;color:#cfd6da;text-align:center}#vrBack a{color:#4fe3ff;text-align:center;font-size:15px}#vrBack button:disabled{opacity:.4}#vrBack button{padding:16px;font-size:20px}
 /* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
+#menuCard .wz{display:none}#menuCard[data-step="1"] .s1,#menuCard[data-step="2"] .s2,#menuCard[data-step="3"] .s3{display:block}
+#menuCard[data-step="1"]{max-width:620px}#menuCard[data-step="2"]{max-width:760px}
+.mmain.one{grid-template-columns:minmax(0,1fr)!important}
+.wzbar{display:flex;gap:6px;margin:4px 0 16px}.wzbar span{flex:1;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.05);font-size:12px;color:var(--mute);letter-spacing:.04em}
+#menuCard[data-step="1"] .wzbar [data-s="1"],#menuCard[data-step="2"] .wzbar [data-s="2"],#menuCard[data-step="3"] .wzbar [data-s="3"]{background:var(--amber);color:#111;font-weight:700}
+#menuCard[data-step="2"] .wzbar [data-s="1"],#menuCard[data-step="3"] .wzbar [data-s="1"],#menuCard[data-step="3"] .wzbar [data-s="2"]{color:#ffc828}
+#pilotName{width:100%;box-sizing:border-box;font-size:22px;padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:#fff;margin:6px 0}
+#pilotName:focus{outline:2px solid var(--amber);outline-offset:1px}
+.wzhint{font-size:12px;color:var(--mute);margin:2px 0 14px}
+.wzbtns{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}.wzbtns button{min-width:120px}.wzbtns .primary{padding:12px 22px;font-size:16px}
+.wzmid{display:flex;gap:8px}.wzwho{font-size:12px;color:var(--mute)}
+#wzVR{background:#1d2a33;border:1px solid #4fe3ff;color:#4fe3ff}#wzVR.hidden{display:none}
+.s2 .hangar .afcards{grid-template-columns:repeat(4,minmax(0,1fr))}.s2 .afStageW{aspect-ratio:auto;height:min(30vh,250px)}
+.wz .wzbtns{position:sticky;bottom:-16px;background:linear-gradient(transparent,rgba(14,18,22,.97) 30%);padding:14px 0 12px;z-index:3}
+.s3 .msStageW{max-height:34vh}
+.padinfo h3{margin:14px 0 6px}
 .mmain{display:grid;grid-template-columns:minmax(280px,350px) minmax(0,1fr);gap:18px;align-items:start}
 .hangar,.ops{min-width:0}
 .afStageW{--cc:#5aa9ff;position:relative;border:1px solid color-mix(in srgb,var(--cc) 40%,transparent);border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 50% 78%,color-mix(in srgb,var(--cc) 22%,#121a20),#080b0e 72%);aspect-ratio:4/3}
@@ -305,18 +321,32 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="rot" class="hidden"><div class="ph"></div><div>Please rotate your phone to landscape</div></div>
 
 <div id="menu" class="panel">
-  <div class="card" style="position:relative">
+  <div class="card" style="position:relative" id="menuCard" data-step="1">
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>Real-terrain drone obstacle course · web simulator (prototype v0.5)</h2>
-    <div id="sitePickWrap"><div class="pickLbl">Training site</div><div id="sitePick" class="sitepick"></div></div>
-    <div class="mmain">
+    <div class="wzbar"><span data-s="1">1 · Pilot</span><span data-s="2">2 · Drone</span><span data-s="3">3 · Course</span></div>
+    <section class="wz s1">
+      <div class="pickLbl">Pilot name</div>
+      <input id="pilotName" maxlength="16" placeholder="Name or call sign" autocomplete="off" spellcheck="false">
+      <p class="wzhint">Shown on records, the debrief and report photos.</p>
+      <div class="wzbtns"><span></span><button class="primary" id="wz1Next">Next ▶</button></div>
+      <div class="note">Speed, size and climb rate approximate public specifications; this training-concept simulator does not reproduce the real aircraft's flight characteristics. Airframe names indicate shape only.</div>
+    </section>
+    <div class="wz s2">
+      <div class="mmain one">
       <section class="hangar">
         <div class="pickLbl">Airframe <small>approximated from public specs</small></div>
         <div class="afStageW"><canvas id="afStage"></canvas><div id="afInfo" class="afinfo"></div></div>
         <div id="afStats" class="afstats"></div>
         <div id="afCards" class="afcards"></div>
       </section>
+      </div>
+      <div class="wzbtns"><button id="wz2Back">◀ Back</button><button id="wzVR" class="vrgo hidden">Fly in Quest VR</button><button class="primary" id="wz2Next">Next ▶</button></div>
+    </div>
+    <div class="wz s3">
+      <div id="sitePickWrap"><div class="pickLbl">Training site</div><div id="sitePick" class="sitepick"></div></div>
+      <div class="mmain one">
       <section class="ops">
         <div class="pickLbl">Mission <small>pick a group → tap a mission to preview → launch (tap twice to launch now)</small></div>
         <div id="msTabs" class="mstabs"><button data-g="basic">Getting started<small>Tutorial · core course</small></button><button data-g="skill">Flying skills<small>Forest · race · ridge</small></button><button data-g="mission">Missions<small>Recon · rescue · strike</small></button></div>
@@ -339,11 +369,15 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
           <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
+      </div>
+      <div class="wzbtns"><button id="wz3Back">◀ Drone</button><span class="wzmid"><button id="bOpt">⚙ Options</button><button id="bCtl">🎮 Controls</button></span><span id="wzWho" class="wzwho"></span></div>
     </div>
-    <div class="btns small" style="margin-top:10px">
-      <button id="bRec">Records · Replay</button><button id="bSet">SETTINGS</button><button id="bHelp">Controls</button><button id="bCred">Data sources</button><button id="bRC">Controller setup</button><button id="bFull">Full screen</button>
-      <span id="padStatus"></span>
-    </div>
+  </div>
+</div>
+
+<div id="optPanel" class="panel hidden">
+  <div class="card" style="max-width:760px">
+    <h1>OPTIONS</h1><h2>Options · flight mode, display and environment</h2>
     <div class="opt" style="margin-top:16px">
       <div>Difficulty <span class="seg" id="segDiff"><button data-v="train" class="on">Training</button><button data-v="easy">Easy</button><button data-v="atti">ATTI</button><button data-v="sport">Sport</button></span></div>
       <div>Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span></div>
@@ -352,16 +386,34 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <div>Wind <span class="seg" id="segWind"><button data-v="0" class="on">None</button><button data-v="1">Light 3 m/s</button><button data-v="2">Strong 7 m/s</button></span></div>
       <div>Guide <span class="seg" id="segGuide"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
     </div>
+    <div class="btns small" style="margin-top:14px">
+      <button id="bRec">Records · Replay</button><button id="bSet">SETTINGS</button><button id="bHelp">Controls</button><button id="bCred">Data sources</button><button id="bRC">Controller setup</button><button id="bFull">Full screen</button>
+      <span id="padStatus"></span>
+    </div>
+    <div class="btns" style="margin-top:18px"><button class="primary" id="optClose">Close</button></div>
+  </div>
+</div>
+
+<div id="ctlPanel" class="panel hidden">
+  <div class="card" style="max-width:820px">
+    <h1>CONTROLS</h1><h2>Controls · keyboard · gamepad · RC transmitter · touch</h2>
     <div class="deskOnly">
       <h3>KEYBOARD <button id="bKB2" class="mini">Change keys</button></h3>
       <div id="kbdMenu" class="kbd"></div>
+    </div>
+    <div class="padinfo">
+      <h3>Gamepad (Xbox / standard layout)</h3>
+      <div class="thumbs"><div><b>Left stick</b>↕ climb·descend · ↔ yaw (Mode 2)</div><div><b>Right stick</b>↕ forward·back · ↔ sideways</div></div>
+      <div class="note">A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause</div>
+      <h3>RC transmitter (USB joystick mode)</h3>
+      <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
     </div>
     <div class="touchOnly">
       <h3>TOUCH CONTROLS</h3>
       <div class="thumbs"><div><b>Left thumb</b>Press and drag on the left side<br>↕ climb·descend · ↔ yaw</div><div><b>Right thumb</b>Press and drag on the right side<br>↕ forward·back · ↔ strafe</div></div>
       <div class="note">DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD guide · ZM camera distance · ⛶ full screen · ❚❚ pause</div>
     </div>
-    <div class="note">Speed, size and climb rate approximate public specifications; this training-concept simulator does not reproduce the real aircraft's flight characteristics. Airframe names indicate shape only.</div>
+    <div class="btns" style="margin-top:18px"><button id="bHelp2">Full controls guide</button><button class="primary" id="ctlClose">Close</button></div>
   </div>
 </div>
 
@@ -542,7 +594,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=3903d9f1"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=3903d9f1"></script>
+<script src="sites/yeongin.js?v=487ad40e"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=487ad40e"></script>
 </body>
 </html>

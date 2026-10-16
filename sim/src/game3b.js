@@ -248,4 +248,5 @@ function toMenu() {
   $('rp').classList.add('hidden'); $('tut').classList.add('hidden'); ui.hud.classList.remove('replaying');
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   resetDrone(startPos(), startHead()); refreshBest();
+  if (typeof wizGo === 'function') wizGo(3);   // 비행 끝나고 돌아오면 코스 고르기 화면
 }

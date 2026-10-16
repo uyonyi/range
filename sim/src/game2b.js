@@ -162,6 +162,7 @@ let KBCAP = null;   // 키 지정 화면에서 다음 입력을 기다리는 기
 addEventListener('keydown', e => {
   if (KBCAP) { e.preventDefault(); e.stopPropagation(); kbCapture(e.code); return; }
   const inInput = e.target && e.target.tagName === 'INPUT';
+  if (inInput && e.target.type !== 'range') return;   // 이름 입력 중에는 게임 키로 쓰지 않음
   const act = Object.keys(KB).find(k => KB[k] === e.code);
   if (!inInput && (act || ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))) e.preventDefault();
   initAudio(); musicStart();

@@ -470,7 +470,7 @@ function photoAdd(c, label, xy, ok) {
 function missionPhoto() {
   if (!DR.alive) return;
   flashPhoto(); sfx('drop');
-  const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'), o = msObj();
+  const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ' · ' + pilotName(), o = msObj();
   const xyS = (d, s) => { const xy = to5186(d, s); return xy ? `X ${xy[0].toFixed(0)}  Y ${xy[1].toFixed(0)}` : ''; };
   if (S.kind === 'fire') {
     const f = MS.list.find(x => x.active && !x.done && x.inView);
@@ -515,7 +515,7 @@ function msFinish() {
     if (S.state !== 'run') return;
     S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden');
     const a = AFc(), total = S.t + S.pen, nm = MS_NAME[S.kind]; if ($('resTitle')) $('resTitle').textContent = 'MISSION COMPLETE';
-    ui.resSub.textContent = `${nm} · ${a.name} · ${MODES[SET.diff].name}`;
+    ui.resSub.textContent = `${pilotName()} · ${nm} · ${a.name} · ${MODES[SET.diff].name}`;
     const G = msGrade(total), rows = [['비행 시간', fmt(S.t)], ['벌점', '+' + S.pen.toFixed(0) + ' s'], ['합계', fmt(total)], ['충돌', S.impacts + ' 회']];
     if (S.kind === 'strike') rows.push(['명중', S.hitsS + ' / ' + STRIKE.filter(t => !t.decoy).length], [L2('기만체 타격', 'Decoys hit'), (S.decoyHit || 0) + L2(' 대', '')], ['기체 손실(빗나감)', (S.lost || 0) + ' 대'], ['평균 오차', (S.errS.reduce((x, y) => x + y, 0) / Math.max(1, S.errS.length)).toFixed(1) + ' m']);
     else if (S.lost) rows.push(['기체 손실', S.lost + ' 대']);
@@ -1452,6 +1452,31 @@ document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
   b.addEventListener('click', () => { const now = performance.now(), again = MENU.ms === b.dataset.ms && now - MENU.dbl < 450; MENU.dbl = now; if (again) menuGo(); else menuSel(b.dataset.ms); });
 });
 $('msGo').onclick = menuGo;
+// ---- 첫 화면 3단계: 1 조종사 이름 → 2 기체 → 3 코스 (각 단계 뒤로 가기) ----
+MENU.step = 1;
+try { SET.pilot = localStorage.getItem('hroc_pilot') || ''; } catch (e) { SET.pilot = ''; }
+function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
+function wizGo(n) {
+  n = Math.max(1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
+  if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('hroc_pilot', v); } catch (e) { } }
+  MENU.step = n; c.dataset.step = n; closePanels();
+  if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
+  if (n === 2) { afUI(); }
+  if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; }
+  try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+  if (ui.menu) ui.menu.scrollTop = 0;
+}
+if ($('pilotName')) { $('pilotName').value = SET.pilot || ''; $('pilotName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wizGo(2); } }); }
+[['wz1Next', 2], ['wz2Back', 1], ['wz2Next', 3], ['wz3Back', 2]].forEach(([id, n]) => { if ($(id)) $(id).onclick = () => wizGo(n); });
+if ($('bOpt')) $('bOpt').onclick = () => openPanel('optPanel');
+if ($('bCtl')) $('bCtl').onclick = () => { openPanel('ctlPanel'); try { kbHelp(); } catch (e) { } };
+if ($('optClose')) $('optClose').onclick = () => closePanels();
+if ($('ctlClose')) $('ctlClose').onclick = () => closePanels();
+if ($('bHelp2')) $('bHelp2').onclick = () => openPanel('helpPanel');
+if ($('bRC2')) $('bRC2').onclick = () => { closePanels(); rcOpen(); };
+if ($('wzVR')) $('wzVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
+setInterval(() => { const a = $('padStatus'), b = $('padStatus2'); if (a && b) b.textContent = a.textContent; }, 1000);
+setTimeout(() => wizGo(1), 0);
 // ---- 임무 현장 미리 보기 (메뉴 뒤 카메라) ----
 function menuShow(k) {
   Object.values(MSG).forEach(g => g.visible = false);
@@ -1544,7 +1569,7 @@ function menuRenderPost() {
 }
 document.addEventListener('keydown', e => {
   if (S.state !== 'menu' || ui.menu.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) return;
-  if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
+  if (MENU.step !== 3 || ['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel', 'optPanel', 'ctlPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
   // 좌우: 같은 종류 안에서 · 위아래: 종류 바꾸기
   if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { const gi = MS_GRP.indexOf(MENU.g || 'basic'), d = e.code === 'ArrowUp' ? -1 : 1; menuTab(MS_GRP[(gi + d + MS_GRP.length) % MS_GRP.length]); e.preventDefault(); return; }
   const L = msInGrp(MENU.g || 'basic'), i = L.indexOf(MENU.ms), d = e.code === 'ArrowLeft' ? -1 : 1;
@@ -1933,7 +1958,7 @@ function vrPageInit() {
 }
 function vrBtnUpdate() {   // PC 판: VR 기기에서 열면 VR 판으로 가는 버튼
   const b = $('msGoVR'); if (!b) return;
-  b.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL);
+  b.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL); const w = $('wzVR'); if (w) w.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL);
   b.textContent = L2('Quest VR 버전 열기', 'Open the Quest VR version');
 }
 if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
