@@ -19,6 +19,7 @@ EN = {
 '마지막 비행 리플레이': 'Last-flight replay',
 '설정': 'SETTINGS',
 '조종 난이도': 'Difficulty',
+'스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span>': 'Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span>',
 '입문': 'Training',
 '쉬움': 'Easy',
 '스포츠': 'Sport',

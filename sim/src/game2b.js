@@ -187,6 +187,9 @@ function calAxis(gp, i) {
   const v = raw >= c.c ? (raw - c.c) / Math.max(c.max - c.c, 1e-3) : (raw - c.c) / Math.max(c.c - c.min, 1e-3);
   return clamp(v, -1, 1);
 }
+// 스틱 곡선: real = 거의 선형(민 만큼 기울기·속도, 실제 조종기 기본값에 가까움) · soft = 가운데가 무딘 엑스포
+function stickExpo(vr) { return SET.expo || (vr ? 'real' : 'soft'); }
+function stickCurve(v, dz, vr) { if (stickExpo(vr) !== 'real') return shape(v, dz); if (Math.abs(v) < dz) return 0; const s = (Math.abs(v) - dz) / (1 - dz); return Math.sign(v) * Math.min(1, 0.8 * s + 0.2 * s * s * s); }
 function shape(v, deadz) { if (Math.abs(v) < deadz) return 0; const s = (Math.abs(v) - deadz) / (1 - deadz); return Math.sign(v) * (0.4 * s + 0.6 * s * s * s); }
 const padPrevBtn = {};
 function btnState(gp, b) {
@@ -208,14 +211,14 @@ function readInput(dt) {
     const st = {};
     for (const k of ['thr', 'yaw', 'pitch', 'roll']) {
       const a = RC.axes[k]; let v = calAxis(gp, a.i); if (a.inv) v = -v;
-      st[k] = shape(v, k === 'thr' && RC.thrType === 'bottom' ? 0.12 : 0.07);
+      st[k] = stickCurve(v, k === 'thr' && RC.thrType === 'bottom' ? 0.12 : 0.07, false);
     }
     const any = Math.abs(st.thr) + Math.abs(st.yaw) + Math.abs(st.roll) + Math.abs(st.pitch) > 0.02;
     if (any) { for (const k in st) if (Math.abs(st[k]) > Math.abs(IN[k])) IN[k] = st[k]; IN.src = 'PAD'; }
     const map = { drop: 'Space', cam: 'KeyC', reset: 'KeyR' };
     for (const k in map) { const s = btnState(gp, RC.btn[k]); if (s && !padPrevBtn[k]) pressed.push(map[k]); padPrevBtn[k] = s; }
     const sb = gp.buttons[9] && gp.buttons[9].pressed; if (sb && !padPrevBtn.start) pressed.push('Escape'); padPrevBtn.start = sb;
-    if (gp.buttons[6] && gp.buttons[6].value > 0.4) IN.boost = true;
+    if (gp.buttons[6] && gp.buttons[6].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
     if (gp.mapping === 'standard') {   // Xbox / 표준 배치 추가 버튼
       const ex = { rt: [7, 'Space'], lb: [4, 'PadLB'], rb: [5, 'PadRB'], x: [2, 'KeyH'], back: [8, 'KeyG'], up: [12, 'PadUp'], down: [13, 'PadDown'], left: [14, 'PadLeft'], right: [15, 'PadRight'], a: [0, 'PadA'] };
       for (const k in ex) { const bt = gp.buttons[ex[k][0]]; const s = !!(bt && (bt.pressed || bt.value > 0.5)); if (s && !padPrevBtn['x' + k]) pressed.push(ex[k][1]); padPrevBtn['x' + k] = s; }

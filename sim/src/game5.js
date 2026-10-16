@@ -28,7 +28,7 @@ function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' |
 // 난이도 + 기체 -> 비행 특성
 function effMode() {
   const m = MODES[SET.diff], a = AFc(); if (a.id === 'x2d') return m;
-  const o = Object.assign({}, m); o.vmax = a.vmax[SET.diff]; o.maxTilt = a.tilt[SET.diff] * DEG;
+  const o = Object.assign({}, m), dk = a.vmax[SET.diff] ? SET.diff : 'easy'; o.vmax = a.vmax[dk]; o.maxTilt = a.tilt[dk] * DEG;
   o.yawRate = a.yaw * DEG * (SET.diff === 'train' ? 0.45 : SET.diff === 'easy' ? 0.7 : 1);
   if (a.acro && SET.acro && SET.diff === 'sport') { o.althold = false; o.acro = true; o.brake = 0; }
   return o;
@@ -679,6 +679,9 @@ function envTick(dt) {
   }
 }
 document.querySelectorAll('#segTime button').forEach(b => b.addEventListener('click', () => { SET.night = b.dataset.v === '1'; ENV.night = SET.night; saveSet(); envApply(); if (ENV.ir) { irSet(false); } syncTime(); }));
+function syncExpo() { document.querySelectorAll('#segExpo button').forEach(x => x.classList.toggle('on', x.dataset.v === stickExpo(false))); }
+document.querySelectorAll('#segExpo button').forEach(b => b.addEventListener('click', () => { SET.expo = b.dataset.v; saveSet(); syncExpo(); }));
+syncExpo();
 function syncHud() { document.querySelectorAll('#segHud button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.hud || 'auto'))); }
 document.querySelectorAll('#segHud button').forEach(b => b.addEventListener('click', () => { SET.hud = b.dataset.v; saveSet(); syncHud(); }));
 syncHud();
@@ -1574,7 +1577,7 @@ VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBas
 { const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.414), new THREE.MeshBasicMaterial({ color: 0xffc828 })); fr.position.z = -0.001; VR_PIP.m.add(fr); }
 const VR_MAP = (function () { const t = new THREE.CanvasTexture(ui.map); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.833), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.95, toneMapped: false }));
   m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); m.visible = false; VR_SCR.add(m); return { t, m }; })();
-const VR_MENU = vrPlane(1.3, 1.3 * 1220 / 1024, 1024, 1220); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
+const VR_MENU = vrPlane(1.3, 1.3 * 1280 / 1024, 1024, 1280); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
 // 컨트롤러 광선
 for (let i = 0; i < 2; i++) {
   const c = renderer.xr.getController(i); VRS.add(c);
@@ -1668,9 +1671,9 @@ function xrInput(dt) {
   if (SET.vrMode === 3) st = vrHeadSteer(dt, lx, ly, rx, ry);
   else IN.head = false;
   let any = false;
-  for (const k in st) { const v = SET.vrMode === 3 ? st[k] : shape(st[k], 0.1); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
+  for (const k in st) { const v = SET.vrMode === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
-  if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4) IN.boost = true;
+  if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 A = 사진
   if (B) vrMenuOpen();
@@ -1732,13 +1735,14 @@ function vrMenuDraw() {
   const afN = id => ({ x2d: 'Skydio X2D', anafi: 'ANAFI', fpv: L2('FPV 레이싱', 'FPV racer'), kfpv: L2('자폭 FPV', 'Kamikaze FPV'), fw: 'RQ-11 Raven', puma: 'RQ-20 Puma', kfw: L2('자폭 고정익', 'Loitering wing') })[id];
   row(y, L2('기체', 'Drone')); VR_AF.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
   row(y, L2('고정익', 'Fixed-wing')); VR_AFW.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
-  row(y, L2('난이도', 'Difficulty')); [['train', L2('입문', 'Training')], ['easy', L2('쉬움', 'Easy')], ['sport', L2('스포츠', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
+  row(y, L2('비행 모드', 'Flight mode')); [['train', L2('입문', 'Training')], ['easy', L2('쉬움 (P)', 'Easy (P)')], ['atti', 'ATTI'], ['sport', L2('스포츠', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
   row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
   row(y, L2('카메라', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('하부 카메라', 'Lower cam')); [[0, L2('끔', 'Off')], [90, '90°'], [60, '60°'], [45, '45°']].forEach(([v, n], i) => btn('pip:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrPip | 0) === v)); y += RH;
   row(y, L2('환경', 'Light')); [['day', L2('낮', 'Day'), !SET.night && !ENV.ir], ['night', L2('밤', 'Night'), !!SET.night && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
   btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
+  row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
   row(y, L2('계기', 'Instruments')); [['auto', L2('자동', 'Auto')], ['fpv', L2('간단 (FPV)', 'Simple (FPV)')], ['uas', L2('항공 (UAS)', 'Aviation (UAS)')]].forEach(([v, n], i) => btn('hud:' + v, 190 + i * 200, y, 188, RW, n + (v === 'auto' ? ' · ' + (hudMode() === 'uas' ? 'UAS' : 'FPV') : ''), (SET.hud || 'auto') === v)); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
   g.fillText((SET.vrMode === 3 ? L2('머리 방향: 보는 쪽으로 비행 · 왼쪽 스틱 앞뒤 속도 · 오른쪽 스틱 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : (SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
@@ -1749,7 +1753,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('없음 · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR14', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR15', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -1779,6 +1783,7 @@ function vrMenuClick(hand) {
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
   if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
   if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('expo:')) { SET.expo = id.slice(5); saveSet(); syncExpo(); return; }
   if (id.startsWith('hud:')) { SET.hud = id.slice(4); saveSet(); syncHud(); return; }
   if (id.startsWith('pip:')) { SET.vrPip = +id.slice(4); saveSet(); return; }
   if (id.startsWith('env:')) { vrEnv(id.slice(4)); return; }

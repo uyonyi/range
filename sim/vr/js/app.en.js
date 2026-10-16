@@ -1708,6 +1708,9 @@ function calAxis(gp, i) {
   const v = raw >= c.c ? (raw - c.c) / Math.max(c.max - c.c, 1e-3) : (raw - c.c) / Math.max(c.c - c.min, 1e-3);
   return clamp(v, -1, 1);
 }
+// 스틱 곡선: real = 거의 선형(민 만큼 기울기·속도, 실제 조종기 Defaults에 가까움) · soft = 가운데가 무딘 엑스포
+function stickExpo(vr) { return SET.expo || (vr ? 'real' : 'soft'); }
+function stickCurve(v, dz, vr) { if (stickExpo(vr) !== 'real') return shape(v, dz); if (Math.abs(v) < dz) return 0; const s = (Math.abs(v) - dz) / (1 - dz); return Math.sign(v) * Math.min(1, 0.8 * s + 0.2 * s * s * s); }
 function shape(v, deadz) { if (Math.abs(v) < deadz) return 0; const s = (Math.abs(v) - deadz) / (1 - deadz); return Math.sign(v) * (0.4 * s + 0.6 * s * s * s); }
 const padPrevBtn = {};
 function btnState(gp, b) {
@@ -1729,14 +1732,14 @@ function readInput(dt) {
     const st = {};
     for (const k of ['thr', 'yaw', 'pitch', 'roll']) {
       const a = RC.axes[k]; let v = calAxis(gp, a.i); if (a.inv) v = -v;
-      st[k] = shape(v, k === 'thr' && RC.thrType === 'bottom' ? 0.12 : 0.07);
+      st[k] = stickCurve(v, k === 'thr' && RC.thrType === 'bottom' ? 0.12 : 0.07, false);
     }
     const any = Math.abs(st.thr) + Math.abs(st.yaw) + Math.abs(st.roll) + Math.abs(st.pitch) > 0.02;
     if (any) { for (const k in st) if (Math.abs(st[k]) > Math.abs(IN[k])) IN[k] = st[k]; IN.src = 'PAD'; }
     const map = { drop: 'Space', cam: 'KeyC', reset: 'KeyR' };
     for (const k in map) { const s = btnState(gp, RC.btn[k]); if (s && !padPrevBtn[k]) pressed.push(map[k]); padPrevBtn[k] = s; }
     const sb = gp.buttons[9] && gp.buttons[9].pressed; if (sb && !padPrevBtn.start) pressed.push('Escape'); padPrevBtn.start = sb;
-    if (gp.buttons[6] && gp.buttons[6].value > 0.4) IN.boost = true;
+    if (gp.buttons[6] && gp.buttons[6].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
     if (gp.mapping === 'standard') {   // Xbox / 표준 배치 추가 버튼
       const ex = { rt: [7, 'Space'], lb: [4, 'PadLB'], rb: [5, 'PadRB'], x: [2, 'KeyH'], back: [8, 'KeyG'], up: [12, 'PadUp'], down: [13, 'PadDown'], left: [14, 'PadLeft'], right: [15, 'PadRight'], a: [0, 'PadA'] };
       for (const k in ex) { const bt = gp.buttons[ex[k][0]]; const s = !!(bt && (bt.pressed || bt.value > 0.5)); if (s && !padPrevBtn['x' + k]) pressed.push(ex[k][1]); padPrevBtn['x' + k] = s; }
@@ -1756,13 +1759,15 @@ function rumble(strong, weak, ms) {
 const MODES = {
   train: { name: 'TRAINING', maxTilt: 25 * DEG, vmax: 9, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
   easy: { name: 'EASY', maxTilt: 32 * DEG, vmax: 12, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
+  // ATTI: 위치 유지(GPS) None · 놓아도 안 멈추고 관성·바람으로 흐름 · altitude hold만 · Boost None → 스틱을 민 만큼(기울기) 속도가 남
+  atti: { name: 'ATTI', maxTilt: 30 * DEG, vmax: 12, yawRate: 110 * DEG, althold: true, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 3, atti: true },
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.4, h: 0.8, fov: 56 }];   // 추적 Camera distance (멀리·보통·가까이)
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrScreen: 'head', vrCam: 'fpv', vrPip: 0, vrMap: true };
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, hud: SET.hud })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, hud: SET.hud, expo: SET.expo })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -1908,11 +1913,11 @@ function stepDrone(dt) {
   if (AFc().cls === 'wing') { stepWing(dt); return; }
   const md = effMode(), afc = AFc();
   const grounded = DR.landed && IN.thr <= 0.05;
-  const boost = !!IN.boost && !grounded && boostZone(); S.boosting = boost;
+  const boost = !!IN.boost && !grounded && boostZone() && !md.atti; S.boosting = boost;
   const vmaxB = boost ? Math.max(md.vmax, afc.top) : md.vmax, tiltB = md.maxTilt + (boost ? 15 * DEG : 0);
   const k = G * Math.tan(tiltB) / vmaxB;
   // 반응: 실제 기체처럼 1초 안팎에 속도가 붙고 멈추도록 (최고 속도는 그대로, 가속·감속만 빠르게)
-  const kk = Math.max(k, 1 / (SET.diff === 'train' ? 1.25 : SET.diff === 'easy' ? 1.0 : 0.85)), ksc = kk / k;
+  const kk = md.atti ? k : Math.max(k, 1 / (SET.diff === 'train' ? 1.25 : SET.diff === 'easy' ? 1.0 : 0.85)), ksc = kk / k;   // ATTI: 공기 저항만으로 천천히 멈춤
   const a = 1 - Math.exp(-dt / 0.11);
   const stun = S.stun > 0 ? 0.25 : 1;
   let ip = IN.pitch * stun, ir = IN.roll * stun, iy = IN.yaw * stun;
@@ -3486,7 +3491,7 @@ function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' |
 // Difficulty + 기체 -> FLIGHT 특성
 function effMode() {
   const m = MODES[SET.diff], a = AFc(); if (a.id === 'x2d') return m;
-  const o = Object.assign({}, m); o.vmax = a.vmax[SET.diff]; o.maxTilt = a.tilt[SET.diff] * DEG;
+  const o = Object.assign({}, m), dk = a.vmax[SET.diff] ? SET.diff : 'easy'; o.vmax = a.vmax[dk]; o.maxTilt = a.tilt[dk] * DEG;
   o.yawRate = a.yaw * DEG * (SET.diff === 'train' ? 0.45 : SET.diff === 'easy' ? 0.7 : 1);
   if (a.acro && SET.acro && SET.diff === 'sport') { o.althold = false; o.acro = true; o.brake = 0; }
   return o;
@@ -4137,6 +4142,9 @@ function envTick(dt) {
   }
 }
 document.querySelectorAll('#segTime button').forEach(b => b.addEventListener('click', () => { SET.night = b.dataset.v === '1'; ENV.night = SET.night; saveSet(); envApply(); if (ENV.ir) { irSet(false); } syncTime(); }));
+function syncExpo() { document.querySelectorAll('#segExpo button').forEach(x => x.classList.toggle('on', x.dataset.v === stickExpo(false))); }
+document.querySelectorAll('#segExpo button').forEach(b => b.addEventListener('click', () => { SET.expo = b.dataset.v; saveSet(); syncExpo(); }));
+syncExpo();
 function syncHud() { document.querySelectorAll('#segHud button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.hud || 'auto'))); }
 document.querySelectorAll('#segHud button').forEach(b => b.addEventListener('click', () => { SET.hud = b.dataset.v; saveSet(); syncHud(); }));
 syncHud();
@@ -5032,7 +5040,7 @@ VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBas
 { const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.414), new THREE.MeshBasicMaterial({ color: 0xffc828 })); fr.position.z = -0.001; VR_PIP.m.add(fr); }
 const VR_MAP = (function () { const t = new THREE.CanvasTexture(ui.map); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.833), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.95, toneMapped: false }));
   m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); m.visible = false; VR_SCR.add(m); return { t, m }; })();
-const VR_MENU = vrPlane(1.3, 1.3 * 1220 / 1024, 1024, 1220); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
+const VR_MENU = vrPlane(1.3, 1.3 * 1280 / 1024, 1024, 1280); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
 // 컨트롤러 광선
 for (let i = 0; i < 2; i++) {
   const c = renderer.xr.getController(i); VRS.add(c);
@@ -5126,9 +5134,9 @@ function xrInput(dt) {
   if (SET.vrMode === 3) st = vrHeadSteer(dt, lx, ly, rx, ry);
   else IN.head = false;
   let any = false;
-  for (const k in st) { const v = SET.vrMode === 3 ? st[k] : shape(st[k], 0.1); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
+  for (const k in st) { const v = SET.vrMode === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
-  if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4) IN.boost = true;
+  if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 A = 사진
   if (B) vrMenuOpen();
@@ -5190,13 +5198,14 @@ function vrMenuDraw() {
   const afN = id => ({ x2d: 'Skydio X2D', anafi: 'ANAFI', fpv: L2('FPV racer', 'FPV racer'), kfpv: L2('Kamikaze FPV', 'Kamikaze FPV'), fw: 'RQ-11 Raven', puma: 'RQ-20 Puma', kfw: L2('Loitering fixed-wing', 'Loitering wing') })[id];
   row(y, L2('기체', 'Drone')); VR_AF.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
   row(y, L2('고정익', 'Fixed-wing')); VR_AFW.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
-  row(y, L2('Difficulty', 'Difficulty')); [['train', L2('Training', 'Training')], ['easy', L2('Easy', 'Easy')], ['sport', L2('Sport', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
+  row(y, L2('FLIGHT 모드', 'Flight mode')); [['train', L2('Training', 'Training')], ['easy', L2('Easy (P)', 'Easy (P)')], ['atti', 'ATTI'], ['sport', L2('Sport', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
   row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
   row(y, L2('Camera', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('하부 Camera', 'Lower cam')); [[0, L2('Off', 'Off')], [90, '90°'], [60, '60°'], [45, '45°']].forEach(([v, n], i) => btn('pip:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrPip | 0) === v)); y += RH;
   row(y, L2('환경', 'Light')); [['day', L2('낮', 'Day'), !SET.night && !ENV.ir], ['night', L2('밤', 'Night'), !!SET.night && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
   btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
+  row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
   row(y, L2('계기', 'Instruments')); [['auto', L2('자동', 'Auto')], ['fpv', L2('간단 (FPV)', 'Simple (FPV)')], ['uas', L2('항공 (UAS)', 'Aviation (UAS)')]].forEach(([v, n], i) => btn('hud:' + v, 190 + i * 200, y, 188, RW, n + (v === 'auto' ? ' · ' + (hudMode() === 'uas' ? 'UAS' : 'FPV') : ''), (SET.hud || 'auto') === v)); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
   g.fillText((SET.vrMode === 3 ? L2('머리 방향: 보는 쪽으로 FLIGHT · Left stick 앞뒤 속도 · Right stick 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : (SET.vrMode || 2) === 2 ? L2('모드 2: Left stick Climb·yaw / Right stick 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: Left stick 전후·yaw / Right stick Climb·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
@@ -5207,7 +5216,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR14', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR15', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -5237,6 +5246,7 @@ function vrMenuClick(hand) {
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
   if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
   if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('expo:')) { SET.expo = id.slice(5); saveSet(); syncExpo(); return; }
   if (id.startsWith('hud:')) { SET.hud = id.slice(4); saveSet(); syncHud(); return; }
   if (id.startsWith('pip:')) { SET.vrPip = +id.slice(4); saveSet(); return; }
   if (id.startsWith('env:')) { vrEnv(id.slice(4)); return; }
