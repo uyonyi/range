@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <title>FPV Terrain Trainer</title>
 <script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="ko")location.replace("en.html")}catch(e){}</script>
+<script>/* 주소 끝에 ?reset 을 붙이면 저장된 설정을 지움 */try{if(/[?&]reset/.test(location.search)){Object.keys(localStorage).forEach(function(k){if(/_fpv_settings$|_fpv_keys2$|_fpv_rc$|_menu_ms$/.test(k))localStorage.removeItem(k)});}}catch(e){}</script>
+<script>/* 실행 오류를 화면에 표시 (기기에서 원인 확인용) */(function(){var shown=0;function show(m){if(shown++>2)return;try{var d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#3a0d0d;color:#ffd0d0;border:1px solid #ff6060;border-radius:8px;padding:8px 10px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:30vh;overflow:auto';(document.body||document.documentElement).appendChild(d);}d.textContent+=(d.textContent?'\n':'')+'⚠ '+m;var v=document.getElementById('vrBackD');if(v)v.textContent='오류: '+m;}catch(e){}}
+window.addEventListener('error',function(e){show((e.message||'error')+(e.filename?' @ '+String(e.filename).split('/').pop()+':'+e.lineno:''));});window.addEventListener('unhandledrejection',function(e){var r=e.reason;if(r&&/radio_voice|fetch/i.test(String(r)))return;show('promise: '+(r&&r.message||r));});})();</script>
 <style>
 :root{--amber:#ffc828;--cyan:#4fe3ff;--red:#ff4d4d;--green:#5dff9a;--panel:rgba(10,13,16,.78);--line:rgba(255,255,255,.14);--text:#eef2f4;--mute:#9aa6ad}
 *{box-sizing:border-box}
