@@ -42,6 +42,7 @@ GitHub Pages 주소: `https://uyonyi.github.io/range/sim/` (영문: `en.html`)
 | 나무·능선 경로 | 정사영상·DEM 자체 처리 |
 | 기체 제원 | Skydio X2D 데이터시트, Parrot ANAFI USA 백서, 미 해군 Group 1 sUAS 제원표, 미 공군 RQ-11B 제원표 |
 | 라이브러리 | three.js · geotiff.js · proj4js (MIT) |
+| 무전 음성 | Kokoro-82M (hexgrad, Apache-2.0) 음성 am_michael 으로 미리 만든 문장 조각 — `lib/radio_voice.bin/.json` (생성: `tools/voice/`, kokoro-onnx MIT) |
 | 무전 음성 대체 | meSpeak / speak.js / eSpeak (GNU GPL v3) — `lib/tts-worker.js`, 기기에 영어 음성이 없을 때만 불러옴 (빌드: `tools/tts/worker.js`, esbuild) |
 
 화면에서는 첫 화면 **데이터 출처** 버튼과 화면 왼쪽 아래 작은 표시로 볼 수 있습니다.

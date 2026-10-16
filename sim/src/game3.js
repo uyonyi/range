@@ -146,6 +146,8 @@ function openingOf(o) {
 //  physics
 // =====================================================================
 const FWD = new V3(), RGT = new V3(), _ax = new V3(), _ay = new V3();
+// 수색 과제: 구역(o.search) 안에 들어오면 정확한 위치 안내를 끔 (눈·열화상으로 찾기)
+function searchIn(o, p) { return !!(o && o.search && o.mk && p && Math.hypot(o.mk.x - p.x, o.mk.z - p.z) < o.search.r); }
 function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 function stepDrone(dt) {
   if (!DR.alive) { deadTick(dt); return; }
@@ -171,7 +173,7 @@ function stepDrone(dt) {
   if (!grounded) {
     DR.h += iy * md.yawRate * dt;
     // 자동 방향 보조 (입문): 회전 입력이 없으면 다음 과제 쪽으로 천천히 돌아감
-    if (md.autoYaw && assistOn && !IN.head && o && o.mk && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
+    if (md.autoYaw && assistOn && !IN.head && o && o.mk && !o.search && Math.abs(iy) < 0.05 && (Math.abs(ip) > 0.1 || Math.hypot(DR.v.x, DR.v.z) > 1.2)) {
       const op = openingOf(o); let tp = o.mk;
       if (op) tp = op.b.world(op.lx, op.ly - 0.0, op.lz);
       if (GUIDE.next) tp = GUIDE.next;
@@ -260,7 +262,9 @@ function dropPayload(fromPos, fromVel, ghost) {
   if (!ghost && S.kind === 'course' && S.payloads <= 0) { showMsg('NO PAYLOAD', '#ff6060', 1); sfx('bad'); return; }
   const can = meshes.find(c => c.visible); if (can) can.visible = false;
   if (!ghost && S.kind === 'course') S.payloads--;
-  if (!ghost && (S.kind === 'free' || S.kind === 'tutorial' || S.kind === 'sar') && !meshes.some(c => c.visible)) setTimeout(() => droneM.cans.forEach(c => c.visible = true), 1500);
+  if (!ghost && S.kind === 'tutorial' && !meshes.some(c => c.visible)) setTimeout(() => droneM.cans.forEach(c => c.visible = true), 1500);   // 연습(튜토리얼)만 자동 보충
+  if (!ghost && S.kind === 'free' && !can) { showMsg(L2x('투하물 없음 · 착륙하면 재장전', 'No payload · land to reload'), '#ff6060', 1.2); sfx('bad'); return; }
+  if (!ghost && S.kind === 'sar') { if ((S.kits | 0) <= 0) { showMsg(L2x('구조 키트 없음', 'No rescue kits left'), '#ff6060', 1.2); sfx('bad'); return; } S.kits--; }
   if (!ghost) recEvent({ k: 'drop', p: [fromPos.x, fromPos.y, fromPos.z], v: [fromVel.x, fromVel.y, fromVel.z] });
   const kit = S.kind === 'sar';
   const m = kit ? new THREE.Mesh(UBOX, mat(0xff6a00, { roughness: 0.7 })) : new THREE.Mesh(UCYL, mat(0x7c8288, { roughness: 0.45, metalness: 0.5 })); if (kit) m.scale.set(0.12, 0.08, 0.16); else m.scale.set(0.022, 0.12, 0.022); m.castShadow = true;
@@ -307,18 +311,24 @@ function nearestTarget(pos, mitT) {
 }
 function evalDrop(pos, hitObj) {
   const o = curObj();
-  if (!o || o.kind !== 'drop') { refundPayload(o && o.kind === 'orbit' ? 'ORBIT FIRST · 먼저 탱크를 한 바퀴 도세요' : 'NOT A DROP TASK · 탑재물 회수'); return; }
+  if (!o || o.kind !== 'drop') { refundPayload(o && o.kind === 'orbit' ? 'ORBIT FIRST · 투하물 낭비' : 'NOT A DROP TASK · 투하물 낭비'); return; }
   const r = targetEval(o.target, pos, hitObj);
   if (r.hit) { S.hits++; rumble(0.5, 1.0, 160); completeObj(1, `${r.name} HIT ✓`); return; }
-  if (r.d > 25) { refundPayload(`TOO FAR (${r.d.toFixed(0)} m) · 탑재물 회수`); return; }
+  if (r.d > 25) { refundPayload(`TOO FAR (${r.d.toFixed(0)} m) · 투하물 낭비`); return; }
   if (S.kind === 'tutorial') { showMsg(`MISS ${r.d.toFixed(1)} m · 다시 시도`, '#ff9a40', 1.6); sfx('bad'); return; }
   // 한 번 투하하면 맞든 안 맞든 다음 과제로 (빗나가면 +10초)
   S.pen += S.kind === 'course' ? 10 : 0; S.misses++;
   completeObj(2, `MISS ${r.d.toFixed(1)} m${S.kind === 'course' ? ' · +10s' : ''} → NEXT`, '#ff9a40');
 }
-function refundPayload(msg) {
-  if (S.kind === 'course') { S.payloads = Math.min(3, S.payloads + 1); const c = droneM.cans.find(c => !c.visible); if (c) c.visible = true; }
-  showMsg(msg, '#ffc828', 1.8); sfx('bad');
+function refundPayload(msg) {   // 실제처럼: 한 번 떨어뜨린 투하물은 돌아오지 않음 (튜토리얼만 보충)
+  if (S.kind === 'tutorial') { S.payloads = Math.min(3, S.payloads + 1); const c = droneM.cans.find(c => !c.visible); if (c) c.visible = true; }
+  showMsg(msg + (S.kind === 'course' ? L2x(` · 남은 ${S.payloads}개`, ` · ${S.payloads} left`) : ''), '#ffc828', 1.8); sfx('bad');
+}
+function L2x(ko, en) { return window.SIM_LANG === 'en' ? en : ko; }
+// 자유 비행: 착륙해서 2초 있으면 재장전
+function reloadTick(dt) {
+  if (S.state !== 'run' || S.kind !== 'free' || !AFc().drop || !DR.landed || droneM.cans.every(c => c.visible)) { S.reloadT = 0; return; }
+  S.reloadT = (S.reloadT || 0) + dt; if (S.reloadT >= 2) { droneM.cans.forEach(c => c.visible = true); S.reloadT = 0; showMsg(L2x('재장전 완료', 'Reloaded'), '#5dff9a', 1.2); sfx('good'); }
 }
 // 부스트: 켜기/끄기 (어디서나 사용). 켜면 기체 최고 속도까지
 const BOOST = { on: false };
@@ -555,7 +565,8 @@ function drawMap(gpos) {
   const g = ui.map.getContext('2d'); g.clearRect(0, 0, 180, 300); g.drawImage(mapBg, 0, 0);
   const toDS = p => [-p.z, p.x];
   const o = curObj();
-  if (o && o.mk) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
+  if (o && o.mk && o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s), q = mxy(d + o.search.r, s), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.9)'; g.fillStyle = 'rgba(255,200,40,.14)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill(); g.stroke(); g.setLineDash([]); }
+  else if (o && o.mk) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
   if (gpos) { const [d, s] = toDS(gpos); const p = mxy(d, s); g.fillStyle = '#4fe3ff'; g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fill(); }
   if (S.state !== 'demo') {
     const src = S.state === 'replay' ? RP.pose : DR;
@@ -636,11 +647,11 @@ function updateHUD(dt, subj) {
   msgTimer -= dt; if (msgTimer <= 0) ui.objMsg.classList.remove('show');
   const spd = subj.v ? subj.v.length() * 3.6 : 0;
   const o = curObj();
-  const dist = o && o.mk ? o.mk.distanceTo(subj.p) : null;
+  const sIn = searchIn(o, subj.p), dist = o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : o.mk.distanceTo(subj.p)) : null;
   const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : (S.kind === 'course' || isMission()) ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
   ui.osd.innerHTML = `<div class="big">${fmt(tm)}${(S.kind === 'course' || isMission()) && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
     `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span style="color:#9aa6ad;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
-    (dist !== null ? `<div><b>DIST</b>${dist.toFixed(0)} m</div>` : '') +
+    (dist !== null ? `<div><b>${o.search ? 'AREA' : 'DIST'}</b>${dist.toFixed(0)} m</div>` : sIn ? `<div style="color:#ffc828">${L2x('수색 구역 안', 'IN SEARCH AREA')}</div>` : '') +
     (S.kind === 'course' ? `<div><b>HIT</b>${S.impacts}</div>` : '') +
     (o && o.kind === 'orbit' ? `<div style="color:#4fe3ff">ORBIT ${Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0)}%</div>` : '') +
     (S.state === 'run' && (isMission() || AFc().cls === 'wing') ? msOsd() : '') + (S.state === 'run' ? windOsd(subj.p) : '') +
@@ -654,9 +665,9 @@ function updateHUD(dt, subj) {
   else if (S.state === 'replay') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REPLAY <small>${RP.rec.kind === 'course' ? MODES[RP.rec.diff] ? MODES[RP.rec.diff].name : '' : 'FREE'} ×${RP.speed}</small>`; }
   else if (S.kind === 'demo') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REFERENCE FLIGHT <small>${fmt(S.ghostT)} / ${fmt(GH.total)}</small>`; }
   else ui.objNext.style.display = 'none';
-  const n = S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
-  ui.payload.innerHTML = 'M84 ' + [0, 1, 2].map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
-  if (o && o.mk && S.state === 'run' && DR.alive) {
+  const kitM = S.kind === 'sar' && S.state === 'run', n = kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
+  ui.payload.innerHTML = (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
+  if (o && o.mk && S.state === 'run' && DR.alive && !sIn) {
     const s = toScreen(o.mk);
     let x = s.x / innerWidth * 2 - 1, y = 1 - s.y / innerHeight * 2; if (s.behind) { x = -x; y = -y; }
     const off = s.behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.88;
@@ -796,7 +807,7 @@ function frame(now, noRender) {
   if (o && o.kind === 'bunker') { o.hint = S.scanned ? o.hint2 : o.hint1; o.mk = S.scanned ? o.mk2 : o.mk1; }
   if (o) {
     if (o.hint) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); } }
-    marker.visible = !!o.mk; if (o.mk) { marker.position.copy(o.mk).add(new V3(0, Math.sin(S.simT * 3) * 0.15, 0)); marker.rotation.y += dt * 2; const d = camera.position.distanceTo(marker.position); const sc = Math.max(1, d / 22); marker.scale.set(sc, sc * 1.5, sc); }
+    marker.visible = !!o.mk && !searchIn(o, subj.p); if (marker.visible) { marker.position.copy(o.mk).add(new V3(0, Math.sin(S.simT * 3) * 0.15, 0)); marker.rotation.y += dt * 2; const d = camera.position.distanceTo(marker.position); const sc = Math.max(1, d / 22); marker.scale.set(sc, sc * 1.5, sc); }
   } else marker.visible = false;
   const subjPos = subj.p;
   const inB = S.state !== 'menu' && insideBunker(subjPos);
@@ -815,7 +826,7 @@ function frame(now, noRender) {
   const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt); envTick(dt); scenTick(dt);
+  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림

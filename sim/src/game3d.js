@@ -30,7 +30,7 @@ function orbitDir(c, p) {
 function guidePoints(o, p) {
   GUIDE.detour = false;
   if (!o) return null;
-  if (o.kind === 'ms') return o.pts(p);
+  if (o.kind === 'ms') return searchIn(o, p) ? null : o.pts(p);
   const up = (y) => new V3(0, y, 0);
   if (o.kind === 'takeoff') return [p.clone(), p.clone().add(up(2.5))];
   if (o.kind === 'custom') return o.mk ? [p.clone(), o.mk.clone()] : null;
