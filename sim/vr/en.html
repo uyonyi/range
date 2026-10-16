@@ -119,6 +119,8 @@ body.touch .panel{touch-action:pan-y}
 .tb.down{background:rgba(255,200,40,.6)}#tbBoost.on{background:#ff9a40;color:#111;box-shadow:0 0 14px rgba(255,154,64,.7)}
 #tbDrop{right:calc(14px + env(safe-area-inset-right));bottom:46%;width:78px;height:78px;border-color:var(--amber);color:var(--amber)}
 #tbPhoto{right:calc(24px + env(safe-area-inset-right));bottom:calc(46% + 92px);width:58px;height:58px;font-size:24px;border-color:#5dff9a}
+#resScore{display:flex;align-items:baseline;gap:14px;margin:6px 0 10px}#resScore .sc{font:800 44px var(--mono,monospace);color:#ffc828}#resScore .gr{font:800 30px system-ui;}#resScore .pt{font-size:13px;color:#9aa6ad;line-height:1.5}
+#resDebrief{margin-top:10px;font-size:13px}#resDebrief h4{margin:12px 0 4px;font-size:13px;color:#ffc828;letter-spacing:.04em}#resDebrief .ln{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--mono,monospace)}#resDebrief .ok{color:#5dff9a}#resDebrief .bad{color:#ff8080}#resDebrief .dim{color:#9aa6ad}
 #resPhotos figure{margin:0;width:150px;font-size:11px;color:var(--mute,#9aa6ad)}#resPhotos img{width:150px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line,#333);cursor:pointer;display:block}
 #tbCam,#tbReset,#tbAssist,#tbPause{width:46px;height:46px;font-size:12px}
 #tbPause{right:calc(14px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
@@ -523,9 +525,11 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 </div>
 
 <div id="result" class="panel hidden">
-  <div class="card" style="max-width:520px">
+  <div class="card" style="max-width:620px;max-height:92vh;overflow:auto">
     <h1 id="resTitle">COURSE COMPLETE</h1><h2 id="resSub"></h2>
+    <div id="resScore"></div>
     <table id="resTable"></table>
+    <div id="resDebrief"></div>
     <div id="resBest" style="margin-top:12px;color:var(--green);font-size:14px"></div>
     <div id="resPhotos" style="display:none;margin-top:12px;gap:8px;flex-wrap:wrap"></div>
     <div class="btns" style="margin-top:18px"><button class="primary" id="bAgain">Fly again</button><button id="bReplay">Watch replay</button><button id="bMenu2">Menu</button></div>
@@ -535,7 +539,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=66f2b170"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.en.js?v=66f2b170"></script>
+<script src="../sites/yeongin.js?v=715b902d"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.en.js?v=715b902d"></script>
 </body>
 </html>

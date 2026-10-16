@@ -1788,6 +1788,7 @@ function startRun(kind) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
+  dbfStart();
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
@@ -1811,7 +1812,7 @@ function curObj() {
 }
 function completeObj(status, msg, col) {
   const o = curObj(); if (!o) return;
-  S.objState[S.objIdx] = status;
+  S.objState[S.objIdx] = status; dbfObj(o.label, status === 1);
   if (o.hint) o.hint.visible = false;
   S.respawn = { p: DR.p.clone(), h: DR.h };
   if (status === 1) sfx('good'); else sfx('bad');
@@ -1832,6 +1833,7 @@ function finishRun() {
     const rows = [['Flight time', fmt(S.t)], ['Penalty', '+' + S.pen.toFixed(0) + ' s'], ['Total', fmt(total)], ['Impacts', S.impacts + ' '],
       ['Drop hits', S.hits + ' / 3'], ['Reference flight (video)', fmt(GH.total)]];
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
+    debriefShow(done, OBJS.length, GH.total * 1.25);
     const key = 'fpvsim_fpv_best_' + SET.diff + SITE_KEY; let best = null;
     try { best = parseFloat(localStorage.getItem(key)); } catch (e) { }
     if (!best || total < best) { try { localStorage.setItem(key, String(total)); } catch (e) { } saveBest(rec); ui.resBest.textContent = '★ New best (saved for replay and ghost)'; }
@@ -1854,6 +1856,7 @@ function impact(n, vn) {
   showMsg('IMPACT' + ((S.kind === 'course' || isMission()) && S.running ? ` +${pen}s` : ''), '#ff5050', 1.1);
 }
 function respawn() {
+  if (S.state === 'run' && S.running) DBF.resp++;
   if (S.kind === 'tutorial' && S.tut) { const st = S.tut.startPose; const p = st.p.clone(); if (!st.landed) p.y = Math.max(p.y, groundAt(p.x, p.z) + 1.0); resetDrone(p, st.h); if (st.landed) DR.landed = true; S.scanned = false; S.scan = 0; S.wasInside = false; S.tut.hold = 0; if (LESSONS[S.tut.i].custom) S.tut.step = 0; else S.objIdx = LESSONS[S.tut.i].range[0]; PAY.forEach(p => scene.remove(p.m)); PAY.length = 0; droneM.cans.forEach(c => c.visible = true); tutRender(); return; }
   if (isMission() || AFc().cls === 'wing') {
     let p, h; const o = curObj();
@@ -2246,7 +2249,7 @@ const ui = {
   brk: $('brk'), brkLbl: $('brkLbl'), fpm: $('fpm'), scope: $('scope'), scopeC: $('scopeC'), scopeTxt: $('scopeTxt'), scopeBar: $('scopeBar')
 };
 let msgTimer = 0;
-function showMsg(t, col, dur) { if (t && REC) recEvent({ k: 'msg', text: t, col }); ui.objMsg.textContent = t; ui.objMsg.style.color = col || '#fff'; ui.objMsg.classList.add('show'); msgTimer = dur || 1.2; }
+function showMsg(t, col, dur) { if (t) { S.lastMsg = t; S.lastMsgT = S.t; } if (t && REC) recEvent({ k: 'msg', text: t, col }); ui.objMsg.textContent = t; ui.objMsg.style.color = col || '#fff'; ui.objMsg.classList.add('show'); msgTimer = dur || 1.2; }
 function renderList() {
   if (isMission()) { ui.list.innerHTML = msListHTML(); return; }
   if (S.kind !== 'course') { ui.list.innerHTML = ''; return; }
@@ -3744,7 +3747,7 @@ function msStart(kind) {
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
-  o.done = true; sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
+  o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; commAck(o, S.kind);
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
   renderList();
@@ -3761,7 +3764,7 @@ function passCross(o, prev, cur) {
 // 통과점 하나만 실패로 두고 다음 목표로
 function msSkip() {
   const o = msObj(); if (!o) return;
-  o.done = true; o.miss = true; sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
+  o.done = true; o.miss = true; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
   comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
@@ -3808,19 +3811,48 @@ function sensorSees(tp, cur, maxD) {
 }
 // ---- 사진 보고: 지금 Camera 화면을 작은 사진으로 (좌표·시각 표시) ----
 const PH = { rt: null, lut: null, last: null, lastT: 0 };
+// ---- 임무 후 브리핑: 점수(과제·시간·안전) · FLIGHT 기록 · Penalty 내역 · 과제별 시간 ----
+const DBF = { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0 };
+function dbfStart() { Object.assign(DBF, { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0, flyT: 0 }); }
+function dbfObj(label, ok) { if (S.state === 'run') DBF.objs.push({ label: String(label || ''), ok, t: S.t }); }
+function dbfTick(dt) {
+  if (S.state !== 'run' || !S.running) return;
+  if (DR.alive && !DR.landed) { const v = DR.v.length(); DBF.dist += v * dt; DBF.vmax = Math.max(DBF.vmax, v); DBF.flyT += dt; DBF.altMax = Math.max(DBF.altMax, DR.p.y - groundAt(DR.p.x, DR.p.z)); }
+  if (S.pen > DBF.pen0 + 0.01) { DBF.pens.push({ t: S.t, d: S.pen - DBF.pen0, why: S.lastMsg && S.t - (S.lastMsgT || 0) < 2 && /\+\s?\d+\s?(s|초)|MISS|IMPACT|SKIP|번짐|spread/i.test(S.lastMsg) ? S.lastMsg : (S.kind === 'fire' ? L2('불씨 번짐', 'fire spread') : '') }); DBF.pen0 = S.pen; }
+}
+function dbfScore(ok, n, par) {
+  const total = S.t + S.pen, r = n ? ok / n : 1, tf = par > 0 ? clamp(par / Math.max(1, total), 0, 1) : 1, cf = Math.max(0, 1 - 0.1 * (S.impacts || 0) - 0.15 * DBF.resp - 0.2 * (S.lost || 0));
+  const a = Math.round(55 * r), b = Math.round(30 * tf), c = Math.round(15 * cf), sc = a + b + c;
+  return { sc, a, b, c, g: sc >= 90 ? 'S' : sc >= 80 ? 'A' : sc >= 65 ? 'B' : sc >= 50 ? 'C' : 'D', col: sc >= 90 ? '#ffc828' : sc >= 80 ? '#5dff9a' : sc >= 65 ? '#4fe3ff' : '#ff9a40', total, par };
+}
+function debriefShow(ok, n, par) {
+  const R = dbfScore(ok, n, par); DBF.last = Object.assign({ ok, n }, R);
+  const el = $('resScore'); if (el) el.innerHTML = `<span class="sc">${R.sc}</span><span class="gr" style="color:${R.col}">${R.g}</span><span class="pt">${L2('과제', 'Tasks')} ${R.a}/55 · ${L2('시간', 'Time')} ${R.b}/30 · ${L2('안전', 'Safety')} ${R.c}/15<br>${L2('Total', 'Total')} ${fmt(R.total)} · ${L2('기준', 'Par')} ${fmt(par || 0)}</span>`;
+  const ln = (a, b, cls) => `<div class="ln"><span>${a}</span><span class="${cls || ''}">${b}</span></div>`;
+  let h = `<h4>${L2('FLIGHT 기록', 'FLIGHT')}</h4>` + ln(L2('FLIGHT Zoom', 'Distance'), (DBF.dist >= 1000 ? (DBF.dist / 1000).toFixed(2) + ' km' : DBF.dist.toFixed(0) + ' m')) + ln(L2('최고 속도', 'Top speed'), (DBF.vmax * 3.6).toFixed(0) + ' km/h') +
+    ln(L2('평균 속도', 'Average speed'), (DBF.flyT > 1 ? DBF.dist / DBF.flyT * 3.6 : 0).toFixed(0) + ' km/h') + ln(L2('최고 고도 (지면 위)', 'Max height (AGL)'), DBF.altMax.toFixed(1) + ' m') +
+    ln(L2('Impacts · 재출발', 'Impacts · restarts'), `${S.impacts || 0} · ${DBF.resp}`, (S.impacts || DBF.resp) ? 'bad' : 'ok');
+  if (S.photos && S.photos.length) h += ln(L2('사진 (인정 / 전체)', 'Photos (valid / taken)'), `${S.photos.filter(p => p.ok).length} / ${S.photos.length}`);
+  h += `<h4>${L2('Penalty 내역', 'PENALTIES')} · +${S.pen.toFixed(0)} s</h4>` + (DBF.pens.length ? DBF.pens.map(p => ln(`${fmt(p.t)} ${p.why || L2('Penalty', 'penalty')}`, '+' + p.d.toFixed(0) + ' s', 'bad')).join('') : `<div class="dim">${L2('None', 'None')}</div>`);
+  if (DBF.objs.length) { let pt = 0; h += `<h4>${L2('과제별 기록', 'TASKS')} · ${ok}/${n}</h4>` + DBF.objs.map((o, i) => { const s = ln(`${i + 1}. ${o.ok ? '✓' : '✗'} ${o.label}`, `${fmt(o.t)} <span class="dim">(+${(o.t - pt).toFixed(1)})</span>`, o.ok ? 'ok' : 'bad'); pt = o.t; return s; }).join(''); }
+  const d = $('resDebrief'); if (d) d.innerHTML = h;
+}
 function photoMission() { return S.kind === 'fire' || S.kind === 'sar'; }
 function snapPhoto(cap, tp) {
   try {
     const W0 = 384, H0 = 216; if (!PH.rt) { PH.rt = new THREE.WebGLRenderTarget(W0, H0); PH.lut = new Uint8Array(256); for (let i = 0; i < 256; i++) PH.lut[i] = Math.round(255 * Math.pow(i / 255, 1 / 2.2)); }
     const xe = renderer.xr.enabled, cur = renderer.getRenderTarget(), asp = camera.aspect; renderer.xr.enabled = false; camera.aspect = 16 / 9; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
-    let cam = camera;   // 목표가 화면 밖(바로 아래 등)이면 짐벌을 목표 쪽으로 돌려 찍음
-    if (tp) { const q = tp.clone().project(camera); if (!(q.z < 1 && Math.abs(q.x) < 0.8 && Math.abs(q.y) < 0.8)) { cam = PH.cam || (PH.cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 4000)); cam.position.copy(DR.p).add(new V3(0, -0.15, 0)); cam.lookAt(tp); cam.updateMatrixWorld(); } }
+    PH.via = 'main'; let cam = camera;   // 목표가 화면 밖(바로 아래 등)이면 짐벌을 목표 쪽으로 돌려 찍음
+    const seen = (c) => { const q = tp.clone().project(c); return q.z < 1 && q.z > -1 && Math.abs(q.x) < 0.8 && Math.abs(q.y) < 0.8; };
+    if (tp && !seen(camera)) { const lc = XR_ON && (SET.vrPip | 0) > 0 ? VR_PIP.cam : (typeof bellyMode === 'function' && bellyMode() !== null ? bellyCam : null); if (lc && seen(lc)) { cam = lc; PH.via = 'lower'; } }
+    if (tp && cam === camera && !seen(camera)) { PH.via = 'gimbal'; { cam = PH.cam || (PH.cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 4000)); cam.position.copy(DR.p).add(new V3(0, -0.15, 0)); cam.lookAt(tp); cam.updateMatrixWorld(); } }
     renderer.setRenderTarget(PH.rt); renderer.clear(); renderer.render(scene, cam); const px = new Uint8Array(W0 * H0 * 4); renderer.readRenderTargetPixels(PH.rt, 0, 0, W0, H0, px);
     renderer.setRenderTarget(cur); renderer.xr.enabled = xe; camera.aspect = asp; camera.updateProjectionMatrix();
     const c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d'), id = g.createImageData(W0, H0), lin = PH.rt.texture.encoding !== THREE.sRGBEncoding;
     for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) { const s = ((H0 - 1 - y) * W0 + x) * 4, d = (y * W0 + x) * 4; for (let k = 0; k < 3; k++) id.data[d + k] = lin ? PH.lut[px[s + k]] : px[s + k]; id.data[d + 3] = 255; }
     g.putImageData(id, 0, 0);
     g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, H0 - 34, W0, 34); g.fillStyle = '#ffc828'; g.font = '700 13px monospace'; g.fillText(cap[0] || '', 8, H0 - 19); g.fillStyle = '#fff'; g.font = '12px monospace'; g.fillText(cap[1] || '', 8, H0 - 5);
+    g.textAlign = 'right'; g.fillStyle = '#9fe9ff'; g.fillText(({ main: L2('주 Camera', 'MAIN CAM'), lower: L2('하부 Camera', 'LOWER CAM'), gimbal: L2('짐벌 yaw', 'GIMBAL') })[PH.via] || '', W0 - 8, H0 - 19); g.textAlign = 'left';
     g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1; g.strokeRect(W0 / 2 - 30, H0 / 2 - 30, 60, 60);
     return c;
   } catch (e) { return null; }
@@ -3850,7 +3882,7 @@ function missionPhoto() {
   }
   photoAdd(snapPhoto([L2('사진', 'PHOTO') + '  ' + hm, '']), '', null, false);
 }
-function photoTick(dt) { if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.toggle('hidden', !(S.state === 'run' && photoMission())); }
+function photoTick(dt) { dbfTick(dt); if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.toggle('hidden', !(S.state === 'run' && photoMission())); }
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
@@ -3880,7 +3912,7 @@ function msFinish() {
     S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden');
     const a = AFc(), total = S.t + S.pen, nm = MS_NAME[S.kind]; if ($('resTitle')) $('resTitle').textContent = 'MISSION COMPLETE';
     ui.resSub.textContent = `${nm} · ${a.name} · ${MODES[SET.diff].name}`;
-    const G = msGrade(total), rows = [[L2('등급', 'Grade'), `<b style="color:${G.c};font-size:18px">${G.g}</b> (${L2('기준', 'par')} ${fmt(MS.par || 0)})`], ['Flight time', fmt(S.t)], ['Penalty', '+' + S.pen.toFixed(0) + ' s'], ['Total', fmt(total)], ['Impacts', S.impacts + ' ']];
+    const G = msGrade(total), rows = [['Flight time', fmt(S.t)], ['Penalty', '+' + S.pen.toFixed(0) + ' s'], ['Total', fmt(total)], ['Impacts', S.impacts + ' ']];
     if (S.kind === 'strike') rows.push(['Hits', S.hitsS + ' / ' + STRIKE.filter(t => !t.decoy).length], [L2('기만체 타격', 'Decoys hit'), (S.decoyHit || 0) + L2(' 대', '')], ['Drones lost (misses)', (S.lost || 0) + ''], ['Mean error', (S.errS.reduce((x, y) => x + y, 0) / Math.max(1, S.errS.length)).toFixed(1) + ' m']);
     else if (S.lost) rows.push(['Drones lost', S.lost + '']);
     if (S.kind === 'sar' && S.sarXY) rows.push(['Hiker position (EPSG:5186)', S.sarXY[0].toFixed(0) + ', ' + S.sarXY[1].toFixed(0)]);
@@ -3889,6 +3921,7 @@ function msFinish() {
     if (S.kind === 'ridge' && RIDGE) rows.push(['Summit elevation', RIDGE.top.toFixed(0) + ' m']);
     if (S.kind === 'fire') (S.fireRep || []).forEach((xy, i) => xy && rows.push(['Hotspot ' + (i + 1) + ' (EPSG:5186)', xy[0].toFixed(0) + ', ' + xy[1].toFixed(0)]));
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
+    debriefShow(MS.list.filter(x => x.done && !x.miss).length, MS.list.length, MS.par || 0);
     const ph = (S.photos || []).filter(p => p.ok), rp = $('resPhotos');
     if (rp) { rp.style.display = ph.length ? 'flex' : 'none'; rp.innerHTML = ph.map((p, i) => `<figure><a href="${p.url}" download="report_${S.kind}_${i + 1}.jpg"><img src="${p.url}" alt=""></a>${L2('보고 ', 'Report ')}${i + 1}${p.xy ? ' · ' + p.xy[0].toFixed(0) + ', ' + p.xy[1].toFixed(0) : ''}</figure>`).join(''); }
     const key = 'fpvsim_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY; let best = null;
@@ -4258,7 +4291,7 @@ function firePick() {
   return P;
 }
 function fireReport(f, xy) {   // 사진으로 보고한 불씨 처리 · 다음 신고는 몇 초 뒤 새로 피어오름
-  f.done = true; S.fireRep.push(xy); sfx('good'); commAck(f, 'fire');
+  f.done = true; dbfObj(f.label, true); S.fireRep.push(xy); sfx('good'); commAck(f, 'fire');
   showMsg(xy ? `불씨 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '불씨 사진 보고 ✓', '#ffb070', 1.8);
   const nx = MS.list.find(x => !x.active && !x.done); if (nx) nx.ignT = MS.t0 + 5 + Math.random() * 6;
   MS.idx = MS.list.findIndex(x => !x.done); if (MS.idx < 0) { MS.idx = MS.list.length; msFinish(); } renderList();
@@ -5108,7 +5141,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR12', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR13', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -5150,8 +5183,17 @@ function vrOsdDraw() {
   g.textBaseline = 'top';
   const box = (lines, col) => { g.fillStyle = 'rgba(6,10,14,.82)'; vrRR(g, 190, 190, 900, 340, 22); g.fill(); g.strokeStyle = col; g.lineWidth = 3; g.stroke(); let y = 220; lines.forEach(([t, sz, c]) => { const ws = String(t).split(' '); let ln = ''; g.font = `700 ${sz}px system-ui, sans-serif`; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 840 && ln) { sh(ln, 220, y, sz, c); y += sz * 1.25; ln = w; } else ln = tl; } if (ln) { sh(ln, 220, y, sz, c); y += sz * 1.35; } }); };
   if (S.brief) { const b = $('brief'); box([['BRIEFING', 30, '#4fe3ff'], [b && b.querySelector('h3') ? b.querySelector('h3').textContent : '', 40, '#fff'], [b && b.querySelector('p') ? b.querySelector('p').textContent : '', 26, '#cfd6da'], [L2('A 버튼: 시작', 'A button: start'), 30, '#ffc828']], '#4fe3ff'); tex.needsUpdate = true; return; }
-  if (S.state === 'result') { box([[($('resTitle') || {}).textContent || '', 44, '#5dff9a'], [($('resSub') || {}).textContent || '', 28, '#e8eef2'], [L2('A Restart · B Menu', 'A again · B menu'), 30, '#ffc828']], '#5dff9a');
-    const ph = (S.photos || []).filter(p => p.ok).slice(-4); ph.forEach((p, i) => { if (!p.im) { p.im = new Image(); p.im.src = p.url; } if (p.im.complete) g.drawImage(p.im, 220 + i * 214, 400, 200, 112); }); tex.needsUpdate = true; return; }
+  if (S.state === 'result') {
+    const R = DBF.last, ph = (S.photos || []).filter(p => p.ok).slice(-4);
+    g.fillStyle = 'rgba(6,10,14,.86)'; vrRR(g, 140, 60, 1000, 600, 22); g.fill(); g.strokeStyle = '#5dff9a'; g.lineWidth = 3; g.stroke();
+    sh(($('resTitle') || {}).textContent || '', 170, 84, 40, '#5dff9a'); sh(($('resSub') || {}).textContent || '', 170, 134, 24, '#cfd6da');
+    if (R) { sh(String(R.sc), 1100, 76, 64, '#ffc828', 'right'); sh(R.g, 1100, 146, 34, R.col, 'right');
+      const L = [[L2('Total', 'Total'), `${fmt(R.total)}  (${L2('FLIGHT', 'flight')} ${fmt(S.t)} + ${L2('Penalty', 'pen')} ${S.pen.toFixed(0)} s · ${L2('기준', 'par')} ${fmt(R.par || 0)})`], [L2('점수', 'Score'), `${L2('과제', 'tasks')} ${R.a}/55 · ${L2('시간', 'time')} ${R.b}/30 · ${L2('안전', 'safety')} ${R.c}/15`],
+        [L2('과제', 'Tasks'), `${R.ok} / ${R.n}`], [L2('Zoom · 최고 속도', 'Distance · top speed'), `${DBF.dist.toFixed(0)} m · ${(DBF.vmax * 3.6).toFixed(0)} km/h`], [L2('Impacts · 재출발', 'Impacts · restarts'), `${S.impacts || 0} · ${DBF.resp}`]];
+      if (DBF.pens.length) L.push([L2('Penalty 내역', 'Penalties'), DBF.pens.slice(0, 3).map(p => `+${p.d.toFixed(0)} ${String(p.why || '').split(' ')[0]}`).join(' · ') + (DBF.pens.length > 3 ? ' …' : '')]);
+      L.forEach(([a, b], i) => { sh(a, 170, 196 + i * 40, 24, '#9fb0b8'); sh(b, 470, 196 + i * 40, 24, '#fff'); }); }
+    ph.forEach((p, i) => { if (!p.im) { p.im = new Image(); p.im.src = p.url; } if (p.im.complete) g.drawImage(p.im, 170 + i * 236, 470, 220, 124); });
+    sh(L2('A Restart · B Menu', 'A again · B menu'), W2 / 2, 612, 28, '#ffc828', 'center'); tex.needsUpdate = true; return; }
   if (S.state === 'pause') { box([[L2('일시 Pause', 'PAUSED'), 44, '#ffc828'], [L2('B: Menu', 'B: menu'), 30, '#e8eef2']], '#ffc828'); tex.needsUpdate = true; return; }
   if (S.state === 'menu') { tex.needsUpdate = true; return; }
   if (S.state === 'replay' && RP.rec) { const s0 = RP.rec.s[0][0], e0 = RP.rec.s[RP.rec.s.length - 1][0]; sh(`REPLAY  ${fmt(RP.t - s0)} / ${fmt(e0 - s0)}  ×${RP.speed}${RP.playing ? '' : '  ❚❚'}`, W2 / 2, 22, 40, '#4fe3ff', 'center');
@@ -5283,5 +5325,5 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
