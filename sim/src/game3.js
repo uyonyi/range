@@ -80,7 +80,7 @@ function finishRun() {
     if (S.state !== 'run') return;
     S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden'); if ($('resTitle')) $('resTitle').textContent = 'COURSE COMPLETE'; { const rp = $('resPhotos'); if (rp) rp.style.display = 'none'; }
     const total = S.t + S.pen, done = S.objState.filter(v => v === 1).length;
-    ui.resSub.textContent = `${MODES[SET.diff].name} · 과제 ${done}/${OBJS.length} 성공`;
+    ui.resSub.textContent = `${pilotName()} · ${MODES[SET.diff].name} · 과제 ${done}/${OBJS.length} 성공`;
     const rows = [['비행 시간', fmt(S.t)], ['벌점', '+' + S.pen.toFixed(0) + ' s'], ['합계', fmt(total)], ['충돌', S.impacts + ' 회'],
       ['투하 명중', S.hits + ' / 3'], ['기준 비행 (영상)', fmt(GH.total)]];
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
@@ -722,9 +722,9 @@ function handleKeys() {
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }
     if (S.state === 'menu') {
-      if (k === 'Escape') { closePanels(); continue; }
+      if (k === 'Escape') { if (!closePanels() && MENU.step > 1) wizGo(MENU.step - 1); continue; }
       if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel'].some(p => !$(p).classList.contains('hidden'))) continue;
-      if (k === 'Enter' || k === 'PadA') menuGo(); else if (k === 'KeyT') openTutMenu(); continue;
+      if (k === 'Enter' || k === 'PadA') { if (MENU.step < 3) wizGo(MENU.step + 1); else menuGo(); } else if (k === 'KeyT' && MENU.step === 3) openTutMenu(); continue;
     }
     if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
     if (k === 'Escape') { togglePause(); continue; }
