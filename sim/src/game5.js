@@ -1653,7 +1653,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('없음 · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR11', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR12', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -1721,24 +1721,25 @@ function vrOsdDraw() {
       sh(Math.round(dist) + ' m', px - Math.cos(an) * 60, py - Math.sin(an) * 60 - 14, 28, '#ffc828', 'center'); } }
   // 큰 숫자 계기
   // 계기는 화면 가운데 가까이 (시선을 조금만 옮겨 보이게): 왼쪽 = 속도, 오른쪽 = 고도·상승률, 위 = 시간·목표·방위
-  const CX = W2 / 2, LX = CX - 210, RX = CX + 210, MY = H2 / 2 - 70;
+  // 계기는 지도 둘레에 모음: 지도 위 = 고도·상승률·투하물, 지도 왼쪽 아래 = 속도 / 위쪽 가운데 = 시간·목표·방위
+  const CX = W2 / 2, MX = W2 - 250, MYT = H2 - 330 - 34, MXR = MX + 198;
   if (S.state !== 'replay') sh(fmt(S.t || 0), CX, 26, 34, '#fff', 'center');
-  sh(`${Math.round(sp * 3.6)}`, LX, MY, 54, '#fff', 'right'); sh('km/h', LX, MY + 58, 24, '#cfd6da', 'right');
-  sh(`${(sb.p.y - gh).toFixed(1)}`, RX, MY, 54, '#fff', 'left'); sh(L2('m 고도', 'm AGL'), RX, MY + 58, 24, '#cfd6da', 'left');
-  const vs = sb.v ? sb.v.y : 0; sh((vs > 0.15 ? '▲ ' : vs < -0.15 ? '▼ ' : '■ ') + Math.abs(vs).toFixed(1) + ' m/s', RX, MY + 90, 26, Math.abs(vs) > 3 ? '#ff9a40' : '#e8eef2', 'left');
+  sh(`${Math.round(sp * 3.6)}`, MX - 16, H2 - 150, 50, '#fff', 'right'); sh('km/h', MX - 16, H2 - 96, 22, '#cfd6da', 'right');
+  sh(`${(sb.p.y - gh).toFixed(1)}`, MX, MYT - 150, 48, '#fff', 'left'); sh(L2('m 고도', 'm AGL'), MXR, MYT - 132, 22, '#cfd6da', 'right');
+  const vs = sb.v ? sb.v.y : 0; sh((vs > 0.15 ? '▲ ' : vs < -0.15 ? '▼ ' : '■ ') + Math.abs(vs).toFixed(1) + ' m/s', MX, MYT - 92, 24, Math.abs(vs) > 3 ? '#ff9a40' : '#e8eef2', 'left');
   { const hdg = ((((SITE.brg || 0) + (sb.h || 0) * 180 / Math.PI) % 360) + 360) % 360; sh(String(Math.round(hdg)).padStart(3, '0') + '°', CX, 124, 30, '#e8eef2', 'center'); }
   if (o && S.state !== 'replay') sh('▸ ' + (o.label || MS_NAME[S.kind] || ''), CX, 70, 40, '#ffc828', 'center');
   if (S.state === 'demo') sh(L2('기준 비행', 'REFERENCE FLIGHT'), CX, 70, 38, '#4fe3ff', 'center');
-  if (ENV.ir) sh('IR', LX, MY - 44, 30, '#ff9a40', 'right');
-  { const n = S.kind === 'course' ? S.payloads || 0 : S.kind === 'sar' ? S.kits | 0 : S.kind === 'free' && AFc().drop ? droneM.cans.filter(c => c.visible).length : -1; if (n >= 0 && S.state === 'run') sh((S.kind === 'sar' ? 'KIT ' : 'M84 ') + ('●'.repeat(n) || '—'), W2 / 2 + 210, H2 / 2 + 58, 26, '#ffc828', 'left'); }
+  if (ENV.ir) sh('IR', MX - 16, H2 - 196, 28, '#ff9a40', 'right');
+  { const n = S.kind === 'course' ? S.payloads || 0 : S.kind === 'sar' ? S.kits | 0 : S.kind === 'free' && AFc().drop ? droneM.cans.filter(c => c.visible).length : -1; if (n >= 0 && S.state === 'run') sh((S.kind === 'sar' ? 'KIT ' : 'M84 ') + ('●'.repeat(n) || '—'), W2 - 250, H2 - 330 - 34 - 56, 24, '#ffc828', 'left'); }
   if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', 40, H2 - 252, 24, '#ffc828');
   if (PH.last && PH.lastT > 0 && PH.last.complete) { g.globalAlpha = Math.min(1, PH.lastT); g.drawImage(PH.last, 40, 150, 288, 162); g.strokeStyle = PH.lastOk ? '#5dff9a' : '#ff9a40'; g.lineWidth = 4; g.strokeRect(40, 150, 288, 162); g.globalAlpha = 1; }
-  const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 760 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2 - 30, H2 - 112 + i * 36, 28, '#9fe9ff', 'center')); }
+  const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 680 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2 - 70, H2 - 112 + i * 36, 28, '#9fe9ff', 'center')); }
   const m = $('objMsg'); if (m && m.classList.contains('show') && m.textContent.trim()) sh(m.textContent.trim(), W2 / 2, H2 / 2 + 90, 44, m.style.color || '#5dff9a', 'center');
   // 등고선 지도 (PC 화면처럼 오른쪽 아래, 가운데 쪽으로 당겨 둠)
   if (SET.vrMap !== false && ui.map) { const mw = 198, mh = 330, mx = W2 - 250, my = H2 - mh - 34; g.globalAlpha = 0.92; g.fillStyle = 'rgba(6,10,14,.75)'; g.fillRect(mx - 4, my - 4, mw + 8, mh + 8); g.filter = 'brightness(1.6) contrast(1.15)'; g.drawImage(ui.map, mx, my, mw, mh); g.filter = 'none'; g.globalAlpha = 1; g.strokeStyle = 'rgba(255,200,40,.8)'; g.lineWidth = 2; g.strokeRect(mx - 4, my - 4, mw + 8, mh + 8); }
   // 경로 안내 문구 (예: 고도 내리기 3.2 m (왼쪽 스틱 ↓))
-  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2 - 30, H2 - 200 + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
+  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2 - 70, H2 - 200 + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
   if (SET.vrCam !== 'chase') { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(W2 / 2 - 22, H2 / 2); g.lineTo(W2 / 2 - 7, H2 / 2); g.moveTo(W2 / 2 + 7, H2 / 2); g.lineTo(W2 / 2 + 22, H2 / 2); g.moveTo(W2 / 2, H2 / 2 + 7); g.lineTo(W2 / 2, H2 / 2 + 16); g.stroke(); }
   g.textAlign = 'left'; tex.needsUpdate = true;
 }
