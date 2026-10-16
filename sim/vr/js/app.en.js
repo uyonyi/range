@@ -4143,14 +4143,14 @@ function envTick(dt) {
     if (f.glow) { f.glow.visible = ENV.night && !ENV.ir; f.glow.material.opacity = 0.55 + 0.35 * Math.sin(envT * 7 + f.d); f.glow.scale.set(9 * big, 6 * big, 1); }
   }
 }
-document.querySelectorAll('#segTime button').forEach(b => b.addEventListener('click', () => { SET.night = b.dataset.v === '1'; ENV.night = SET.night; saveSet(); envApply(); if (ENV.ir) { irSet(false); } syncTime(); }));
+document.querySelectorAll('#segTime button, #segTime2 button').forEach(b => b.addEventListener('click', () => { SET.night = b.dataset.v === '1'; ENV.night = SET.night; saveSet(); envApply(); if (ENV.ir) { irSet(false); } syncTime(); }));
 function syncExpo() { document.querySelectorAll('#segExpo button').forEach(x => x.classList.toggle('on', x.dataset.v === stickExpo(false))); }
 document.querySelectorAll('#segExpo button').forEach(b => b.addEventListener('click', () => { SET.expo = b.dataset.v; saveSet(); syncExpo(); }));
 syncExpo();
 function syncHud() { document.querySelectorAll('#segHud button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.hud || 'auto'))); }
 document.querySelectorAll('#segHud button').forEach(b => b.addEventListener('click', () => { SET.hud = b.dataset.v; saveSet(); syncHud(); }));
 syncHud();
-function syncTime() { document.querySelectorAll('#segTime button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.night)); }
+function syncTime() { document.querySelectorAll('#segTime button, #segTime2 button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.night)); }
 envApply(); syncTime();
 
 
@@ -4879,7 +4879,7 @@ function menuDetail() {
   if (best) meta.push(L2('내 최고 ', 'Best ') + `<b>${fmt(best)}</b>`);
   meta.push(AFc().name + ' · ' + { train: L2('Training', 'Training'), easy: L2('Easy', 'Easy'), sport: L2('Sport', 'Sport') }[SET.diff]);
   $('mdMeta').innerHTML = meta.join(' · ');
-  $('msGo').disabled = !av.ok; $('msGo').textContent = k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
+  $('msGo').disabled = !av.ok; $('msGo').textContent = MENU.mode === 'vr' ? (k === 'demo' ? L2('VR로 재생 ▶ (헤드셋 착용)', 'Play in VR ▶') : L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)')) : k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
   $('mdWhy').textContent = av.why || MENU.afNote || '';
   if (typeof vrBtnUpdate === 'function' && VR_OK) vrBtnUpdate();
   const no = $('msStageNo'); if (no) { no.classList.toggle('on', !av.site); no.textContent = av.site ? '' : L2('이 훈련장에는 없는 임무입니다', 'This mission is not available at this site'); }
@@ -4911,6 +4911,7 @@ function menuSel(k, go) {
 document.querySelectorAll('#msTabs [data-g]').forEach(b => b.addEventListener('click', () => menuTab(b.dataset.g)));
 function menuGo() {
   const k = MENU.ms; if (!msAvail(k).ok) return;
+  if (MENU.mode === 'vr') { if (k === 'tutorial') { const w = $('mdWhy'); if (w) w.textContent = L2('Tutorial은 컴퓨터 판에서만 · VR에서는 장애물 코스부터', 'Tutorial is on the computer version only'); return; } if (!VR_OK.ok) { const w = $('mdWhy'); if (w) w.textContent = L2('이 기기는 VR을 지원하지 않습니다', 'This device does not support VR'); return; } XR.pending = k; vrStart(); return; }
   if (k === 'tutorial') openTutMenu(); else startRun(k);
 }
 document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
@@ -4918,16 +4919,18 @@ document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
 });
 $('msGo').onclick = menuGo;
 // ---- 첫 화면 3단계: 1 Pilot name → 2 기체 → 3 코스 (각 단계 뒤로 가기) ----
-MENU.step = 1;
+MENU.step = 0; const HAS_INTRO = !!(window.SIM_VR || window.SIM_VR_URL); MENU.mode = window.SIM_VR ? 'vr' : 'pc';
 try { SET.pilot = localStorage.getItem('fpvsim_pilot') || ''; } catch (e) { SET.pilot = ''; }
 function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
 function wizGo(n) {
-  n = Math.max(1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
+  n = Math.max(HAS_INTRO ? 0 : 1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
   if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
   MENU.step = n; c.dataset.step = n; closePanels();
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
-  if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; }
+  if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
+  const md = $('wzMode'); if (md) { md.style.display = HAS_INTRO ? '' : 'none'; md.textContent = MENU.mode === 'vr' ? '🥽 VR' : '🖥 PC'; }
+  if ($('wz1Back')) $('wz1Back').style.visibility = HAS_INTRO ? '' : 'hidden';
   try { window.dispatchEvent(new Event('resize')); } catch (e) { }
   if (ui.menu) ui.menu.scrollTop = 0;
 }
@@ -4941,7 +4944,18 @@ if ($('bHelp2')) $('bHelp2').onclick = () => openPanel('helpPanel');
 if ($('bRC2')) $('bRC2').onclick = () => { closePanels(); rcOpen(); };
 if ($('wzVR')) $('wzVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
 setInterval(() => { const a = $('padStatus'), b = $('padStatus2'); if (a && b) b.textContent = a.textContent; }, 1000);
-setTimeout(() => wizGo(1), 0);
+setTimeout(() => wizGo(HAS_INTRO ? 0 : 1), 0);
+// 처음 화면: 컴퓨터 / VR 갈림길 (PC 판과 VR 판은 서로 다른 주소)
+function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
+if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
+if ($('introVR')) $('introVR').onclick = () => {
+  const n = $('introNote');
+  if (window.SIM_VR) { if (VR_OK.ok) wizGo(1); else if (n) n.textContent = L2('이 기기·브라우저는 VR을 지원하지 않습니다. Meta Quest 헤드셋의 브라우저에서 이 주소를 열어 주세요.', 'This device or browser does not support VR. Open this address in the Meta Quest browser.'); return; }
+  if (VR_OK.ok) { location.href = vrUrlAbs(); return; }
+  if (n) n.innerHTML = L2('VR은 Meta Quest 헤드셋의 브라우저에서 엽니다: ', 'Open VR in the Meta Quest browser: ') + `<b style="color:#4fe3ff;user-select:all">${vrUrlAbs().replace(/^https?:\/\//, '')}</b>`;
+};
+if ($('wz1Back')) $('wz1Back').onclick = () => wizGo(0);
+if ($('wzMode')) $('wzMode').onclick = () => wizGo(0);
 // ---- 임무 Site 미리 보기 (Menu 뒤 Camera) ----
 function menuShow(k) {
   Object.values(MSG).forEach(g => g.visible = false);
@@ -5103,7 +5117,8 @@ function vrRecenter() {   // 공간 고정: 지금 바라보는 쪽 앞에 화�
 // ---- 세션 ----
 async function vrStart() {
   if (!navigator.xr || XR.sess) return;
-  let sess; try { sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] }); } catch (e) { vrOverlay(L2('VR을 시작할 수 없습니다. Restart 눌러 주세요.', 'Could not start VR. Please try again.')); return; }
+  xrPlanesPatch();
+  let sess; try { sess = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] }); } catch (e) { XR.pending = null; vrOverlay(L2('VR을 시작할 수 없습니다. Restart 눌러 주세요.', 'Could not start VR. Please try again.')); return; }
   XR.sess = sess; XR.userExit = false; renderer.xr.enabled = true;
   renderer.xr.setFramebufferScaleFactor(window.XR_FB || 1.0); renderer.xr.setReferenceSpaceType('local-floor');
   try { await renderer.xr.setSession(sess); }
@@ -5115,7 +5130,9 @@ async function vrStart() {
   sess.addEventListener('visibilitychange', () => { if (sess.visibilityState !== 'visible' && (S.state === 'run' || S.state === 'demo')) { togglePause(); XR.autoPaused = true; } else if (sess.visibilityState === 'visible' && XR.autoPaused && S.state === 'pause') { togglePause(); XR.autoPaused = false; } });
   $('vrBack').classList.add('hidden');
   vrScreenMode(SET.vrScreen);
-  if (S.state === 'pause') { XR.menu = false; togglePause(); } else vrMenuOpen();
+  $('vrNote') && $('vrNote').classList.add('hidden');
+  if (XR.pending) { const k = XR.pending; XR.pending = null; XR.menu = false; startRun(k); vrApplyCam(); }
+  else if (S.state === 'pause') { XR.menu = false; togglePause(); } else vrMenuOpen();
   XR.recenter = 2;   // 첫 프레임들에서 머리 위치가 잡히면 화면·Menu 위치를 Restart 맞춤
   last = performance.now();
   renderer.setAnimationLoop((t, f) => { if (f) frame(performance.now()); });
@@ -5127,16 +5144,25 @@ function vrEnded() {
   last = performance.now(); if (!TEST) requestAnimationFrame(frame);
   if (XR.afterExit === 'video') {   // VR Menu에서 '영상 저장': 2D 화면에서 Replay를 재생하며 녹화
     XR.afterExit = null; $('vrBack').classList.add('hidden'); S.cam = CAMS.indexOf(SET.vrCam === 'chase' ? 'CHASE' : 'FPV');
-    exportReplayVideo(LAST_REC, ok => { if (IS_VR) ui.menu.classList.add('hidden'); vrOverlay(ok ? L2('영상을 저장했습니다. 다운로드 폴더(파일 앱)에서 볼 수 있습니다.', 'Video saved to your Downloads folder.') : L2('영상을 만들지 못했습니다.', 'Could not create the video.'), L2('VR 시작', 'Start VR')); });
+    exportReplayVideo(LAST_REC, ok => { toMenu(); vrOverlay(ok ? L2('영상을 저장했습니다. 다운로드 폴더(파일 앱)에서 볼 수 있습니다.', 'Video saved to your Downloads folder.') : L2('영상을 만들지 못했습니다.', 'Could not create the video.'), L2('VR 시작', 'Start VR')); });
     return;
   }
-  if (S.state === 'run' || S.state === 'demo') togglePause();
-  vrOverlay(XR.userExit ? '' : L2('VR이 멈췄습니다. 버튼을 누르면 하던 FLIGHT을 이어 갑니다.', 'VR was interrupted. Press the button to continue your flight.'), XR.userExit ? L2('VR 시작', 'Start VR') : L2('VR로 돌아가기', 'Back to VR'));
+  if (XR.userExit && (S.state === 'run' || S.state === 'demo' || S.state === 'pause')) toMenu(); else if (S.state === 'run' || S.state === 'demo') togglePause();
+  vrOverlay(XR.userExit ? '' : L2('VR이 멈췄습니다. 버튼을 누르면 하던 FLIGHT을 이어 갑니다.', 'VR was interrupted. Press the button to continue your flight.'), XR.userExit ? L2('VR 시작', 'Start VR') : L2('Back to VR', 'Back to VR'));
 }
-function vrOverlay(msg, btn) {
-  const o = $('vrBack'); if (!o) return; o.classList.remove('hidden');
-  if (msg) $('vrBackD').textContent = msg; if (btn) $('vrBackGo').textContent = btn;
+function vrOverlay(msg, btn) {   // VR 판 2D 화면: Menu(3단계 코스 화면) 위에 안내 줄
+  const o = $('vrBack'); if (o) o.classList.add('hidden');
+  ui.pause.classList.add('hidden'); ui.menu.classList.remove('hidden'); if (MENU.step < 3) wizGo(3);
+  const n = $('vrNote'), r = $('vrResume'), paused = S.state === 'pause';
+  if (n) { n.classList.toggle('hidden', !msg); $('vrNoteT').textContent = msg || ''; }
+  if (r) { r.classList.toggle('hidden', !paused); r.onclick = () => vrStart(); }
 }
+// three r149: Quest 브라우저에서 XRFrame.detectedPlanes 를 읽으면 (평면 인식을 안 켰을 때) 오류가 남 -> 오류 대신 'None'
+function xrPlanesPatch() {
+  try { const P = window.XRFrame && XRFrame.prototype, d = P && Object.getOwnPropertyDescriptor(P, 'detectedPlanes');
+    if (d && d.get && !d.get.__safe) { const g = function () { try { return d.get.call(this); } catch (e) { return undefined; } }; g.__safe = true; Object.defineProperty(P, 'detectedPlanes', { configurable: true, enumerable: d.enumerable, get: g }); } } catch (e) { }
+}
+xrPlanesPatch();
 // ---- 컨트롤러 입력 (readInput 끝에서 부름) ----
 function xrPads() {
   const srcs = XR.src || (XR.sess ? XR.sess.inputSources : []); let L = null, R = null;
@@ -5243,7 +5269,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR15', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR16', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -5411,19 +5437,17 @@ if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSuppo
 else setTimeout(vrPageInit, 0);
 function vrPageInit() {
   if (!IS_VR) return;
-  ui.menu.classList.add('hidden');
   // 한 파일판: 훈련장 고르기 버튼 (고르면 Restart 불러옴) · PC 판 링크 숨김
   const L = sitesAll(), vb = document.querySelector('#vrBack .vb');
   if (vb && L.length > 1 && !$('vrSites')) { const d = document.createElement('div'); d.id = 'vrSites'; d.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:center';
     for (const st of L) { const b = document.createElement('button'); b.textContent = stName(st); b.className = st.id === SITE.id ? 'primary' : ''; b.style.cssText = 'padding:10px 14px;font-size:15px'; b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; d.appendChild(b); }
     vb.insertBefore(d, $('vrBackGo')); }
   if (!window.SIM_BASE && $('vrPC')) $('vrPC').style.display = 'none';
-  vrOverlay(VR_OK.ok ? '' : L2('이 기기·브라우저는 VR을 지원하지 않습니다. Quest 브라우저에서 열어 주세요.', 'This device or browser does not support VR. Open this page in the Quest browser.'));
-  $('vrBackGo').disabled = !VR_OK.ok;
+  if ($('vrBack')) $('vrBack').classList.add('hidden');
 }
 function vrBtnUpdate() {   // PC 판: VR 기기에서 열면 VR 판으로 가는 버튼
   const b = $('msGoVR'); if (!b) return;
-  b.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL); const w = $('wzVR'); if (w) w.classList.toggle('hidden', IS_VR || !VR_OK.ok || !window.SIM_VR_URL);
+  b.classList.add('hidden'); const w = $('wzVR'); if (w) w.classList.add('hidden');   // 처음 화면에서 컴퓨터/VR 을 고르므로 중복 버튼은 숨김
   b.textContent = L2('Quest VR 버전 열기', 'Open the Quest VR version');
 }
 if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };

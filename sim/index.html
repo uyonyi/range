@@ -216,6 +216,13 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 
 #vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:24px;color:#fff;text-align:center}#vrBack p{margin:0;max-width:420px;font-size:15px;line-height:1.5;color:#cfd6da;text-align:center}#vrBack a{color:#4fe3ff;text-align:center;font-size:15px}#vrBack button:disabled{opacity:.4}#vrBack button{padding:16px;font-size:20px}
 /* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
+#menuCard[data-step="0"] .wzbar{display:none}#menuCard[data-step="0"]{max-width:720px}#menuCard[data-step="0"] .s0,
+#menuCard[data-step="0"] .s0{display:block!important}.s0>*{width:100%;box-sizing:border-box}
+.introG{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.introC{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:22px 20px;border-radius:12px;text-align:left;min-height:150px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(255,200,40,.14),rgba(255,200,40,.02))}.introC.vr{background:linear-gradient(135deg,rgba(79,227,255,.16),rgba(79,227,255,.02))}.introC i{font-style:normal;font-size:38px;line-height:1}.introC b{font-size:21px;margin-top:6px}.introC small{font-size:12px;opacity:.75}.introC:hover{outline:2px solid var(--amber)}.introC.vr:hover{outline-color:#4fe3ff}
+@media (max-width:560px){.introG{grid-template-columns:1fr}}
+.wzmode{flex:0 0 auto!important;cursor:pointer;background:#1d2a33!important;color:#4fe3ff!important;font-weight:700}
+.stgtog{position:absolute;right:10px;top:10px;z-index:2}.stgtog button{padding:4px 10px;font-size:12px}
+.vrnote{margin:10px 0 0;padding:10px 12px;border:1px solid #4fe3ff;border-radius:8px;background:rgba(79,227,255,.08);display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px}.vrnote.hidden{display:none}#vrResume.hidden{display:none}
 #menuCard .wz{display:none}#menuCard[data-step="1"] .s1,#menuCard[data-step="2"] .s2,#menuCard[data-step="3"] .s3{display:block}
 #menuCard[data-step="1"]{max-width:620px}#menuCard[data-step="2"]{max-width:760px}
 .mmain.one{grid-template-columns:minmax(0,1fr)!important}
@@ -321,16 +328,24 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="rot" class="hidden"><div class="ph"></div><div>휴대폰을 가로로 돌려 주세요</div></div>
 
 <div id="menu" class="panel">
-  <div class="card" style="position:relative" id="menuCard" data-step="1">
+  <div class="card" style="position:relative" id="menuCard" data-step="0">
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)</h2>
-    <div class="wzbar"><span data-s="1">1 · 조종사</span><span data-s="2">2 · 기체</span><span data-s="3">3 · 코스</span></div>
+    <div class="wzbar"><span class="wzmode" id="wzMode"></span><span data-s="1">1 · 조종사</span><span data-s="2">2 · 기체</span><span data-s="3">3 · 코스</span></div>
+    <section class="wz s0">
+      <div class="pickLbl">어떻게 비행할까요?</div>
+      <div class="introG">
+        <button id="introPC" class="introC"><i>🖥</i><b>컴퓨터로 비행</b><small>키보드 · 게임패드 · RC 조종기 · 휴대폰 터치</small></button>
+        <button id="introVR" class="introC vr"><i>🥽</i><b>VR로 비행</b><small>Meta Quest 헤드셋 · FPV 고글 화면</small></button>
+      </div>
+      <p id="introNote" class="wzhint"></p>
+    </section>
     <section class="wz s1">
       <div class="pickLbl">조종사 이름</div>
       <input id="pilotName" maxlength="16" placeholder="이름 또는 호출 부호" autocomplete="off" spellcheck="false">
       <p class="wzhint">기록 · 결과 브리핑 · 보고 사진에 표시됩니다.</p>
-      <div class="wzbtns"><span></span><button class="primary" id="wz1Next">다음 ▶</button></div>
+      <div class="wzbtns"><button id="wz1Back">◀ 처음</button><button class="primary" id="wz1Next">다음 ▶</button></div>
       <div class="note">속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.</div>
     </section>
     <div class="wz s2">
@@ -365,11 +380,12 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
           <button data-cat="strike" data-g="mission" data-ms="strike" data-ic="✕"><b>타격</b><small>표적 차량에 돌입 · 명중 오차</small></button>
         </div>
         <div id="msDetail" class="msdetail">
-          <div class="msStageW"><canvas id="msStage"></canvas><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
+          <div class="msStageW"><canvas id="msStage"></canvas><div class="seg stgtog" id="segTime2"><button data-v="0" class="on">☀ 낮</button><button data-v="1">☾ 밤</button></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
           <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">출격 ▶</button><button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
       </div>
+      <div id="vrNote" class="vrnote hidden"><span id="vrNoteT"></span><button id="vrResume" class="primary hidden">VR로 돌아가기</button></div>
       <div class="wzbtns"><button id="wz3Back">◀ 기체</button><span class="wzmid"><button id="bOpt">⚙ 옵션</button><button id="bCtl">🎮 조작 안내</button></span><span id="wzWho" class="wzwho"></span></div>
     </div>
   </div>
@@ -594,7 +610,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=7121f7e8"></script><script>window.SIM_LANG='ko';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.ko.js?v=7121f7e8"></script>
+<script src="sites/yeongin.js?v=a7b6eef1"></script><script>window.SIM_LANG='ko';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.ko.js?v=a7b6eef1"></script>
 </body>
 </html>
