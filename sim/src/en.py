@@ -437,6 +437,7 @@ EN.update({
 '<b>자유 비행</b><small>제한 없이</small>': '<b>Free flight</b><small>No limits</small>',
 '<b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small>': '<b>Tutorial</b><small>Step-by-step lessons (recon quad)</small>',
 '<b>기준 비행 보기</b><small>모범 비행 재생</small>': '<b>Reference flight</b><small>Replay the model flight</small>',
+'계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span>': 'Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span>',
 '시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="1">밤</button></span>': 'Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="1">Night</button></span>',
 'FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span>': 'FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span>',
 '속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.': "Speed, size and climb rate approximate public specifications; this training-concept simulator does not reproduce the real aircraft's flight characteristics. Airframe names indicate shape only.",
