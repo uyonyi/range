@@ -75,7 +75,7 @@ function finishRun() {
   const rec = recFinish();
   setTimeout(() => {
     if (S.state !== 'run') return;
-    S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden');
+    S.state = 'result'; ui.hud.classList.add('hidden'); ui.result.classList.remove('hidden'); if ($('resTitle')) $('resTitle').textContent = 'COURSE COMPLETE'; { const rp = $('resPhotos'); if (rp) rp.style.display = 'none'; }
     const total = S.t + S.pen, done = S.objState.filter(v => v === 1).length;
     ui.resSub.textContent = `${MODES[SET.diff].name} · 과제 ${done}/${OBJS.length} 성공`;
     const rows = [['비행 시간', fmt(S.t)], ['벌점', '+' + S.pen.toFixed(0) + ' s'], ['합계', fmt(total)], ['충돌', S.impacts + ' 회'],
@@ -723,6 +723,7 @@ function handleKeys() {
     if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
     if (k === 'Escape') { togglePause(); continue; }
     if (S.state === 'pause') continue;
+    if ((k === 'Enter' || k === 'PadA') && S.state === 'run' && photoMission()) { missionPhoto(); continue; }   // 산불·수색: 사진 찍어 보고
     if (S.kind === 'tutorial' && S.tut) {
       if (S.tut.st === 'intro' && (k === 'Enter' || k === 'Space' || k === 'X_Space' || k === 'PadA')) { tutFly(); continue; }
       if (S.tut.st === 'done') { if (k === 'Enter' || k === 'Space' || k === 'X_Space' || k === 'PadA') { tutNext(); continue; } if (k === 'KeyR') { tutRetry(); continue; } }
