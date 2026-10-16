@@ -59,7 +59,9 @@ def build_public(outdir, site_ids=('yeongin',)):
     """공개판: 라이브러리·현장 데이터·앱을 따로 둔 여러 파일 구조"""
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
-    if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
+    if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
+    for f in ('radio_voice.bin', 'radio_voice.json'):   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+        if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
         s = dict(all_sites[sid])
@@ -123,6 +125,9 @@ def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False):
     o += '<script>' + sk[3] + '</script>'   # 현장·코스 데이터는 한 번만 (언어별 차이는 이름·언어 값뿐)
     if vr and os.path.exists('tts-worker.js'):   # VR 한 파일판: 무전 음성 합성기를 파일 안에 (GPL 구성 요소, 영어 음성 없는 기기에서만 씀)
         o += '<script type="text/plain" id="ttsw">' + esc(open('tts-worker.js', encoding='utf-8').read()) + '</script>'
+    if os.path.exists('radio_voice.bin'):   # 무전 음성 조각을 파일 안에
+        import base64
+        o += '<script type="text/plain" id="rvb">' + base64.b64encode(open('radio_voice.bin', 'rb').read()).decode() + '</script><script type="application/json" id="rvi">' + open('radio_voice.json').read() + '</script>'
     o += '<script type="text/plain" id="g_ko">' + esc(sk[4]) + '</script><script type="text/plain" id="g_en">' + esc(se[4]) + '</script>'
     o += '<script>window.SIM_DUAL=true;window.SIM_PAGES=' + json.dumps({'ko': {'body': bk, 'title': tk}, 'en': {'body': be, 'title': te}}, ensure_ascii=False).replace('</', '<\\/') + ';' + """
 (function(){var L='ko';try{L=localStorage.getItem('fpvsim_lang')||'ko'}catch(e){}if(L!=='en')L='ko';
