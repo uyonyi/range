@@ -5092,16 +5092,44 @@ if ($('wzVR')) $('wzVR').onclick = () => { if (window.SIM_VR_URL) location.href 
 setInterval(() => { const a = $('padStatus'), b = $('padStatus2'); if (a && b) b.textContent = a.textContent; }, 1000);
 setTimeout(() => wizGo(HAS_INTRO ? 0 : 1), 0);
 // 첫 화면 비밀번호 (간단한 출입 확인용 · 이 기기에서 한 번 맞히면 기억)
+// 입장 번호: 번호 자체는 코드에 두지 않고, 소금+SHA-256 1만2천 번 반복한 값만 둔다.
+// 기억 값은 중간 단계(5천 번) 값이라 코드에 없는 값이고, 나머지를 돌려 확인한다.
+function sha256hex(str) {
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const b = unescape(encodeURIComponent(str)), l = b.length, n = ((l + 9 + 63) >> 6) << 4, w = new Array(n).fill(0);
+  for (let i = 0; i < l; i++) w[i >> 2] |= b.charCodeAt(i) << (24 - (i & 3) * 8);
+  w[l >> 2] |= 0x80 << (24 - (l & 3) * 8); w[n - 1] = l * 8;
+  let h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]; const W = new Array(64);
+  const r = (x, y) => (x >>> y) | (x << (32 - y));
+  for (let o = 0; o < n; o += 16) {
+    for (let i = 0; i < 64; i++) W[i] = i < 16 ? w[o + i] | 0 : (r(W[i-2],17) ^ r(W[i-2],19) ^ (W[i-2] >>> 10)) + W[i-7] + (r(W[i-15],7) ^ r(W[i-15],18) ^ (W[i-15] >>> 3)) + W[i-16] | 0;
+    let [A, B, C, D, E, F, G, H] = h;
+    for (let i = 0; i < 64; i++) {
+      const t1 = H + (r(E,6) ^ r(E,11) ^ r(E,25)) + ((E & F) ^ (~E & G)) + K[i] + W[i] | 0, t2 = (r(A,2) ^ r(A,13) ^ r(A,22)) + ((A & B) ^ (A & C) ^ (B & C)) | 0;
+      H = G; G = F; F = E; E = D + t1 | 0; D = C; C = B; B = A; A = t1 + t2 | 0;
+    }
+    h = h.map((v, i) => v + [A, B, C, D, E, F, G, H][i] | 0);
+  }
+  return h.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+}
+function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex('fpv~' + i + '~' + x); return x; }
 (function pinGate() {
-  const CODE = '5210', KEY = 'fpvsim_pin_ok', el = $('pinGate'); if (!el) return;
-  let ok = false; try { ok = localStorage.getItem(KEY) === '1'; } catch (e) { }
+  const SALT = 'k7Qx2#range', MID = 5000, N = 12000, FIN = '667c6eac4841dacac28af88ce9febae877dcf0556f15edc5211601d0f51bb8eb', KEY = 'fpvsim_pin_ok', el = $('pinGate'); if (!el) return;
+  const okMid = m => typeof m === 'string' && /^[0-9a-f]{64}$/.test(m) && pinStretch(m, MID, N) === FIN;
+  let ok = false; try { ok = okMid(localStorage.getItem(KEY)); } catch (e) { }
   if (ok || /[?&]test/.test(location.search)) return;
   el.classList.remove('hidden'); let v = '';
   const dots = $('pinDots'), msg = $('pinMsg'), draw = () => [...dots.children].forEach((d, i) => d.classList.toggle('on', i < v.length));
+  let wrong = 0, lockUntil = 0;
   const press = k => {
+    if (performance.now() < lockUntil) return;
     if (k === 'del') v = v.slice(0, -1); else if (/^\d$/.test(k) && v.length < 4) v += k; draw();
-    if (v.length === 4) { if (v === CODE) { try { localStorage.setItem(KEY, '1'); } catch (e) { } el.classList.add('hidden'); window.removeEventListener('keydown', kd, true); }
-      else { msg.textContent = L2('번호가 맞지 않습니다', 'Wrong code'); dots.classList.remove('bad'); void dots.offsetWidth; dots.classList.add('bad'); setTimeout(() => { v = ''; draw(); }, 350); } }
+    if (v.length !== 4) return;
+    const mid = pinStretch(SALT + v, 0, MID);
+    if (pinStretch(mid, MID, N) === FIN) { try { localStorage.setItem(KEY, mid); } catch (e) { } el.classList.add('hidden'); window.removeEventListener('keydown', kd, true); return; }
+    wrong++; const wait = wrong >= 5 ? Math.min(30, 5 * (wrong - 4)) : 0; lockUntil = performance.now() + wait * 1000;
+    msg.textContent = wait ? L2(`번호가 맞지 않습니다 · ${wait}초 뒤 Restart`, `Wrong code · retry in ${wait}s`) : L2('번호가 맞지 않습니다', 'Wrong code');
+    dots.classList.remove('bad'); void dots.offsetWidth; dots.classList.add('bad'); setTimeout(() => { v = ''; draw(); }, 350);
   };
   $('pinPad').querySelectorAll('button').forEach(b => b.addEventListener('click', () => press(b.dataset.k || b.textContent)));
   const kd = e => { if (el.classList.contains('hidden')) return; e.stopImmediatePropagation(); e.preventDefault(); if (/^Digit\d$|^Numpad\d$/.test(e.code)) press(e.code.slice(-1)); else if (e.key === 'Backspace') press('del'); };
@@ -5620,4 +5648,55 @@ if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
 Object.assign(window.__sim, { setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+// ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 SETTINGS ----
+(function optUX() {
+  const P = $('optPanel'); if (!P || !$('optTabs')) return;
+  const H = {
+    segDiff: { train: ['느리고, 스틱을 놓으면 멈추고, 다음 과제 쪽으로 방향을 잡아 줍니다 · 처음 FLIGHT에', 'Slow, stops when you let go, turns toward the next task · for first flights'], easy: ['고도를 유지하고 약하게 assist합니다', 'Holds altitude with light assistance'], atti: ['위치를 잡아 주지 않고 자세만 유지 · 바람에 밀리고 관성으로 미끄러짐 · 실기체 감각', 'Holds attitude only, not position · drifts with wind and momentum · like the real aircraft'], sport: ['assist None · 가장 빠르고 민감합니다', 'No assistance · fastest and most sensitive'] },
+    segExpo: { real: ['스틱을 민 만큼 그대로 반응 · RC 조종기와 같은 느낌', 'Responds exactly to stick travel · feels like an RC transmitter'], soft: ['가운데 부근이 둔해서 미세 조종이 쉽습니다', 'Softer around centre for easy fine control'] },
+    segAssist: { 1: ['자세·고도를 잡아 줍니다 (H 키로 켜기/끄기)', 'Steadies attitude and altitude (H toggles)'], 0: ['assist 없이 직접 조종합니다', 'You fly without assistance'] },
+    segGuide: { 1: ['다음 과제 쪽 화살표를 보여 줍니다', 'Shows an arrow toward the next task'], 0: ['화살표 없이 지도와 무전만으로 찾아갑니다', 'No arrow · navigate by map and radio'] },
+    segAcro: { 0: ['스틱을 놓으면 기체가 수평으로 돌아옵니다', 'The aircraft levels out when you let go'], 1: ['기울어진 채로 유지되는 완전 수동 · 숙련자용', 'Fully manual, stays banked · for experienced pilots'] },
+    segTime: { 0: ['밝은 낮 · 가장 잘 보입니다', 'Daylight · best visibility'], 2: ['해가 낮아 그림자가 길고 역광이 생깁니다', 'Low sun, long shadows and glare'], 1: ['어두움 · IR Camera와 Light이 중요합니다', 'Dark · IR camera and lights matter'] },
+    segWx: { clear: ['비·눈을 고르면 시야가 줄고 산불 감시는 쉽니다', 'Rain or snow cuts visibility and stops fire watch'], rain: ['빗줄기·안개로 시야가 줄어듭니다 · 산불 감시 불가', 'Rain and fog cut visibility · no fire watch'], snow: ['땅과 나무가 눈에 덮입니다 · 산불 감시 불가', 'Ground and trees under snow · no fire watch'] },
+    segWxFx: { 0: ['날씨는 보이기만 하고 FLIGHT에는 영향 None', 'Weather is visual only'], 1: ['돌풍이 불고 Camera·센서 시야가 떨어집니다', 'Gusts, and reduced camera and sensor range'] },
+    segWind: { 0: ['바람 None', 'Calm'], 1: ['Pause FLIGHT이 조금씩 밀립니다', 'Hover drifts a little'], 2: ['제자리에서도 Resume 수정 조작이 필요합니다', 'Constant correction needed even in a hover'] },
+    segHud: { auto: ['기체 종류에 맞춰 자동으로 고릅니다', 'Picked automatically for the airframe'], fpv: ['고도·속도 숫자 위주의 간단한 표시', 'Simple altitude and speed readouts'], uas: ['피치 사다리 · 속도·고도 테이프 · HSI 방위계', 'Pitch ladder, speed and altitude tapes, HSI'] },
+    segBelly: { 1: ['Drop·선 때 아래 화면이 자동으로 뜹니다', 'Lower view appears automatically for drops and orbits'], 0: ['X 키를 눌렀을 때만 봅니다', 'Only when you press X'] },
+    segFull: { 1: ['출격할 때 Full screen으로 바꿉니다', 'Switches to full screen at launch'], 0: ['창 크기 그대로 FLIGHT합니다', 'Stays in the window'] },
+    segVoice: { 1: ['CONTROL(남)·EAGLE ONE(여) 영어 무전을 SOUND로 들려줍니다', 'Plays CONTROL (male) and EAGLE ONE (female) radio'], 0: ['무전은 글자로만 보입니다', 'Radio shown as text only'] },
+    segMusic: { 1: ['Music On · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['Music Off', 'Music off'] },
+    segKeys: { A: ['W/S climb·descend · A/D yaw · 방향키 move', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·yaw, WASD로 move', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 set manually합니다', 'Assign every key yourself'] },
+  };
+  const segV = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.dataset.v : null; };
+  const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
+  Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
+  // 빠른 SETTINGS (코스 고르는 화면)
+  const QS = [['segDiff', '🎚', 'Difficulty', 'Mode'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', 'Guide', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
+  const bar = $('qsBar');
+  const draw = () => {
+    P.querySelectorAll('small.oh').forEach(h => { const m = H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
+    if (bar) bar.querySelectorAll('button[data-s]').forEach(b => { b.querySelector('b').textContent = segT(b.dataset.s); const m = H[b.dataset.s], t = m && m[segV(b.dataset.s)]; b.title = t ? L2(t[0], t[1]) : ''; });
+  };
+  if (bar) {
+    bar.innerHTML = QS.map(([id, ic, ko, en]) => `<button data-s="${id}">${ic} ${L2(ko, en)}<b></b></button>`).join('') + `<button class="all">⚙ ${L2('모든 옵션', 'All options')}</button>`;
+    bar.querySelectorAll('button[data-s]').forEach(b => b.onclick = () => {
+      const bs = [...$(b.dataset.s).querySelectorAll('button')].filter(x => !x.disabled), i = bs.findIndex(x => x.classList.contains('on'));
+      const nx = bs[(i + 1) % bs.length]; if (nx) nx.click();
+      b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); setTimeout(draw, 0);
+    });
+    bar.querySelector('.all').onclick = () => optOpen();
+  }
+  // 탭
+  let last = 'fly';
+  const tab = t => { last = t; $('optTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); P.querySelectorAll('.otab').forEach(d => d.classList.toggle('on', d.dataset.t === t)); };
+  $('optTabs').querySelectorAll('button').forEach(b => b.onclick = () => tab(b.dataset.t));
+  window.optOpen = t => { tab(t || last); openPanel('optPanel'); draw(); };
+  tab('fly');
+  if ($('bOpt')) $('bOpt').onclick = () => optOpen();
+  if ($('bPauseOpt')) $('bPauseOpt').onclick = () => optOpen();
+  if ($('bSet')) $('bSet').onclick = () => optOpen('gis');
+  new MutationObserver(() => draw()).observe(P, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  draw();
+})();
 })();

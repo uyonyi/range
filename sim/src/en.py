@@ -1,4 +1,10 @@
 EN = {
+'✈️ 비행': '✈️ Flight',
+'🌤 날씨·시간': '🌤 Weather·time',
+'🖥 화면': '🖥 Display',
+'🔊 소리': '🔊 Sound',
+'🎮 조작 장치': '🎮 Controllers',
+'🗺 지형': '🗺 Terrain',
 '<div class="pickLbl">기체 <small>공개 제원 기준 근사</small></div>': '<div class="pickLbl">Airframe <small>approximated from public specs</small></div>',
 '<div class="pickLbl">임무 <small>눌러서 미리 보기 · 두 번 누르면 바로 출격</small></div>': '<div class="pickLbl">Mission <small>tap to preview · tap twice to launch</small></div>',
 '<button id="msGo" class="primary go">출격 ▶</button>': '<button id="msGo" class="primary go">Launch ▶</button>',
