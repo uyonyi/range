@@ -43,7 +43,7 @@ function startRun(kind) {
   if (!isMission(kind)) mapView('course');
   dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset();   // 이전 비행 기록·명령·무전이 섞이지 않게
   if (isMission(kind)) msStart(kind);
-  else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
+  else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing' && typeof wingRwyOK === 'function' && wingRwyOK(AFc())) { wingGround(); MS.launch = { p: DR.p.clone(), h: DR.h }; } else if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
   S._fromDemo = kind === 'demo';
   OBJS.forEach(o => { if (o.hint) o.hint.visible = false; });
@@ -575,6 +575,7 @@ function drawMapBg() {
     const col = { pad: '#fff', gate_sq: '#ffc828', gate_tri: '#ffc828', ring: '#ffc828', pole: '#e0b020', bunker: '#c09060', tunnel: '#9aa', tank: '#a3b26a', mit: '#a3b26a', ivan_group: '#a3b26a' }[o.type] || 'rgba(200,200,200,.45)';
     g.fillStyle = col; const s = ['building', 'hipbld', 'pavilion', 'bleacher', 'shelter', 'tank'].includes(o.type) ? 5 : 3; g.fillRect(p[0] - s / 2, p[1] - s / 2, s, s);
   }
+  if (window.__RWY) { const A = window.__RWY.a, B = window.__RWY.b, p = mxy(-A.z, A.x), q = mxy(-B.z, B.x); g.strokeStyle = 'rgba(230,230,225,.9)'; g.lineWidth = 3.5; g.setLineDash([]); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }   // 활주로
   // 비행 구역 경계 (점선 원)
   { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
 }
