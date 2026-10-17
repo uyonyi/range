@@ -756,16 +756,78 @@ function snowPatch() {   // 처음 눈이 올 때 한 번: 장면의 지형·나
 function wxTick(dt) {
   // 눈: 몇 초에 걸쳐 쌓이고, 그치면 서서히 녹음 · 풀은 눈 속에 묻힘
   { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 6, dt / 6); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
+  lensTick(dt);
   if (!WX.g || (ENV.wx || 'clear') === 'clear') return;
-  const c = (S.state === 'replay' && RP.pose) ? RP.pose.p : DR.p; WX.g.position.set(c.x, c.y, c.z);
-  const wv = windAt(c), B = WX.B, H = WX.H, half = B / 2, t = performance.now() / 1000;
+  // 입자는 땅에 고정: 묶음은 드론을 따라가되, 드론이 움직인 만큼 입자를 반대로 옮김 -> 날아가면 비·눈이 스쳐 지나감
+  const c = (S.state === 'replay' && RP.pose) ? RP.pose.p : DR.p;
+  if (!WX.last) WX.last = c.clone();
+  const dx = c.x - WX.last.x, dy = c.y - WX.last.y, dz = c.z - WX.last.z, jump = dx * dx + dy * dy + dz * dz > 400;   // 20 m 넘게 순간 이동(재시작 등)이면 그대로 둠
+  if (!WX.vel) WX.vel = new V3();
+  if (!jump && dt > 0) WX.vel.lerp(new V3(dx / dt, dy / dt, dz / dt), 1 - Math.exp(-dt * 12)); else WX.vel.set(0, 0, 0);
+  WX.last.copy(c); WX.g.position.set(c.x, c.y, c.z);
+  const mx = jump ? 0 : dx, my = jump ? 0 : dy, mz = jump ? 0 : dz;
+  const wv = windAt(c), B = WX.B, H = WX.H, half = B / 2, hh = H / 2, t = performance.now() / 1000, dv = WX.vel;
   const wrap = (a, i) => { if (a[i] < -half) a[i] += B; else if (a[i] > half) a[i] -= B; };
-  if (WX.rain && WX.rain.visible) { const a = WX.rain.geometry.attributes.position.array, vy = -14 * dt, vx = wv.x * dt, vz = wv.z * dt;
-    for (let i = 0; i < a.length; i += 6) { a[i] += vx; a[i + 2] += vz; a[i + 1] += vy; if (a[i + 1] < -H / 2) a[i + 1] += H; wrap(a, i); wrap(a, i + 2); a[i + 3] = a[i] - wv.x * 0.05; a[i + 4] = a[i + 1] - 0.7; a[i + 5] = a[i + 2] - wv.z * 0.05; }
+  const wrapY = (a, i) => { if (a[i] < -hh) a[i] += H; else if (a[i] > hh) a[i] -= H; };
+  if (WX.rain && WX.rain.visible) { const a = WX.rain.geometry.attributes.position.array, EXP = 0.045;
+    for (let i = 0, j = 0; i < a.length; i += 6, j++) {
+      const fall = 7.5 + (j % 9) * 0.25;   // 빗방울 낙하 속도 7.5~9.5 m/s
+      a[i] += wv.x * dt - mx; a[i + 1] += -fall * dt - my; a[i + 2] += wv.z * dt - mz; wrap(a, i); wrapY(a, i + 1); wrap(a, i + 2);
+      // 줄기 = 카메라가 본 상대 속도 × 노출 시간 (호버링: 수직 짧게, 전진: 앞에서 날아오듯 기울고 길게)
+      let rx = wv.x - dv.x, ry = -fall - dv.y, rz = wv.z - dv.z; const L = Math.hypot(rx, ry, rz) * EXP, k = L > 2.2 ? 2.2 / L : 1;
+      a[i + 3] = a[i] - rx * EXP * k; a[i + 4] = a[i + 1] - ry * EXP * k; a[i + 5] = a[i + 2] - rz * EXP * k;
+    }
     WX.rain.geometry.attributes.position.needsUpdate = true; }
   if (WX.snow && WX.snow.visible) { const a = WX.snow.geometry.attributes.position.array;
-    for (let i = 0; i < a.length; i += 3) { const k = i * 0.37; a[i] += (wv.x * 0.6 + Math.sin(t * 0.9 + k) * 0.5) * dt; a[i + 2] += (wv.z * 0.6 + Math.cos(t * 0.7 + k) * 0.5) * dt; a[i + 1] -= 1.1 * dt; if (a[i + 1] < -H / 2) a[i + 1] += H; wrap(a, i); wrap(a, i + 2); }
+    for (let i = 0; i < a.length; i += 3) { const k = i * 0.37; a[i] += (wv.x * 0.6 + Math.sin(t * 0.9 + k) * 0.5) * dt - mx; a[i + 2] += (wv.z * 0.6 + Math.cos(t * 0.7 + k) * 0.5) * dt - mz; a[i + 1] -= 1.1 * dt + my; wrapY(a, i + 1); wrap(a, i); wrap(a, i + 2); }
     WX.snow.geometry.attributes.position.needsUpdate = true; }
+}
+// ---- 렌즈 물방울 (FPV 카메라 · 비): 앉아 있다가 커지면 흘러내리고, 전진하면 바깥으로 · 옆바람엔 옆으로 밀림 ----
+const LENS = { cv: null, g: null, d: [], acc: 0, on: false, dirty: false, tex: null, m: null, q: new THREE.Quaternion(), v: new V3() };
+function lensSize() { if (!LENS.cv) return; const w = 640, h = XR_ON ? 360 : Math.max(200, Math.round(640 * innerHeight / Math.max(1, innerWidth))); if (LENS.cv.width !== w || LENS.cv.height !== h) { LENS.cv.width = w; LENS.cv.height = h; LENS.d.length = 0; } }
+function lensInit() {
+  if (LENS.cv) return; const cv = LENS.cv = document.createElement('canvas'); cv.id = 'lensWx'; LENS.g = cv.getContext('2d');
+  const vig = $('vig'); (vig && vig.parentNode ? vig.parentNode : document.body).insertBefore(cv, vig ? vig.nextSibling : null); lensSize(); addEventListener('resize', lensSize);
+  if (typeof VR_SCR !== 'undefined') { LENS.tex = new THREE.CanvasTexture(cv); LENS.tex.encoding = THREE.sRGBEncoding;
+    LENS.m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), new THREE.MeshBasicMaterial({ map: LENS.tex, transparent: true, depthWrite: false, toneMapped: false })); LENS.m.position.z = 0.0015; LENS.m.renderOrder = 9; LENS.m.visible = false; VR_SCR.add(LENS.m); }
+}
+function lensTick(dt) {
+  const want = (ENV.wx === 'rain') && CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay' || S.state === 'pause');
+  if (!want && !LENS.d.length) { if (LENS.dirty) { LENS.g.clearRect(0, 0, LENS.cv.width, LENS.cv.height); LENS.dirty = false; if (LENS.tex) LENS.tex.needsUpdate = true; } if (LENS.m) LENS.m.visible = false; return; }
+  lensInit(); lensSize(); const W2 = LENS.cv.width, H2 = LENS.cv.height, g = LENS.g, D = LENS.d, run = S.state !== 'pause';
+  if (LENS.m) LENS.m.visible = XR_ON;
+  // 카메라 기준 공기 흐름: 드론 속도 - 바람 → 카메라 좌표 (앞 = -z)
+  const vel = (WX.vel || LENS.v), wv = windAt(DR.p); LENS.v.set(vel.x - wv.x, vel.y - wv.y, vel.z - wv.z).applyQuaternion(LENS.q.copy(camera.quaternion).invert());
+  const fwd = -LENS.v.z, side = LENS.v.x, up = LENS.v.y, sp = Math.hypot(fwd, side, up);
+  if (run && dt > 0) {
+    if (want) { LENS.acc += dt * (2.2 + Math.max(0, fwd) * 0.45 + Math.max(0, up) * 0.3); while (LENS.acc > 1 && D.length < 70) { LENS.acc -= 1; D.push({ x: Math.random() * W2, y: Math.random() * H2, r: 2.4 + Math.random() * 4.2, life: 7 + Math.random() * 8, age: 0, hold: Math.random() * 3, tr: [] }); } }
+    else D.forEach(d => d.life = Math.min(d.life, d.age + 0.6));   // 카메라를 바꾸거나 비가 그치면 금방 사라짐
+    const cx = W2 / 2, cy = H2 / 2, S0 = W2 / 2;
+    for (const d of D) {
+      d.age += dt; d.r = Math.min(12, d.r + dt * 0.25 * (want ? 1 : 0));
+      // 공기 흐름: 전진하면 가운데에서 바깥으로, 옆·위아래 이동은 반대쪽으로 밀림 (작은 물방울은 표면 장력으로 버팀)
+      const grip = 4 / d.r; let ax = 0, ay = 0;
+      if (fwd > 2) { const f = (fwd - 2) * 2.4; ax += (d.x - cx) / S0 * f; ay += (d.y - cy) / S0 * f; }
+      ax += -side * 2.2; ay += up * 2.2;
+      const air = Math.hypot(ax, ay), moving = air > 8 * grip || d.r > 8;
+      if (d.hold > 0 && !moving) d.hold -= dt;
+      let vx = 0, vy = 0;
+      if (moving) { const m = Math.max(0, air - 6 * grip); if (air > 0) { vx = ax / air * m * 4; vy = ay / air * m * 4; } if (d.r > 8) vy += (d.r - 7) * 9 + Math.sin(d.age * 3 + d.x) * 4; }
+      if (vx || vy) { d.tr.push(d.x, d.y); if (d.tr.length > 16) d.tr.splice(0, 2); d.x += vx * dt; d.y += vy * dt; d.r = Math.max(2, d.r - Math.hypot(vx, vy) * dt * 0.01); }
+      else if (d.tr.length) d.tr.splice(0, 2);
+    }
+    for (let i = D.length - 1; i >= 0; i--) { const d = D[i]; if (d.age > d.life || d.x < -20 || d.x > W2 + 20 || d.y < -20 || d.y > H2 + 20) D.splice(i, 1); }
+  }
+  g.clearRect(0, 0, W2, H2); LENS.dirty = true;
+  for (const d of D) {
+    const a = Math.min(1, d.age * 3, (d.life - d.age) * 1.2);
+    if (d.tr.length >= 4) { g.strokeStyle = `rgba(210,224,238,${0.16 * a})`; g.lineWidth = d.r * 0.7; g.lineCap = 'round'; g.beginPath(); g.moveTo(d.tr[0], d.tr[1]); for (let k = 2; k < d.tr.length; k += 2) g.lineTo(d.tr[k], d.tr[k + 1]); g.lineTo(d.x, d.y); g.stroke(); }
+    const gr = g.createRadialGradient(d.x - d.r * 0.25, d.y - d.r * 0.3, d.r * 0.1, d.x, d.y, d.r);
+    gr.addColorStop(0, `rgba(240,246,252,${0.22 * a})`); gr.addColorStop(0.6, `rgba(160,175,190,${0.16 * a})`); gr.addColorStop(0.85, `rgba(45,55,66,${0.24 * a})`); gr.addColorStop(1, `rgba(220,230,240,${0.14 * a})`);
+    g.fillStyle = gr; g.beginPath(); g.ellipse(d.x, d.y, d.r * 0.92, d.r, 0, 0, 6.2832); g.fill();
+    g.fillStyle = `rgba(255,255,255,${0.45 * a})`; g.beginPath(); g.arc(d.x - d.r * 0.35, d.y - d.r * 0.4, Math.max(0.6, d.r * 0.22), 0, 6.2832); g.fill();
+  }
+  if (LENS.tex && XR_ON) LENS.tex.needsUpdate = true;
 }
 function setTod(v) { SET.tod = v; SET.night = v === 'night'; ENV.night = SET.night; ENV.dusk = v === 'dusk'; saveSet(); if (ENV.ir) irSet(false); envApply(); syncTime(); }
 function setWxFx(on) { SET.wxFx = !!on; saveSet(); syncTime(); if (S.state === 'run') showMsg(on ? L2('기상 영향 켬 · 돌풍·시야 감소', 'Weather effects on · gusts, reduced visibility') : L2('기상 영향 끔', 'Weather effects off'), '#4fe3ff', 1.2); }
