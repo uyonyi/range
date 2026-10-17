@@ -63,6 +63,7 @@ EN = {
 'title="맑음"': 'title="Clear"',
 'title="비"': 'title="Rain"',
 'title="눈"': 'title="Snow"',
+'비밀번호 4자리': 'Enter the 4-digit code',
 '조종 난이도': 'Difficulty',
 '스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span>': 'Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span>',
 '입문': 'Training',

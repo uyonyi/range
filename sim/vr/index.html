@@ -219,6 +219,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 
 #vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:24px;color:#fff;text-align:center}#vrBack p{margin:0;max-width:420px;font-size:15px;line-height:1.5;color:#cfd6da;text-align:center}#vrBack a{color:#4fe3ff;text-align:center;font-size:15px}#vrBack button:disabled{opacity:.4}#vrBack button{padding:16px;font-size:20px}
 /* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
+#pinGate{z-index:90;background:rgba(6,8,10,.92)}.pincard{max-width:340px;text-align:center}.pindots{display:flex;gap:14px;justify-content:center;margin:14px 0 18px}.pindots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--amber);display:block}.pindots i.on{background:var(--amber)}.pindots.bad{animation:pinShake .35s}@keyframes pinShake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pinpad button{margin:0;padding:14px 0;font-size:22px;border-radius:10px}
 #menuCard[data-step="0"] .wzbar{display:none}#menuCard[data-step="0"]{max-width:720px}#menuCard[data-step="0"] .s0,
 #menuCard[data-step="0"] .s0{display:block!important}.s0>*{width:100%;box-sizing:border-box}
 .introG{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.introC{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:22px 20px;border-radius:12px;text-align:left;min-height:150px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(255,200,40,.14),rgba(255,200,40,.02))}.introC.vr{background:linear-gradient(135deg,rgba(79,227,255,.16),rgba(79,227,255,.02))}.introC i{font-style:normal;font-size:38px;line-height:1}.introC b{font-size:21px;margin-top:6px}.introC small{font-size:12px;opacity:.75}.introC:hover{outline:2px solid var(--amber)}.introC.vr:hover{outline-color:#4fe3ff}
@@ -330,6 +331,14 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="vrBack" class="hidden"><div class="vb"><b id="vrBackT">FPV 드론 VR</b><p id="vrBackD">Quest 컨트롤러로 조종하는 FPV 고글 화면 시뮬레이터입니다. 버튼을 누르면 VR 안 메뉴에서 시작합니다.</p><button id="vrBackGo" class="primary">VR 시작</button><a id="vrPC" href="../">PC·휴대폰 버전으로</a></div></div>
 <div id="rot" class="hidden"><div class="ph"></div><div>휴대폰을 가로로 돌려 주세요</div></div>
 
+<div id="pinGate" class="panel hidden">
+  <div class="card pincard">
+    <h1>FPV</h1><h2>비밀번호 4자리</h2>
+    <div id="pinDots" class="pindots"><i></i><i></i><i></i><i></i></div>
+    <div id="pinPad" class="pinpad"><button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button><button>8</button><button>9</button><span></span><button>0</button><button data-k="del">⌫</button></div>
+    <p id="pinMsg" class="wzhint"></p>
+  </div>
+</div>
 <div id="menu" class="panel">
   <div class="card" style="position:relative" id="menuCard" data-step="0">
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
@@ -620,7 +629,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=ccd5cc8f"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.ko.js?v=ccd5cc8f"></script>
+<script src="../sites/yeongin.js?v=7e43e4e9"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.ko.js?v=7e43e4e9"></script>
 </body>
 </html>
