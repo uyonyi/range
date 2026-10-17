@@ -176,7 +176,8 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #brief .bt{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;color:#ffc828}#brief h3{margin:8px 0 6px;font-size:20px}#brief p{margin:6px 0;line-height:1.5;font-size:14px}#brief .bn{color:#9ad7ff}#brief .bm{margin:10px 0 14px;font-size:12px;color:#9aa6ad}
 body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bottom:calc(var(--hsiH,0px) + 44px)}#uasHud{position:fixed;inset:0;pointer-events:none;z-index:6}
 #optPanel,#ctlPanel,#helpPanel,#kbPanel{z-index:60}
-#orderBox{position:absolute;left:14px;top:178px;max-width:300px;padding:7px 10px 8px 12px;background:rgba(10,14,18,.72);border-left:3px solid #ffc828;font:500 12.5px/1.45 system-ui,sans-serif;color:#e8eef2;pointer-events:none}#orderBox b{display:block;color:#ffc828;font-size:11px;letter-spacing:.06em;margin-bottom:2px}body.touch #orderBox{top:auto;bottom:120px;max-width:44vw;font-size:11px}
+.porder{margin:4px 0 12px;padding:8px 10px;border-left:3px solid #ffc828;background:rgba(255,200,40,.07);font-size:13px;line-height:1.45}.porder b{display:block;color:#ffc828;font-size:11px;letter-spacing:.06em;margin-bottom:2px}
+#orderBox{position:absolute;left:calc(10px + env(safe-area-inset-left));top:auto;bottom:88px;max-width:46vw;padding:5px 9px;background:rgba(10,14,18,.78);border:1px solid rgba(255,200,40,.6);border-radius:16px;font:500 11px/1.4 system-ui,sans-serif;color:#e8eef2;pointer-events:auto;z-index:12;touch-action:none}#orderBox b{color:#ffc828;font-size:11px;letter-spacing:.04em}#orderBox b i{font-style:normal;margin-left:4px;display:inline-block;transition:transform .2s}#orderBox span{display:none}#orderBox.open{border-radius:8px}#orderBox.open span{display:block;margin-top:3px}#orderBox.open b i{transform:rotate(180deg)}#orderBox.new{box-shadow:0 0 0 2px rgba(255,200,40,.6);animation:obPulse 1.2s ease-in-out 3}@keyframes obPulse{50%{box-shadow:0 0 0 6px rgba(255,200,40,0)}}
 #radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(440px,70vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:12px;padding:5px 9px;border-radius:7px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 9px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:3px}#radio .re{font:600 11.5px/1.3 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:10.5px;color:#9fb8a8;margin-top:2px}
 body.touch #radio{bottom:auto;top:calc(54px + env(safe-area-inset-top));max-width:min(360px,46vw)}
 .lyHide{display:none!important}
@@ -594,6 +595,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   <div class="card" style="max-width:420px">
     <h1>PAUSED</h1><h2>Pause</h2>
     <div id="pauseWho" class="wzhint"></div>
+    <div id="pauseOrder" class="porder" style="display:none"></div>
     <div class="btns"><button class="primary" id="bResume">Resume</button><button id="bRestart">Restart</button><button id="bPauseRp">Replay so far</button></div>
     <div class="btns" style="margin-top:8px"><button id="bPauseOpt">⚙ Options</button><button id="bPauseCtl">🎮 Controls</button><button id="bLayout">Edit HUD layout</button></div>
     <div class="btns" style="margin-top:8px"><button id="bMenu">⏹ End mission · menu</button></div>
@@ -616,7 +618,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=cd2d38f6"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=cd2d38f6"></script>
+<script src="sites/yeongin.js?v=468cb3fe"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=468cb3fe"></script>
 </body>
 </html>

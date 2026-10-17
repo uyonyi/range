@@ -9,7 +9,7 @@ def numw(n): return U[n] if n < 20 else T[n // 10 - 2] + ('' if n % 10 == 0 else
 def norm(t): return ' '.join(re.findall(r"[a-z']+", re.sub(r'\d+', lambda m: ' ' + numw(int(m.group())) + ' ', t.lower())))
 def say(t): return re.sub(r'\bMIT\b', 'M.I.T.', re.sub(r'\bID\b', 'I.D.', t))
 cache = f'{OUT}/cache'; os.makedirs(cache, exist_ok=True)
-items = [(p, 1.05, 'am_michael', '') for p in D['phrases']] + [(w, 1.0, 'am_michael', '') for w in D['words']] + [(p, 1.08, 'am_fenrir', 'op|') for p in D.get('op', [])]
+items = [(p, 1.05, 'am_michael', '') for p in D['phrases']] + [(w, 1.0, 'am_michael', '') for w in D['words']] + [(p, 1.05, 'af_heart', 'op|') for p in D.get('op', [])]
 idx, blob = {}, bytearray()
 for n, (t, sp, voice, pre) in enumerate(items):
     key = pre + norm(t)
