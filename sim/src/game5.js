@@ -1599,6 +1599,22 @@ if ($('bRC2')) $('bRC2').onclick = () => { closePanels(); rcOpen(); };
 if ($('wzVR')) $('wzVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
 setInterval(() => { const a = $('padStatus'), b = $('padStatus2'); if (a && b) b.textContent = a.textContent; }, 1000);
 setTimeout(() => wizGo(HAS_INTRO ? 0 : 1), 0);
+// 첫 화면 비밀번호 (간단한 출입 확인용 · 이 기기에서 한 번 맞히면 기억)
+(function pinGate() {
+  const CODE = '5210', KEY = 'hroc_pin_ok', el = $('pinGate'); if (!el) return;
+  let ok = false; try { ok = localStorage.getItem(KEY) === '1'; } catch (e) { }
+  if (ok || /[?&]test/.test(location.search)) return;
+  el.classList.remove('hidden'); let v = '';
+  const dots = $('pinDots'), msg = $('pinMsg'), draw = () => [...dots.children].forEach((d, i) => d.classList.toggle('on', i < v.length));
+  const press = k => {
+    if (k === 'del') v = v.slice(0, -1); else if (/^\d$/.test(k) && v.length < 4) v += k; draw();
+    if (v.length === 4) { if (v === CODE) { try { localStorage.setItem(KEY, '1'); } catch (e) { } el.classList.add('hidden'); window.removeEventListener('keydown', kd, true); }
+      else { msg.textContent = L2('번호가 맞지 않습니다', 'Wrong code'); dots.classList.remove('bad'); void dots.offsetWidth; dots.classList.add('bad'); setTimeout(() => { v = ''; draw(); }, 350); } }
+  };
+  $('pinPad').querySelectorAll('button').forEach(b => b.addEventListener('click', () => press(b.dataset.k || b.textContent)));
+  const kd = e => { if (el.classList.contains('hidden')) return; e.stopImmediatePropagation(); e.preventDefault(); if (/^Digit\d$|^Numpad\d$/.test(e.code)) press(e.code.slice(-1)); else if (e.key === 'Backspace') press('del'); };
+  window.addEventListener('keydown', kd, true);
+})();
 // 처음 화면: 컴퓨터 / VR 갈림길 (PC 판과 VR 판은 서로 다른 주소)
 function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
 if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
