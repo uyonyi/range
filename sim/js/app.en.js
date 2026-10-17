@@ -1794,7 +1794,7 @@ function startRun(kind) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
-  dbfStart();
+  dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null;   // 이전 FLIGHT 기록·명령이 섞이지 않게
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
@@ -2018,6 +2018,7 @@ S.msgCD = 0;
 // ---------------- payloads ----------------
 function dropPayload(fromPos, fromVel, ghost) {
   if (!ghost && !AFc().drop) return;
+  if (!ghost && isMission() && S.kind !== 'sar') { showMsg(L2x('Drop 포드가 비어 있습니다', 'Payload pod is empty'), '#ff9a40', 1.2); sfx('bad'); return; }   // Drop가 필요 없는 임무
   const meshes = ghost && ghost !== 'demo' && ghost !== 'replay' ? ghostM.cans : droneM.cans;
   if (!ghost && S.kind === 'course' && S.payloads <= 0) { showMsg('NO PAYLOAD', '#ff6060', 1); sfx('bad'); return; }
   const can = meshes.find(c => c.visible); if (can) can.visible = false;
@@ -2326,7 +2327,13 @@ function drawMap(gpos) {
   const toDS = p => [-p.z, p.x];
   const o = curObj();
   if (o && o.mk && o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s), q = mxy(d + o.search.r, s), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.9)'; g.fillStyle = 'rgba(255,200,40,.14)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill(); g.stroke(); g.setLineDash([]); }
-  else if (o && o.mk) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
+  // 산불: 다른 신고 구역(번호)과 보고 끝난 불씨(✓) 도 지도에
+  if (S.kind === 'fire' && isMission() && MS.list) { g.font = '700 10px monospace'; MS.list.forEach((x, i) => { if (!x.mk) return;
+    if (x.done) { const q = mxy(...toDS(x.tp)); g.fillStyle = '#9aa6ad'; g.fillText('✓' + (i + 1), q[0] + 3, q[1] - 2); g.beginPath(); g.arc(q[0], q[1], 2, 0, 7); g.fill(); return; }
+    if (!x.active) return; const p = mxy(...toDS(x.mk)); if (x !== o) { const q = mxy(...toDS(x.mk.clone().add(new V3(0, 0, -x.search.r)))), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.5)'; g.setLineDash([3, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke(); g.setLineDash([]); }
+    g.fillStyle = '#ffc828'; g.fillText(String(i + 1), p[0] - 3, p[1] + 4); }); }
+  if (o && o.mk && o.search && S.kind === 'sar') { const p = mxy(...toDS(o.mk)); g.font = '700 10px monospace'; g.fillStyle = '#ffc828'; g.fillText('SAR', p[0] - 9, p[1] + 4); }
+  else if (o && o.mk && !o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
   if (gpos) { const [d, s] = toDS(gpos); const p = mxy(d, s); g.fillStyle = '#4fe3ff'; g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fill(); }
   if (S.state !== 'demo') {
     const src = S.state === 'replay' ? RP.pose : DR;
@@ -2426,8 +2433,8 @@ function updateHUD(dt, subj) {
   else if (S.state === 'replay') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REPLAY <small>${RP.rec.kind === 'course' ? MODES[RP.rec.diff] ? MODES[RP.rec.diff].name : '' : 'FREE'} ×${RP.speed}</small>`; }
   else if (S.kind === 'demo') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REFERENCE FLIGHT <small>${fmt(S.ghostT)} / ${fmt(GH.total)}</small>`; }
   else ui.objNext.style.display = 'none';
-  const kitM = S.kind === 'sar' && S.state === 'run', n = kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
-  ui.payload.innerHTML = (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
+  const podE = isMission() && S.kind !== 'sar' && S.state === 'run', kitM = S.kind === 'sar' && S.state === 'run', n = podE ? 0 : kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
+  ui.payload.innerHTML = podE ? 'POD —' : (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
   if (o && o.mk && S.state === 'run' && DR.alive && !sIn) {
     const s = toScreen(o.mk);
     let x = s.x / innerWidth * 2 - 1, y = 1 - s.y / innerHeight * 2; if (s.behind) { x = -x; y = -y; }
@@ -3734,7 +3741,7 @@ function msStart(kind) {
   Object.values(MSG).forEach(g => g.visible = false);
   STRIKE.forEach(t => { t.col.off = true; t.dead = false; t.hull.material = t.hull.userData.m0 || t.hull.material; });
   if (FLANE) FLANE.G.visible = true;
-  MS.idx = 0; S.photos = []; S.lost = 0; S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
+  MS.idx = 0; S.photos = []; S.lost = 0; droneM.cans.forEach(c => c.visible = kind === 'sar'); S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
   const a = AFc(); let L = [];
   if (kind === 'forest' && FLANE) L = FLANE.cps.map(c => passCP(c.label, c.q, c.hw, c.y0, c.y1));
   if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
@@ -3805,7 +3812,7 @@ function msStep(prev, cur, dt) {
   else if (o.t === 'recon') {
     const inView = sensorSees(o.tp, cur, AFc().reconD || 260);
     o.inView = inView;
-    if (inView) { S.recT += dt; if (S.recT >= o.need) { flashPhoto(); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); } }
+    if (inView) { S.recT += dt; if (S.recT >= o.need) { flashPhoto(); comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); } }
     else S.recT = Math.max(0, S.recT - dt * 0.3);
   }
 }
@@ -3929,7 +3936,7 @@ function snapPhoto(cap, tp) {
 function photoAdd(c, label, xy, ok) {
   if (!c) return; const url = c.toDataURL('image/jpeg', 0.82); (S.photos = S.photos || []).push({ url, label, xy, ok, t: S.t });
   const im = new Image(); im.src = url; PH.last = im; PH.lastOk = ok; PH.lastT = 3;
-  let el = $('photoPop'); if (!el) { el = document.createElement('img'); el.id = 'photoPop'; el.style.cssText = 'position:fixed;left:14px;top:120px;width:220px;border-radius:8px;border:2px solid #5dff9a;z-index:40;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:opacity .4s'; document.body.appendChild(el); }
+  let el = $('photoPop'); if (!el) { el = document.createElement('img'); el.id = 'photoPop'; el.style.cssText = 'position:fixed;right:14px;top:120px;width:220px;border-radius:8px;border:2px solid #5dff9a;z-index:40;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:opacity .4s'; document.body.appendChild(el); }
   el.src = url; el.style.borderColor = ok ? '#5dff9a' : '#ff9a40'; el.style.opacity = 1; clearTimeout(PH.tm); PH.tm = setTimeout(() => { el.style.opacity = 0; }, 2600);
 }
 function missionPhoto() {
@@ -3939,19 +3946,24 @@ function missionPhoto() {
   const xyS = (d, s) => { const xy = to5186(d, s); return xy ? `X ${xy[0].toFixed(0)}  Y ${xy[1].toFixed(0)}` : ''; };
   if (S.kind === 'fire') {
     const f = MS.list.find(x => x.active && !x.done && x.inView);
-    if (f) { const xy = to5186(f.d, f.s); photoAdd(snapPhoto([L2('불씨 확인 · 열화상', 'HOTSPOT · THERMAL') + '  ' + hm, xyS(f.d, f.s)], f.tp), f.label, xy, true); fireReport(f, xy); return; }
+    if (f) { comm('Control, Eagle One. Hotspot confirmed. Photo and grid sent.', '이글 원: 불씨 확인 · 사진과 좌표 전송', OP); const xy = to5186(f.d, f.s); photoAdd(snapPhoto([L2('불씨 확인 · 열화상', 'HOTSPOT · THERMAL') + '  ' + hm, xyS(f.d, f.s)], f.tp), f.label, xy, true); fireReport(f, xy); return; }
     const seen = MS.list.find(x => x.active && !x.done && x.seenVis);
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(seen ? L2('연기는 찍혔지만 불씨 확인 불가 · 열화상(T)으로 Restart', 'Smoke only · switch to thermal (T) and retake') : L2('사진에 불씨 None · 화면 가운데에 두고 찍기', 'No hotspot in frame · center it and retake'), '#ff9a40', 1.8); return;
   }
   if (S.kind === 'sar' && o && o.t === 'sarfind') {
-    if (o.inView) { const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
+    if (o.inView) { comm('Control, Eagle One. Subject located. Photo and grid sent.', '이글 원: 실종자 발견 · 사진과 좌표 전송', OP); const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(L2('사진에 실종자 None · 가까이(열화상은 멀리서도) 화면 가운데에', 'No subject in frame · get closer (or use thermal) and center it'), '#ff9a40', 1.8); return;
   }
   photoAdd(snapPhoto([L2('사진', 'PHOTO') + '  ' + hm, '']), '', null, false);
 }
-function photoTick(dt) { dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.toggle('hidden', !(S.state === 'run' && photoMission())); }
+function orderTick() {
+  let el = $('orderBox'); const on = !!ORDER.m && S.state === 'run' && (isMission() || S.kind === 'course') && !XR_ON;
+  if (!el) { if (!on) return; el = document.createElement('div'); el.id = 'orderBox'; (ui.hud || document.body).appendChild(el); }
+  el.style.display = on ? '' : 'none'; if (!on) return; const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; if (el.dataset.t !== t) { el.dataset.t = t; el.innerHTML = `<b>${L2('📻 명령', '📻 ORDERS')}</b>${t}`; }
+}
+function photoTick(dt) { orderTick(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.toggle('hidden', !(S.state === 'run' && photoMission())); }
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
@@ -4139,7 +4151,7 @@ function envTick(dt) {
     f.em.visible = !ENV.ir && (ENV.night || true);
     // 연기 기둥: 바람 쪽으로 기울며 60 m 가까이 올라감 (멀리서도 보이는 단서)
     const wv = windAt(f.g.position.clone().setY(f.g.position.y + 30)), wl = Math.hypot(wv.x, wv.z), wx = wl > 0.1 ? wv.x / wl : 0.6, wz = wl > 0.1 ? wv.z / wl : 0.3, lean = 10 + wl * 5, big = f.spread ? 1.5 : 1;
-    for (const p of f.puffs) { const u = (envT * 0.07 + p.userData.ph) % 1, j = p.userData.j; p.position.set(wx * lean * Math.pow(u, 1.4) * 2.2 + Math.sin(u * 7 + f.s + j * 6) * 2 * u, 1 + u * 58 * big, wz * lean * Math.pow(u, 1.4) * 2.2 + Math.cos(u * 5 + j * 6) * 2 * u); const k = (2 + u * 11) * big; p.scale.set(k, k * 0.85, k); p.material.opacity = 0.75 * Math.min(1, u * 5) * Math.pow(1 - u, 0.8) + 0.05; p.visible = !ENV.ir && !ENV.night; }
+    for (const p of f.puffs) { const u = (envT * 0.07 + p.userData.ph) % 1, j = p.userData.j; p.position.set(wx * lean * Math.pow(u, 1.4) * 2.2 + Math.sin(u * 7 + f.s + j * 6) * 2 * u, 1 + u * 58 * big, wz * lean * Math.pow(u, 1.4) * 2.2 + Math.cos(u * 5 + j * 6) * 2 * u); const k = (2 + u * 11) * big; p.scale.set(k, k * 0.85, k); p.material.opacity = (f.done ? 0.6 : 0.8) * Math.min(1, u * 5) * Math.pow(1 - u, 0.8) + 0.05; p.material.color.setHex(f.done ? 0x5f5b55 : 0xf6f4ef); p.visible = !ENV.ir && !ENV.night; }   // 새 신고 = 흰 연기 · 보고 끝 = 색 연기
     if (f.glow) { f.glow.visible = ENV.night && !ENV.ir; f.glow.material.opacity = 0.55 + 0.35 * Math.sin(envT * 7 + f.d); f.glow.scale.set(9 * big, 6 * big, 1); }
   }
 }
@@ -4327,7 +4339,7 @@ function scenTick(dt) {
 function sarKit(pos) {
   const o = msObj(); if (!o || o.t !== 'sarkit') return false;
   const e = Math.hypot(pos.x - SAR.c.x, pos.z - SAR.c.z); S.kitErr = e;
-  if (e <= 5) msNext(`Kit delivered ✓ ${e.toFixed(1)} m`, '#5dff9a'); else if ((S.kits | 0) > 0) { showMsg(`키트 ${e.toFixed(1)} m · 5 m 안으로 Restart (남은 ${S.kits}개)`, '#ff9a40', 1.6); sfx('bad'); } else { S.pen += 30; msSkip(); }
+  if (e <= 5) { comm('Control, Eagle One. Kit away.', '이글 원: 키트 Drop 완료', OP); msNext(`Kit delivered ✓ ${e.toFixed(1)} m`, '#5dff9a'); } else if ((S.kits | 0) > 0) { showMsg(`키트 ${e.toFixed(1)} m · 5 m 안으로 Restart (남은 ${S.kits}개)`, '#ff9a40', 1.6); sfx('bad'); } else { S.pen += 30; msSkip(); }
   return true;
 }
 function scenOsd(o) {
@@ -4445,7 +4457,7 @@ function msEvents(dt) {
   MS.t0 += dt; const t = MS.t0;
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
-      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
+      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
       if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; comm(`${CS}, hotspot ${i + 1} is spreading. Expedite your report.`, `불씨 ${i + 1} 번짐 · +15초`); f.g.scale.setScalar(1.8); }
     }
   }
@@ -4479,6 +4491,10 @@ function sarRandom() {
 // 실종자 수색 구역을 좁힘 (가운데는 여전히 실제 위치와 조금 어긋나게)
 function sarNarrow(o, r, off) { const a = Math.random() * 6.283; o.mk.copy(W(SAR.d + Math.cos(a) * off, SAR.s + Math.sin(a) * off, 30)); o.search.r = r; o.label = L2(`실종자 수색 · 구역 반경 ${r} m`, `Find the hiker · area radius ${r} m`); renderList(); }
 // 출발점 기준 방위·Zoom (무전용)
+function brgFrom(o, p) {   // o 에서 p 까지 방위(진북)·Zoom (무전용 낱말 포함)
+  const dx = p.x - o.x, dz = p.z - o.z, h = Math.atan2(dx, -dz), brg = ((Math.round(((SITE.brg || 0) + h * 180 / Math.PI) / 5) * 5) % 360 + 360) % 360, dist = Math.max(50, Math.round(Math.hypot(dx, dz) / 50) * 50);
+  return { brg: String(brg).padStart(3, '0'), dist, brgW: String(brg).padStart(3, '0').split('').map(c => DIG[+c]).join(' '), distW: numWords(dist) };
+}
 function fromLaunch(p) {
   const st = startPos(), dx = p.x - st.x, dz = p.z - st.z, h = Math.atan2(dx, -dz), brg = ((Math.round(((SITE.brg || 0) + h * 180 / Math.PI) / 5) * 5) % 360 + 360) % 360, dist = Math.max(50, Math.round(Math.hypot(dx, dz) / 50) * 50);
   return { brg: String(brg).padStart(3, '0'), dist, brgW: String(brg).padStart(3, '0').split('').map(c => DIG[+c]).join(' '), distW: numWords(dist) };
@@ -4520,6 +4536,8 @@ function speakify(t) {
     .replace(/\bEAGLE ONE\b/g, 'Eagle One').replace(/\bCONTROL\b/g, 'Control').replace(/\bRTB\b/g, 'R T B');
 }
 const COMM = { q: [], busy: 0, voice: null };
+const ORDER = { m: null };
+const OP = 'EAGLE ONE';   // 드론 운용자(우리 쪽) 무전 · 다른 목SOUND
 function pickVoice() { try { const V = speechSynthesis.getVoices(); COMM.voice = V.find(v => /en-US/.test(v.lang) && /Male|David|Guy|Daniel|Alex/i.test(v.name)) || V.find(v => /^en/.test(v.lang)) || null; } catch (e) { } }
 try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) { }
 // 말하는 동안 무전 잡음 (대역 제한 잡음 + 흔들림 + 지직거림)
@@ -4546,7 +4564,7 @@ function squelch(open) {
 function comm(en, ko, from, tag) {
   if (S.state !== 'run' && S.state !== 'result') return;
   if (tag) COMM.q = COMM.q.filter(m => m.tag !== tag);   // 같은 종류(코스 안내)는 최신 것만
-  COMM.q.push({ en, ko, from: from || 'CONTROL', tag }); if (COMM.q.length > 4) COMM.q.shift();
+  COMM.q.push({ en, ko, from: from || 'CONTROL', tag }); if (COMM.q.length > 6) COMM.q.shift();
 }
 // 코스 음성 안내: 과제를 마칠 때마다 다음 과제를 불러 줌 (슬라럼 같은 연속 과제는 처음·끝만)
 function courseCallSay(l) { return String(l).replace(/360°/g, 'three sixty').replace(/H-PAD/g, 'H pad').replace(/\s*·\s*/g, ', ').replace(/\s*\(([^)]*)\)/g, ', $1').replace(/\bLOW\b/g, 'Low').replace(/\b([A-Z])([A-Z]{3,})\b/g, (m, a, b) => a + b.toLowerCase()).replace(/(\d+)\/(\d+)/g, '$1 of $2'); }
@@ -4586,10 +4604,10 @@ setTimeout(rvLoad, window.SIM_VR ? 300 : 1500);
 const RV_U = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' '), RV_T = 'twenty thirty forty fifty sixty seventy eighty ninety'.split(' ');
 function rvNumW(n) { return n < 20 ? RV_U[n] : n < 100 ? RV_T[Math.floor(n / 10) - 2] + (n % 10 ? ' ' + RV_U[n % 10] : '') : String(n); }
 function rvNorm(t) { return String(t).toLowerCase().replace(/\d+/g, m => ' ' + rvNumW(+m) + ' ').match(/[a-z']+/g) || []; }
-function rvPlan(text) {   // 가장 긴 조각부터 맞춰 나감 (문장 단위 조각이면 억양이 자연스러움)
+function rvPlan(text, spk) {   // 가장 긴 조각부터 맞춰 나감 (문장 단위 조각이면 억양이 자연스러움) · spk 'op' = 드론 운용자 목SOUND
   if (RV.st !== 'ready' || SET.voiceEng === 'synth') return null;
-  const w = rvNorm(text), out = []; let i = 0;
-  while (i < w.length) { let hit = 0; for (let L = Math.min(40, w.length - i); L >= 1; L--) { const k = w.slice(i, i + L).join(' '); if (RV.idx[k]) { out.push(k); hit = L; break; } } if (!hit) return null; i += hit; }
+  const w = rvNorm(text), out = [], pre = spk === 'op' ? 'op|' : ''; let i = 0;
+  while (i < w.length) { let hit = 0; for (let L = Math.min(40, w.length - i); L >= 1; L--) { const k = pre + w.slice(i, i + L).join(' '); if (RV.idx[k]) { out.push(k); hit = L; break; } } if (!hit) return null; i += hit; }
   return out.length ? out : null;
 }
 function rvBuf(k) { if (RV.ab[k]) return Promise.resolve(RV.ab[k]); const [o, l] = RV.idx[k]; return AU.ctx.decodeAudioData(RV.buf.slice(o, o + l)).then(b => (RV.ab[k] = b)); }
@@ -4603,7 +4621,7 @@ function rvSpeak(plan, est) {
     const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 280; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3600;
     const g = c.createGain(); g.gain.value = 1.35; hp.connect(lp); lp.connect(g); g.connect(AU.master);
     let t = c.currentTime + 0.06; const S2 = [];
-    bs.forEach((b, i) => { const s = c.createBufferSource(); s.buffer = b; s.connect(hp); s.start(t); S2.push(s); t += b.duration + (plan[i].indexOf(' ') > 0 && i < bs.length - 1 && plan[i + 1].indexOf(' ') > 0 ? 0.14 : 0.03); });
+    bs.forEach((b, i) => { const s = c.createBufferSource(); s.buffer = b; s.connect(hp); s.start(t); S2.push(s); t += b.duration + (plan[i].replace('op|', '').indexOf(' ') > 0 && i < bs.length - 1 && plan[i + 1].replace('op|', '').indexOf(' ') > 0 ? 0.14 : 0.03); });
     S2[S2.length - 1].onended = done; COMM.src = { stop() { S2.forEach(s => { try { s.stop(); } catch (e) { } }); } }; COMM.rvOk = true;
   }).catch(e => { COMM.rvErr = 'decode: ' + (e && e.message || e); done(); });
   setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(12, est * 2.5) * 1000);
@@ -4636,7 +4654,7 @@ function commSpeakFallback(text, est) {
   setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(10, est * 2.2) * 1000);
 }
 function commSpeak(text, est) {
-  const pl = rvPlan(text); if (pl) return rvSpeak(pl, est);
+  const pl = rvPlan(text, COMM.spk); if (pl) return rvSpeak(pl, est);
   if (needFallbackVoice() && TTSW.ok !== false && ttsWorker()) return commSpeakFallback(text, est);
   const done = () => { if (COMM.cur === myId) commSpeechDone(); };
   const myId = (COMM.cur = (COMM.cur || 0) + 1);
@@ -4647,7 +4665,7 @@ function commSpeak(text, est) {
     if (i >= parts.length) return done();
     const t = parts[i++].trim(); if (!t) return next();
     const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; if (COMM.voice) u.voice = COMM.voice;
-    u.rate = 1.0; u.pitch = 0.9; u.volume = 1;
+    u.rate = 1.0; u.pitch = COMM.spk === 'op' ? 1.15 : 0.9; u.volume = 1;
     u.onstart = () => { started = true; }; u.onend = next; u.onerror = (e) => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; if (!started && i === 1) COMM.err = (COMM.err || 0) + 1; next(); };
     (COMM.keep = COMM.keep || []).push(u); if (COMM.keep.length > 8) COMM.keep.shift(); // GC 방지
     try { speechSynthesis.speak(u); } catch (e) { next(); }
@@ -4663,7 +4681,9 @@ function commTick(dt) {
   if (COMM.busy > 0 || !COMM.q.length) return;
   const m = COMM.q.shift(), el = $('radio'); if (!el) return;
   el.innerHTML = `<div class="rf">📻 ${m.from}</div><div class="re">${m.en}</div>` + (window.SIM_LANG !== 'en' && m.ko ? `<div class="rk">${m.ko}</div>` : '');
+  if (m.from === 'CONTROL' && !/missed/i.test(m.en)) ORDER.m = { en: m.en, ko: m.ko, t: S.t };   // 마지막 명령은 화면에 남김
   const sp = speakify(m.en), dur = Math.max(3.5, sp.length / 13);
+  COMM.spk = m.from === 'CONTROL' ? '' : 'op';
   el.classList.add('show'); radioT = dur + 1; COMM.busy = dur + 0.6;
   squelch(true); commStatic(true, dur + 0.4);
   if (SET.voice !== false && (RV.st === 'ready' || window.speechSynthesis || (needFallbackVoice() && TTSW.ok !== false))) {
@@ -4679,19 +4699,20 @@ function commStart(kind) {
   const T = {
     forest: [`${CS}, CONTROL. Cleared for launch. Proceed into the forest trail, stay low under the canopy. ${w}Over.`, 'Takeoff 허가. 숲길로 진입, 수관 아래로 낮게.'],
     race: [`${CS}, CONTROL. Range is hot. Rings are set along the valley. Go when ready. ${w}`, '코스 준비 완료. 계곡 링 따라 출발.'],
-    recon: [`${CS}, CONTROL. Four structures tasked for imagery. First target, grid ${MS.list[0] ? grid(MS.list[0].d, MS.list[0].s) : '—'}. ${n}Over.`, '건물 4곳 촬영 임무. 첫 대상 좌표 전달.'],
+    recon: (() => { const b = MS.list[0] ? fromLaunch(MS.list[0].tp) : null; return [`${CS}, CONTROL. Four structures tasked for imagery. ${b ? `First structure bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} ${n}Over.`, `건물 4곳 촬영 임무.${b ? ` 첫 대상: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m` : ''}`]; })(),
     strike: [`${CS}, CONTROL. Five vehicles in the valley, two are decoys. Positive ID by thermal before you commit. Cleared hot.`, '차량 5대 중 2대 기만체. 열화상으로 식별 후 돌입. 공격 허가.'],
     fire: [`${CS}, CONTROL. Fire watch requested. Smoke reports coming in, locate each fire, confirm with thermal and report. ${w}Over.`, '산불 감시 요청. 연기 신고가 들어옴. 직접 찾아 열화상으로 확인 후 보고.'],
-    sar: [`${CS}, CONTROL. Missing hiker, last seen near the trail. Search the marked area. Look for his pack and signal flashes, use thermal under the trees. ${n}Over.`, '실종자 수색. 표시 구역 수색. 배낭·신호 반짝임 확인, 나무 아래는 열화상.'],
+    sar: (() => { const b = SAR ? fromLaunch(SAR.area) : null; return [`${CS}, CONTROL. Missing hiker, last seen near the trail. ${b ? `Search area bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} Sweep the area, look for his pack and signal flashes, use thermal under the trees. ${n}Over.`, `실종자 수색.${b ? ` 수색 구역: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m.` : ''} 구역을 훑으며 배낭·신호 반짝임, 나무 아래는 열화상.`]; })(),
     track: [`${CS}, CONTROL. Target vehicle on the forest road. Close in, then maintain standoff and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 접근 후 Zoom 유지, 60초 관측.'],
     ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 FLIGHT 승인. 능선 위 돌풍 주의.']
   }[kind];
-  if (T) comm(T[0], T[1]);
+  if (T) { comm(T[0], T[1]); if (isMission(kind)) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); }
 }
 let COMM_LAST = 0;
 function commAck(o, kind) {   // 목표 하나 끝났을 때
   const left = MS.list.filter(x => !x.done).length;
-  if (kind === 'recon') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
+  if (kind === 'recon') { const x = MS.list.find(y => !y.done), b = x ? brgFrom(DR.p, x.tp) : null; return comm(`Copy imagery. ${b ? `Next structure bearing ${b.brgW}, about ${b.distW} meters from your position.` : 'All imagery received.'}`, b ? `촬영 확인. 다음 대상: 현 위치에서 방위 ${b.brg}° · 약 ${b.dist} m` : '촬영 모두 수신.'); }
+  if (kind === 'recon-old') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
   if (kind === 'fire') return comm(`Copy imagery, hotspot confirmed at grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? ' Stand by for the next report.' : ' All reported.'}`, `사진 접수 · 불씨 확인, 진화대 출동.${left ? ' 다음 신고 대기.' : ' 모두 보고됨.'}`);
   if (kind === 'sar' && o.t === 'sarfind') return comm(`Copy imagery, subject located at grid ${grid(SAR.d, SAR.s)}. ${AFc().drop ? 'Drop the rescue kit within five meters.' : 'Return to base.'}`, `실종자 위치 확인. ${AFc().drop ? '구조 키트 5 m 이내 Drop.' : '복귀.'}`);
   if (kind === 'sar' && o.t === 'sarkit') return comm('Good drop, kit on the ground. Ground team is en route. RTB.', '키트 전달 확인. 구조대 move 중. 복귀.');
@@ -5081,7 +5102,7 @@ VR_PIP.m = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.394), new THREE.MeshBas
 { const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.414), new THREE.MeshBasicMaterial({ color: 0xffc828 })); fr.position.z = -0.001; VR_PIP.m.add(fr); }
 const VR_MAP = (function () { const t = new THREE.CanvasTexture(ui.map); t.encoding = THREE.sRGBEncoding; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.833), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0.95, toneMapped: false }));
   m.position.set(-1.2 - 0.29, 0.675 - 0.4165, 0); m.visible = false; VR_SCR.add(m); return { t, m }; })();
-const VR_MENU = vrPlane(1.3, 1.3 * 1280 / 1024, 1024, 1280); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
+const VR_MENU = vrPlane(1.3, 1.3 * 1060 / 1024, 1024, 1060); VR_MENU.btns = []; VR_MENU.m.visible = false; VRS.add(VR_MENU.m);
 // 컨트롤러 광선
 for (let i = 0; i < 2; i++) {
   const c = renderer.xr.getController(i); VRS.add(c);
@@ -5217,8 +5238,8 @@ function vrHeadSteer(dt, lx, ly, rx, ry) {
 const VR_MS = () => [['course', L2('장애물 코스', 'Obstacle course')], ['forest', L2('숲길 통과', 'Forest trail')], ['race', L2('타임 레이스', 'Time race')], ['ridge', L2('능선 종주', 'Ridge run')], ['free', L2('Free Flight', 'Free flight')], ['demo', L2('Watch Reference Flight', 'Reference flight')]];
 const VR_AF = ['x2d', 'anafi', 'fpv', 'kfpv'], VR_AFW = ['fw', 'puma', 'kfw'];
 const VR_MS2 = () => [['recon', L2('정찰', 'Recon')], ['track', L2('차량 추적', 'Vehicle track')], ['fire', L2('산불 감시', 'Wildfire watch')], ['sar', L2('수색·구조', 'Search & rescue')], ['strike', L2('타격', 'Strike')]];
-function vrMenuOpen() {   // FLIGHT 중이면 멈춰 두고(Resume하기 가능), 끝났으면 menu
-  if (S.state === 'run' || S.state === 'demo') togglePause(); else if (S.state !== 'pause' && S.state !== 'menu') toMenu();
+function vrMenuOpen() {   // FLIGHT 중이면 멈춰 두고(Resume하기 가능) · 결과·Replay 상태는 그대로 (임무는 웹 화면에서 고름)
+  if (S.state === 'run' || S.state === 'demo') togglePause(); else if (S.state === 'replay') replayEnd();
   XR.menu = true; XR.menuPlace = true; XR.hover = null; XR.mT = 0;
 }
 function vrResume() { XR.menu = false; if (S.state === 'pause') togglePause(); vrApplyCam(); if (SET.vrScreen === 'space') vrRecenter(); }
@@ -5237,20 +5258,16 @@ function vrMenuDraw() {
     if (!dis) P.btns.push({ id, x, y, w, h });
   };
   let y = 112;
-  const hasRec = !!(REC && REC.s.length > 1) || !!(LAST_REC && LAST_REC.s && LAST_REC.s.length > 1);
+  const hasRec = !!(REC && REC.s.length > 1) || !!(LAST_REC && LAST_REC.s && LAST_REC.s.length > 1), lk = S.lastKind || S.kind, done = S.state === 'result' || S.state === 'menu';
+  { const kn = MS_NAME[lk] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('Free Flight', 'Free flight'), demo: L2('Reference', 'Reference flight') })[lk] || lk; g.fillStyle = '#e8eef2'; g.font = '700 26px system-ui, sans-serif'; g.fillText(L2('현재 임무: ', 'Mission: ') + kn + ' · ' + AFc().name + ' · ' + pilotName(), 36, 106); y = 150; }
+  if (done) { btn('restart', 36, y, 300, 80, '↺ ' + L2('같은 임무 Restart', 'Fly it again'), false, false, true); btn('replay', 348, y, 310, 80, L2('이번 FLIGHT Replay', 'Replay this flight'), false, !hasRec); btn('video', 670, y, 318, 80, '⬇ ' + L2('영상 저장', 'Save video'), false, !hasRec); y += 96; }
   if (paused) {
     const kn = (MS_NAME[S.kind] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('Free Flight', 'Free flight'), demo: L2('Reference', 'Reference flight') })[S.kind] || S.kind);
-    btn('resume', 36, y, 196, 80, '▶ ' + L2('Resume하기', 'Resume'), false, false, true); btn('restart', 244, y, 180, 80, '↺ ' + L2('Restart', 'Restart'), false); btn('end', 436, y, 180, 80, '⏹ ' + L2('임무 종료', 'End mission'), false);
-    btn('replay', 628, y, 172, 80, L2('Replay', 'Replay'), false, !hasRec); btn('video', 812, y, 176, 80, '⬇ ' + L2('영상 저장', 'Save video'), false, !hasRec); y += 96;
-    g.fillStyle = 'rgba(255,255,255,.45)'; g.font = '500 17px system-ui, sans-serif'; g.fillText(L2('기체·임무를 바꾸려면 ⏹ 임무 종료', 'To change drone or mission: ⏹ End mission'), 36, y - 12); y += 14;
-  } else if (hasRec) { btn('replay', 36, y, 460, 70, '▶ ' + L2('Last-flight replay', 'Replay last flight'), false); btn('video', 528, y, 460, 70, '⬇ ' + L2('마지막 FLIGHT 영상 저장', 'Save last flight video'), false); y += 84; }
-  const L = VR_MS().concat(VR_MS2());
-  L.forEach(([k, n], i) => btn('ms:' + k, 36 + (i % 4) * 240, y + Math.floor(i / 4) * 84, 228, 74, n, !paused && false, msAvail(k).site === false));
-  y += Math.ceil(L.length / 4) * 84 + 10;
+    btn('resume', 36, y, 300, 80, '▶ ' + L2('Resume하기', 'Resume'), false, false, true); btn('restart', 348, y, 310, 80, '↺ ' + L2('Restart', 'Restart'), false); btn('replay', 670, y, 318, 80, L2('지금까지 Replay', 'Replay so far'), false, !hasRec); y += 96;
+  }
+  g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '500 18px system-ui, sans-serif'; g.fillText(L2('다른 임무·기체는 ⏹ 임무 끝내기 → 웹 화면에서 고르기', 'Other missions or drones: ⏹ End mission → choose on the web page'), 36, y); y += 36;
   const RH = 60, RW = 50, row = (yy, lbl) => { g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 22px system-ui, sans-serif'; g.fillText(lbl, 36, yy + 14); };
   const afN = id => ({ x2d: 'Skydio X2D', anafi: 'ANAFI', fpv: L2('FPV racer', 'FPV racer'), kfpv: L2('Kamikaze FPV', 'Kamikaze FPV'), fw: 'RQ-11 Raven', puma: 'RQ-20 Puma', kfw: L2('Loitering fixed-wing', 'Loitering wing') })[id];
-  row(y, L2('기체', 'Drone')); VR_AF.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
-  row(y, L2('고정익', 'Fixed-wing')); VR_AFW.forEach((id, i) => btn('af:' + id, 190 + i * 200, y, 188, RW, afN(id), SET.af === id, paused)); y += RH;
   row(y, L2('FLIGHT 모드', 'Flight mode')); [['train', L2('Training', 'Training')], ['easy', L2('Easy (P)', 'Easy (P)')], ['atti', 'ATTI'], ['sport', L2('Sport', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
   row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
   row(y, L2('Camera', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
@@ -5268,8 +5285,8 @@ function vrMenuDraw() {
   g.fillStyle = eng === 'none' ? 'rgba(255,154,122,.95)' : 'rgba(93,255,154,.85)';
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('None · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
-  btn('exit', W2 - 280, H2 - 76, 244, 56, L2('VR 끝내기', 'Exit VR'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR16', 360, H2 - 56);
+  btn('exit', W2 - 380, H2 - 76, 344, 56, '⏹ ' + L2('임무 끝내기 · 웹 menu', 'End mission · web menu'), false);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR17', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -5288,7 +5305,7 @@ function vrMenuClick(hand) {
   if (id === 'exit') { vrStop(); return; }
   if (id === 'resume') { vrResume(); return; }
   if (id === 'end') { if (REC) LAST_REC = recFinish(); toMenu(); XR.menu = true; XR.hover = null; return; }
-  if (id === 'restart') { XR.menu = false; startRun(S.kind); vrApplyCam(); if (SET.vrScreen === 'space') vrRecenter(); return; }
+  if (id === 'restart') { XR.menu = false; startRun(S.lastKind || S.kind); vrApplyCam(); if (SET.vrScreen === 'space') vrRecenter(); return; }
   if (id === 'vtest') { vrVoiceTest(); return; }
   if (id === 'replay') { if (REC) LAST_REC = recFinish(); XR.menu = false; replayStart(LAST_REC, 'menu'); vrApplyCam(); if (SET.vrCam !== 'chase' && S.cam !== 0) S.cam = 0; return; }
   if (id === 'video') { if (REC) LAST_REC = recFinish(); XR.afterExit = 'video'; vrStop(); return; }
@@ -5362,6 +5379,8 @@ function vrOsdDraw() {
   { const n = S.kind === 'course' ? S.payloads || 0 : S.kind === 'sar' ? S.kits | 0 : S.kind === 'free' && AFc().drop ? droneM.cans.filter(c => c.visible).length : -1; if (n >= 0 && S.state === 'run') sh((S.kind === 'sar' ? 'KIT ' : 'M84 ') + ('●'.repeat(n) || '—'), W2 - 250, H2 - 330 - 34 - 56, 24, '#ffc828', 'left'); }
   if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', 40, H2 - 252, 24, '#ffc828');
   if (PH.last && PH.lastT > 0 && PH.last.complete) { g.globalAlpha = Math.min(1, PH.lastT); g.drawImage(PH.last, 40, 150, 288, 162); g.strokeStyle = PH.lastOk ? '#5dff9a' : '#ff9a40'; g.lineWidth = 4; g.strokeRect(40, 150, 288, 162); g.globalAlpha = 1; }
+  if (ORDER.m && (S.state === 'run' || S.state === 'pause') && (isMission() || S.kind === 'course')) { const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; g.font = '600 22px system-ui, sans-serif'; const ws = String(t).split(' '), L = []; let ln = ''; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 400 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); const LL = L.slice(0, 4), oy = 330;
+    g.fillStyle = 'rgba(6,10,14,.55)'; g.fillRect(30, oy - 8, 430, 38 + LL.length * 28); g.fillStyle = '#ffc828'; g.fillRect(30, oy - 8, 4, 38 + LL.length * 28); sh(L2('📻 명령', '📻 ORDERS'), 44, oy, 20, '#ffc828'); LL.forEach((l, i) => sh(l, 44, oy + 28 + i * 28, 22, '#e8eef2')); }
   const r = $('radio'); if (r && r.classList.contains('show')) { const t = r.querySelector('.re') ? r.querySelector('.re').textContent : r.textContent; g.font = '600 28px system-ui, sans-serif'; const ws = t.split(' '); let ln = ''; const L = []; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 680 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); L.slice(-2).forEach((l, i) => sh(l, W2 / 2 - (UAS ? 0 : 70), (UAS ? 116 : H2 - 112) + i * 36, 28, '#9fe9ff', 'center')); }
   const m = $('objMsg'); if (m && m.classList.contains('show') && m.textContent.trim()) sh(m.textContent.trim(), W2 / 2, H2 / 2 + 90, 44, m.style.color || '#5dff9a', 'center');
   // 등고선 지도 (PC 화면처럼 오른쪽 아래, 가운데 쪽으로 당겨 둠)
