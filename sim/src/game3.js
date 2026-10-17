@@ -39,6 +39,7 @@ function startRun(kind) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
+  if (!isMission(kind)) mapView('course');
   dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset();   // 이전 비행 기록·명령·무전이 섞이지 않게
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
@@ -524,7 +525,10 @@ function updateTags() {
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
-const MAPV = (function () {
+// 비행 구역: 중심 (down 150, side 0), 반지름 650 m (쿼드 경계) · 임무 사건은 이 안 (FLY_R_SAFE) 에만 둠
+const FLY_C = { x: 0, z: -150 }, FLY_R = 650, FLY_R_SAFE = 560;
+function flyL(p) { return Math.hypot(p.x - FLY_C.x, p.z - FLY_C.z); }
+const MAPV_COURSE = (function () {
   if (!CRS_C) return { d0: -24, d1: 340, s0: -112, s1: 90 };
   // 전용 코스: 경로·장애물을 다 담는 범위 (세로 300 : 가로 180 비율 유지)
   let d0 = 1e9, d1 = -1e9, s0 = 1e9, s1 = -1e9;
@@ -533,18 +537,19 @@ const MAPV = (function () {
   const kd = (d1 - d0) / 300, ks = (s1 - s0) / 180, k = Math.max(kd, ks), dc = (d0 + d1) / 2, sc = (s0 + s1) / 2;
   return { d0: dc - 150 * k, d1: dc + 150 * k, s0: sc - 90 * k, s1: sc + 90 * k };
 })();
-const mapBg = document.createElement('canvas'); mapBg.width = 180; mapBg.height = 300;
+let MAPV = MAPV_COURSE, mapBg = document.createElement('canvas'); mapBg.width = 180; mapBg.height = 300;
+const MAP_CACHE = {};
 function mxy(down, side) { return [(side - MAPV.s0) / (MAPV.s1 - MAPV.s0) * 180, (MAPV.d1 - down) / (MAPV.d1 - MAPV.d0) * 300]; }
-(function drawMapBg() {
-  const g = mapBg.getContext('2d');
+function drawMapBg() {
+  const g = mapBg.getContext('2d'); g.clearRect(0, 0, 180, 300);
   if (TER.h) {   // 음영기복 + 등고선 (5 m 간격, 25 m 마다 굵게)
-    const id = g.createImageData(180, 300), kd = (MAPV.d1 - MAPV.d0) / 300, ks = (MAPV.s1 - MAPV.s0) / 180;
+    const id = g.createImageData(180, 300), kd = (MAPV.d1 - MAPV.d0) / 300, ks = (MAPV.s1 - MAPV.s0) / 180, CI = kd <= 1.6 ? 5 : kd <= 3.2 ? 10 : 20;   // 넓은 지도는 등고선 간격을 넓힘
     const hAt = (x, y) => terrainAt(MAPV.s0 + x * ks, -(MAPV.d1 - y * kd));
     for (let y = 0; y < 300; y++) for (let x = 0; x < 180; x++) {
       const z = hAt(x, y), zx = (hAt(x + 1, y) - hAt(x - 1, y)) / (2 * ks), zy = (hAt(x, y + 1) - hAt(x, y - 1)) / (2 * kd);
       const sh = Math.max(0, Math.min(1, 0.55 + (-zx + zy) * 0.6)), o = (y * 180 + x) * 4;
-      const c0 = Math.floor(z / 5), lineA = [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / 5) !== c0);
-      const major = lineA && [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / 25) !== Math.floor(z / 25));
+      const c0 = Math.floor(z / CI), lineA = [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / CI) !== c0);
+      const major = lineA && [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / (CI * 5)) !== Math.floor(z / (CI * 5)));
       const v = 40 + sh * 70; id.data[o] = v * 0.9; id.data[o + 1] = v; id.data[o + 2] = v * 0.85; id.data[o + 3] = 150;
       if (lineA) { id.data[o] = 200; id.data[o + 1] = 170; id.data[o + 2] = 110; id.data[o + 3] = major ? 230 : 120; }
     }
@@ -566,7 +571,22 @@ function mxy(down, side) { return [(side - MAPV.s0) / (MAPV.s1 - MAPV.s0) * 180,
     const col = { pad: '#fff', gate_sq: '#ffc828', gate_tri: '#ffc828', ring: '#ffc828', pole: '#e0b020', bunker: '#c09060', tunnel: '#9aa', tank: '#a3b26a', mit: '#a3b26a', ivan_group: '#a3b26a' }[o.type] || 'rgba(200,200,200,.45)';
     g.fillStyle = col; const s = ['building', 'hipbld', 'pavilion', 'bleacher', 'shelter', 'tank'].includes(o.type) ? 5 : 3; g.fillRect(p[0] - s / 2, p[1] - s / 2, s, s);
   }
-})();
+  // 비행 구역 경계 (점선 원)
+  { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
+}
+drawMapBg(); MAP_CACHE.course = mapBg;
+// 지도 범위: 코스 = 코스 둘레 / 임무 = 그 임무의 사건·구역이 다 들어오게 (배경은 한 번 만들어 둠)
+function mapView(key, pts, once) {
+  if (!pts || !pts.length) key = 'course';
+  if (MAP_CACHE[key] && !once) { mapBg = MAP_CACHE[key]; MAPV = MAP_CACHE[key].V; return; }
+  let d0 = 1e9, d1 = -1e9, s0 = 1e9, s1 = -1e9;
+  for (const [d, s, r] of pts) { d0 = Math.min(d0, d - (r || 0)); d1 = Math.max(d1, d + (r || 0)); s0 = Math.min(s0, s - (r || 0)); s1 = Math.max(s1, s + (r || 0)); }
+  d0 -= 40; d1 += 40; s0 -= 40; s1 += 40;
+  const kd = (d1 - d0) / 300, ks = (s1 - s0) / 180, k = Math.max(kd, ks, 1.0), dc = (d0 + d1) / 2, sc = (s0 + s1) / 2;
+  MAPV = { d0: dc - 150 * k, d1: dc + 150 * k, s0: sc - 90 * k, s1: sc + 90 * k };
+  mapBg = document.createElement('canvas'); mapBg.width = 180; mapBg.height = 300; drawMapBg(); mapBg.V = MAPV; if (!once) MAP_CACHE[key] = mapBg;
+}
+MAP_CACHE.course.V = MAPV_COURSE;
 function drawMap(gpos) {
   const g = ui.map.getContext('2d'); g.clearRect(0, 0, 180, 300); g.drawImage(mapBg, 0, 0);
   const toDS = p => [-p.z, p.x];

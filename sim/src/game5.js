@@ -265,6 +265,23 @@ const STRIKE = (function () {
   return L;
 })();
 function msObj() { return MS.list[MS.idx] || null; }
+// 임무 지도 범위: 그 임무에서 나올 수 있는 사건·구역 전부 + 출발점 ([down, side, 반지름])
+function missionMapPts(kind, run) {   // run: 이번 비행에 정해진 위치만 (산불·수색·정찰·추적은 매번 다름)
+  const P = [], add = (p, r) => { if (p) P.push([-p.z, p.x, r || 0]); }, st = startPos(); add(st, 30);
+  if (run && kind === 'fire') { MS.list.forEach(f => { add(f.mk, 115); add(f.tp, 20); }); return P; }
+  if (run && kind === 'sar' && SAR) { add(SAR.area, 125); add(SAR.tp, 70); add(SAR.pkP, 20); return P; }
+  if (run && kind === 'recon') { MS.list.forEach(o => add(o.tp, 40)); return P; }
+  if (run && kind === 'track' && TRACK) { for (let t = TRACK.s; t <= (TRACK.endS || TRACK.total); t += 40) add(trackPose(t).p, 30); return P; }
+  if (kind === 'fire') FIRE.filter(f => flyL(f.tp) <= FLY_R_SAFE - 60).forEach(f => add(f.tp, 190));
+  else if (kind === 'sar') SAR_POOL.forEach(([d, s]) => add(W(d, s, 0), 215));
+  else if (kind === 'recon') RECON.forEach(r => add(r.tp, 30));
+  else if (kind === 'strike') STRIKE.forEach(t => add(t.c, 30));
+  else if (kind === 'race') RACE.forEach(r => add(r.c || r.mk, 20));
+  else if (kind === 'ridge' && RIDGE) RIDGE.list.forEach(r => add(r.c || r.mk, 20));
+  else if (kind === 'forest' && FLANE) FLANE.cps.forEach(c => add(W(c.q.d, c.q.s, 0), 20));
+  else if (kind === 'track') { add(new V3(FLY_C.x, 0, FLY_C.z), FLY_R_SAFE); }
+  return P;
+}
 function msStart(kind) {
   Object.values(MSG).forEach(g => g.visible = false);
   STRIKE.forEach(t => { t.col.off = true; t.dead = false; t.hull.material = t.hull.userData.m0 || t.hull.material; });
@@ -286,6 +303,7 @@ function msStart(kind) {
   S.respawn = null;
   if (ENV.ir) { irSet(false); irSet(true); }   // 바뀐 열 세기 반영
   MS.par = msPar(kind, L); briefShow(kind, L);
+  try { const run = ['fire', 'sar', 'recon', 'track'].includes(kind); mapView('ms_' + kind, missionMapPts(kind, run), run); } catch (e) { mapView('course'); }
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
@@ -869,13 +887,13 @@ function scenStep(o, cur, dt) {
     if (T.go) { S.trWin += dt; if (o.inView) S.trT += dt; }
     o.mk.copy(vp.p).add(new V3(0, 12, 0));
     if (S.trT >= o.need) { S.trackOK = true; comm('Good track, we have what we need. Break off and RTB.', '추적 완료 · 이탈 후 복귀'); msNext(`추적 성공 · ${S.trT.toFixed(0)}초 / ${S.trWin.toFixed(0)}초`, '#5dff9a'); }
-    else if (T.s >= T.total - 1) { S.trackOK = false; msNext(`차량 도착 · 추적 ${S.trT.toFixed(0)}초 (부족)`, '#ff9a40'); }
+    else if (T.s >= (T.endS || T.total) - 1) { S.trackOK = false; msNext(`차량 도착 · 추적 ${S.trT.toFixed(0)}초 (부족)`, '#ff9a40'); }
   }
 }
 function scenTick(dt) {
   photoTick(dt); WIND.t += dt; msEvents(dt); commTick(dt); if (S.kind === 'sar') sarClues(dt, DR.p);
   if (TRACK && MSG.track && MSG.track.visible && TRACK.go && S.state === 'run') {
-    TRACK.s = Math.min(TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
+    TRACK.s = Math.min(TRACK.endS || TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
     TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; TRACK.g.rotation.x = Math.atan2(ah.p.y - vp.p.y, 3) * 1;
   }
 }
@@ -908,16 +926,17 @@ const L2 = (ko, en) => window.SIM_LANG === 'en' ? en : ko;
 const shuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 function nearOrder(L, p) { const out = [], rest = L.slice(); let c = p; while (rest.length) { let k = 0, bd = 1e9; rest.forEach((o, i) => { const d = Math.hypot(o.tp.x - c.x, o.tp.z - c.z); if (d < bd) { bd = d; k = i; } }); c = rest[k].tp; out.push(rest.splice(k, 1)[0]); } return out; }
 function reconPick() {
-  const L = nearOrder(shuffle(RECON).slice(0, Math.min(4, RECON.length)), startPos());
+  const ok = RECON.filter(r => flyL(r.tp) <= FLY_R_SAFE), pool = ok.length >= 4 ? ok : RECON.slice().sort((a, b) => flyL(a.tp) - flyL(b.tp));
+  const L = nearOrder(shuffle(pool).slice(0, Math.min(4, pool.length)), startPos());
   L.forEach((o, i) => { o.label = `정찰 ${i + 1} · 건물 (${o.wl})`; o.done = false; }); return L;
 }
 // 산불: 후보 8곳 중 5곳, 3곳은 처음부터 · 2곳은 나중에 신고
 function firePick() {
   MSG.fire.visible = true; S.fireRep = [];
   FIRE.forEach(f => { f.on = false; f.g.visible = false; f.done = false; f.spread = false; });
-  const P = shuffle(FIRE).slice(0, 4), when = [0, 1e9, 1e9, 1e9];   // 한 곳씩: 보고하면 다음 신고
+  const P = shuffle(FIRE.filter(f => flyL(f.tp) <= FLY_R_SAFE - 60)).slice(0, 4), when = [0, 1e9, 1e9, 1e9];   // 한 곳씩: 보고하면 다음 신고
   P.forEach((f, i) => { f.on = true; f.ignT = when[i] + i * 0.05; f.active = false; f.g.visible = false; f.recT = 0; f.g.scale.setScalar(1);
-    const ang = Math.random() * 6.283, dist = 35 + Math.random() * 45; f.mk = W(f.d + Math.cos(ang) * dist, f.s + Math.sin(ang) * dist, 30); f.search = { r: 110 };
+    for (let t = 0; t < 24; t++) { const ang = Math.random() * 6.283, dist = 35 + Math.random() * 45; f.mk = W(f.d + Math.cos(ang) * dist, f.s + Math.sin(ang) * dist, 30); if (flyL(f.mk) <= FLY_R - 120) break; } f.search = { r: 110 };
     f.label = L2(`연기 신고 ${i + 1} · 수색 구역 반경 110 m`, `Smoke report ${i + 1} · search radius 110 m`); });
   return P;
 }
@@ -1022,14 +1041,14 @@ function msEvents(dt) {
 const SAR_POOL = (function () {
   if (!SAR) return [];
   const st = BY.pad_start, P = [];
-  for (const a of VEC.trail) for (let i = 0; i < a.length; i += 6) { const d = a[i], s = a[i + 1], dist = Math.hypot(d - st.down, s - st.side); if (dist > 220 && dist < 520 && INB(d, s) && !P.some(p => Math.hypot(p[0] - d, p[1] - s) < 90)) P.push([d, s]); }
+  for (const a of VEC.trail) for (let i = 0; i < a.length; i += 6) { const d = a[i], s = a[i + 1], dist = Math.hypot(d - st.down, s - st.side); if (dist > 220 && dist < 520 && INB(d, s) && flyL(W(d, s, 0)) <= 470 && !P.some(p => Math.hypot(p[0] - d, p[1] - s) < 90)) P.push([d, s]); }
   return P.length ? P : [[SAR.d, SAR.s]];
 })();
 function sarRandom() {
   const q = SAR_POOL[Math.floor(Math.random() * SAR_POOL.length)], d = q[0] + (Math.random() - 0.5) * 12, s = q[1] + (Math.random() - 0.5) * 12, c = W(d, s, 0);
   SAR.d = d; SAR.s = s; SAR.c.copy(c); SAR.tp.copy(c).add(new V3(0, 0.3, 0)); SAR.g.position.copy(c); SAR.g.rotation.y = Math.random() * 6.28;
-  const ang = Math.random() * 6.283, ad = 55 + Math.random() * 40; SAR.area.copy(W(d + Math.cos(ang) * ad, s + Math.sin(ang) * ad, 30)); MS.h1 = MS.h2 = false;
-  const pa = Math.random() * 6.283, pd = 45 + Math.random() * 25; SAR.pkP.copy(W(d + Math.cos(pa) * pd, s + Math.sin(pa) * pd, 0)); SAR.pk.position.copy(SAR.pkP); SAR.pk.rotation.y = Math.random() * 6.28; SAR.pk.visible = true; SAR.pkFound = false;
+  for (let t = 0; t < 24; t++) { const ang = Math.random() * 6.283, ad = 55 + Math.random() * 40; SAR.area.copy(W(d + Math.cos(ang) * ad, s + Math.sin(ang) * ad, 30)); if (flyL(SAR.area) <= FLY_R - 130) break; } MS.h1 = MS.h2 = false;   // 수색 구역이 비행 구역 안에 들어오게
+  for (let t = 0; t < 24; t++) { const pa = Math.random() * 6.283, pd = 45 + Math.random() * 25; SAR.pkP.copy(W(d + Math.cos(pa) * pd, s + Math.sin(pa) * pd, 0)); if (flyL(SAR.pkP) <= FLY_R_SAFE) break; } SAR.pk.position.copy(SAR.pkP); SAR.pk.rotation.y = Math.random() * 6.28; SAR.pk.visible = true; SAR.pkFound = false;
   SAR.sig.position.copy(c).add(new V3(0, 0.9, 0)); SAR.sigT = Math.random() * 3;
 }
 // 실종자 수색 구역을 좁힘 (가운데는 여전히 실제 위치와 조금 어긋나게)
@@ -1059,7 +1078,9 @@ function sarClues(dt, cur) {
       if (o.search.r > 35) sarNarrow(o, 35, 10 + Math.random() * 8); comm(`Copy, that's his pack. He can't be far, search within three zero meters.`, '배낭 확인 · 반경 30 m 안을 수색'); }
   } else S.pkT = 0;
 }
-function trackRandom() { const T = TRACK; T.s = Math.random() * T.total * 0.25; T.base = 7 + Math.random() * 3; T.ph = Math.random() * 6; T.tt = 0; T.stopT = 0; T.stops = [T.s + 400 + Math.random() * 300, T.s + 1100 + Math.random() * 400]; }
+function trackRandom() { const T = TRACK; T.s = Math.random() * T.total * 0.25;
+  { const endAt = s0 => { for (let s = s0; s <= T.total; s += 10) if (flyL(trackPose(s).p) > FLY_R_SAFE) return s; return T.total; }; let e = endAt(T.s), tries = 0; while (e - T.s < 800 && tries++ < 20) { T.s = Math.random() * T.total * 0.5; if (flyL(trackPose(T.s).p) > FLY_R_SAFE) continue; e = endAt(T.s); } T.endS = e; /* 비행 구역 밖으로 나가는 곳에서 끝 */ }
+  T.base = 7 + Math.random() * 3; T.ph = Math.random() * 6; T.tt = 0; T.stopT = 0; T.stops = [T.s + 400 + Math.random() * 300, T.s + 1100 + Math.random() * 400]; }
 
 // =====================================================================
 //  무전 교신 (영어 · 원격 통제소가 지시). 화면 표시 + 무전 잡음 + 영어 음성(설정)
@@ -2029,5 +2050,5 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
