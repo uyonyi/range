@@ -332,6 +332,8 @@ function refundPayload(msg) {   // 실제처럼: 한 번 떨어뜨린 투하물�
   if (S.kind === 'tutorial') { S.payloads = Math.min(3, S.payloads + 1); const c = droneM.cans.find(c => !c.visible); if (c) c.visible = true; }
   showMsg(msg + (S.kind === 'course' ? L2x(` · 남은 ${S.payloads}개`, ` · ${S.payloads} left`) : ''), '#ffc828', 1.8); sfx('bad');
 }
+// 드론 조명: 기본은 밤에 자동으로 켬 · L 키 / 패드 오른쪽 스틱 누르기 / VR X / 터치 💡 로 직접 켜고 끔
+function lightOn() { return S.lightOv != null ? S.lightOv : (!!SET.light || (ENV.night && !ENV.ir)); }
 function L2x(ko, en) { return window.SIM_LANG === 'en' ? en : ko; }
 // 자유 비행: 착륙해서 2초 있으면 재장전
 function reloadTick(dt) {
@@ -768,7 +770,7 @@ function handleKeys() {
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
-    else if (k === 'KeyL') { SET.light = !SET.light; }
+    else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('조명 켬', 'LIGHT ON') : L2x('조명 끔', 'LIGHT OFF'), '#ffe9a0', 0.9); }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
     else if (k === 'KeyH') { SET.assist = !SET.assist; saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }
     else if (k === 'PadUp') { SET.tilt = Math.min(40, SET.tilt + 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
@@ -848,7 +850,7 @@ function frame(now, noRender) {
   const inB = S.state !== 'menu' && insideBunker(subjPos);
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;
   hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : envHemi(), 1 - Math.exp(-dt * 5));
-  spot.intensity = lerp(spot.intensity, (SET.light || inB || nearB || (ENV.night && !ENV.ir)) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
+  spot.intensity = lerp(spot.intensity, (lightOn() || inB || nearB) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
   { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);

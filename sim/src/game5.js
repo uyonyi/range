@@ -526,7 +526,7 @@ function orderTick() {   // 휴대폰: 📻 버튼(눌러 펼치기) · PC·VR: 
   el.style.display = on ? '' : 'none'; if (!on) return; const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; if (el.dataset.t !== t) { el.dataset.t = t; el.innerHTML = `<b>${L2('📻 명령', '📻 ORDER')}<i>▾</i></b><span>${t}</span>`; if (!el.classList.contains('open')) el.classList.add('new'); }
 }
 function actionUI() { const b = $('tbDrop'); if (!b) return; const k = S.state === 'run' ? actionKind() : 'drop', t = k === 'report' ? '📷 REPORT' : k === 'none' ? '—' : 'DROP'; if (b.dataset.k !== k) { b.dataset.k = k; b.textContent = t; b.style.borderColor = k === 'report' ? '#5dff9a' : ''; b.style.color = k === 'report' ? '#5dff9a' : ''; b.style.fontSize = k === 'report' ? '13px' : ''; } }
-function photoTick(dt) { wxTick(dt); orderTick(); actionUI(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.add('hidden'); }   // 투하 버튼이 사진 보고를 겸함
+function photoTick(dt) { { const lb = $('tbLight'); if (lb) lb.classList.toggle('off', !lightOn()); } wxTick(dt); orderTick(); actionUI(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.add('hidden'); }   // 투하 버튼이 사진 보고를 겸함
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
@@ -1060,12 +1060,15 @@ function scenStep(o, cur, dt) {
     // 들킴: 운전자 시야(차 앞쪽 ±40°), 가까움, 낮은 고도(프로펠러 소리)일수록 빨리 참 · 안전하면 서서히 내려감
     if (T.go) {
       const fx = Math.sin(vp.h), fz = -Math.cos(vp.h), rx = cur.x - vp.p.x, rz = cur.z - vp.p.z, dh = Math.hypot(rx, rz), hy = cur.y - vp.p.y, front = dh > 1 ? (rx * fx + rz * fz) / dh : 0;
-      let r = 0;
-      if (front > 0.77 && dh < 160) r += 32 * (1 - dh / 160) + 6;
-      if (dd < 60) r += (60 - dd) * 1.3;
-      if (hy < 35 && dh < 100) r += (35 - Math.max(0, hy)) * 0.7;
-      if (ENV.night && !(front > 0.77)) r *= 0.7; if (ENV.wx === 'rain') r *= 0.75;
-      T.sus = clamp(T.sus + (r * 0.55 - 7) * dt, 0, 100); T.susMax = Math.max(T.susMax || 0, T.sus);
+      // 운전자 시야: 앞유리(정면 ±50°, 올려다보는 각 35° 아래, 200 m 안) > 옆 유리(±50~110°, 25° 아래, 100 m 안)
+      const el = Math.atan2(Math.max(0, hy), Math.max(1, dh)) / DEG; let r = 0; o.seen = false;
+      if (front > 0.64 && el < 35 && dh < 200) { r += 45 * (1 - dh / 200) + 10; o.seen = true; }
+      else if (front > -0.34 && el < 25 && dh < 100) { r += 15 * (1 - dh / 100); o.seen = true; }
+      if (dd < 60) r += (60 - dd) * 1.5;                       // 가까우면 소리·모습
+      if (hy < 35 && dh < 100) r += (35 - Math.max(0, hy)) * 0.8;   // 낮으면 프로펠러 소리
+      if (ENV.night) r *= lightOn() ? 1.5 : 0.6;               // 밤: 조명을 켜면 훨씬 잘 보임
+      if (ENV.wx === 'rain') r *= 0.75;
+      T.sus = clamp(T.sus + (r * 0.55 - 6) * dt, 0, 100); T.susMax = Math.max(T.susMax || 0, T.sus);
       if (!T.warn && T.sus >= 45) { T.warn = true; sfx('bad'); showMsg(L2('노출 주의 · 거리를 벌릴 것', 'Exposure · back off'), '#ff9a40', 1.6); comm(`${CS}, CONTROL. Driver is looking around. Back off and increase your standoff.`, '운전자가 주변을 살핌 · 뒤로 빠져 거리 넓힐 것'); }
       if (T.warn && T.sus < 20) T.warn = false;
       if (T.sus >= 100 && !T.burn) {
@@ -1109,7 +1112,7 @@ function scenOsd(o) {
   if (o.t === 'sarfind') return `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('실종자 포착 · Enter/📷 촬영', 'SUBJECT · Enter/📷 to photo') : ENV.ir ? 'IR 수색 중' : '숲 아래는 열화상(T)'}</div>`;
   if (o.t === 'track') { const su = Math.round(TRACK.sus || 0), sc = su >= 70 ? '#ff6060' : su >= 40 ? '#ff9a40' : '#5dff9a';
     return `<div style="color:${o.inView ? '#5dff9a' : o.close ? '#ff9a40' : '#9aa6ad'}">TRACK ${S.trT.toFixed(0)}/${o.need}s${o.close ? ' · 너무 가까움' : o.inView ? ' ●' : TRACK.go ? ' · 시야 밖' : ' · 접근하면 출발'}</div>`
-      + `<div style="color:${sc}">${L2('노출', 'EXPOSURE')} <span style="display:inline-block;width:70px;height:7px;background:rgba(255,255,255,.15);vertical-align:middle"><i style="display:block;height:100%;width:${su}%;background:${sc}"></i></span> ${su}%</div>`; }
+      + `<div style="color:${sc}">${L2('노출', 'EXPOSURE')}${o.seen ? L2(' · 운전자 시야', ' · in view') : ''} <span style="display:inline-block;width:70px;height:7px;background:rgba(255,255,255,.15);vertical-align:middle"><i style="display:block;height:100%;width:${su}%;background:${sc}"></i></span> ${su}%</div>`; }
   return '';
 }
 
@@ -1194,7 +1197,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
   fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow), switch to thermal (T), center the hotspot and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
   sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. 2 rescue kits: drop one within 5 m.'],
-  track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in front of it, close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay 100 m+ behind or to the side and 40 m+ up. Headlights and brake lights at night.'],
+  track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in the driver\'s view (ahead, low angle), close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay behind it and high. At night turn your light off (L) to stay hidden.'],
   ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.']
 } : {
   forest: ['숲 속 좁은 길', '주 경로 옆 숲 속에 낸 좁은 길을 따라 게이트·좁은 틈·쓰러진 나무를 지나 결승까지.', '나무 사이는 2~3 m. 수관 아래(지면 3 m 이하)로 낮게 날 것.'],
@@ -1203,7 +1206,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
   fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 열화상(T)으로 불씨를 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
   sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 구조 키트 2개 · 5 m 안에 투하.'],
-  track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '차 앞쪽·가까이·낮게 있으면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 측후방 100 m 이상·고도 40 m 이상 권장. 밤에는 전조등·브레이크등이 켜짐.'],
+  track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '운전자 시야(차 앞쪽·낮은 각도)·근접·저고도면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 차 뒤쪽 높이 유지 권장. 밤에는 드론 조명을 끄면(L) 덜 들킴.'],
   ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.']
 };
 function briefShow(kind, L) {
@@ -1504,7 +1507,7 @@ function commAck(o, kind) {   // 목표 하나 끝났을 때
 const LY_ITEMS = [
   ['osd', '비행 정보', 'Flight data'], ['obj', '다음 과제', 'Next task'], ['list', '과제 목록', 'Task list'], ['map', '지도', 'Map'], ['belly', '아래 카메라', 'Belly cam'],
   ['radio', '무전', 'Radio'], ['guide', '안내 문구', 'Guide'], ['bottom', '상태 표시', 'Status'], ['scope', '투하 조준', 'Drop scope'],
-  ['tbBoost', 'BST', 'BST'], ['tbDrop', 'DROP', 'DROP'], ['tbCam', 'CAM', 'CAM'], ['tbReset', '⟲', '⟲'], ['tbBelly', '↓CAM', '↓CAM'], ['tbIR', 'IR', 'IR'], ['tbAssist', 'AST', 'AST'], ['tbZoom', 'ZM', 'ZM'], ['tbGuide', 'GD', 'GD'], ['tbFull', '⛶', '⛶'], ['tbPause', '❚❚', '❚❚']
+  ['tbBoost', 'BST', 'BST'], ['tbDrop', 'DROP', 'DROP'], ['tbCam', 'CAM', 'CAM'], ['tbReset', '⟲', '⟲'], ['tbBelly', '↓CAM', '↓CAM'], ['tbIR', 'IR', 'IR'], ['tbLight', '💡', '💡'], ['tbAssist', 'AST', 'AST'], ['tbZoom', 'ZM', 'ZM'], ['tbGuide', 'GD', 'GD'], ['tbFull', '⛶', '⛶'], ['tbPause', '❚❚', '❚❚']
 ];
 const LY = { key: 'hroc_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
 try { LY.d = JSON.parse(localStorage.getItem(LY.key) || '{}'); } catch (e) { }
@@ -1516,7 +1519,7 @@ LY.def = IS_TOUCH ? {
   // 버튼: 오른쪽 위 한 줄 (간격 54 px, 오른쪽 끝 기준) + 그 아래 BST·DROP 가운데 높이 맞춤
   // 4개씩 두 줄, 오른쪽 끝 정렬: [GD AST ⛶ ❚❚] / [IR CAM ↓CAM ZM], 그 아래 BST·DROP 가운데 높이 맞춤
   tbGuide: { r: 174, t: 10 }, tbAssist: { r: 120, t: 10 }, tbFull: { r: 66, t: 10 }, tbPause: { r: 12, t: 10 },
-  tbIR: { r: 174, t: 64 }, tbCam: { r: 120, t: 64 }, tbBelly: { r: 66, t: 64 }, tbZoom: { r: 12, t: 64 },
+  tbLight: { r: 228, t: 64 }, tbIR: { r: 174, t: 64 }, tbCam: { r: 120, t: 64 }, tbBelly: { r: 66, t: 64 }, tbZoom: { r: 12, t: 64 },
   tbDrop: { r: 12, t: 122 }, tbBoost: { r: 102, t: 132 }, tbReset: { r: 172, t: 138, h: true }
 } : {};
 function lySave() { try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
@@ -1902,7 +1905,7 @@ document.addEventListener('keydown', e => {
 //  지형·드론은 드론 카메라로 한 번만 그려 화면 텍스처에 담고, 헤드셋에는 어두운 방 + 큰 화면 + 메뉴만 그림.
 //  (머리 움직임으로 세상이 흔들리지 않아 멀미가 적고, 장면을 두 번 그리지 않아 빠름)
 //  모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우   모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우
-//  오른쪽 트리거 투하 · 왼쪽 트리거 부스트 · A 확인 · B 메뉴 · X 다시 · Y 화면 앞으로 · 왼쪽 스틱 누르기 화면 고정 방식
+//  오른쪽 트리거 투하 · 왼쪽 트리거 부스트 · A 확인 · B 메뉴 · X 조명 · Y 하부 카메라 · 왼쪽 스틱 누르기 카메라 · 오른쪽 스틱 누르기 열화상
 // =====================================================================
 const IS_VR = !!window.SIM_VR;
 const XR = { sess: null, prev: {}, menu: false, userExit: false, ctl: [], hover: null, src: null, osdT: 0, mT: 0, frames: 0 };
@@ -2038,6 +2041,7 @@ function xrInput(dt) {
   if (Y) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 카메라 ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 카메라 끔', 'Lower camera off'), '#ffc828', 1); }
   if (LS) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
   if (RS) irSet(!ENV.ir);
+  if (X) pressed.push('KeyL');   // 조명 켜기/끄기
 }
 // 머리 방향 모드: 고개를 돌린 쪽으로 기체가 돌고, 왼쪽 스틱 앞뒤 = 속도, 고개를 들거나 숙이면 그쪽으로 오르내림
 // 오른쪽 스틱: 좌우 = 옆으로, 위아래 = 고도 (직접), 왼쪽 스틱 좌우 = 몸을 돌리지 않고 회전
@@ -2104,7 +2108,7 @@ function vrMenuDraw() {
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
   g.fillText((SET.vrMode === 3 ? L2('머리 방향: 보는 쪽으로 비행 · 왼쪽 스틱 앞뒤 속도 · 오른쪽 스틱 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : (SET.vrMode || 2) === 2 ? L2('모드 2: 왼쪽 스틱 상승·회전 / 오른쪽 스틱 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: 왼쪽 스틱 전후·회전 / 오른쪽 스틱 상승·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
   g.fillText(L2('R트리거 투하 · L트리거 부스트 · A 확인·사진 보고 · B 메뉴/계속', 'R-trigger drop · L-trigger boost · A ok/photo report · B menu/resume'), 36, y + 26);
-  g.fillText(L2('Y 하부 카메라 · 왼쪽 스틱 누르기 카메라 전환 · 오른쪽 스틱 누르기 열화상', 'Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
+  g.fillText(L2('X 조명 · Y 하부 카메라 · 왼쪽 스틱 누르기 카메라 · 오른쪽 스틱 누르기 열화상', 'X light · Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
   const vi = voiceInfo(), eng = commEngine(), au = AU.ctx ? AU.ctx.state : L2('없음', 'none');
   g.fillStyle = eng === 'none' ? 'rgba(255,154,122,.95)' : 'rgba(93,255,154,.85)';
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('없음 · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
