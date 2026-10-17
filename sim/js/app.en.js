@@ -5121,7 +5121,7 @@ function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex
   const SALT = 'k7Qx2#range', MID = 5000, N = 12000, FIN = '667c6eac4841dacac28af88ce9febae877dcf0556f15edc5211601d0f51bb8eb', KEY = 'fpvsim_pin_ok', el = $('pinGate'); if (!el) return;
   const okMid = m => typeof m === 'string' && /^[0-9a-f]{64}$/.test(m) && pinStretch(m, MID, N) === FIN;
   let ok = false; try { ok = okMid(localStorage.getItem(KEY)); } catch (e) { }
-  if (ok || /[?&]test/.test(location.search)) return;
+  if (ok || window.SIM_UNLOCKED || /[?&]test/.test(location.search)) return;   // 암호로 잠근 파일은 이미 문구 암호를 거쳤으므로 Restart 묻지 않음
   el.classList.remove('hidden'); let v = '';
   const dots = $('pinDots'), msg = $('pinMsg'), draw = () => [...dots.children].forEach((d, i) => d.classList.toggle('on', i < v.length));
   let wrong = 0, lockUntil = 0;
