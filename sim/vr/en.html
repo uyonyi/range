@@ -129,6 +129,8 @@ body.touch .panel{touch-action:pan-y}
 #tbAssist{right:calc(70px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbBoost{width:58px;height:58px;font-size:12px;right:calc(104px + env(safe-area-inset-right));bottom:calc(46% + 78px);border-color:#ff9a40;color:#ff9a40}
 #tbBelly{width:46px;height:46px;font-size:10px;right:calc(160px + env(safe-area-inset-right));bottom:calc(46% + 16px)}
+#tbLight{width:46px;height:46px;font-size:18px;right:calc(350px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
+#tbLight.off{filter:grayscale(1);opacity:.5}
 #tbIR{width:46px;height:46px;font-size:12px;right:calc(294px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbZoom,#tbFull,#tbGuide{width:46px;height:46px;font-size:12px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 body.touch #keys,body.touch #sticks,body.touch #list{display:none!important}
@@ -335,7 +337,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="tz" id="tzL"><div class="base"><div class="knob"></div></div><span class="lbl">↕ climb·descend ↔ yaw</span></div>
     <div class="tz" id="tzR"><div class="base"><div class="knob"></div></div><span class="lbl">↕ forward·back ↔ strafe</span></div>
     <div class="tb" id="tbDrop">DROP</div><div class="tb hidden" id="tbPhoto">📷</div><div class="tb" id="tbCam">CAM</div><div class="tb" id="tbReset">⟲</div>
-    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbIR">IR</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
+    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbLight">💡</div><div class="tb" id="tbIR">IR</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
   </div>
   <div id="tut" class="hidden"></div>
   <div id="rp" class="hidden"><button id="rpBack">⏪ 5s</button><button id="rpPlay">❚❚</button><button id="rpFwd">5s ⏩</button><input id="rpSeek" type="range" min="0" max="100" step="0.01"><span id="rpTime"></span><button id="rpSpd">×1</button><button id="rpCam">Camera</button><button id="rpVid">⬇ Save video</button><button id="rpClose">Close</button></div>
@@ -482,7 +484,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
     <div class="padinfo">
       <h3>Gamepad (Xbox / standard layout)</h3>
       <div class="thumbs"><div><b>Left stick</b>↕ climb·descend · ↔ yaw (Mode 2)</div><div><b>Right stick</b>↕ forward·back · ↔ sideways</div></div>
-      <div class="note">A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause</div>
+      <div class="note">A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause · R-stick click light</div>
       <h3>RC transmitter (USB joystick mode)</h3>
       <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
     </div>
@@ -650,7 +652,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=b0a7ee89"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.en.js?v=b0a7ee89"></script>
+<script src="../sites/yeongin.js?v=2f0d27cc"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.en.js?v=2f0d27cc"></script>
 </body>
 </html>
