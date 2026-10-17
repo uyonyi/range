@@ -49,6 +49,8 @@ EN = {
 '☀ 낮': '☀ Day',
 '☾ 밤': '☾ Night',
 'VR로 돌아가기': 'Back to VR',
+'⏹ 임무 끝내기 · 메뉴로': '⏹ End mission · menu',
+'다른 임무·기체는 임무 끝내기 → 메뉴에서 고르기': 'Other missions or drones: end the mission, then choose in the menu',
 '조종 난이도': 'Difficulty',
 '스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span>': 'Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span>',
 '입문': 'Training',

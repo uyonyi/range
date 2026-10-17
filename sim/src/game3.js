@@ -39,7 +39,7 @@ function startRun(kind) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
-  dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null;   // 이전 비행 기록·명령이 섞이지 않게
+  dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset();   // 이전 비행 기록·명령·무전이 섞이지 않게
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
@@ -679,7 +679,7 @@ function updateHUD(dt, subj) {
   else if (S.kind === 'demo') { ui.objNext.style.display = ''; ui.objNext.innerHTML = `REFERENCE FLIGHT <small>${fmt(S.ghostT)} / ${fmt(GH.total)}</small>`; }
   else ui.objNext.style.display = 'none';
   const podE = isMission() && S.kind !== 'sar' && S.state === 'run', kitM = S.kind === 'sar' && S.state === 'run', n = podE ? 0 : kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
-  ui.payload.innerHTML = podE ? 'POD —' : (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
+  const ak = actionKind(); ui.payload.innerHTML = ak === 'report' ? '📷 REPORT' : podE ? 'POD —' : (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
   if (o && o.mk && S.state === 'run' && DR.alive && !sIn) {
     const s = toScreen(o.mk);
     let x = s.x / innerWidth * 2 - 1, y = 1 - s.y / innerHeight * 2; if (s.behind) { x = -x; y = -y; }
@@ -733,7 +733,7 @@ function handleKeys() {
       if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel'].some(p => !$(p).classList.contains('hidden'))) continue;
       if (k === 'Enter' || k === 'PadA') { if (MENU.step < 3) wizGo(MENU.step + 1); else menuGo(); } else if (k === 'KeyT' && MENU.step === 3) openTutMenu(); continue;
     }
-    if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun('course'); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
+    if (S.state === 'result') { if (k === 'Enter' || k === 'PadA') startRun(S.lastKind || S.kind); else if (k === 'KeyV' || k === 'KeyH') replayStart(LAST_REC, 'result'); else if (k === 'Escape') toMenu(); continue; }
     if (k === 'Escape') { togglePause(); continue; }
     if (S.state === 'pause') continue;
     if ((k === 'Enter' || k === 'PadA') && S.state === 'run' && photoMission()) { missionPhoto(); continue; }   // 산불·수색: 사진 찍어 보고
@@ -754,7 +754,7 @@ function handleKeys() {
     else if (k === 'PadDown') { SET.tilt = Math.max(0, SET.tilt - 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
     if (S.state !== 'run') continue;
     if (S.tut && S.tut.st !== 'fly') continue;
-    if (k === 'Space' && DR.alive) dropPayload(DR.p, DR.v, false);
+    if (k === 'Space' && DR.alive) { if (actionKind() === 'report') missionPhoto(); else dropPayload(DR.p, DR.v, false); }   // 투하 버튼 = 임무에 따라 투하 / 사진 보고
     else if (k === 'KeyR') respawn();
     else if (k === 'KeyN' && isMission() && S.running && msObj()) { S.pen += 20; msNext('SKIPPED +20s', '#ff9a40'); }
     else if (k === 'KeyN' && S.kind === 'course' && S.running && curObj() && curObj().kind !== 'land') { S.pen += 20; completeObj(2, 'SKIPPED +20s', '#ff9a40'); }
