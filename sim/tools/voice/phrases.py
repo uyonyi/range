@@ -67,6 +67,7 @@ for m in re.finditer(r'\bcomm\(', srcs):
 # 임무 시작 무전 (commStart 의 T 표)
 cs = srcs[srcs.index('function commStart'):]; cs = cs[:cs.index('\n}\n')]
 for m in re.finditer(r'^\s*\w+: \[', cs, re.M): exprs.append(first_arg(cs, m.end()))
+exprs.append(cs[cs.index('const T = {'):])   # 표 안의 모든 문자열 (함수로 만든 항목 포함)
 exprs.append("'Eagle One, Control. Radio check. How copy? Over.'")
 for x in ['Winds three meters per second from west-northwest.', 'Winds seven meters per second from west-northwest.', 'Winds three meters per second.', 'Winds seven meters per second.', 'Night ops, keep your strobes on.', 'Eagle One, Control.', 'Over.']: exprs.append("'" + x + "'")
 def speakify(t): return re.sub(r'\bRTB\b', 'R T B', t.replace('EAGLE ONE', 'Eagle One').replace('CONTROL', 'Control'))
@@ -86,9 +87,15 @@ for d in range(50, 1050, 50):
     U = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']; h, r = d // 100, d % 100
     w = ' '.join(x for x in [('one thousand' if h >= 10 else U[h] + ' hundred') if h else '', 'fifty' if r == 50 else ''] if x)
     P.add(f'about {w} meters from launch point.')
+    P.add(f'about {w} meters from your position.')
 W = set(['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'niner', 'nine', 'ten', 'hundred', 'thousand', 'fifty', 'grid', 'remaining', 'bearing',
          'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'Juliett', 'Kilo', 'Lima', 'Mike', 'November', 'Papa', 'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey', 'X-ray', 'Yankee', 'Zulu'])
 W |= {'eleven', 'twelve', 'remaining', 'Over', 'Copy', 'Eagle One', 'Control'}
+# 드론 운용자(우리 쪽) 응답: 다른 목소리 · 소스에서 OP 로 보내는 문장
+OPS = set()
+for m in re.finditer(r"comm\(\s*'([^']*)'\s*,\s*'[^']*'\s*,\s*OP\s*\)", srcs):
+    for s2 in re.split(r'(?<=[.?!])\s+', speakify(m.group(1)).strip()):
+        if s2: OPS.add(s2.strip(' ,'))
 Wl = {}
 for w in W: Wl.setdefault(w.lower(), w)
-print(json.dumps({'phrases': sorted(P), 'words': sorted(Wl.values(), key=str.lower)}, ensure_ascii=False, indent=0))
+print(json.dumps({'phrases': sorted(P), 'words': sorted(Wl.values(), key=str.lower), 'op': sorted(OPS)}, ensure_ascii=False, indent=0))
