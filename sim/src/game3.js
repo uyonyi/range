@@ -400,12 +400,13 @@ function checkObjectives(prev, cur, dt) {
       completeObj(1, `${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40');
       return;
     }
-    const nx = OBJS[S.objIdx + 1];
-    if (nx && o.mk && nx.mk && !(o.kind === 'drop' && PAY.some(p => p.course))) {
-      const A = o.mk, dx = nx.mk.x - A.x, dz = nx.mk.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
+    const anc = q => q.kind === 'orbit' && q.b ? q.b.world(0, 0, 0) : q.mk;   // 오빗 안내점(mk)은 드론을 따라 원 위를 돌므로 탱크 중심으로 잼
+    const oA = anc(o); let nx = null; for (let k = S.objIdx + 1; k < OBJS.length; k++) { const q = OBJS[k], qa = anc(q); if (q.kind !== 'drop' && qa && oA && Math.hypot(qa.x - oA.x, qa.z - oA.z) > 10) { nx = q; break; } }   // 방향은 고정된 다음 과제로 잼 (투하 표적은 움직이거나 같은 자리라 제외)
+    if (nx && oA && !(o.kind === 'drop' && PAY.some(p => p.course))) {
+      const A = oA, nA = anc(nx), dx = nA.x - A.x, dz = nA.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
       if (dA < 20) S.objNear = S.objIdx;
       const u = L2 > 1 ? ((cur.x - A.x) * dx + (cur.z - A.z) * dz) / L2 : 0;
-      if (S.objNear === S.objIdx && u > 0.5 && !(o.kind === 'orbit' && dA < 26)) {
+      if (((S.objNear === S.objIdx && u > 0.5) || u > 0.85) && !(o.kind === 'orbit' && dA < 26 && Math.abs(S.orbSum) > 0.3)) {   // 가까이 안 와도 다음 과제 쪽으로 85% 넘게 가면 건너뜀
         comm(`${CS}, CONTROL. You missed that one. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
         completeObj(2, `${o.label} ✗ → NEXT`, '#ff9a40'); return;
       }

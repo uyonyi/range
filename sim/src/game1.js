@@ -980,7 +980,7 @@ const STREES = (function siteTrees() {
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
   }
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new V3(0, 1, 0), SCV = new V3(), col = new THREE.Color();
-  const pos = new Float32Array(n * 3), dim = new Float32Array(n * 2), _a = new V3();
+  const pos = new Float32Array(n * 3), dim = new Float32Array(n * 2), _a = new V3(), REF = new Int32Array(n * 2);   // REF: 나무 i -> (조각, 인스턴스 번호)
   for (const [key, ids] of groups) {
     const kind = +key.split(',')[2];
     const view = G0 => { const g = new THREE.BufferGeometry(); for (const a in G0.attributes) g.setAttribute(a, G0.attributes[a]); return g; };   // 꼭짓점 버퍼는 공유, 경계 구만 구역별
@@ -990,7 +990,7 @@ const STREES = (function siteTrees() {
       const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
       const w = W(d, s, 0); w.y = Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2;
       Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.4 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.4 * (0.9 + 0.2 * hsh(d, d, 3)));
-      M4.compose(w, Q, SCV); im.setMatrixAt(k, M4);
+      M4.compose(w, Q, SCV); im.setMatrixAt(k, M4); REF[i * 2] = CHUNKS.length; REF[i * 2 + 1] = k;
       col.setRGB(u8[i * 4] / 255 * 0.92, u8[i * 4 + 1] / 255 * 0.86, u8[i * 4 + 2] / 255 * 0.8).convertSRGBToLinear(); im.setColorAt(k, col);
       bb.expandByPoint(w); bb.expandByPoint(_a.set(w.x, w.y + h, w.z));
       pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z; dim[i * 2] = h; dim[i * 2 + 1] = r * 1.24;
@@ -1026,7 +1026,18 @@ const STREES = (function siteTrees() {
       if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);
-  return { n, col: col1, lod };
+  // 산불: 불난 자리 나무를 그을린 앙상한 줄기로 (숲에 구멍이 나서 위에서 불길이 보이게) · 임무가 바뀌면 되돌림
+  const BURNT = [], _m = new THREE.Matrix4(), _p = new V3(), _q = new THREE.Quaternion(), _s = new V3(), _c = new THREE.Color();
+  function scorch(p, R) {
+    const gx = Math.floor(p.x / GC), gz = Math.floor(p.z / GC), g = Math.ceil(R / GC);
+    for (let ix = gx - g; ix <= gx + g; ix++) for (let iz = gz - g; iz <= gz + g; iz++) { const L = GRID.get(ix + ',' + iz); if (!L) continue;
+      for (const v of L) { const i = v & 0xffffff; if (Math.hypot(pos[i * 3] - p.x, pos[i * 3 + 2] - p.z) > R || BURNT.some(b => b.i === i)) continue;
+        const ch = CHUNKS[REF[i * 2]], k = REF[i * 2 + 1], im = ch.im; im.getMatrixAt(k, _m); const m0 = _m.clone(); im.getColorAt(k, _c); const c0 = _c.clone();
+        _m.decompose(_p, _q, _s); _s.x *= 0.22; _s.z *= 0.22; _s.y *= 0.8; _m.compose(_p, _q, _s); im.setMatrixAt(k, _m); im.setColorAt(k, _c.setRGB(0.035, 0.03, 0.025));
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; BURNT.push({ i, im, k, m0, c0, r0: dim[i * 2 + 1] }); dim[i * 2 + 1] *= 0.25; } }
+  }
+  function unscorch() { for (const b of BURNT) { b.im.setMatrixAt(b.k, b.m0); b.im.setColorAt(b.k, b.c0); b.im.instanceMatrix.needsUpdate = true; if (b.im.instanceColor) b.im.instanceColor.needsUpdate = true; dim[b.i * 2 + 1] = b.r0; } BURNT.length = 0; }
+  return { n, col: col1, lod, scorch, unscorch };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }

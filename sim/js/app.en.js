@@ -1202,7 +1202,7 @@ const STREES = (function siteTrees() {
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
   }
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new V3(0, 1, 0), SCV = new V3(), col = new THREE.Color();
-  const pos = new Float32Array(n * 3), dim = new Float32Array(n * 2), _a = new V3();
+  const pos = new Float32Array(n * 3), dim = new Float32Array(n * 2), _a = new V3(), REF = new Int32Array(n * 2);   // REF: 나무 i -> (조각, 인스턴스 번호)
   for (const [key, ids] of groups) {
     const kind = +key.split(',')[2];
     const view = G0 => { const g = new THREE.BufferGeometry(); for (const a in G0.attributes) g.setAttribute(a, G0.attributes[a]); return g; };   // 꼭짓점 버퍼는 공유, 경계 구만 구역별
@@ -1212,7 +1212,7 @@ const STREES = (function siteTrees() {
       const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
       const w = W(d, s, 0); w.y = Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2;
       Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.4 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.4 * (0.9 + 0.2 * hsh(d, d, 3)));
-      M4.compose(w, Q, SCV); im.setMatrixAt(k, M4);
+      M4.compose(w, Q, SCV); im.setMatrixAt(k, M4); REF[i * 2] = CHUNKS.length; REF[i * 2 + 1] = k;
       col.setRGB(u8[i * 4] / 255 * 0.92, u8[i * 4 + 1] / 255 * 0.86, u8[i * 4 + 2] / 255 * 0.8).convertSRGBToLinear(); im.setColorAt(k, col);
       bb.expandByPoint(w); bb.expandByPoint(_a.set(w.x, w.y + h, w.z));
       pos[i * 3] = w.x; pos[i * 3 + 1] = w.y; pos[i * 3 + 2] = w.z; dim[i * 2] = h; dim[i * 2 + 1] = r * 1.24;
@@ -1248,7 +1248,18 @@ const STREES = (function siteTrees() {
       if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);
-  return { n, col: col1, lod };
+  // 산불: 불난 자리 나무를 그을린 앙상한 줄기로 (숲에 구멍이 나서 위에서 불길이 보이게) · 임무가 바뀌면 되돌림
+  const BURNT = [], _m = new THREE.Matrix4(), _p = new V3(), _q = new THREE.Quaternion(), _s = new V3(), _c = new THREE.Color();
+  function scorch(p, R) {
+    const gx = Math.floor(p.x / GC), gz = Math.floor(p.z / GC), g = Math.ceil(R / GC);
+    for (let ix = gx - g; ix <= gx + g; ix++) for (let iz = gz - g; iz <= gz + g; iz++) { const L = GRID.get(ix + ',' + iz); if (!L) continue;
+      for (const v of L) { const i = v & 0xffffff; if (Math.hypot(pos[i * 3] - p.x, pos[i * 3 + 2] - p.z) > R || BURNT.some(b => b.i === i)) continue;
+        const ch = CHUNKS[REF[i * 2]], k = REF[i * 2 + 1], im = ch.im; im.getMatrixAt(k, _m); const m0 = _m.clone(); im.getColorAt(k, _c); const c0 = _c.clone();
+        _m.decompose(_p, _q, _s); _s.x *= 0.22; _s.z *= 0.22; _s.y *= 0.8; _m.compose(_p, _q, _s); im.setMatrixAt(k, _m); im.setColorAt(k, _c.setRGB(0.035, 0.03, 0.025));
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; BURNT.push({ i, im, k, m0, c0, r0: dim[i * 2 + 1] }); dim[i * 2 + 1] *= 0.25; } }
+  }
+  function unscorch() { for (const b of BURNT) { b.im.setMatrixAt(b.k, b.m0); b.im.setColorAt(b.k, b.c0); b.im.instanceMatrix.needsUpdate = true; if (b.im.instanceColor) b.im.instanceColor.needsUpdate = true; dim[b.i * 2 + 1] = b.r0; } BURNT.length = 0; }
+  return { n, col: col1, lod, scorch, unscorch };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }
@@ -2155,12 +2166,13 @@ function checkObjectives(prev, cur, dt) {
       completeObj(1, `${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40');
       return;
     }
-    const nx = OBJS[S.objIdx + 1];
-    if (nx && o.mk && nx.mk && !(o.kind === 'drop' && PAY.some(p => p.course))) {
-      const A = o.mk, dx = nx.mk.x - A.x, dz = nx.mk.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
+    const anc = q => q.kind === 'orbit' && q.b ? q.b.world(0, 0, 0) : q.mk;   // 오빗 안내점(mk)은 드론을 따라 원 위를 돌므로 탱크 중심으로 잼
+    const oA = anc(o); let nx = null; for (let k = S.objIdx + 1; k < OBJS.length; k++) { const q = OBJS[k], qa = anc(q); if (q.kind !== 'drop' && qa && oA && Math.hypot(qa.x - oA.x, qa.z - oA.z) > 10) { nx = q; break; } }   // 방향은 고정된 다음 과제로 잼 (Drop 표적은 움직이거나 같은 자리라 제외)
+    if (nx && oA && !(o.kind === 'drop' && PAY.some(p => p.course))) {
+      const A = oA, nA = anc(nx), dx = nA.x - A.x, dz = nA.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
       if (dA < 20) S.objNear = S.objIdx;
       const u = L2 > 1 ? ((cur.x - A.x) * dx + (cur.z - A.z) * dz) / L2 : 0;
-      if (S.objNear === S.objIdx && u > 0.5 && !(o.kind === 'orbit' && dA < 26)) {
+      if (((S.objNear === S.objIdx && u > 0.5) || u > 0.85) && !(o.kind === 'orbit' && dA < 26 && Math.abs(S.orbSum) > 0.3)) {   // 가까이 안 와도 다음 과제 쪽으로 85% 넘게 가면 건너뜀
         comm(`${CS}, CONTROL. You missed that one. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
         completeObj(2, `${o.label} ✗ → NEXT`, '#ff9a40'); return;
       }
@@ -3075,7 +3087,7 @@ function bellyMode() {
   const ov = S.bellyOv;
   if (ov && ov.val === false && ov.idx !== S.objIdx) S.bellyOv = null;          // 끈 것은 다음 과제에서 Restart 자동
   const o = curObj();
-  const auto = SET.belly && o && ((o.kind === 'drop' && dropTargetPos(o).distanceTo(DR.p) < 45) || (o.kind === 'orbit' && o.b.world(0, 0, 0).distanceTo(DR.p) < 30) || ((o.t === 'recon' || o.t === 'fire') && Math.hypot(o.tp.x - DR.p.x, o.tp.z - DR.p.z) < 140));
+  const auto = SET.belly && o && ((o.kind === 'drop' && dropTargetPos(o).distanceTo(DR.p) < 45) || (o.kind === 'orbit' && o.b.world(0, 0, 0).distanceTo(DR.p) < 30) || ((o.t === 'recon' || o.t === 'fire') && Math.hypot(o.tp.x - DR.p.x, o.tp.z - DR.p.z) < 140) || (o.t === 'sarfind' && o.mk && Math.hypot(o.mk.x - DR.p.x, o.mk.z - DR.p.z) < (o.search ? o.search.r : 120) + 30));
   if (S.bellyOv && S.bellyOv.val === false) return null;
   if (auto) return 'big';
   if (S.bellyOv && S.bellyOv.val === true) return 'small';
@@ -3842,7 +3854,7 @@ function msStep(prev, cur, dt) {
         const A = o.c, dx = nx.c.x - A.x, dz = nx.c.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
         if (dA < 20) S.msNear = o;
         const u = L2 > 1 ? ((cur.x - A.x) * dx + (cur.z - A.z) * dz) / L2 : 0;
-        if (S.msNear === o && u > 0.5) { msSkip(); return; }
+        if ((S.msNear === o && u > 0.5) || u > 0.85) { msSkip(); return; }
       }
     }
     const r = passCross(o, prev, cur);
@@ -3852,16 +3864,22 @@ function msStep(prev, cur, dt) {
   else if (o.t === 'sarfind' || o.t === 'land' || o.t === 'track') scenStep(o, cur, dt);
   else if (o.t === 'recon') {
     const inView = sensorSees(o.tp, cur, AFc().reconD || 260);
-    o.inView = inView;   // 사진은 직접 찍어 보고 (SPACE·Enter·📷·A·R트리거)
+    o.inView = inView; if (inView) o.seenT = S.simT;   // 사진은 직접 찍어 보고 (SPACE·Enter·📷·A·R트리거)
   }
 }
 // 센서 시야: 앞 화면 가운데 or 아래 Camera(수직) 시야 안
+const _sv = new V3();
 function sensorSees(tp, cur, maxD) {
   maxD *= wxSense();
   const d = tp.distanceTo(cur), sp = toScreen(tp), x = sp.x / innerWidth * 2 - 1, y = 1 - sp.y / innerHeight * 2;
-  const front = !sp.behind && Math.abs(x) < 0.35 && Math.abs(y) < 0.45 && d > 15 && d < maxD;
-  const dy = cur.y - tp.y, h = Math.hypot(tp.x - cur.x, tp.z - cur.z), nadir = dy > 6 && dy < maxD && h < dy * 0.5;
-  return front || nadir;
+  const front = !sp.behind && Math.abs(x) < 0.92 && Math.abs(y) < 0.92 && d > 3 && d < maxD;   // 화면에 보이면 (가장자리 조금 빼고)
+  if (front) return true;
+  const dy = cur.y - tp.y, h = Math.hypot(tp.x - cur.x, tp.z - cur.z);
+  if (dy > 3 && dy < maxD && h < dy * 0.85) return true;   // 바로 아래 (아래 Camera)
+  // 지금 켜져 있는 아래 Camera 화면(PC 작은 창 · VR 하부 Camera)에 보이면
+  const lc = XR_ON && (SET.vrPip | 0) > 0 ? VR_PIP.cam : (typeof bellyMode === 'function' && bellyMode() !== null ? bellyCam : null);
+  if (lc && d < maxD) { _sv.copy(tp).project(lc); if (_sv.z < 1 && Math.abs(_sv.x) < 0.95 && Math.abs(_sv.y) < 0.95) return true; }
+  return false;
 }
 // ---- 사진 보고: 지금 Camera 화면을 작은 사진으로 (좌표·시각 표시) ----
 const PH = { rt: null, lut: null, last: null, lastT: 0 };
@@ -3993,14 +4011,14 @@ function missionPhoto() {
   const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ' · ' + pilotName(), o = msObj();
   const xyS = (d, s) => { const xy = to5186(d, s); return xy ? `X ${xy[0].toFixed(0)}  Y ${xy[1].toFixed(0)}` : ''; };
   if (S.kind === 'fire') {
-    const f = MS.list.find(x => x.active && !x.done && x.inView);
+    const f = MS.list.find(x => x.active && !x.done && (x.inView || (ENV.ir && S.simT - (x.seenT ?? -9) < 1.5)));
     if (f) { comm('Control, Eagle One. Hotspot confirmed. Photo and grid sent.', '이글 원: 불씨 확인 · 사진과 좌표 전송', OP); const xy = to5186(f.d, f.s); photoAdd(snapPhoto([L2('불씨 확인 · 열화상', 'HOTSPOT · THERMAL') + '  ' + hm, xyS(f.d, f.s)], f.tp), f.label, xy, true); fireReport(f, xy); return; }
     const seen = MS.list.find(x => x.active && !x.done && x.seenVis);
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(seen ? L2('연기는 찍혔지만 불씨 확인 불가 · 열화상(T)으로 Restart', 'Smoke only · switch to thermal (T) and retake') : L2('사진에 불씨 None · 화면 가운데에 두고 찍기', 'No hotspot in frame · center it and retake'), '#ff9a40', 1.8); return;
   }
   if (S.kind === 'recon' && o && o.t === 'recon') {
-    if (o.inView) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); photoAdd(snapPhoto([L2('정찰 사진', 'RECON IMAGE') + '  ' + hm, o.label.split(' · ')[0]], o.tp), o.label, to5186(o.d || 0, o.s || 0), true); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); return; }
+    if (o.inView || S.simT - (o.seenT ?? -9) < 1.5) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); photoAdd(snapPhoto([L2('정찰 사진', 'RECON IMAGE') + '  ' + hm, o.label.split(' · ')[0]], o.tp), o.label, to5186(o.d || 0, o.s || 0), true); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); return; }
     photoAdd(snapPhoto([L2('사진 · 대상 None', 'PHOTO · NO TARGET') + '  ' + hm, '']), '', null, false); showMsg(L2('사진에 대상 건물 None · 화면 가운데(or 아래 Camera)에 담고 Restart', 'Target not in frame · center it and retake'), '#ff9a40', 1.8); return;
   }
   if (S.kind === 'track' && o && o.t === 'track') {
@@ -4008,7 +4026,7 @@ function missionPhoto() {
     if (ok) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); showMsg(L2('차량 사진 보고 ✓', 'Vehicle photo reported ✓'), '#5dff9a', 1.4); } else showMsg(L2('사진에 차량 None', 'Vehicle not in frame'), '#ff9a40', 1.4); return;
   }
   if (S.kind === 'sar' && o && o.t === 'sarfind') {
-    if (o.inView) { comm('Control, Eagle One. Subject located. Photo and grid sent.', '이글 원: 실종자 발견 · 사진과 좌표 전송', OP); const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
+    if (o.inView || S.simT - (o.seenT ?? -9) < 1.5) { comm('Control, Eagle One. Subject located. Photo and grid sent.', '이글 원: 실종자 발견 · 사진과 좌표 전송', OP); const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(L2('사진에 실종자 None · 가까이(열화상은 멀리서도) 화면 가운데에', 'No subject in frame · get closer (or use thermal) and center it'), '#ff9a40', 1.8); return;
   }
@@ -4184,6 +4202,11 @@ const FIRE = (function () {
   const smokeM = new THREE.MeshLambertMaterial({ color: 0xc4c0b8, transparent: true, opacity: 0.3, depthWrite: false, fog: false });
   const hotM = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), plumeM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
   const emberM = new THREE.MeshBasicMaterial({ color: 0xff7a22, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
+  const scorchM = new THREE.MeshBasicMaterial({ color: 0x14100c, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  const flameM = new THREE.MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
+  const flameM2 = new THREE.MeshBasicMaterial({ color: 0xffc23a, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false });
+  const sparkM = new THREE.PointsMaterial({ color: 0xffa040, size: 0.35, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+  const FL_GEO = new THREE.ConeGeometry(1, 1, 7, 1, true).translate(0, 0.5, 0);
   for (let i = 0; i < 8; i++) {
     let q, d, s, tries = 0;
     do { q = PATHL.at(60 + r() * (PATHL.total - 100)); const off = (r() < 0.5 ? -1 : 1) * (45 + r() * 90); d = q.d - q.ts * off; s = q.s + q.td * off; tries++; }
@@ -4192,11 +4215,15 @@ const FIRE = (function () {
     const hot = new THREE.Mesh(new THREE.CircleGeometry(2.6, 20), hotM); hot.rotation.x = -Math.PI / 2; hot.position.y = 0.25; hot.userData.irOnly = true; hot.visible = false; g.add(hot);
     const pl = new THREE.Mesh(UCYL, plumeM); pl.scale.set(1.4, 16, 1.4); pl.position.y = 8; pl.userData.irOnly = true; pl.visible = false; g.add(pl);
     const em = new THREE.Mesh(USPH, emberM); em.scale.set(0.9, 0.35, 0.9); em.position.y = 0.3; g.add(em);
+    // 발화점: 그을린 땅 + 일렁이는 불꽃 (숲 바닥에서 나무 높이까지) + 튀어 오르는 불티
+    const sc = new THREE.Mesh(new THREE.CircleGeometry(5.5, 24), scorchM); sc.rotation.x = -Math.PI / 2; sc.position.y = 0.12; sc.renderOrder = 1; g.add(sc);
+    const flames = []; for (let k = 0; k < 9; k++) { const fl = new THREE.Mesh(FL_GEO, k % 3 ? flameM : flameM2); const a = r() * 6.283, rr = k < 3 ? r() * 1.2 : 1 + r() * 2.8; fl.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); fl.userData.h = k < 3 ? 9 + r() * 6 : 3 + r() * 4; fl.userData.w = k < 3 ? 1.1 + r() * 0.7 : 0.6 + r() * 0.6; /* 가운데 3개는 나무 위로 솟는 불길 */ fl.userData.ph = r() * 6; g.add(fl); flames.push(fl); }
+    const sparks = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(40 * 3), 3)), sparkM); sparks.userData.s = Array.from({ length: 40 }, () => [r() * 6.283, r(), r()]); sparks.frustumCulled = false; g.add(sparks);
     const puffs = []; for (let k = 0; k < 14; k++) { const p = new THREE.Mesh(USPH, smokeM.clone()); p.userData.ph = k / 14; p.userData.j = r(); g.add(p); puffs.push(p); }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff8a30, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); glow.scale.set(9, 6, 1); glow.position.y = 2; glow.visible = false; g.add(glow);
     // 신고 지점: 실제 위치에서 조금 떨어진 곳 (수색 구역 반경 50 m)
     const ang = r() * 6.283, dist = 15 + r() * 25, area = W(d + Math.cos(ang) * dist, s + Math.sin(ang) * dist, 30);
-    L.push({ kind: 'ms', t: 'fire', label: `Hotspot ${i + 1} · search radius 50 m`, d, s, tp: c.clone().add(new V3(0, 0.6, 0)), mk: area, need: 1.2, g, em, puffs, glow, search: { r: 110 },
+    L.push({ kind: 'ms', t: 'fire', label: `Hotspot ${i + 1} · search radius 50 m`, d, s, tp: c.clone().add(new V3(0, 0.6, 0)), mk: area, need: 1.2, g, em, puffs, glow, flames, sparks, sc, search: { r: 110 },
       pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } });
   }
   return L;
@@ -4216,6 +4243,11 @@ function envTick(dt) {
     if (!f.on || !f.active) continue;
     f.em.material.opacity = 0.55 + 0.35 * Math.sin(envT * 9 + f.d) * Math.sin(envT * 5.3);
     f.em.visible = !ENV.ir && (ENV.night || true);
+    if (f.flames) { const wv0 = windAt(f.g.position), lx = clamp(wv0.x * 0.06, -0.35, 0.35), lz = clamp(wv0.z * 0.06, -0.35, 0.35);
+      for (const fl of f.flames) { const u = fl.userData, fk = 0.75 + 0.25 * Math.sin(envT * 11 + u.ph) * Math.sin(envT * 6.3 + u.ph * 2); fl.visible = !ENV.ir; fl.scale.set(u.w * (0.85 + 0.2 * fk), u.h * fk, u.w * (0.85 + 0.2 * fk)); fl.rotation.set(lz, u.ph, -lx); }
+      const a = f.sparks.geometry.attributes.position.array, ss = f.sparks.userData.s; f.sparks.visible = !ENV.ir;
+      for (let k = 0; k < ss.length; k++) { const q = ss[k], t = (envT * (0.35 + q[1] * 0.3) + q[2]) % 1; a[k * 3] = Math.cos(q[0] + t * 3) * (0.5 + t * 2) + wv0.x * t * 1.2; a[k * 3 + 1] = 1 + t * 14; a[k * 3 + 2] = Math.sin(q[0] + t * 3) * (0.5 + t * 2) + wv0.z * t * 1.2; }
+      f.sparks.geometry.attributes.position.needsUpdate = true; f.sparks.material.opacity = 0.9; }
     // 연기 기둥: 바람 쪽으로 기울며 60 m 가까이 올라감 (멀리서도 보이는 단서)
     const wv = windAt(f.g.position.clone().setY(f.g.position.y + 30)), wl = Math.hypot(wv.x, wv.z), wx = wl > 0.1 ? wv.x / wl : 0.6, wz = wl > 0.1 ? wv.z / wl : 0.3, lean = 10 + wl * 5, big = f.spread ? 1.5 : 1;
     for (const p of f.puffs) { const u = (envT * 0.07 + p.userData.ph) % 1, j = p.userData.j; p.position.set(wx * lean * Math.pow(u, 1.4) * 2.2 + Math.sin(u * 7 + f.s + j * 6) * 2 * u, 1 + u * 58 * big, wz * lean * Math.pow(u, 1.4) * 2.2 + Math.cos(u * 5 + j * 6) * 2 * u); const k = (2 + u * 11) * big; p.scale.set(k, k * 0.85, k); p.material.opacity = (f.done ? 0.6 : 0.8) * Math.min(1, u * 5) * Math.pow(1 - u, 0.8) + 0.05; p.material.color.setHex(f.done ? 0x5f5b55 : 0xf6f4ef); p.visible = !ENV.ir && !ENV.night; }   // 새 신고 = 흰 연기 · 보고 끝 = 색 연기
@@ -4251,7 +4283,6 @@ function snowPatch() {   // 처음 눈이 올 때 한 번: 장면의 지형·나
 function wxTick(dt) {
   // 눈: 몇 초에 걸쳐 쌓이고, 그치면 서서히 녹음 · 풀은 눈 속에 묻힘
   { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 6, dt / 6); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
-  lensTick(dt);
   if (!WX.g || (ENV.wx || 'clear') === 'clear') return;
   // 입자는 땅에 고정: 묶음은 드론을 따라가되, 드론이 움직인 만큼 입자를 반대로 옮김 -> 날아가면 비·눈이 스쳐 지나감
   const c = (S.state === 'replay' && RP.pose) ? RP.pose.p : DR.p;
@@ -4276,53 +4307,6 @@ function wxTick(dt) {
   if (WX.snow && WX.snow.visible) { const a = WX.snow.geometry.attributes.position.array;
     for (let i = 0; i < a.length; i += 3) { const k = i * 0.37; a[i] += (wv.x * 0.6 + Math.sin(t * 0.9 + k) * 0.5) * dt - mx; a[i + 2] += (wv.z * 0.6 + Math.cos(t * 0.7 + k) * 0.5) * dt - mz; a[i + 1] -= 1.1 * dt + my; wrapY(a, i + 1); wrap(a, i); wrap(a, i + 2); }
     WX.snow.geometry.attributes.position.needsUpdate = true; }
-}
-// ---- 렌즈 물방울 (FPV Camera · 비): 앉아 있다가 커지면 흘러내리고, Forward하면 바깥으로 · 옆바람엔 옆으로 밀림 ----
-const LENS = { cv: null, g: null, d: [], acc: 0, on: false, dirty: false, tex: null, m: null, q: new THREE.Quaternion(), v: new V3() };
-function lensSize() { if (!LENS.cv) return; const w = 640, h = XR_ON ? 360 : Math.max(200, Math.round(640 * innerHeight / Math.max(1, innerWidth))); if (LENS.cv.width !== w || LENS.cv.height !== h) { LENS.cv.width = w; LENS.cv.height = h; LENS.d.length = 0; } }
-function lensInit() {
-  if (LENS.cv) return; const cv = LENS.cv = document.createElement('canvas'); cv.id = 'lensWx'; LENS.g = cv.getContext('2d');
-  const vig = $('vig'); (vig && vig.parentNode ? vig.parentNode : document.body).insertBefore(cv, vig ? vig.nextSibling : null); lensSize(); addEventListener('resize', lensSize);
-  if (typeof VR_SCR !== 'undefined') { LENS.tex = new THREE.CanvasTexture(cv); LENS.tex.encoding = THREE.sRGBEncoding;
-    LENS.m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.35), new THREE.MeshBasicMaterial({ map: LENS.tex, transparent: true, depthWrite: false, toneMapped: false })); LENS.m.position.z = 0.0015; LENS.m.renderOrder = 9; LENS.m.visible = false; VR_SCR.add(LENS.m); }
-}
-function lensTick(dt) {
-  const want = (ENV.wx === 'rain') && CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay' || S.state === 'pause');
-  if (!want && !LENS.d.length) { if (LENS.dirty) { LENS.g.clearRect(0, 0, LENS.cv.width, LENS.cv.height); LENS.dirty = false; if (LENS.tex) LENS.tex.needsUpdate = true; } if (LENS.m) LENS.m.visible = false; return; }
-  lensInit(); lensSize(); const W2 = LENS.cv.width, H2 = LENS.cv.height, g = LENS.g, D = LENS.d, run = S.state !== 'pause';
-  if (LENS.m) LENS.m.visible = XR_ON;
-  // Camera 기준 공기 흐름: 드론 속도 - 바람 → Camera 좌표 (앞 = -z)
-  const vel = (WX.vel || LENS.v), wv = windAt(DR.p); LENS.v.set(vel.x - wv.x, vel.y - wv.y, vel.z - wv.z).applyQuaternion(LENS.q.copy(camera.quaternion).invert());
-  const fwd = -LENS.v.z, side = LENS.v.x, up = LENS.v.y, sp = Math.hypot(fwd, side, up);
-  if (run && dt > 0) {
-    if (want) { LENS.acc += dt * (2.2 + Math.max(0, fwd) * 0.45 + Math.max(0, up) * 0.3); while (LENS.acc > 1 && D.length < 70) { LENS.acc -= 1; D.push({ x: Math.random() * W2, y: Math.random() * H2, r: 2.4 + Math.random() * 4.2, life: 7 + Math.random() * 8, age: 0, hold: Math.random() * 3, tr: [] }); } }
-    else D.forEach(d => d.life = Math.min(d.life, d.age + 0.6));   // Camera를 바꾸거나 비가 그치면 금방 사라짐
-    const cx = W2 / 2, cy = H2 / 2, S0 = W2 / 2;
-    for (const d of D) {
-      d.age += dt; d.r = Math.min(12, d.r + dt * 0.25 * (want ? 1 : 0));
-      // 공기 흐름: Forward하면 가운데에서 바깥으로, 옆·위아래 move은 반대쪽으로 밀림 (작은 물방울은 표면 장력으로 버팀)
-      const grip = 4 / d.r; let ax = 0, ay = 0;
-      if (fwd > 2) { const f = (fwd - 2) * 2.4; ax += (d.x - cx) / S0 * f; ay += (d.y - cy) / S0 * f; }
-      ax += -side * 2.2; ay += up * 2.2;
-      const air = Math.hypot(ax, ay), moving = air > 8 * grip || d.r > 8;
-      if (d.hold > 0 && !moving) d.hold -= dt;
-      let vx = 0, vy = 0;
-      if (moving) { const m = Math.max(0, air - 6 * grip); if (air > 0) { vx = ax / air * m * 4; vy = ay / air * m * 4; } if (d.r > 8) vy += (d.r - 7) * 9 + Math.sin(d.age * 3 + d.x) * 4; }
-      if (vx || vy) { d.tr.push(d.x, d.y); if (d.tr.length > 16) d.tr.splice(0, 2); d.x += vx * dt; d.y += vy * dt; d.r = Math.max(2, d.r - Math.hypot(vx, vy) * dt * 0.01); }
-      else if (d.tr.length) d.tr.splice(0, 2);
-    }
-    for (let i = D.length - 1; i >= 0; i--) { const d = D[i]; if (d.age > d.life || d.x < -20 || d.x > W2 + 20 || d.y < -20 || d.y > H2 + 20) D.splice(i, 1); }
-  }
-  g.clearRect(0, 0, W2, H2); LENS.dirty = true;
-  for (const d of D) {
-    const a = Math.min(1, d.age * 3, (d.life - d.age) * 1.2);
-    if (d.tr.length >= 4) { g.strokeStyle = `rgba(210,224,238,${0.16 * a})`; g.lineWidth = d.r * 0.7; g.lineCap = 'round'; g.beginPath(); g.moveTo(d.tr[0], d.tr[1]); for (let k = 2; k < d.tr.length; k += 2) g.lineTo(d.tr[k], d.tr[k + 1]); g.lineTo(d.x, d.y); g.stroke(); }
-    const gr = g.createRadialGradient(d.x - d.r * 0.25, d.y - d.r * 0.3, d.r * 0.1, d.x, d.y, d.r);
-    gr.addColorStop(0, `rgba(240,246,252,${0.22 * a})`); gr.addColorStop(0.6, `rgba(160,175,190,${0.16 * a})`); gr.addColorStop(0.85, `rgba(45,55,66,${0.24 * a})`); gr.addColorStop(1, `rgba(220,230,240,${0.14 * a})`);
-    g.fillStyle = gr; g.beginPath(); g.ellipse(d.x, d.y, d.r * 0.92, d.r, 0, 0, 6.2832); g.fill();
-    g.fillStyle = `rgba(255,255,255,${0.45 * a})`; g.beginPath(); g.arc(d.x - d.r * 0.35, d.y - d.r * 0.4, Math.max(0.6, d.r * 0.22), 0, 6.2832); g.fill();
-  }
-  if (LENS.tex && XR_ON) LENS.tex.needsUpdate = true;
 }
 function setTod(v) { SET.tod = v; SET.night = v === 'night'; ENV.night = SET.night; ENV.dusk = v === 'dusk'; saveSet(); if (ENV.ir) irSet(false); envApply(); syncTime(); }
 function setWxFx(on) { SET.wxFx = !!on; saveSet(); syncTime(); if (S.state === 'run') showMsg(on ? L2('기상 영향 On · 돌풍·시야 감소', 'Weather effects on · gusts, reduced visibility') : L2('기상 영향 Off', 'Weather effects off'), '#4fe3ff', 1.2); }
@@ -4505,7 +4489,7 @@ const RIDGE = (function () {
   const all = up.concat(down.slice(1)).map(k => ds(k % n, (k / n) | 0));
   // 70 m 마다 체크포인트
   const cps = []; let acc = 0;
-  for (let i = 1; i < all.length; i++) { acc += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]); const isTop = i === up.length - 1; if ((acc >= 70 && i < all.length - 6) || isTop) { cps.push({ q: { d: all[i][0], s: all[i][1], td: all[Math.min(all.length - 1, i + 1)][0] - all[i - 1][0], ts: all[Math.min(all.length - 1, i + 1)][1] - all[i - 1][1] }, top: isTop }); acc = 0; } }
+  for (let i = 1; i < all.length; i++) { acc += Math.hypot(all[i][0] - all[i - 1][0], all[i][1] - all[i - 1][1]); const isTop = i === up.length - 1; if ((acc >= 100 && i < all.length - 6) || isTop) { cps.push({ q: { d: all[i][0], s: all[i][1], td: all[Math.min(all.length - 1, i + 1)][0] - all[i - 1][0], ts: all[Math.min(all.length - 1, i + 1)][1] - all[i - 1][1] }, top: isTop }); acc = 0; } }
   cps.forEach(c => { const l = Math.hypot(c.q.td, c.q.ts) || 1; c.q.td /= l; c.q.ts /= l; });
   const g = new THREE.Group(); MSG.ridge = MSG.ridge || new THREE.Group(); scene.add(MSG.ridge); MSG.ridge.visible = false; MSG.ridge.add(g);
   const list = cps.map((c, i) => { const cp = passCP(c.top ? `Summit (${(mx + SITE.base).toFixed(0)} m ASL)` : 'Ridge ' + (i + 1), c.q, 0, 15, 15, 4); cp.q = c.q; cp.alt = 15;
@@ -4514,7 +4498,7 @@ const RIDGE = (function () {
   return { list, top: mx + SITE.base, len: all.length * st };
 })();
 function scenStart(kind, a) {
-  ['sar', 'track', 'ridge'].forEach(k => MSG[k] && (MSG[k].visible = false));
+  ['sar', 'track', 'ridge'].forEach(k => MSG[k] && (MSG[k].visible = false)); if (STREES.unscorch) STREES.unscorch();
   if (kind === 'sar' && SAR) {
     MSG.sar.visible = true; SAR.kit = null; sarRandom();
     S.kits = 2; SAR.pkFound = false;
@@ -4535,15 +4519,15 @@ function scenStart(kind, a) {
   }
   if (kind === 'ridge' && RIDGE) {
     MSG.ridge.visible = true; const k = a.cls === 'wing' ? 2.2 : 1;
-    RIDGE.list.forEach(r => { r.ring = 4 * k; const al = a.cls === 'wing' ? 38 : 15; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(4 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
+    RIDGE.list.forEach(r => { r.ring = 6 * k; const al = a.cls === 'wing' ? 38 : 18; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(6 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
     return RIDGE.list;
   }
   return null;
 }
 function scenStep(o, cur, dt) {
   if (o.t === 'sarfind') {
-    const d = o.tp.distanceTo(cur), vis = sensorSees(o.tp, cur, ENV.ir ? (AFc().reconD || 260) * 0.8 : 32);
-    o.inView = vis;
+    const d = o.tp.distanceTo(cur), vis = sensorSees(o.tp, cur, ENV.ir ? (AFc().reconD || 260) * 0.8 : (ENV.night ? (lightOn() ? 40 : 18) : 75));
+    o.inView = vis; if (vis) o.seenT = S.simT;
   } else if (o.t === 'land') {
     const pad = startPos(); if (DR.landed && Math.hypot(DR.p.x - pad.x, DR.p.z - pad.z) < 2.5) msNext('Landed ✓', '#5dff9a');
   } else if (o.t === 'track') {
@@ -4650,7 +4634,7 @@ function fireStep(cur, dt) {
   for (const f of MS.list) {
     if (f.done || !f.active) continue;
     const vis = sensorSees(f.tp, cur, (AFc().reconD || 260) * 0.8);
-    f.inView = vis && ENV.ir; f.seenVis = vis && !ENV.ir;
+    f.inView = vis && ENV.ir; f.seenVis = vis && !ENV.ir; if (f.inView) f.seenT = S.simT;
   }
   const o = msObj(); if (o) S.recT = o.recT || 0;
 }
@@ -4720,7 +4704,7 @@ function msEvents(dt) {
   MS.t0 += dt; const t = MS.t0;
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
-      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
+      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; if (STREES.scorch) STREES.scorch(f.g.position, 9); const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
       if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; comm(`${CS}, hotspot ${i + 1} is spreading. Expedite your report.`, `불씨 ${i + 1} 번짐 · +15초`); f.g.scale.setScalar(1.8); }
     }
   }
@@ -5301,7 +5285,7 @@ function menuShow(k) {
   Object.values(MSG).forEach(g => g.visible = false);
   const a = AFc(), kw = a.cls === 'wing' ? 2.2 : 1;
   if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt)); }); }
-  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 15); r.mesh.position.copy(c); r.mesh.scale.setScalar(4 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
+  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18); r.mesh.position.copy(c); r.mesh.scale.setScalar(6 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
   if (k === 'fire' && FIRE.length) { MSG.fire.visible = true; FIRE.forEach((f, i) => { f.on = f.active = i < 3; f.g.visible = i < 3; f.g.scale.setScalar(1); }); }
   if (k === 'sar' && SAR) MSG.sar.visible = true;
   if (k === 'track' && TRACK) { MSG.track.visible = true; if (!(TRACK.s > 0)) TRACK.s = TRACK.total * 0.2; }
