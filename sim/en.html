@@ -176,6 +176,21 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #brief .bt{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;color:#ffc828}#brief h3{margin:8px 0 6px;font-size:20px}#brief p{margin:6px 0;line-height:1.5;font-size:14px}#brief .bn{color:#9ad7ff}#brief .bm{margin:10px 0 14px;font-size:12px;color:#9aa6ad}
 body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bottom:calc(var(--hsiH,0px) + 44px)}#uasHud{position:fixed;inset:0;pointer-events:none;z-index:6}
 #optPanel,#ctlPanel,#helpPanel,#kbPanel{z-index:60}
+.otabs{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.otabs button{padding:7px 11px;font-size:13px;background:transparent;border-color:transparent;color:var(--mute)}
+.otabs button.on{color:#111;background:var(--amber);border-color:var(--amber);font-weight:700}
+.otab{display:none;min-height:150px}.otab.on{display:block}
+.optCard .opt.col>div{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;align-items:center;width:100%}
+.optCard .opt.col>div>.seg,.optCard .opt.col>div>input,.optCard .opt.col>div>.oh{grid-column:2}
+.oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
+.qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
+.qsbar+.go{margin-top:4px}
+.qsbar button{padding:4px 8px;font-size:11.5px;border-radius:999px;background:#1a2229;border:1px solid var(--line);color:var(--text);white-space:nowrap}
+.qsbar button b{color:var(--amber);font-weight:600;margin-left:3px}
+.qsbar button.all{border-color:var(--amber);color:var(--amber)}
+.qsbar button.bump{animation:qsb .35s}@keyframes qsb{50%{background:#3a4650}}
+@media (max-width:640px){.optCard .opt.col>div{grid-template-columns:1fr}.optCard .opt.col>div>*{grid-column:1!important}.otabs button{padding:6px 8px;font-size:12px}.qsbar button{font-size:10.5px;padding:3px 7px}}
+
 .porder{margin:4px 0 12px;padding:8px 10px;border-left:3px solid #ffc828;background:rgba(255,200,40,.07);font-size:13px;line-height:1.45}.porder b{display:block;color:#ffc828;font-size:11px;letter-spacing:.06em;margin-bottom:2px}
 #orderBox{position:absolute;left:calc(10px + env(safe-area-inset-left));top:auto;bottom:88px;max-width:46vw;padding:5px 9px;background:rgba(10,14,18,.78);border:1px solid rgba(255,200,40,.6);border-radius:16px;font:500 11px/1.4 system-ui,sans-serif;color:#e8eef2;pointer-events:auto;z-index:12;touch-action:none}#orderBox b{color:#ffc828;font-size:11px;letter-spacing:.04em}#orderBox b i{font-style:normal;margin-left:4px;display:inline-block;transition:transform .2s}#orderBox span{display:none}#orderBox.open{border-radius:8px}#orderBox.open span{display:block;margin-top:3px}#orderBox.open b i{transform:rotate(180deg)}#orderBox.new{box-shadow:0 0 0 2px rgba(255,200,40,.6);animation:obPulse 1.2s ease-in-out 3}@keyframes obPulse{50%{box-shadow:0 0 0 6px rgba(255,200,40,0)}}
 #radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(440px,70vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:12px;padding:5px 9px;border-radius:7px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 9px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:3px}#radio .re{font:600 11.5px/1.3 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:10.5px;color:#9fb8a8;margin-top:2px}
@@ -393,7 +408,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
         </div>
         <div id="msDetail" class="msdetail">
           <div class="msStageW"><canvas id="msStage"></canvas><div class="stgtog"><div class="pics" id="segTime2"><button data-v="0" class="on" title="Day">☀️</button><button data-v="2" title="Dusk">🌇</button><button data-v="1" title="Night">🌙</button></div><i class="pdiv"></i><div class="pics" id="segWx2"><button data-v="clear" class="on" title="Clear">🌤</button><button data-v="rain" title="Rain">🌧</button><button data-v="snow" title="Snow">❄️</button></div></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
-          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
+          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><div id="qsBar" class="qsbar"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
       </div>
@@ -404,21 +419,53 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 </div>
 
 <div id="optPanel" class="panel hidden">
-  <div class="card" style="max-width:760px">
+  <div class="card optCard" style="max-width:760px">
     <h1>OPTIONS</h1><h2>Options · flight mode, display and environment</h2>
-    <div class="opt" style="margin-top:16px">
+    <div class="otabs" id="optTabs"><button data-t="fly" class="on">✈️ Flight</button><button data-t="env">🌤 Weather·time</button><button data-t="view">🖥 Display</button><button data-t="snd">🔊 Sound</button><button data-t="dev">🎮 Controllers</button><button data-t="gis">🗺 Terrain</button></div>
+    <div class="otab" data-t="fly"><div class="opt col">
       <div>Difficulty <span class="seg" id="segDiff"><button data-v="train" class="on">Training</button><button data-v="easy">Easy</button><button data-v="atti">ATTI</button><button data-v="sport">Sport</button></span></div>
       <div>Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span></div>
-      <div>Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span></div>
-      <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="2">Dusk</button><button data-v="1">밤</button></span></div>
-      <div>Weather effects <span class="seg" id="segWxFx"><button data-v="0" class="on">Off</button><button data-v="1">On (gusts · visibility)</button></span></div>
-      <div>날씨 <span class="seg" id="segWx"><button data-v="clear" class="on">Clear</button><button data-v="rain">비</button><button data-v="snow">눈</button></span></div>
-      <div>Wind <span class="seg" id="segWind"><button data-v="0" class="on">None</button><button data-v="1">Light 3 m/s</button><button data-v="2">Strong 7 m/s</button></span></div>
+      <div>Flight assist <span class="seg" id="segAssist"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Guide <span class="seg" id="segGuide"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+      <div>FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span></div>
+    </div>
+    <div class="note">Difficulty — <b>Training</b>: slow, stops when you release the sticks, turns toward the next task automatically and nudges you to the center of each gate · <b>Easy</b>: altitude hold + light assist · <b>Sport</b>: no assist. Hitting an obstacle bounces you off with a time penalty (Training 2 s · Easy 3 s · Sport 5 s) and the flight continues.</div></div>
+    <div class="otab" data-t="env"><div class="opt col">
+      <div>Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="2">Dusk</button><button data-v="1">Night</button></span></div>
+      <div>Weather <span class="seg" id="segWx"><button data-v="clear" class="on">Clear</button><button data-v="rain">Rain</button><button data-v="snow">Snow</button></span></div>
+      <div>Weather effects <span class="seg" id="segWxFx"><button data-v="0" class="on">Off</button><button data-v="1">On (gusts · visibility)</button></span></div>
+      <div>Wind <span class="seg" id="segWind"><button data-v="0" class="on">None</button><button data-v="1">Light 3 m/s</button><button data-v="2">Strong 7 m/s</button></span></div>
+    </div></div>
+    <div class="otab" data-t="view"><div class="opt col">
+      <div>Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span></div>
+      <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+      <div>FPV camera tilt <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+    </div></div>
+    <div class="otab" data-t="snd"><div class="opt col">
+      <div>Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+      <div>Music <span class="seg" id="segMusic"><button data-v="1" class="on">On</button><button data-v="0">Off</button><input id="mvol" type="range" min="0" max="100" value="50" style="margin-left:10px;vertical-align:middle"></span></div>
+    </div></div>
+    <div class="otab" data-t="dev"><div class="opt col">
+      <div class="deskOnly">Key layout <span class="seg" id="segKeys"><button data-v="A" class="on">A · Default</button><button data-v="B">B · Arrows for altitude</button><button data-v="C">Custom…</button></span></div>
+    </div>
+    <div class="btns small" style="margin-top:10px"><button id="bRC">Controller setup</button><button id="bHelp">Controls</button><span id="padStatus"></span></div></div>
+    <div class="otab" data-t="gis"><div class="opt col">
+      <div>Site <span class="seg" id="segSite"></span></div>
+    </div>
+    <div id="siteInfo" class="note mono" style="font-size:12px;line-height:1.6"></div>
+    <div class="opt small" style="margin-top:8px">
+      <button id="bDem">Load DEM (GeoTIFF · ASC)</button>
+      <span style="font-size:12px;color:var(--mute)">auto CRS · reprojection · resampling · site grading</span>
+    </div>
+    <div class="opt small" style="margin-top:8px">
+      <button id="bOrtho">Load orthophoto (GeoTIFF)</button><button id="bOrthoReset">Default ground</button>
+      <span id="orthoStatus" style="font-size:12px;color:var(--mute)">Using default ground</span>
+    </div>
+    <input id="demFile" type="file" accept=".tif,.tiff,.asc,.txt,image/tiff" class="hidden"><input id="orthoFile" type="file" accept=".tif,.tiff,image/tiff" class="hidden">
     </div>
     <div class="btns small" style="margin-top:14px">
-      <button id="bRec">Records · Replay</button><button id="bSet">SETTINGS</button><button id="bHelp">Controls</button><button id="bCred">Data sources</button><button id="bRC">Controller setup</button><button id="bFull">Full screen</button>
-      <span id="padStatus"></span>
+      <button id="bRec">Records · Replay</button><button id="bCred">Data sources</button><button id="bFull">Full screen</button><button id="bSet" class="hidden">SETTINGS</button>
     </div>
     <div class="btns" style="margin-top:18px"><button class="primary" id="optClose">Close</button></div>
   </div>
@@ -460,34 +507,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="lyBar" class="hidden"></div>
 <div id="setPanel" class="panel hidden">
   <div class="card" style="max-width:760px">
-    <h1>SETTINGS</h1><h2>Settings · changes are saved in this browser</h2>
-    <h3>FLIGHT</h3>
-    <div class="opt col">
-      <div>FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span></div>
-      <div>Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>Flight assist <span class="seg" id="segAssist"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>FPV camera tilt <input id="tilt" type="range" min="0" max="40" value="15"> <span id="tiltV" class="mono">15°</span></div>
-      <div class="deskOnly">Key layout <span class="seg" id="segKeys"><button data-v="A" class="on">A · Default</button><button data-v="B">B · Arrows for altitude</button><button data-v="C">Custom…</button></span></div>
-    </div>
-    <div class="note">Difficulty — <b>Training</b>: slow, stops when you release the sticks, turns toward the next task automatically and nudges you to the center of each gate · <b>Easy</b>: altitude hold + light assist · <b>Sport</b>: no assist. Hitting an obstacle bounces you off with a time penalty (Training 2 s · Easy 3 s · Sport 5 s) and the flight continues.</div>
-    <h3>SOUND</h3>
-    <div class="opt"><div>Music <span class="seg" id="segMusic"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span> <input id="mvol" type="range" min="0" max="100" value="50"></div></div>
-    <h3>TERRAIN · SITE (GIS)</h3>
-    <div class="opt col">
-      <div>Site <span class="seg" id="segSite"></span></div>
-    </div>
-    <div id="siteInfo" class="note mono" style="font-size:12px;line-height:1.6"></div>
-    <div class="opt small" style="margin-top:8px">
-      <button id="bDem">Load DEM (GeoTIFF · ASC)</button>
-      <span style="font-size:12px;color:var(--mute)">auto CRS · reprojection · resampling · site grading</span>
-    </div>
-    <div class="opt small" style="margin-top:8px">
-      <button id="bOrtho">Load orthophoto (GeoTIFF)</button><button id="bOrthoReset">Default ground</button>
-      <span id="orthoStatus" style="font-size:12px;color:var(--mute)">Using default ground</span>
-    </div>
-    <input id="demFile" type="file" accept=".tif,.tiff,.asc,.txt,image/tiff" class="hidden"><input id="orthoFile" type="file" accept=".tif,.tiff,image/tiff" class="hidden">
+    <h1>SETTINGS</h1>
     <div class="btns" style="margin-top:18px"><button class="primary" id="setClose">Close</button></div>
   </div>
 </div>
@@ -629,7 +649,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=d65a2aa8"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=d65a2aa8"></script>
+<script src="sites/yeongin.js?v=4af5bb5f"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=4af5bb5f"></script>
 </body>
 </html>

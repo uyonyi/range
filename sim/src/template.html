@@ -175,6 +175,21 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 #brief .bt{font:600 12px/1 ui-monospace,monospace;letter-spacing:.2em;color:#ffc828}#brief h3{margin:8px 0 6px;font-size:20px}#brief p{margin:6px 0;line-height:1.5;font-size:14px}#brief .bn{color:#9ad7ff}#brief .bm{margin:10px 0 14px;font-size:12px;color:#9aa6ad}
 body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bottom:calc(var(--hsiH,0px) + 44px)}#uasHud{position:fixed;inset:0;pointer-events:none;z-index:6}
 #optPanel,#ctlPanel,#helpPanel,#kbPanel{z-index:60}
+.otabs{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.otabs button{padding:7px 11px;font-size:13px;background:transparent;border-color:transparent;color:var(--mute)}
+.otabs button.on{color:#111;background:var(--amber);border-color:var(--amber);font-weight:700}
+.otab{display:none;min-height:150px}.otab.on{display:block}
+.optCard .opt.col>div{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;align-items:center;width:100%}
+.optCard .opt.col>div>.seg,.optCard .opt.col>div>input,.optCard .opt.col>div>.oh{grid-column:2}
+.oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
+.qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
+.qsbar+.go{margin-top:4px}
+.qsbar button{padding:4px 8px;font-size:11.5px;border-radius:999px;background:#1a2229;border:1px solid var(--line);color:var(--text);white-space:nowrap}
+.qsbar button b{color:var(--amber);font-weight:600;margin-left:3px}
+.qsbar button.all{border-color:var(--amber);color:var(--amber)}
+.qsbar button.bump{animation:qsb .35s}@keyframes qsb{50%{background:#3a4650}}
+@media (max-width:640px){.optCard .opt.col>div{grid-template-columns:1fr}.optCard .opt.col>div>*{grid-column:1!important}.otabs button{padding:6px 8px;font-size:12px}.qsbar button{font-size:10.5px;padding:3px 7px}}
+
 .porder{margin:4px 0 12px;padding:8px 10px;border-left:3px solid #ffc828;background:rgba(255,200,40,.07);font-size:13px;line-height:1.45}.porder b{display:block;color:#ffc828;font-size:11px;letter-spacing:.06em;margin-bottom:2px}
 #orderBox{position:absolute;left:calc(10px + env(safe-area-inset-left));top:auto;bottom:88px;max-width:46vw;padding:5px 9px;background:rgba(10,14,18,.78);border:1px solid rgba(255,200,40,.6);border-radius:16px;font:500 11px/1.4 system-ui,sans-serif;color:#e8eef2;pointer-events:auto;z-index:12;touch-action:none}#orderBox b{color:#ffc828;font-size:11px;letter-spacing:.04em}#orderBox b i{font-style:normal;margin-left:4px;display:inline-block;transition:transform .2s}#orderBox span{display:none}#orderBox.open{border-radius:8px}#orderBox.open span{display:block;margin-top:3px}#orderBox.open b i{transform:rotate(180deg)}#orderBox.new{box-shadow:0 0 0 2px rgba(255,200,40,.6);animation:obPulse 1.2s ease-in-out 3}@keyframes obPulse{50%{box-shadow:0 0 0 6px rgba(255,200,40,0)}}
 #radio{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);max-width:min(440px,70vw);text-align:left;background:rgba(10,14,18,.82);border:1px solid rgba(93,255,154,.45);color:#d8ffe6;font-size:12px;padding:5px 9px;border-radius:7px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:6}#radio.show{opacity:1}#radio .rf{font:600 9px/1 ui-monospace,monospace;letter-spacing:.12em;color:#5dff9a;margin-bottom:3px}#radio .re{font:600 11.5px/1.3 ui-monospace,monospace;color:#eafff1}#radio .rk{font-size:10.5px;color:#9fb8a8;margin-top:2px}
@@ -392,7 +407,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
         </div>
         <div id="msDetail" class="msdetail">
           <div class="msStageW"><canvas id="msStage"></canvas><div class="stgtog"><div class="pics" id="segTime2"><button data-v="0" class="on" title="낮">☀️</button><button data-v="2" title="해질녘">🌇</button><button data-v="1" title="밤">🌙</button></div><i class="pdiv"></i><div class="pics" id="segWx2"><button data-v="clear" class="on" title="맑음">🌤</button><button data-v="rain" title="비">🌧</button><button data-v="snow" title="눈">❄️</button></div></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
-          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">출격 ▶</button><button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button><div id="mdWhy" class="why"></div></div>
+          <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><div id="qsBar" class="qsbar"></div><button id="msGo" class="primary go">출격 ▶</button><button id="msGoVR" class="go vrgo hidden">VR로 출격 (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
       </div>
@@ -403,21 +418,53 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 </div>
 
 <div id="optPanel" class="panel hidden">
-  <div class="card" style="max-width:760px">
+  <div class="card optCard" style="max-width:760px">
     <h1>OPTIONS</h1><h2>옵션 · 비행 모드와 화면·환경</h2>
-    <div class="opt" style="margin-top:16px">
+    <div class="otabs" id="optTabs"><button data-t="fly" class="on">✈️ 비행</button><button data-t="env">🌤 날씨·시간</button><button data-t="view">🖥 화면</button><button data-t="snd">🔊 소리</button><button data-t="dev">🎮 조작 장치</button><button data-t="gis">🗺 지형</button></div>
+    <div class="otab" data-t="fly"><div class="opt col">
       <div>조종 난이도 <span class="seg" id="segDiff"><button data-v="train" class="on">입문</button><button data-v="easy">쉬움</button><button data-v="atti">ATTI</button><button data-v="sport">스포츠</button></span></div>
       <div>스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span></div>
-      <div>계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span></div>
-      <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="2">해질녘</button><button data-v="1">밤</button></span></div>
-      <div>기상 영향 <span class="seg" id="segWxFx"><button data-v="0" class="on">끔</button><button data-v="1">켬 (돌풍·시야)</button></span></div>
-      <div>날씨 <span class="seg" id="segWx"><button data-v="clear" class="on">맑음</button><button data-v="rain">비</button><button data-v="snow">눈</button></span></div>
-      <div>바람 <span class="seg" id="segWind"><button data-v="0" class="on">없음</button><button data-v="1">약 3 m/s</button><button data-v="2">강 7 m/s</button></span></div>
+      <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>가이드 <span class="seg" id="segGuide"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+      <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
+    </div>
+    <div class="note">난이도 — <b>입문</b>: 느리고, 스틱을 놓으면 멈추고, 다음 과제 쪽으로 자동으로 방향을 잡고, 게이트 가운데로 살짝 끌어줌 · <b>쉬움</b>: 고도 유지 + 약한 보조 · <b>스포츠</b>: 보조 없음. 충돌하면 튕기고 벌점(입문 2초 · 쉬움 3초 · 스포츠 5초)만 붙고 비행은 계속됩니다.</div></div>
+    <div class="otab" data-t="env"><div class="opt col">
+      <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="2">해질녘</button><button data-v="1">밤</button></span></div>
+      <div>날씨 <span class="seg" id="segWx"><button data-v="clear" class="on">맑음</button><button data-v="rain">비</button><button data-v="snow">눈</button></span></div>
+      <div>기상 영향 <span class="seg" id="segWxFx"><button data-v="0" class="on">끔</button><button data-v="1">켬 (돌풍·시야)</button></span></div>
+      <div>바람 <span class="seg" id="segWind"><button data-v="0" class="on">없음</button><button data-v="1">약 3 m/s</button><button data-v="2">강 7 m/s</button></span></div>
+    </div></div>
+    <div class="otab" data-t="view"><div class="opt col">
+      <div>계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span></div>
+      <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+      <div>FPV 카메라 기울기 <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+    </div></div>
+    <div class="otab" data-t="snd"><div class="opt col">
+      <div>무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+      <div>배경음악 <span class="seg" id="segMusic"><button data-v="1" class="on">켬</button><button data-v="0">끔</button><input id="mvol" type="range" min="0" max="100" value="50" style="margin-left:10px;vertical-align:middle"></span></div>
+    </div></div>
+    <div class="otab" data-t="dev"><div class="opt col">
+      <div class="deskOnly">키보드 배치 <span class="seg" id="segKeys"><button data-v="A" class="on">A · 기본 배치</button><button data-v="B">B · 방향키로 고도</button><button data-v="C">직접 지정…</button></span></div>
+    </div>
+    <div class="btns small" style="margin-top:10px"><button id="bRC">조종기 설정</button><button id="bHelp">조작 방법</button><span id="padStatus"></span></div></div>
+    <div class="otab" data-t="gis"><div class="opt col">
+      <div>현장 <span class="seg" id="segSite"></span></div>
+    </div>
+    <div id="siteInfo" class="note mono" style="font-size:12px;line-height:1.6"></div>
+    <div class="opt small" style="margin-top:8px">
+      <button id="bDem">DEM 불러오기 (GeoTIFF · ASC)</button>
+      <span style="font-size:12px;color:var(--mute)">좌표계 자동 인식 · 재투영 · 리샘플 · 시설물 터 정지</span>
+    </div>
+    <div class="opt small" style="margin-top:8px">
+      <button id="bOrtho">위성사진 불러오기 (GeoTIFF)</button><button id="bOrthoReset">기본 바닥</button>
+      <span id="orthoStatus" style="font-size:12px;color:var(--mute)">기본 바닥 사용 중</span>
+    </div>
+    <input id="demFile" type="file" accept=".tif,.tiff,.asc,.txt,image/tiff" class="hidden"><input id="orthoFile" type="file" accept=".tif,.tiff,image/tiff" class="hidden">
     </div>
     <div class="btns small" style="margin-top:14px">
-      <button id="bRec">기록 · 리플레이</button><button id="bSet">설정</button><button id="bHelp">조작 방법</button><button id="bCred">데이터 출처</button><button id="bRC">조종기 설정</button><button id="bFull">전체 화면</button>
-      <span id="padStatus"></span>
+      <button id="bRec">기록 · 리플레이</button><button id="bCred">데이터 출처</button><button id="bFull">전체 화면</button><button id="bSet" class="hidden">설정</button>
     </div>
     <div class="btns" style="margin-top:18px"><button class="primary" id="optClose">닫기</button></div>
   </div>
@@ -459,34 +506,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <div id="lyBar" class="hidden"></div>
 <div id="setPanel" class="panel hidden">
   <div class="card" style="max-width:760px">
-    <h1>SETTINGS</h1><h2>설정 · 바꾼 값은 이 브라우저에 저장됩니다</h2>
-    <h3>비행</h3>
-    <div class="opt col">
-      <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
-      <div>무전 음성 (영어) <span class="seg" id="segVoice"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
-      <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
-      <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
-      <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
-      <div>FPV 카메라 기울기 <input id="tilt" type="range" min="0" max="40" value="15"> <span id="tiltV" class="mono">15°</span></div>
-      <div class="deskOnly">키보드 배치 <span class="seg" id="segKeys"><button data-v="A" class="on">A · 기본 배치</button><button data-v="B">B · 방향키로 고도</button><button data-v="C">직접 지정…</button></span></div>
-    </div>
-    <div class="note">난이도 — <b>입문</b>: 느리고, 스틱을 놓으면 멈추고, 다음 과제 쪽으로 자동으로 방향을 잡고, 게이트 가운데로 살짝 끌어줌 · <b>쉬움</b>: 고도 유지 + 약한 보조 · <b>스포츠</b>: 보조 없음. 충돌하면 튕기고 벌점(입문 2초 · 쉬움 3초 · 스포츠 5초)만 붙고 비행은 계속됩니다.</div>
-    <h3>소리</h3>
-    <div class="opt"><div>배경음악 <span class="seg" id="segMusic"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span> <input id="mvol" type="range" min="0" max="100" value="50"></div></div>
-    <h3>지형 · 현장 (GIS)</h3>
-    <div class="opt col">
-      <div>현장 <span class="seg" id="segSite"></span></div>
-    </div>
-    <div id="siteInfo" class="note mono" style="font-size:12px;line-height:1.6"></div>
-    <div class="opt small" style="margin-top:8px">
-      <button id="bDem">DEM 불러오기 (GeoTIFF · ASC)</button>
-      <span style="font-size:12px;color:var(--mute)">좌표계 자동 인식 · 재투영 · 리샘플 · 시설물 터 정지</span>
-    </div>
-    <div class="opt small" style="margin-top:8px">
-      <button id="bOrtho">위성사진 불러오기 (GeoTIFF)</button><button id="bOrthoReset">기본 바닥</button>
-      <span id="orthoStatus" style="font-size:12px;color:var(--mute)">기본 바닥 사용 중</span>
-    </div>
-    <input id="demFile" type="file" accept=".tif,.tiff,.asc,.txt,image/tiff" class="hidden"><input id="orthoFile" type="file" accept=".tif,.tiff,image/tiff" class="hidden">
+    <h1>SETTINGS</h1>
     <div class="btns" style="margin-top:18px"><button class="primary" id="setClose">닫기</button></div>
   </div>
 </div>
