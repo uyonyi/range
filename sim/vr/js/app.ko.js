@@ -4120,6 +4120,8 @@ document.querySelectorAll('#segAcro button').forEach(b => b.addEventListener('cl
 // =====================================================================
 if (!SET.tod) SET.tod = SET.night ? 'night' : 'day'; if (!SET.wx) SET.wx = 'clear';
 const ENV = { night: SET.tod === 'night', dusk: SET.tod === 'dusk', wx: SET.wx, ir: false };
+// 비·눈 오는 해질녘: 구름 낀 어두운 하늘 + 지평선에 흐린 주황 띠
+const DUSK_WET_BG = (function () { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#24272f'); gr.addColorStop(0.45, '#45434b'); gr.addColorStop(0.64, '#7a6660'); gr.addColorStop(0.72, '#8c705e'); gr.addColorStop(1, '#3a3536'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; })();
 const SUN0 = SUN_DIR.clone(), DUSK_BG = (function () { const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#1d2a4a'); gr.addColorStop(0.42, '#6a4f72'); gr.addColorStop(0.62, '#e0875a'); gr.addColorStop(0.72, '#f3b06a'); gr.addColorStop(1, '#5a4636'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; })();
 const DAY0 = { sun: sun.intensity, sunC: sun.color.clone(), hs: hemi.color.clone(), hg: hemi.groundColor.clone(), fog: scene.fog.color.clone(), fn: scene.fog.near, ff: scene.fog.far };
 const STARS = (function () {
@@ -4136,9 +4138,11 @@ function envApply() {
   sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? 0.85 : DAY0.sun * (wet ? 0.45 : 1); sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
   hemi.color.copy(n ? new THREE.Color(0x4a5f8a) : dk ? new THREE.Color(0x9a7a8e) : wet ? new THREE.Color(0xb9c2cc) : DAY0.hs); hemi.groundColor.copy(n ? new THREE.Color(0x0c0c10) : dk ? new THREE.Color(0x3a2a20) : DAY0.hg);
   const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? (n ? 0x0b0b0b : 0x2a2a2a) : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;
-  sky.visible = bg === null; scene.background = bg === null ? null : bg === 'dusk' ? DUSK_BG : new THREE.Color(bg);
-  scene.fog.color.copy(bg === null ? DAY0.fog : bg === 'dusk' ? new THREE.Color(0xc7876a) : new THREE.Color(bg));
-  scene.fog.near = n ? 60 : wet ? 15 : dk ? 40 : DAY0.fn; scene.fog.far = n ? (wet ? 600 : 1100) : wx === 'snow' ? 330 : wx === 'rain' ? 480 : dk ? 1000 : DAY0.ff;
+  sky.visible = bg === null; scene.background = bg === null ? null : bg === 'dusk' ? (wet ? DUSK_WET_BG : DUSK_BG) : new THREE.Color(bg);
+  // 안개 색은 하늘보다 어둡게: 먼 산이 밝은 띠(눈 덮인 산처럼)로 뜨지 않고 어두운 능선 실루엣으로 겹쳐 보이게
+  const fogC = bg === null ? DAY0.fog : bg === 'dusk' ? (wet ? 0x4f4a4e : 0x6a5662) : wx === 'rain' && !n && !ir ? 0x737b82 : bg;
+  scene.fog.color.copy(fogC instanceof THREE.Color ? fogC : new THREE.Color(fogC));
+  scene.fog.near = n ? 60 : wet ? 15 : dk ? 60 : DAY0.fn; scene.fog.far = n ? (wet ? 600 : 1100) : wx === 'snow' ? 330 : wx === 'rain' ? (dk ? 420 : 480) : dk ? 1300 : DAY0.ff;
   wxSetup();
   STARS.visible = n && !ir;
   spot.distance = n ? 45 : 14; spot.angle = n ? 0.6 : 0.7;
