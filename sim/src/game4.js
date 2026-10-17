@@ -295,7 +295,7 @@ document.querySelectorAll('#segMusic button').forEach(b => b.addEventListener('c
 $('mvol').addEventListener('input', e => { MUS.vol = +e.target.value / 100; initAudio(); musicStart(); musicSetLevel(); saveMusic(); });
 $('tilt').addEventListener('input', e => { SET.tilt = +e.target.value; $('tiltV').textContent = SET.tilt + '°'; saveSet(); });
 $('bResume').onclick = togglePause;
-$('bRestart').onclick = () => { musicSetLevelPaused(false); if (S.kind === 'tutorial' && S.tut) tutStart(S.tut.i); else startRun(S.kind); };
+$('bRestart').onclick = () => { musicSetLevelPaused(false); if (S.kind === 'tutorial' && S.tut) tutStart(S.tut.i); else startRun(S.lastKind || S.kind); };
 $('bMenu').onclick = $('bMenu2').onclick = () => { if (REC) LAST_REC = recFinish(); toMenu(); };
 $('bPauseRp').onclick = () => { if (REC) { LAST_REC = recFinish(); } ui.pause.classList.add('hidden'); musicSetLevelPaused(false); replayStart(LAST_REC, 'menu'); };
 $('bReplay').onclick = () => replayStart(LAST_REC, 'result');
@@ -357,7 +357,7 @@ function renderKbd(el) {
 $('bKB2').onclick = kbOpen;
 document.querySelectorAll('#segGhostSrc button').forEach(b => b.addEventListener('click', () => { SET.ghostSrc = b.dataset.v; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segGuide button').forEach(b => b.addEventListener('click', () => { SET.guide = b.dataset.v === '1'; saveSet(); syncSeg(); }));
-$('bAgain').onclick = () => startRun(S.kind);
+$('bAgain').onclick = () => startRun(S.lastKind || S.kind);
 $('bOrtho').onclick = () => $('orthoFile').click();
 $('orthoFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;

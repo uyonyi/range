@@ -269,7 +269,7 @@ function msStart(kind) {
   Object.values(MSG).forEach(g => g.visible = false);
   STRIKE.forEach(t => { t.col.off = true; t.dead = false; t.hull.material = t.hull.userData.m0 || t.hull.material; });
   if (FLANE) FLANE.G.visible = true;
-  MS.idx = 0; S.photos = []; S.lost = 0; droneM.cans.forEach(c => c.visible = kind === 'sar'); S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
+  MS.idx = 0; S.photos = []; PH.lastSim = undefined; S.lost = 0; droneM.cans.forEach(c => c.visible = kind === 'sar'); S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
   const a = AFc(); let L = [];
   if (kind === 'forest' && FLANE) L = FLANE.cps.map(c => passCP(c.label, c.q, c.hw, c.y0, c.y1));
   if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
@@ -339,9 +339,7 @@ function msStep(prev, cur, dt) {
   else if (o.t === 'sarfind' || o.t === 'land' || o.t === 'track') scenStep(o, cur, dt);
   else if (o.t === 'recon') {
     const inView = sensorSees(o.tp, cur, AFc().reconD || 260);
-    o.inView = inView;
-    if (inView) { S.recT += dt; if (S.recT >= o.need) { flashPhoto(); comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); } }
-    else S.recT = Math.max(0, S.recT - dt * 0.3);
+    o.inView = inView;   // 사진은 직접 찍어 보고 (SPACE·Enter·📷·A·R트리거)
   }
 }
 // 센서 시야: 앞 화면 가운데 또는 아래 카메라(수직) 시야 안
@@ -441,7 +439,14 @@ function uasPC(sb, o) {
   document.body.style.setProperty('--hsiH', Math.round(260 * Hp / 720) + 'px');
   uasDraw(g, VW, 720, sb, o, searchIn(o, sb.p), 720 - 150);
 }
-function photoMission() { return S.kind === 'fire' || S.kind === 'sar'; }
+function photoMission() { return S.kind === 'fire' || S.kind === 'sar' || S.kind === 'recon' || S.kind === 'track'; }
+// 투하 버튼이 하는 일: 코스·자유 = 투하 / 산불·정찰·추적·수색(찾기 전) = 사진 보고 / 그 밖 = 없음
+function actionKind() {
+  if (!isMission()) return AFc().drop ? 'drop' : 'none';
+  if (S.kind === 'sar') { const o = msObj(); return o && o.t === 'sarkit' ? 'drop' : 'report'; }
+  if (S.kind === 'fire' || S.kind === 'recon' || S.kind === 'track') return 'report';
+  return 'none';
+}
 function snapPhoto(cap, tp) {
   try {
     const W0 = 384, H0 = 216; if (!PH.rt) { PH.rt = new THREE.WebGLRenderTarget(W0, H0); PH.lut = new Uint8Array(256); for (let i = 0; i < 256; i++) PH.lut[i] = Math.round(255 * Math.pow(i / 255, 1 / 2.2)); }
@@ -469,6 +474,7 @@ function photoAdd(c, label, xy, ok) {
 }
 function missionPhoto() {
   if (!DR.alive) return;
+  if (PH.lastSim !== undefined && Math.abs(S.simT - PH.lastSim) < 0.3) return; PH.lastSim = S.simT;   // 같은 버튼이 두 번 들어와도 한 장만
   flashPhoto(); sfx('drop');
   const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ' · ' + pilotName(), o = msObj();
   const xyS = (d, s) => { const xy = to5186(d, s); return xy ? `X ${xy[0].toFixed(0)}  Y ${xy[1].toFixed(0)}` : ''; };
@@ -478,6 +484,14 @@ function missionPhoto() {
     const seen = MS.list.find(x => x.active && !x.done && x.seenVis);
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(seen ? L2('연기는 찍혔지만 불씨 확인 불가 · 열화상(T)으로 다시', 'Smoke only · switch to thermal (T) and retake') : L2('사진에 불씨 없음 · 화면 가운데에 두고 찍기', 'No hotspot in frame · center it and retake'), '#ff9a40', 1.8); return;
+  }
+  if (S.kind === 'recon' && o && o.t === 'recon') {
+    if (o.inView) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); photoAdd(snapPhoto([L2('정찰 사진', 'RECON IMAGE') + '  ' + hm, o.label.split(' · ')[0]], o.tp), o.label, to5186(o.d || 0, o.s || 0), true); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); return; }
+    photoAdd(snapPhoto([L2('사진 · 대상 없음', 'PHOTO · NO TARGET') + '  ' + hm, '']), '', null, false); showMsg(L2('사진에 대상 건물 없음 · 화면 가운데(또는 아래 카메라)에 담고 다시', 'Target not in frame · center it and retake'), '#ff9a40', 1.8); return;
+  }
+  if (S.kind === 'track' && o && o.t === 'track') {
+    const ok = !!o.inView; photoAdd(snapPhoto([(ok ? L2('추적 차량', 'TRACKED VEHICLE') : L2('사진', 'PHOTO')) + '  ' + hm, ''], ok && TRACK ? trackPose(TRACK.s).p : null), o.label, null, ok);
+    if (ok) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); showMsg(L2('차량 사진 보고 ✓', 'Vehicle photo reported ✓'), '#5dff9a', 1.4); } else showMsg(L2('사진에 차량 없음', 'Vehicle not in frame'), '#ff9a40', 1.4); return;
   }
   if (S.kind === 'sar' && o && o.t === 'sarfind') {
     if (o.inView) { comm('Control, Eagle One. Subject located. Photo and grid sent.', '이글 원: 실종자 발견 · 사진과 좌표 전송', OP); const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
@@ -491,7 +505,8 @@ function orderTick() {
   if (!el) { if (!on) return; el = document.createElement('div'); el.id = 'orderBox'; (ui.hud || document.body).appendChild(el); }
   el.style.display = on ? '' : 'none'; if (!on) return; const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; if (el.dataset.t !== t) { el.dataset.t = t; el.innerHTML = `<b>${L2('📻 명령', '📻 ORDERS')}</b>${t}`; }
 }
-function photoTick(dt) { orderTick(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.toggle('hidden', !(S.state === 'run' && photoMission())); }
+function actionUI() { const b = $('tbDrop'); if (!b) return; const k = S.state === 'run' ? actionKind() : 'drop', t = k === 'report' ? '📷 REPORT' : k === 'none' ? '—' : 'DROP'; if (b.dataset.k !== k) { b.dataset.k = k; b.textContent = t; b.style.borderColor = k === 'report' ? '#5dff9a' : ''; b.style.color = k === 'report' ? '#5dff9a' : ''; b.style.fontSize = k === 'report' ? '13px' : ''; } }
+function photoTick(dt) { orderTick(); actionUI(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.add('hidden'); }   // 투하 버튼이 사진 보고를 겸함
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
@@ -547,7 +562,7 @@ function msOsd() {
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
   if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? '<div style="color:#9aa6ad">열화상(T)으로 확인</div>' : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : '열화상 끔 · T'}</div>`;
   h += scenOsd(o);
-  if (o && o.t === 'recon') h += `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">REC ${Math.min(100, S.recT / o.need * 100).toFixed(0)}%${o.inView ? ' ●' : ' · 화면 가운데나 아래 카메라에 담기'}</div>`;
+  if (o && o.t === 'recon') h += `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('건물 포착 · SPACE/📷 보고', 'TARGET · SPACE/📷 to report') : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
   return h;
 }
 function msListHTML() {
@@ -1065,6 +1080,11 @@ function speakify(t) {
 }
 const COMM = { q: [], busy: 0, voice: null };
 const ORDER = { m: null };
+function commReset() {   // 새 비행: 남은 무전·자막·사진 미리보기 정리
+  COMM.q.length = 0; COMM.cur = (COMM.cur || 0) + 1; COMM.sp = false; COMM.busy = 0; try { if (COMM.src) COMM.src.stop(); } catch (e) { } COMM.src = null;
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { } try { commStatic(false); } catch (e) { }
+  const r = $('radio'); if (r) r.classList.remove('show'); const pp = $('photoPop'); if (pp) pp.style.opacity = 0; if (typeof PH !== 'undefined') PH.lastT = 0;
+}
 const OP = 'EAGLE ONE';   // 드론 운용자(우리 쪽) 무전 · 다른 목소리
 function pickVoice() { try { const V = speechSynthesis.getVoices(); COMM.voice = V.find(v => /en-US/.test(v.lang) && /Male|David|Guy|Daniel|Alex/i.test(v.name)) || V.find(v => /^en/.test(v.lang)) || null; } catch (e) { } }
 try { speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); } catch (e) { }
@@ -1467,6 +1487,9 @@ document.querySelectorAll('#msGrid [data-ms]').forEach(b => {
   b.addEventListener('click', () => { const now = performance.now(), again = MENU.ms === b.dataset.ms && now - MENU.dbl < 450; MENU.dbl = now; if (again) menuGo(); else menuSel(b.dataset.ms); });
 });
 $('msGo').onclick = menuGo;
+if ($('bPauseOpt')) $('bPauseOpt').onclick = () => openPanel('optPanel');
+if ($('bPauseCtl')) $('bPauseCtl').onclick = () => { openPanel('ctlPanel'); try { kbHelp(); } catch (e) { } };
+setInterval(() => { const w = $('pauseWho'); if (w && S.state === 'pause') { const lk = S.lastKind || S.kind; w.textContent = L2('현재 임무: ', 'Mission: ') + (MS_NAME[lk] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('자유 비행', 'Free flight'), tutorial: L2('튜토리얼', 'Tutorial'), demo: L2('기준 비행', 'Reference flight') })[lk] || lk) + ' · ' + AFc().name + ' · ' + pilotName(); } }, 400);
 // ---- 첫 화면 3단계: 1 조종사 이름 → 2 기체 → 3 코스 (각 단계 뒤로 가기) ----
 MENU.step = 0; const HAS_INTRO = !!(window.SIM_VR || window.SIM_VR_URL); MENU.mode = window.SIM_VR ? 'vr' : 'pc';
 try { SET.pilot = localStorage.getItem('hroc_pilot') || ''; } catch (e) { SET.pilot = ''; }
@@ -1904,7 +1927,7 @@ function vrOsdDraw() {
   if (o && S.state !== 'replay') sh('▸ ' + (o.label || MS_NAME[S.kind] || ''), CX, 70, 40, '#ffc828', 'center');
   if (S.state === 'demo') sh(L2('기준 비행', 'REFERENCE FLIGHT'), CX, 70, 38, '#4fe3ff', 'center');
   if (ENV.ir) sh('IR', MX - 16, H2 - 196, 28, '#ff9a40', 'right');
-  { const n = S.kind === 'course' ? S.payloads || 0 : S.kind === 'sar' ? S.kits | 0 : S.kind === 'free' && AFc().drop ? droneM.cans.filter(c => c.visible).length : -1; if (n >= 0 && S.state === 'run') sh((S.kind === 'sar' ? 'KIT ' : 'M84 ') + ('●'.repeat(n) || '—'), W2 - 250, H2 - 330 - 34 - 56, 24, '#ffc828', 'left'); }
+  { const n = S.kind === 'course' ? S.payloads || 0 : S.kind === 'sar' ? S.kits | 0 : S.kind === 'free' && AFc().drop ? droneM.cans.filter(c => c.visible).length : -1; if (S.state === 'run' && actionKind() === 'report') sh('📷 ' + L2('R트리거 · A = 사진 보고', 'R-trigger · A = report'), W2 - 250, H2 - 330 - 34 - 56, 22, '#5dff9a', 'left'); else if (n >= 0 && S.state === 'run') sh((S.kind === 'sar' ? 'KIT ' : 'M84 ') + ('●'.repeat(n) || '—'), W2 - 250, H2 - 330 - 34 - 56, 24, '#ffc828', 'left'); }
   if (SET.vrPip) sh(L2('하부 ', 'LOWER ') + SET.vrPip + '°', 40, H2 - 252, 24, '#ffc828');
   if (PH.last && PH.lastT > 0 && PH.last.complete) { g.globalAlpha = Math.min(1, PH.lastT); g.drawImage(PH.last, 40, 150, 288, 162); g.strokeStyle = PH.lastOk ? '#5dff9a' : '#ff9a40'; g.lineWidth = 4; g.strokeRect(40, 150, 288, 162); g.globalAlpha = 1; }
   if (ORDER.m && (S.state === 'run' || S.state === 'pause') && (isMission() || S.kind === 'course')) { const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; g.font = '600 22px system-ui, sans-serif'; const ws = String(t).split(' '), L = []; let ln = ''; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > 400 && ln) { L.push(ln); ln = w; } else ln = tl; } if (ln) L.push(ln); const LL = L.slice(0, 4), oy = 330;
