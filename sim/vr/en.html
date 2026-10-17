@@ -224,7 +224,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .introG{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.introC{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:22px 20px;border-radius:12px;text-align:left;min-height:150px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(255,200,40,.14),rgba(255,200,40,.02))}.introC.vr{background:linear-gradient(135deg,rgba(79,227,255,.16),rgba(79,227,255,.02))}.introC i{font-style:normal;font-size:38px;line-height:1}.introC b{font-size:21px;margin-top:6px}.introC small{font-size:12px;opacity:.75}.introC:hover{outline:2px solid var(--amber)}.introC.vr:hover{outline-color:#4fe3ff}
 @media (max-width:560px){.introG{grid-template-columns:1fr}}
 .wzmode{flex:0 0 auto!important;cursor:pointer;background:#1d2a33!important;color:#4fe3ff!important;font-weight:700}
-.stgtog{position:absolute;right:10px;top:10px;z-index:2}.stgtog button{padding:4px 10px;font-size:12px}
+.stgtog{position:absolute;right:10px;top:10px;z-index:2;display:flex;flex-direction:column;align-items:flex-end;gap:4px}.stgtog button{padding:4px 10px;font-size:12px}
 .vrnote{margin:10px 0 0;padding:10px 12px;border:1px solid #4fe3ff;border-radius:8px;background:rgba(79,227,255,.08);display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px}.vrnote.hidden{display:none}#vrResume.hidden{display:none}
 #menuCard .wz{display:none}#menuCard[data-step="1"] .s1,#menuCard[data-step="2"] .s2,#menuCard[data-step="3"] .s3{display:block}
 #menuCard[data-step="1"]{max-width:620px}#menuCard[data-step="2"]{max-width:760px}
@@ -383,7 +383,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
           <button data-cat="strike" data-g="mission" data-ms="strike" data-ic="✕"><b>Strike</b><small>Dive into target vehicles · hit error</small></button>
         </div>
         <div id="msDetail" class="msdetail">
-          <div class="msStageW"><canvas id="msStage"></canvas><div class="seg stgtog" id="segTime2"><button data-v="0" class="on">☀ Day</button><button data-v="1">☾ Night</button></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
+          <div class="msStageW"><canvas id="msStage"></canvas><div class="stgtog"><div class="seg" id="segTime2"><button data-v="0" class="on">☀ Day</button><button data-v="2">🌇 Dusk</button><button data-v="1">☾ Night</button></div><div class="seg" id="segWx2"><button data-v="clear" class="on">Clear</button><button data-v="rain">🌧 Rain</button><button data-v="snow">❄ Snow</button></div></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
           <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
@@ -401,7 +401,8 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <div>Difficulty <span class="seg" id="segDiff"><button data-v="train" class="on">Training</button><button data-v="easy">Easy</button><button data-v="atti">ATTI</button><button data-v="sport">Sport</button></span></div>
       <div>Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span></div>
       <div>Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span></div>
-      <div>Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="1">Night</button></span></div>
+      <div>Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="2">Dusk</button><button data-v="1">Night</button></span></div>
+      <div>Weather <span class="seg" id="segWx"><button data-v="clear" class="on">Clear</button><button data-v="rain">Rain</button><button data-v="snow">Snow</button></span></div>
       <div>Wind <span class="seg" id="segWind"><button data-v="0" class="on">None</button><button data-v="1">Light 3 m/s</button><button data-v="2">Strong 7 m/s</button></span></div>
       <div>Guide <span class="seg" id="segGuide"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
     </div>
@@ -618,7 +619,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=2230ea29"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.en.js?v=2230ea29"></script>
+<script src="../sites/yeongin.js?v=803d034f"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.en.js?v=803d034f"></script>
 </body>
 </html>
