@@ -1037,7 +1037,15 @@ const STREES = (function siteTrees() {
         im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; BURNT.push({ i, im, k, m0, c0, r0: dim[i * 2 + 1] }); dim[i * 2 + 1] *= 0.25; } }
   }
   function unscorch() { for (const b of BURNT) { b.im.setMatrixAt(b.k, b.m0); b.im.setColorAt(b.k, b.c0); b.im.instanceMatrix.needsUpdate = true; if (b.im.instanceColor) b.im.instanceColor.needsUpdate = true; dim[b.i * 2 + 1] = b.r0; } BURNT.length = 0; }
-  return { n, col: col1, lod, scorch, unscorch };
+  function hideRect(cx, cz, ux, uz, L, Wd) {   // 활주로 띠 안의 나무를 없앰 (영구)
+    let n0 = 0; const R = Math.hypot(L, Wd) / 2, gx = Math.floor(cx / GC), gz = Math.floor(cz / GC), g = Math.ceil(R / GC);
+    for (let ix = gx - g; ix <= gx + g; ix++) for (let iz = gz - g; iz <= gz + g; iz++) { const Lc = GRID.get(ix + ',' + iz); if (!Lc) continue;
+      for (const v of Lc) { const i = v & 0xffffff, dx = pos[i * 3] - cx, dz = pos[i * 3 + 2] - cz, t = dx * ux + dz * uz, w = -dx * uz + dz * ux;
+        if (Math.abs(t) > L / 2 || Math.abs(w) > Wd / 2 || dim[i * 2] === 0) continue;
+        const ch = CHUNKS[REF[i * 2]], k = REF[i * 2 + 1]; ch.im.getMatrixAt(k, _m); _m.decompose(_p, _q, _s); _s.set(0.0001, 0.0001, 0.0001); _m.compose(_p, _q, _s); ch.im.setMatrixAt(k, _m); ch.im.instanceMatrix.needsUpdate = true; dim[i * 2] = 0; dim[i * 2 + 1] = 0; n0++; } }
+    return n0;
+  }
+  return { n, col: col1, lod, scorch, unscorch, hideRect };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }
