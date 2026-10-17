@@ -766,7 +766,10 @@ function wxTick(dt) {
 function setTod(v) { SET.tod = v; SET.night = v === 'night'; ENV.night = SET.night; ENV.dusk = v === 'dusk'; saveSet(); if (ENV.ir) irSet(false); envApply(); syncTime(); }
 function setWxFx(on) { SET.wxFx = !!on; saveSet(); syncTime(); if (S.state === 'run') showMsg(on ? L2('기상 영향 켬 · 돌풍·시야 감소', 'Weather effects on · gusts, reduced visibility') : L2('기상 영향 끔', 'Weather effects off'), '#4fe3ff', 1.2); }
 document.querySelectorAll('#segWxFx button').forEach(b => b.addEventListener('click', () => setWxFx(b.dataset.v === '1')));
-function setWx(v) { SET.wx = v; ENV.wx = v; saveSet(); envApply(); syncTime(); }
+function setWx(v) {
+  if (v !== 'clear' && S.kind === 'fire' && (S.state === 'run' || S.state === 'pause')) { showMsg(L2('산불 감시 중에는 비·눈을 고를 수 없습니다', 'No rain or snow during a wildfire watch'), '#ff9a40', 1.6); syncTime(); return; }
+  SET.wx = v; ENV.wx = v; saveSet(); envApply(); syncTime(); if (S.state === 'menu' && typeof menuSel === 'function' && MENU.ms) menuSel(MENU.ms);
+}
 document.querySelectorAll('#segWx button, #segWx2 button').forEach(b => b.addEventListener('click', () => setWx(b.dataset.v)));
 document.querySelectorAll('#segTime button, #segTime2 button').forEach(b => b.addEventListener('click', () => setTod(b.dataset.v === '1' ? 'night' : b.dataset.v === '2' ? 'dusk' : 'day')));
 document.querySelectorAll('#segNone').forEach(b => b.addEventListener('click', () => { SET.night = b.dataset.v === '1'; ENV.night = SET.night; saveSet(); envApply(); if (ENV.ir) { irSet(false); } syncTime(); }));
@@ -1474,8 +1477,8 @@ const MDESC = () => ({
 function msInfo(k) { const b = BRIEF[k] || MDESC()[k] || [k, '', '']; return { t: b[0], d: b[1], tip: b[2] }; }
 function msAvail(k) {
   const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
-  const site = HAS[k] !== false, af = (MS_OK[k] || []).includes(SET.af);
-  return { ok: site && af, site, af, why: !site ? L2('이 훈련장에는 없는 임무', 'Not available at this site') : !af ? L2('선택한 기체로는 할 수 없는 임무 · 아래 추천 기체를 고르세요', 'Not possible with this airframe · pick a recommended one below') : '' };
+  const site = HAS[k] !== false, af = (MS_OK[k] || []).includes(SET.af), wx = !(k === 'fire' && (SET.wx === 'rain' || SET.wx === 'snow'));   // 비·눈 오는 날은 산불 감시 없음
+  return { ok: site && af && wx, site, af, wx, why: !site ? L2('이 훈련장에는 없는 임무', 'Not available at this site') : !wx ? L2('비·눈 오는 날에는 산불 감시를 하지 않습니다 · 날씨를 맑음으로', 'No wildfire watch in rain or snow · set the weather to clear') : !af ? L2('선택한 기체로는 할 수 없는 임무 · 아래 추천 기체를 고르세요', 'Not possible with this airframe · pick a recommended one below') : '' };
 }
 function afCat(a) { return a.kam ? 'kam' : a.cls === 'wing' ? 'wing' : a.id === 'fpv' ? 'fpv' : 'quad'; }
 // RPG 식 능력치 (공개 제원 근사값을 0~1 로)
