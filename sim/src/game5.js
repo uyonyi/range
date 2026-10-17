@@ -561,7 +561,7 @@ function msFinish() {
     else if (S.lost) rows.push(['기체 손실', S.lost + ' 대']);
     if (S.kind === 'sar' && S.sarXY) rows.push(['실종자 위치 (EPSG:5186)', S.sarXY[0].toFixed(0) + ', ' + S.sarXY[1].toFixed(0)]);
     if (S.kind === 'sar' && S.kitErr !== undefined) rows.push(['키트 오차', S.kitErr.toFixed(1) + ' m']);
-    if (S.kind === 'track') rows.push(['추적 유지', S.trT.toFixed(0) + ' / ' + S.trWin.toFixed(0) + ' s'], ['판정', S.trackOK ? '성공' : '실패']);
+    if (S.kind === 'track') rows.push(['추적 유지', S.trT.toFixed(0) + ' / ' + S.trWin.toFixed(0) + ' s'], [L2('최대 노출', 'Peak exposure'), Math.round(TRACK.susMax || 0) + '%'], [L2('발각', 'Spotted'), TRACK.burn ? L2('예 (-30)', 'yes (-30)') : L2('아니오', 'no')], ['판정', S.trackOK ? '성공' : '실패']);
     if (S.kind === 'ridge' && RIDGE) rows.push(['정상 해발', RIDGE.top.toFixed(0) + ' m']);
     if (S.kind === 'fire') (S.fireRep || []).forEach((xy, i) => xy && rows.push(['불씨 ' + (i + 1) + ' (EPSG:5186)', xy[0].toFixed(0) + ', ' + xy[1].toFixed(0)]));
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
@@ -897,16 +897,27 @@ const SAR = (function () {
   if (!best) return null;
   const d = best.d + 7, s = best.s - 5, c = W(d, s, 0);
   const g = new THREE.Group(); g.position.copy(c); MSG.sar = MSG.sar || new THREE.Group(); scene.add(MSG.sar); MSG.sar.visible = false; MSG.sar.add(g);
-  const jacket = mat(0xd9541e, { roughness: 0.8 }), pants = mat(0x2d3640, { roughness: 0.9 }), skin = mat(0xc99a7a, { roughness: 0.8 });
-  const torso = new THREE.Mesh(UCAP, jacket); torso.scale.set(0.2, 0.32, 0.14); torso.rotation.z = Math.PI / 2; torso.position.set(0, 0.2, 0); g.add(torso);
-  const legs = new THREE.Mesh(UBOX, pants); legs.scale.set(0.8, 0.16, 0.3); legs.position.set(-0.75, 0.1, 0); g.add(legs);
-  const head = new THREE.Mesh(USPH, skin); head.scale.setScalar(0.12); head.position.set(0.48, 0.2, 0); g.add(head);
-  const pack = new THREE.Mesh(UBOX, mat(0x3d5a3a, { roughness: 0.9 })); pack.scale.set(0.45, 0.3, 0.35); pack.position.set(0.1, 0.18, 0.4); g.add(pack);
+  // 등산객: 배낭에 기대 반쯤 누운 자세 · 한쪽 팔은 드론이 가까이 오면 흔듦
+  const jacket = mat(0xd9541e, { roughness: 0.75 }), pants = mat(0x2d3640, { roughness: 0.9 }), skin = mat(0xc99a7a, { roughness: 0.8 }), boot = mat(0x3a2a1c, { roughness: 0.9 }), cap = mat(0x2a5d8a, { roughness: 0.8 }), packM = mat(0x3d5a3a, { roughness: 0.9 });
+  const P = new THREE.Group(); P.rotation.z = 0.22; P.position.y = 0.05; g.add(P);   // 상체를 살짝 세움
+  const put = (geo, m, x, y, z, sx, sy, sz, rz, rx) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.scale.set(sx, sy, sz); if (rz) me.rotation.z = rz; if (rx) me.rotation.x = rx; P.add(me); return me; };
+  const torso = put(UCAP, jacket, 0.05, 0.2, 0, 0.17, 0.24, 0.13, Math.PI / 2);
+  put(UCAP, jacket, 0.3, 0.24, 0, 0.12, 0.1, 0.18, Math.PI / 2);                 // 어깨
+  put(UCYL, skin, 0.47, 0.24, 0, 0.05, 0.08, 0.05, Math.PI / 2);                 // 목
+  const head = put(USPH, skin, 0.6, 0.25, 0, 0.11, 0.12, 0.1);
+  put(USPH, cap, 0.63, 0.31, 0, 0.115, 0.07, 0.105, -0.5);                       // 모자
+  for (const z of [-0.1, 0.1]) { put(UCAP, pants, -0.5, 0.11, z, 0.075, 0.36, 0.075, Math.PI / 2); put(UBOX, boot, -0.95, 0.13, z, 0.12, 0.16, 0.1); }
+  put(UCAP, jacket, 0.08, 0.17, 0.2, 0.055, 0.22, 0.055, Math.PI / 2 + 0.3);     // 왼팔 (몸 옆)
+  const arm = new THREE.Group(); arm.position.set(0.32, 0.27, -0.2); arm.rotation.z = Math.PI / 2 + 0.2; P.add(arm);
+  { const u = new THREE.Mesh(UCAP, jacket); u.scale.set(0.055, 0.2, 0.055); u.position.y = 0.2; arm.add(u); const hnd = new THREE.Mesh(USPH, skin); hnd.scale.setScalar(0.05); hnd.position.y = 0.46; arm.add(hnd); }
+  const pack = put(UBOX, packM, 0.38, 0.12, 0, 0.42, 0.32, 0.5);                 // 등 뒤 배낭 (베개처럼)
+  put(UBOX, mat(0x6b6f52, { roughness: 0.9 }), 0.38, 0.3, 0, 0.36, 0.06, 0.46);  // 배낭 덮개
+  { const pole = put(UCYL, mat(0x8c939a, { roughness: 0.4, metalness: 0.7 }), -0.2, 0.03, 0.55, 0.012, 1.1, 0.012, Math.PI / 2 - 0.15); pole.rotation.y = 0.5; }
   g.traverse(m => { if (m.isMesh) { m.castShadow = true; m.userData.heat = m.material === jacket || m.material === skin ? 0.85 : 0.5; } });
   const ang = r() * 6.283, area = W(d + Math.cos(ang) * 45, s + Math.sin(ang) * 45, 30);
   const pk = new THREE.Group(); { const b = new THREE.Mesh(UBOX, mat(0xe0b020, { roughness: 0.8 })); b.scale.set(0.45, 0.28, 0.32); b.position.y = 0.14; pk.add(b); const s2 = new THREE.Mesh(UBOX, mat(0x2d3640)); s2.scale.set(0.5, 0.05, 0.08); s2.position.y = 0.3; pk.add(s2); } MSG.sar.add(pk);
   const sig = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, sizeAttenuation: false })); sig.scale.set(0.035, 0.035, 1); sig.visible = false; MSG.sar.add(sig);
-  return { d, s, c, tp: c.clone().add(new V3(0, 0.3, 0)), area, g, pk, sig, pkP: new V3() };
+  return { d, s, c, tp: c.clone().add(new V3(0, 0.3, 0)), area, g, pk, sig, pkP: new V3(), arm, wave: 0 };
 })();
 // ---- 차량 추적: 실제 도로(수치지형도)를 따라 달리는 차량 ----
 const TRACK = (function () {
@@ -923,17 +934,50 @@ const TRACK = (function () {
   const P = polyWorld(route, 2).map(q => W(q[0], q[1], 0));
   const cum = [0]; for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z));
   const g = new THREE.Group(); MSG.track = MSG.track || new THREE.Group(); scene.add(MSG.track); MSG.track.visible = false; MSG.track.add(g);
-  const body = mat(0x2f3b45, { roughness: 0.5, metalness: 0.3 }), glass = mat(0x1a2530, { roughness: 0.1, metalness: 0.6 }), tire = mat(0x151515, { roughness: 0.9 });
-  const add = (geo, m, x, y, z, sx, sy, sz) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.scale.set(sx, sy, sz); me.castShadow = true; g.add(me); return me; };
-  add(UBOX, body, 0, 0.75, 0, 1.85, 0.8, 4.6); add(UBOX, body, 0, 1.4, 0.3, 1.7, 0.6, 2.6); add(UBOX, glass, 0, 1.42, -1.0, 1.6, 0.5, 0.05);
-  for (const x of [-0.9, 0.9]) for (const z of [-1.45, 1.45]) { const w = add(UCYL, tire, x, 0.36, z, 0.36, 0.28, 0.36); w.rotation.z = Math.PI / 2; }
-  g.traverse(m => { if (m.isMesh) m.userData.heat = m.material === tire ? 0.45 : 0.35; });
-  return { P, cum, total: cum[cum.length - 1], g, s: 0, v: 8.5 };
+  // SUV: 차체·보닛·실내(유리)·범퍼·그릴·바퀴(휠)·사이드미러·루프랙·번호판 · 앞쪽 = -z
+  const body = mat(0x6a7783, { roughness: 0.42, metalness: 0.12 }), glass = mat(0x16222c, { roughness: 0.12, metalness: 0.3 }), tire = mat(0x121212, { roughness: 0.92 }),
+    trim = mat(0x1b1d20, { roughness: 0.7 }), rim = mat(0x9aa2aa, { roughness: 0.35, metalness: 0.8 }), plate = mat(0xe8e8e0, { roughness: 0.6 });
+  const add = (geo, m, x, y, z, sx, sy, sz, rx) => { const me = new THREE.Mesh(geo, m); me.position.set(x, y, z); me.scale.set(sx, sy, sz); if (rx) me.rotation.x = rx; me.castShadow = true; g.add(me); return me; };
+  add(UBOX, body, 0, 0.78, 0.05, 1.86, 0.62, 4.5);                       // 아래 차체
+  add(UBOX, body, 0, 1.0, -1.65, 1.8, 0.2, 1.1, 0.08);                  // 보닛 (살짝 기울게)
+  add(UBOX, body, 0, 1.43, 0.45, 1.72, 0.62, 2.55);                     // 실내 상자
+  add(UBOX, glass, 0, 1.43, 0.45, 1.74, 0.4, 2.3);                      // 옆 유리 띠
+  add(UBOX, glass, 0, 1.38, -0.93, 1.62, 0.04, 0.72, -0.95);            // 앞 유리 (기울임)
+  add(UBOX, glass, 0, 1.44, 1.73, 1.6, 0.46, 0.04);                     // 뒤 유리
+  add(UBOX, body, 0, 1.76, 0.45, 1.7, 0.05, 2.45);                      // 지붕
+  for (const x of [-0.68, 0.68]) add(UBOX, trim, x, 1.83, 0.45, 0.05, 0.06, 2.0);   // 루프랙
+  add(UBOX, trim, 0, 0.55, -2.33, 1.92, 0.26, 0.22); add(UBOX, trim, 0, 0.55, 2.33, 1.92, 0.26, 0.22);   // 범퍼
+  add(UBOX, trim, 0, 0.84, -2.31, 1.1, 0.26, 0.05);                     // 그릴
+  add(UBOX, plate, 0, 0.56, -2.45, 0.52, 0.12, 0.02); add(UBOX, plate, 0, 0.72, 2.31, 0.52, 0.12, 0.02);
+  for (const x of [-1.0, 1.0]) add(UBOX, trim, x, 1.25, -0.72, 0.16, 0.12, 0.08);   // 사이드미러
+  for (const x of [-0.9, 0.9]) for (const z of [-1.45, 1.45]) {
+    add(UBOX, trim, x * 1.02, 0.66, z, 0.06, 0.34, 1.0);                // 휠 아치
+    const w = add(UCYL, tire, x, 0.37, z, 0.37, 0.27, 0.37); w.rotation.z = Math.PI / 2;
+    const h = add(UCYL, rim, x * 1.06, 0.37, z, 0.22, 0.02, 0.22); h.rotation.z = Math.PI / 2;
+  }
+  // 등화: 전조등·후미등(브레이크등)은 빛나는 재질 + 밤에는 땅을 비추는 전조등 빛과 빛 줄기
+  const headM = new THREE.MeshBasicMaterial({ color: 0x3a3a36, toneMapped: false }), tailM = new THREE.MeshBasicMaterial({ color: 0x3a0c0c, toneMapped: false });
+  for (const x of [-0.64, 0.64]) { add(UBOX, headM, x, 0.9, -2.31, 0.42, 0.14, 0.05).castShadow = false; add(UBOX, tailM, x * 1.06, 0.95, 2.31, 0.34, 0.17, 0.05).castShadow = false; }
+  add(UBOX, tailM, 0, 1.76, 1.72, 0.5, 0.04, 0.03).castShadow = false;   // 보조 제동등
+  const headL = new THREE.SpotLight(0xfff0d0, 0, 75, 0.5, 0.55, 1.3); headL.position.set(0, 0.95, -2.4); headL.target.position.set(0, -0.6, -24); g.add(headL); g.add(headL.target);
+  g.traverse(m => { if (m.isMesh && !m.material.isMeshBasicMaterial) m.userData.heat = m.material === tire ? 0.45 : m.material === trim ? 0.42 : 0.35; });
+  const lights = { headM, tailM, headL, brk: 0, vPrev: 0 };
+  return { P, cum, total: cum[cum.length - 1], g, s: 0, v: 8.5, lt: lights, sus: 0 };
 })();
 function trackPose(s) {
   const T = TRACK; let i = 1; while (i < T.cum.length - 1 && T.cum[i] < s) i++;
   const u = clamp((s - T.cum[i - 1]) / Math.max(1e-6, T.cum[i] - T.cum[i - 1]), 0, 1), a = T.P[i - 1], b = T.P[i];
   const x = a.x + (b.x - a.x) * u, z = a.z + (b.z - a.z) * u; return { p: new V3(x, groundAt(x, z), z), h: Math.atan2(b.x - a.x, -(b.z - a.z)) };
+}
+// 차량 등화: 밤·해질녘·비에는 전조등 · 감속·정차 때 브레이크등 (출발 전에는 시동 꺼짐)
+function trackLights(dt, running) {
+  const T = TRACK, L = T && T.lt; if (!L) return;
+  const dark = (ENV.night || ENV.dusk) && !ENV.ir, on = running && (dark || (ENV.wx && ENV.wx !== 'clear'));
+  const dec = dt > 0 ? (L.vPrev - T.v) / dt : 0; L.vPrev = T.v;
+  const brake = running && (T.v < 0.3 || dec > 0.6); L.brk += ((brake ? 1 : 0) - L.brk) * Math.min(1, dt * 10);
+  L.headM.color.setHex(on ? 0xfff6dc : running ? 0x8a8a80 : 0x3a3a36);
+  L.tailM.color.setRGB(0.23 + (on ? 0.35 : 0.05) + L.brk * 0.75, 0.04 + L.brk * 0.08, 0.04 + L.brk * 0.06);
+  L.headL.intensity = on && dark ? (ENV.night ? 7 : 3.5) : 0;
 }
 // ---- 능선 종주: DEM 에서 '높은 곳을 따라가는' 최소 비용 경로 (GIS 분석) ----
 const RIDGE = (function () {
@@ -988,7 +1032,11 @@ function scenStart(kind, a) {
   if (kind === 'track' && TRACK) {
     MSG.track.visible = true; TRACK.go = false; S.trT = 0; S.trWin = 0; trackRandom();
     const p0 = trackPose(TRACK.s); TRACK.g.position.copy(p0.p); TRACK.g.rotation.y = -p0.h;
-    return [{ kind: 'ms', t: 'track', label: '차량 추적 · 시야에 60초 유지', mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
+    TRACK.sus = 0; TRACK.susMax = 0; TRACK.warn = false; TRACK.burn = false; TRACK.lt.vPrev = 0; trackLights(0, false);
+    const L = [{ kind: 'ms', t: 'track', label: L2('차량 추적 · 들키지 말고 60초 관측', 'Vehicle track · 60 s unseen'), mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
+    if (a.cls === 'wing') L.push(passCP('복귀 · 출발점 상공 통과', { d: BY.pad_start.down, s: BY.pad_start.side, td: 1, ts: 0 }, 0, 35, 35, 14));
+    else L.push({ kind: 'ms', t: 'land', label: '출발 패드로 복귀 · 착륙', mk: startPos().add(new V3(0, 1.5, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } });
+    return L;
   }
   if (kind === 'ridge' && RIDGE) {
     MSG.ridge.visible = true; const k = a.cls === 'wing' ? 2.2 : 1;
@@ -1009,6 +1057,25 @@ function scenStep(o, cur, dt) {
     const tp = vp.p.clone().add(new V3(0, 1, 0)), dd = cur.distanceTo(tp), see = sensorSees(tp, cur, 320);
     o.close = dd < 25; o.inView = see && !o.close;
     if (T.go) { S.trWin += dt; if (o.inView) S.trT += dt; }
+    // 들킴: 운전자 시야(차 앞쪽 ±40°), 가까움, 낮은 고도(프로펠러 소리)일수록 빨리 참 · 안전하면 서서히 내려감
+    if (T.go) {
+      const fx = Math.sin(vp.h), fz = -Math.cos(vp.h), rx = cur.x - vp.p.x, rz = cur.z - vp.p.z, dh = Math.hypot(rx, rz), hy = cur.y - vp.p.y, front = dh > 1 ? (rx * fx + rz * fz) / dh : 0;
+      let r = 0;
+      if (front > 0.77 && dh < 160) r += 32 * (1 - dh / 160) + 6;
+      if (dd < 60) r += (60 - dd) * 1.3;
+      if (hy < 35 && dh < 100) r += (35 - Math.max(0, hy)) * 0.7;
+      if (ENV.night && !(front > 0.77)) r *= 0.7; if (ENV.wx === 'rain') r *= 0.75;
+      T.sus = clamp(T.sus + (r * 0.55 - 7) * dt, 0, 100); T.susMax = Math.max(T.susMax || 0, T.sus);
+      if (!T.warn && T.sus >= 45) { T.warn = true; sfx('bad'); showMsg(L2('노출 주의 · 거리를 벌릴 것', 'Exposure · back off'), '#ff9a40', 1.6); comm(`${CS}, CONTROL. Driver is looking around. Back off and increase your standoff.`, '운전자가 주변을 살핌 · 뒤로 빠져 거리 넓힐 것'); }
+      if (T.warn && T.sus < 20) T.warn = false;
+      if (T.sus >= 100 && !T.burn) {
+        T.burn = true; S.trackOK = false; S.pen += 30; T.base *= 1.7; T.stops = []; T.stopT = 0;
+        comm(`${CS}, you have been spotted. Target is evading. Break off and RTB.`, '발각됨 · 표적 도주 · 추적 중단하고 복귀');
+        o.done = true; o.miss = true; dbfObj(o.label, false); sfx('bad'); showMsg(L2('발각 · 추적 실패 (-30) · 복귀', 'SPOTTED · track failed (-30) · RTB'), '#ff6060', 2.4);
+        MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; renderList(); if (MS.idx >= MS.list.length) msFinish();
+        return;
+      }
+    }
     o.mk.copy(vp.p).add(new V3(0, 12, 0));
     if (S.trT >= o.need) { S.trackOK = true; comm('Good track, we have what we need. Break off and RTB.', '추적 완료 · 이탈 후 복귀'); msNext(`추적 성공 · ${S.trT.toFixed(0)}초 / ${S.trWin.toFixed(0)}초`, '#5dff9a'); }
     else if (T.s >= (T.endS || T.total) - 1) { S.trackOK = false; msNext(`차량 도착 · 추적 ${S.trT.toFixed(0)}초 (부족)`, '#ff9a40'); }
@@ -1020,6 +1087,15 @@ function scenTick(dt) {
     TRACK.s = Math.min(TRACK.endS || TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
     TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; TRACK.g.rotation.x = Math.atan2(ah.p.y - vp.p.y, 3) * 1;
   }
+  if (TRACK && MSG.track && MSG.track.visible) trackLights(S.state === 'pause' ? 0 : dt, !!TRACK.go);
+  if (S.kind === 'sar' && SAR) sarWave(dt);
+}
+// 조난자: 드론이 70 m 안에 오면 팔을 들어 흔듦 (발견 뒤에도 계속)
+function sarWave(dt) {
+  if (!SAR || !SAR.arm || !MSG.sar || !MSG.sar.visible) return;
+  const near = S.state === 'run' && DR.p.distanceTo(SAR.c) < 70; SAR.wave += ((near ? 1 : 0) - SAR.wave) * Math.min(1, dt * 2.5);
+  const t = performance.now() / 1000, w = SAR.wave;
+  SAR.arm.rotation.z = (Math.PI / 2 + 0.2) * (1 - w) + 0.15 * w; SAR.arm.rotation.x = w * Math.sin(t * 7) * 0.55;
 }
 // 구조 키트가 땅에 닿았을 때
 function sarKit(pos) {
@@ -1031,7 +1107,9 @@ function sarKit(pos) {
 function scenOsd(o) {
   if (!o) return '';
   if (o.t === 'sarfind') return `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('실종자 포착 · Enter/📷 촬영', 'SUBJECT · Enter/📷 to photo') : ENV.ir ? 'IR 수색 중' : '숲 아래는 열화상(T)'}</div>`;
-  if (o.t === 'track') return `<div style="color:${o.inView ? '#5dff9a' : o.close ? '#ff9a40' : '#9aa6ad'}">TRACK ${S.trT.toFixed(0)}/${o.need}s${o.close ? ' · 너무 가까움' : o.inView ? ' ●' : TRACK.go ? ' · 시야 밖' : ' · 접근하면 출발'}</div>`;
+  if (o.t === 'track') { const su = Math.round(TRACK.sus || 0), sc = su >= 70 ? '#ff6060' : su >= 40 ? '#ff9a40' : '#5dff9a';
+    return `<div style="color:${o.inView ? '#5dff9a' : o.close ? '#ff9a40' : '#9aa6ad'}">TRACK ${S.trT.toFixed(0)}/${o.need}s${o.close ? ' · 너무 가까움' : o.inView ? ' ●' : TRACK.go ? ' · 시야 밖' : ' · 접근하면 출발'}</div>`
+      + `<div style="color:${sc}">${L2('노출', 'EXPOSURE')} <span style="display:inline-block;width:70px;height:7px;background:rgba(255,255,255,.15);vertical-align:middle"><i style="display:block;height:100%;width:${su}%;background:${sc}"></i></span> ${su}%</div>`; }
   return '';
 }
 
@@ -1101,7 +1179,7 @@ function msPar(kind, L) {
   return 180;
 }
 function msGrade(total) {
-  if (S.kind === 'track') return S.trackOK ? { g: S.trT / Math.max(1, S.trWin) > 0.8 ? 'S' : 'A', c: '#5dff9a' } : { g: 'C', c: '#ff6060' };
+  if (S.kind === 'track') return S.trackOK ? { g: S.trT / Math.max(1, S.trWin) > 0.8 && (TRACK.susMax || 0) < 45 ? 'S' : 'A', c: '#5dff9a' } : { g: TRACK.burn ? 'D' : 'C', c: '#ff6060' };
   const r = total / Math.max(1, MS.par || 1);
   return r <= 1 ? { g: 'S', c: '#ffc828' } : r <= 1.3 ? { g: 'A', c: '#5dff9a' } : r <= 1.7 ? { g: 'B', c: '#4fe3ff' } : { g: 'C', c: '#ff9a40' };
 }
@@ -1116,7 +1194,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
   fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow), switch to thermal (T), center the hotspot and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
   sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. 2 rescue kits: drop one within 5 m.'],
-  track: ['Vehicle tracking', 'Keep a car driving on a real road in view for 60 s.', 'Closer than 25 m and you are spotted (no tracking time). The car changes speed and stops now and then.'],
+  track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in front of it, close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay 100 m+ behind or to the side and 40 m+ up. Headlights and brake lights at night.'],
   ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.']
 } : {
   forest: ['숲 속 좁은 길', '주 경로 옆 숲 속에 낸 좁은 길을 따라 게이트·좁은 틈·쓰러진 나무를 지나 결승까지.', '나무 사이는 2~3 m. 수관 아래(지면 3 m 이하)로 낮게 날 것.'],
@@ -1125,7 +1203,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
   fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 열화상(T)으로 불씨를 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
   sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 구조 키트 2개 · 5 m 안에 투하.'],
-  track: ['차량 추적', '실제 도로를 달리는 차량을 60초 동안 시야에 유지.', '25 m 안으로 붙으면 노출(추적 시간 안 쌓임). 차량은 속도를 바꾸고 중간에 서기도 함.'],
+  track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '차 앞쪽·가까이·낮게 있으면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 측후방 100 m 이상·고도 40 m 이상 권장. 밤에는 전조등·브레이크등이 켜짐.'],
   ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.']
 };
 function briefShow(kind, L) {
@@ -1399,7 +1477,7 @@ function commStart(kind) {
     strike: [`${CS}, CONTROL. Five vehicles in the valley, two are decoys. Positive ID by thermal before you commit. Cleared hot.`, '차량 5대 중 2대 기만체. 열화상으로 식별 후 돌입. 공격 허가.'],
     fire: [`${CS}, CONTROL. Fire watch requested. Smoke reports coming in, locate each fire, confirm with thermal and report. ${w}Over.`, '산불 감시 요청. 연기 신고가 들어옴. 직접 찾아 열화상으로 확인 후 보고.'],
     sar: (() => { const b = kind === 'sar' && SAR ? fromLaunch(SAR.area) : null; return [`${CS}, CONTROL. Missing hiker, last seen near the trail. ${b ? `Search area bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} Sweep the area, look for his pack and signal flashes, use thermal under the trees. ${n}Over.`, `실종자 수색.${b ? ` 수색 구역: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m.` : ''} 구역을 훑으며 배낭·신호 반짝임, 나무 아래는 열화상.`]; })(),
-    track: [`${CS}, CONTROL. Target vehicle on the forest road. Close in, then maintain standoff and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 접근 후 거리 유지, 60초 관측.'],
+    track: [`${CS}, CONTROL. Target vehicle on the forest road. Do not get spotted. Stay out of its front, keep high and well back, and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 들키지 말 것 · 차 앞쪽 피하고 높게, 멀찍이 뒤에서 60초 관측.'],
     ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 비행 승인. 능선 위 돌풍 주의.']
   }[kind];
   if (T) { comm(T[0], T[1]); if (isMission(kind)) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); }
@@ -1749,7 +1827,7 @@ function menuPrev(k) {
 function menuCam(dt) {
   const pv = menuPrev(MENU.ms);
   if (MENU.ms === 'track' && TRACK && MSG.track.visible) {
-    TRACK.s = (TRACK.s + 9 * dt) % Math.max(1, TRACK.total - 5); const vp = trackPose(TRACK.s); TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h;
+    TRACK.s = (TRACK.s + 9 * dt) % Math.max(1, TRACK.total - 5); TRACK.v = 9; const vp = trackPose(TRACK.s); TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; trackLights(dt, true);
     pv.f.copy(vp.p).add(new V3(0, 1, 0));
   }
   const k = 1 - Math.exp(-dt * 3.5);
@@ -2221,7 +2299,7 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 설정 ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
