@@ -224,7 +224,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .introG{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0}.introC{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:22px 20px;border-radius:12px;text-align:left;min-height:150px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(255,200,40,.14),rgba(255,200,40,.02))}.introC.vr{background:linear-gradient(135deg,rgba(79,227,255,.16),rgba(79,227,255,.02))}.introC i{font-style:normal;font-size:38px;line-height:1}.introC b{font-size:21px;margin-top:6px}.introC small{font-size:12px;opacity:.75}.introC:hover{outline:2px solid var(--amber)}.introC.vr:hover{outline-color:#4fe3ff}
 @media (max-width:560px){.introG{grid-template-columns:1fr}}
 .wzmode{flex:0 0 auto!important;cursor:pointer;background:#1d2a33!important;color:#4fe3ff!important;font-weight:700}
-.stgtog{position:absolute;right:10px;top:10px;z-index:2;display:flex;flex-direction:column;align-items:flex-end;gap:4px}.stgtog button{padding:4px 10px;font-size:12px}
+.stgtog{position:absolute;right:8px;bottom:8px;z-index:2;display:flex;align-items:center;gap:4px;padding:3px 5px;border-radius:16px;background:rgba(6,10,14,.55)}.stgtog .pics{display:flex;gap:2px}.stgtog .pics button{margin:0;padding:2px 5px;min-width:0;border:0;border-radius:12px;background:transparent;font-size:15px;line-height:1.2;opacity:.55;filter:grayscale(.6)}.stgtog .pics button.on{opacity:1;filter:none;background:rgba(255,200,40,.28);box-shadow:inset 0 0 0 1px rgba(255,200,40,.8)}.stgtog .pdiv{width:1px;height:16px;background:rgba(255,255,255,.25)}body.touch .stgtog .pics button{font-size:13px;padding:1px 4px}.stgtog button{padding:4px 10px;font-size:12px}
 .vrnote{margin:10px 0 0;padding:10px 12px;border:1px solid #4fe3ff;border-radius:8px;background:rgba(79,227,255,.08);display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px}.vrnote.hidden{display:none}#vrResume.hidden{display:none}
 #menuCard .wz{display:none}#menuCard[data-step="1"] .s1,#menuCard[data-step="2"] .s2,#menuCard[data-step="3"] .s3{display:block}
 #menuCard[data-step="1"]{max-width:620px}#menuCard[data-step="2"]{max-width:760px}
@@ -271,7 +271,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .msStageW .scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0 1px,transparent 1px 3px);box-shadow:inset 0 0 40px rgba(0,0,0,.55)}
 .msStageW .scan::before,.msStageW .scan::after{content:"";position:absolute;width:18px;height:18px;border:2px solid var(--cc);opacity:.8}
 .msStageW .scan::before{left:8px;top:8px;border-right:0;border-bottom:0}.msStageW .scan::after{right:8px;bottom:8px;border-left:0;border-top:0}
-.stag{position:absolute;left:12px;bottom:8px;font:600 10px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em;color:#fff;text-shadow:0 1px 2px #000;opacity:.9}.stag b{color:#ff4d4d}
+.stag{position:absolute;left:12px;bottom:8px;max-width:calc(100% - 200px);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:600 10px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em;color:#fff;text-shadow:0 1px 2px #000;opacity:.9}.stag b{color:#ff4d4d}
 .sno{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:12px;color:var(--mute);text-align:center;padding:10px}.sno.on{display:flex}
 .msinfo{min-width:0;display:flex;flex-direction:column}
 .msinfo .cat{font-style:normal;font-size:10px;letter-spacing:.08em;color:var(--cc)}
@@ -383,7 +383,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
           <button data-cat="strike" data-g="mission" data-ms="strike" data-ic="✕"><b>Strike</b><small>Dive into target vehicles · hit error</small></button>
         </div>
         <div id="msDetail" class="msdetail">
-          <div class="msStageW"><canvas id="msStage"></canvas><div class="stgtog"><div class="seg" id="segTime2"><button data-v="0" class="on">☀ Day</button><button data-v="2">🌇 Dusk</button><button data-v="1">☾ Night</button></div><div class="seg" id="segWx2"><button data-v="clear" class="on">Clear</button><button data-v="rain">🌧 Rain</button><button data-v="snow">❄ Snow</button></div></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
+          <div class="msStageW"><canvas id="msStage"></canvas><div class="stgtog"><div class="pics" id="segTime2"><button data-v="0" class="on" title="Day">☀️</button><button data-v="2" title="Dusk">🌇</button><button data-v="1" title="Night">🌙</button></div><i class="pdiv"></i><div class="pics" id="segWx2"><button data-v="clear" class="on" title="Clear">🌤</button><button data-v="rain" title="Rain">🌧</button><button data-v="snow" title="Snow">❄️</button></div></div><div class="scan"></div><div id="msStageTag" class="stag"></div><div id="msStageNo" class="sno"></div></div>
           <div class="msinfo"><i id="mdCat" class="cat"></i><h3 id="mdTitle"></h3><p id="mdDesc"></p><p id="mdTip" class="tip"></p><div id="mdAf" class="mdaf"></div><div id="mdMeta" class="mdmeta"></div><button id="msGo" class="primary go">Launch ▶</button><button id="msGoVR" class="go vrgo hidden">Launch in VR (Quest)</button><div id="mdWhy" class="why"></div></div>
         </div>
       </section>
@@ -620,7 +620,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=1e87ae41"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=1e87ae41"></script>
+<script src="sites/yeongin.js?v=184e7769"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=184e7769"></script>
 </body>
 </html>
