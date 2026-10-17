@@ -1768,7 +1768,7 @@ const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrScreen: 'head', vrCam: 'fpv', vrPip: 0, vrMap: true };
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -3854,6 +3854,7 @@ function msStep(prev, cur, dt) {
 }
 // 센서 시야: 앞 화면 가운데 또는 아래 카메라(수직) 시야 안
 function sensorSees(tp, cur, maxD) {
+  maxD *= wxSense();
   const d = tp.distanceTo(cur), sp = toScreen(tp), x = sp.x / innerWidth * 2 - 1, y = 1 - sp.y / innerHeight * 2;
   const front = !sp.behind && Math.abs(x) < 0.35 && Math.abs(y) < 0.45 && d > 15 && d < maxD;
   const dy = cur.y - tp.y, h = Math.hypot(tp.x - cur.x, tp.z - cur.z), nadir = dy > 6 && dy < maxD && h < dy * 0.5;
@@ -4225,7 +4226,24 @@ function wxSetup() {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); WX.snow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0.9, depthWrite: false })); WX.snow.frustumCulled = false; WX.g.add(WX.snow); }
   if (WX.rain) WX.rain.visible = wx === 'rain' && !ENV.ir; if (WX.snow) WX.snow.visible = wx === 'snow' && !ENV.ir;
 }
+// ---- 눈 쌓임: 위를 향한 면(땅·나무 윗면·지붕)을 하얗게 (쉐이더에 덧칠) ----
+const SNOW_U = { value: 0 }, SNOW = { patched: false, k: 0 };
+function snowify(m) {
+  if (!m || m.userData.snowy || !(m.isMeshStandardMaterial || m.isMeshLambertMaterial)) return; m.userData.snowy = true;
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); sh.uniforms.uSnow = SNOW_U;
+    sh.vertexShader = 'varying float vSnowN;\n' + sh.vertexShader.replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n  { vec3 snN = objectNormal;\n  #ifdef USE_INSTANCING\n  snN = mat3(instanceMatrix) * snN;\n  #endif\n  vSnowN = normalize(mat3(modelMatrix) * snN).y; }');
+    sh.fragmentShader = 'uniform float uSnow; varying float vSnowN;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.83, 0.87), uSnow * smoothstep(0.45, 0.92, vSnowN));'); };
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => ''; m.customProgramCacheKey = () => ck() + '|snow'; m.needsUpdate = true;
+}
+function snowPatch() {   // 처음 눈이 올 때 한 번: 장면의 지형·나무·건물 재질에 덧칠 (드론·하늘 제외)
+  if (SNOW.patched) return; SNOW.patched = true;
+  const skip = new Set(); [droneM && droneM.g, ghostM && ghostM.g, sky].forEach(o => o && o.traverse(c => skip.add(c)));
+  scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !skip.has(o) && o !== GRASS) (Array.isArray(o.material) ? o.material : [o.material]).forEach(snowify); });
+}
 function wxTick(dt) {
+  // 눈: 몇 초에 걸쳐 쌓이고, 그치면 서서히 녹음 · 풀은 눈 속에 묻힘
+  { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 6, dt / 6); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
   if (!WX.g || (ENV.wx || 'clear') === 'clear') return;
   const c = (S.state === 'replay' && RP.pose) ? RP.pose.p : DR.p; WX.g.position.set(c.x, c.y, c.z);
   const wv = windAt(c), B = WX.B, H = WX.H, half = B / 2, t = performance.now() / 1000;
@@ -4238,6 +4256,8 @@ function wxTick(dt) {
     WX.snow.geometry.attributes.position.needsUpdate = true; }
 }
 function setTod(v) { SET.tod = v; SET.night = v === 'night'; ENV.night = SET.night; ENV.dusk = v === 'dusk'; saveSet(); if (ENV.ir) irSet(false); envApply(); syncTime(); }
+function setWxFx(on) { SET.wxFx = !!on; saveSet(); syncTime(); if (S.state === 'run') showMsg(on ? L2('기상 영향 켬 · 돌풍·시야 감소', 'Weather effects on · gusts, reduced visibility') : L2('기상 영향 끔', 'Weather effects off'), '#4fe3ff', 1.2); }
+document.querySelectorAll('#segWxFx button').forEach(b => b.addEventListener('click', () => setWxFx(b.dataset.v === '1')));
 function setWx(v) { SET.wx = v; ENV.wx = v; saveSet(); envApply(); syncTime(); }
 document.querySelectorAll('#segWx button, #segWx2 button').forEach(b => b.addEventListener('click', () => setWx(b.dataset.v)));
 document.querySelectorAll('#segTime button, #segTime2 button').forEach(b => b.addEventListener('click', () => setTod(b.dataset.v === '1' ? 'night' : b.dataset.v === '2' ? 'dusk' : 'day')));
@@ -4248,7 +4268,7 @@ syncExpo();
 function syncHud() { document.querySelectorAll('#segHud button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.hud || 'auto'))); }
 document.querySelectorAll('#segHud button').forEach(b => b.addEventListener('click', () => { SET.hud = b.dataset.v; saveSet(); syncHud(); }));
 syncHud();
-function syncTime() { const tv = SET.tod === 'night' ? '1' : SET.tod === 'dusk' ? '2' : '0'; document.querySelectorAll('#segTime button, #segTime2 button').forEach(x => x.classList.toggle('on', x.dataset.v === tv)); document.querySelectorAll('#segWx button, #segWx2 button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.wx || 'clear'))); }
+function syncTime() { const tv = SET.tod === 'night' ? '1' : SET.tod === 'dusk' ? '2' : '0'; document.querySelectorAll('#segTime button, #segTime2 button').forEach(x => x.classList.toggle('on', x.dataset.v === tv)); document.querySelectorAll('#segWx button, #segWx2 button').forEach(x => x.classList.toggle('on', x.dataset.v === (SET.wx || 'clear'))); document.querySelectorAll('#segWxFx button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.wxFx)); }
 envApply(); syncTime();
 
 
@@ -4258,19 +4278,22 @@ envApply(); syncTime();
 // 바람: 서북서에서 불어옴. 높이(로그 분포)·능선 노출·돌풍 반영
 const WIND = { lv: SET.wind || 0, dir: new V3(Math.sin(112 * DEG), 0, -Math.cos(112 * DEG)), t: 0 };
 const _wv = new V3();
+function wxFxOn() { return !!SET.wxFx && (ENV.wx === 'rain' || ENV.wx === 'snow'); }
+// 기상 영향(옵션): 비·눈이면 바람이 없어도 돌풍이 불고, 가끔 강한 돌풍이 지나감 · 눈·카메라 탐지 거리 줄어듦
+function wxSense() { return !wxFxOn() ? 1 : ENV.wx === 'snow' ? (ENV.ir ? 0.8 : 0.6) : (ENV.ir ? 0.85 : 0.72); }
 function windAt(p) {
-  if (!WIND.lv || !TER.h) return _wv.set(0, 0, 0);
-  const base = WIND.lv === 1 ? 3 : 7, g0 = terrainAt(p.x, p.z), agl = Math.max(0.5, p.y - g0);
+  const fx = wxFxOn(); if ((!WIND.lv && !fx) || !TER.h) return _wv.set(0, 0, 0);
+  const base = Math.max(WIND.lv === 1 ? 3 : WIND.lv === 2 ? 7 : 0, fx ? (ENV.wx === 'snow' ? 3.5 : 2.5) : 0), g0 = terrainAt(p.x, p.z), agl = Math.max(0.5, p.y - g0);
   const prof = clamp(Math.log((agl + 1) / 0.4) / Math.log(40 / 0.4), 0.15, 1.25);
   const m = (terrainAt(p.x + 90, p.z) + terrainAt(p.x - 90, p.z) + terrainAt(p.x, p.z + 90) + terrainAt(p.x, p.z - 90)) / 4;
   const expo = clamp(1 + (g0 - m) / 45, 0.55, 1.6);
-  const t = WIND.t, gust = 1 + 0.28 * Math.sin(t * 0.9 + p.x * 0.01) * Math.sin(t * 0.37) + 0.12 * Math.sin(t * 2.3 + p.z * 0.02);
+  const t = WIND.t, gf = fx ? 1.9 : 1, burst = fx ? Math.max(0, Math.sin(t * 0.13 + 1.7)) ** 12 * 1.4 : 0, gust = 1 + gf * (0.28 * Math.sin(t * 0.9 + p.x * 0.01) * Math.sin(t * 0.37) + 0.12 * Math.sin(t * 2.3 + p.z * 0.02)) + burst;
   const sw = 0.18 * Math.sin(t * 0.21);   // 방향 흔들림
   const c = Math.cos(sw), s = Math.sin(sw), dx = WIND.dir.x * c - WIND.dir.z * s, dz = WIND.dir.x * s + WIND.dir.z * c;
   const k = base * prof * expo * gust; return _wv.set(dx * k, 0, dz * k);
 }
 function windOsd(p) {
-  if (!WIND.lv || !TER.h) return '';
+  if ((!WIND.lv && !wxFxOn()) || !TER.h) return '';
   const w = windAt(p), sp = Math.hypot(w.x, w.z), rel = wrapA(Math.atan2(w.x, -w.z) - DR.h);
   return `<div><b>WIND</b>${sp.toFixed(1)} m/s <span style="display:inline-block;transform:rotate(${(rel / DEG).toFixed(0)}deg)">↑</span></div>`;
 }
@@ -5374,7 +5397,7 @@ function vrMenuDraw() {
   row(y, L2('카메라', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('하부 카메라', 'Lower cam')); [[0, L2('끔', 'Off')], [90, '90°'], [60, '60°'], [45, '45°']].forEach(([v, n], i) => btn('pip:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrPip | 0) === v)); y += RH;
   row(y, L2('시간대', 'Time')); [['day', L2('낮', 'Day'), SET.tod === 'day' && !ENV.ir], ['dusk', L2('해질녘', 'Dusk'), SET.tod === 'dusk' && !ENV.ir], ['night', L2('밤', 'Night'), SET.tod === 'night' && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
-  row(y, L2('날씨', 'Weather')); [['clear', L2('맑음', 'Clear')], ['rain', L2('비', 'Rain')], ['snow', L2('눈', 'Snow')]].forEach(([v, n], i) => btn('wx:' + v, 190 + i * 200, y, 188, RW, n, (SET.wx || 'clear') === v)); y += RH;
+  row(y, L2('날씨', 'Weather')); [['clear', L2('맑음', 'Clear')], ['rain', L2('비', 'Rain')], ['snow', L2('눈', 'Snow')]].forEach(([v, n], i) => btn('wx:' + v, 190 + i * 200, y, 188, RW, n, (SET.wx || 'clear') === v)); btn('wxfx', 790, y, 188, RW, L2('기상 영향 ', 'Effects ') + (SET.wxFx ? L2('켬', 'on') : L2('끔', 'off')), !!SET.wxFx); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
   btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
   row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
@@ -5388,7 +5411,7 @@ function vrMenuDraw() {
   g.fillText(L2('무전 음성: ', 'Radio voice: ') + (eng === 'natural' ? L2('자연 음성', 'natural voice') + (COMM.rvOk ? '' : '') : eng === 'synth' ? L2('내장 합성기', 'built-in synthesizer') + (TTSW.w ? '' : L2(' (불러오는 중)', ' (loading)')) : eng === 'web' ? vi.name : L2('없음 · 자막만', 'none · subtitles only')) + (COMM.fbOk || COMM.rvOk ? ' ✓' : '') + L2(' · 오디오 ', ' · audio ') + au + (COMM.fbErr ? ' · ' + String(COMM.fbErr).slice(0, 40) : ''), 36, y + 78);
   btn('vtest', 36, H2 - 76, 300, 56, L2('🔊 음성 테스트', '🔊 Voice test'), false);
   btn('exit', W2 - 380, H2 - 76, 344, 56, '⏹ ' + L2('임무 끝내기 · 웹 메뉴로', 'End mission · web menu'), false);
-  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR19', 360, H2 - 56);
+  g.fillStyle = 'rgba(255,255,255,.3)'; g.font = '500 16px monospace'; g.fillText('VR20', 360, H2 - 56);
   P.tex.needsUpdate = true;
 }
 const _vr = new THREE.Raycaster(), _vp = new V3(), _vq = new THREE.Quaternion();
@@ -5421,6 +5444,7 @@ function vrMenuClick(hand) {
   if (id.startsWith('expo:')) { SET.expo = id.slice(5); saveSet(); syncExpo(); return; }
   if (id.startsWith('hud:')) { SET.hud = id.slice(4); saveSet(); syncHud(); return; }
   if (id.startsWith('pip:')) { SET.vrPip = +id.slice(4); saveSet(); return; }
+  if (id === 'wxfx') { setWxFx(!SET.wxFx); return; }
   if (id.startsWith('wx:')) { setWx(id.slice(3)); return; }
   if (id.startsWith('env:')) { vrEnv(id.slice(4)); return; }
   if (id.startsWith('af:')) { if (S.state === 'pause') return; setAirframe(id.slice(3)); afUI(); return; }
@@ -5576,5 +5600,5 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 })();
