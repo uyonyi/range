@@ -598,7 +598,17 @@ function drawMapBg() {
 }
 drawMapBg(); MAP_CACHE.course = mapBg;
 // 지도 범위: 코스 = 코스 둘레 / 임무 = 그 임무의 사건·구역이 다 들어오게 (배경은 한 번 만들어 둠)
+// 지도 크게 보기: 지도 누르기(클릭·탭)·J 키·VR 메뉴 → 비행 구역 전체를 크게 · 다시 누르면 원래대로
+const MAPZ = { on: false, keep: null };
+function mapZoom(on) {
+  if (on === MAPZ.on) return;
+  if (on) { MAPZ.keep = { bg: mapBg, V: MAPV }; mapView('area', [[-FLY_C.z, FLY_C.x, FLY_R + 30]]); }
+  else if (MAPZ.keep) { mapBg = MAPZ.keep.bg; MAPV = MAPZ.keep.V; MAPZ.keep = null; }
+  MAPZ.on = on; ui.map.classList.toggle('big', on);
+}
+ui.map.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); mapZoom(!MAPZ.on); });
 function mapView(key, pts, once) {
+  if (MAPZ.on && key !== 'area') { MAPZ.on = false; MAPZ.keep = null; ui.map.classList.remove('big'); }   // 새 비행이 시작되면 기본 지도로
   if (!pts || !pts.length) key = 'course';
   if (MAP_CACHE[key] && !once) { mapBg = MAP_CACHE[key]; MAPV = MAP_CACHE[key].V; return; }
   let d0 = 1e9, d1 = -1e9, s0 = 1e9, s1 = -1e9;
@@ -789,6 +799,7 @@ function handleKeys() {
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
+    else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }
     else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('조명 켬', 'LIGHT ON') : L2x('조명 끔', 'LIGHT OFF'), '#ffe9a0', 0.9); }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
     else if (k === 'KeyH') { SET.assist = !SET.assist; saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }

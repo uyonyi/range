@@ -340,6 +340,7 @@ $('kbClose').onclick = () => { KBCAP = null; $('kbPanel').classList.add('hidden'
 const KB_SHORT = { up: '상승', down: '하강', yawL: '좌회전', yawR: '우회전', fwd: '전진', back: '후진', left: '좌이동', right: '우이동', drop: '투하', boost: '부스트', cam: '카메라', zoom: '거리', reset: '다시', assist: '보조' };
 const KB_GROUP = { up: 'alt', down: 'alt', yawL: 'alt', yawR: 'alt', fwd: 'mov', back: 'mov', left: 'mov', right: 'mov', boost: 'bst' };
 const KB_FIXED = { KeyF: '전체화면', KeyV: '가이드', KeyX: '아래캠', KeyB: '음악', KeyN: '건너뛰기', KeyT: '열화상', KeyM: '소리', KeyL: '조명', KeyP: '경로선', Escape: '정지' };
+KB_FIXED.KeyJ = L2x('지도 크게', 'Big map'); if (!KB_RESERVED.includes('KeyJ')) KB_RESERVED.push('KeyJ');
 function renderKbd(el) {
   if (!el) return;
   const act = {}; Object.keys(KB).forEach(k => { if (KB[k]) act[KB[k]] = k; });

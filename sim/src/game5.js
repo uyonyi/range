@@ -359,7 +359,7 @@ function passCP(label, q, hw, y0, y1, ring) {
   const c = W(q.d, q.s, 0), n = wdir(q), r = new V3(-n.z, 0, n.x);
   const mid = c.clone().add(new V3(0, (y0 + y1) / 2, 0));
   return { kind: 'ms', t: 'pass', label, c, n, r, hw, y0, y1, ring, mk: mid.clone(),
-    pts(p) { return [p.clone(), mid.clone().addScaledVector(n, -6), mid.clone(), mid.clone().addScaledVector(n, 3)]; } };
+    pts(p) { const ld = guideLead(), cc = this.ring ? this.c : mid, bf = p.clone().sub(cc).dot(n); return bf < -ld - 2 ? [p.clone(), cc.clone().addScaledVector(n, -ld), cc.clone(), cc.clone().addScaledVector(n, 3)] : [p.clone(), cc.clone(), cc.clone().addScaledVector(n, 3)]; } };
 }
 // 레이스 링
 const RACE = (function () {
@@ -1131,7 +1131,7 @@ const RIDGE = (function () {
   cps.forEach(c => { const l = Math.hypot(c.q.td, c.q.ts) || 1; c.q.td /= l; c.q.ts /= l; });
   const g = new THREE.Group(); MSG.ridge = MSG.ridge || new THREE.Group(); scene.add(MSG.ridge); MSG.ridge.visible = false; MSG.ridge.add(g);
   const list = cps.map((c, i) => { const cp = passCP(c.top ? `정상 (해발 ${(mx + SITE.base).toFixed(0)} m)` : '능선 ' + (i + 1), c.q, 0, 15, 15, 4); cp.q = c.q; cp.alt = 15;
-    const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 8, 40), mat(c.top ? 0xff4d4d : 0x4fe3ff, { emissive: c.top ? 0x330000 : 0x002233, roughness: 0.4 })); g.add(tor); cp.mesh = tor; return cp; });
+    const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 8, 40), mat(c.top ? 0xff4d4d : 0x4fe3ff, { emissive: c.top ? 0x330000 : 0x002233, roughness: 0.4 })); g.add(tor); cp.mesh = tor; ringDecor(cp); return cp; });
   const flag = new THREE.Mesh(UBOX, mat(0xff4d4d)); const tw = W(ds(top % n, (top / n) | 0)[0], ds(top % n, (top / n) | 0)[1], 0); flag.position.copy(tw).add(new V3(0, 3, 0)); flag.scale.set(0.08, 6, 0.08); g.add(flag);
   return { list, top: mx + SITE.base, len: all.length * st };
 })();
@@ -1161,7 +1161,7 @@ function scenStart(kind, a) {
       const L = P.map(([t, w, dt0, dw], i) => { const q = RWY.at(t, w), dx = RWY.ux * dt0 - RWY.uz * dw * 0, dz = RWY.uz * dt0 + RWY.ux * dw * 0;
         let tx = dt0 ? RWY.ux * dt0 : -RWY.uz * dw, tz = dt0 ? RWY.uz * dt0 : RWY.ux * dw; if (i === 1) { tx = -RWY.uz * side; tz = RWY.ux * side; }
         const cp = passCP(names[i], { d: -q.z, s: q.x, td: -tz, ts: tx }, 0, i === 3 ? 25 : 40, i === 3 ? 25 : 40, 14); cp.c = cp.mk.clone();   // 링 판정은 링 중심 기준
-        const tor = new THREE.Mesh(new THREE.TorusGeometry(14, 0.35, 8, 48), mat(0xffc828, { emissive: 0x332200 })); tor.position.copy(cp.mk); tor.lookAt(cp.mk.clone().add(cp.n)); MSG.field.add(tor); return cp; });
+        const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.025, 8, 48), mat(0xffc828, { emissive: 0x332200 })); tor.scale.setScalar(14); tor.position.copy(cp.mk); tor.lookAt(cp.mk.clone().add(cp.n)); MSG.field.add(tor); cp.mesh = tor; ringDecor(cp); return cp; });
       L.push(rtbObj(a)); return L;
     }
     const pl = (i, lab) => { const p = RWY.pads[i]; return { kind: 'ms', t: 'padland', label: lab, pad: p, mk: p.clone().setY(p.y + 3), pts(q) { return [q.clone(), this.pad.clone().setY(Math.max(q.y, this.pad.y + 6)), this.pad.clone().setY(this.pad.y + 1)]; } }; };
@@ -1224,6 +1224,7 @@ function scenTick(dt) {
   }
   if (TRACK && MSG.track && MSG.track.visible) trackLights(S.state === 'pause' ? 0 : dt, !!TRACK.go);
   if (S.kind === 'sar' && SAR) sarWave(dt);
+  ringsTick();
 }
 // 조난자: 드론이 70 m 안에 오면 팔을 들어 흔듦 (발견 뒤에도 계속)
 function sarWave(dt) {
@@ -1231,6 +1232,20 @@ function sarWave(dt) {
   const near = S.state === 'run' && DR.p.distanceTo(SAR.c) < 70; SAR.wave += ((near ? 1 : 0) - SAR.wave) * Math.min(1, dt * 2.5);
   const t = performance.now() / 1000, w = SAR.wave;
   SAR.arm.rotation.z = (Math.PI / 2 + 0.2) * (1 - w) + 0.15 * w; SAR.arm.rotation.x = w * Math.sin(t * 7) * 0.55;
+}
+// 링 통과 방향 표시: 들어갈 면 = 초록 막 · 반대 면 = 빨강 · 링을 꿰뚫는 화살표(»)가 진행 방향으로 흐름 (링 로컬: +Z = 통과 방향)
+function chevGeo() { if (chevGeo.g) return chevGeo.g; const g = new THREE.BufferGeometry(), v = [-0.32, 0, -0.12, 0, 0, 0.16, 0, 0, 0.04, -0.32, 0, -0.12, 0, 0, 0.04, -0.32, 0, -0.24, 0.32, 0, -0.12, 0, 0, 0.04, 0, 0, 0.16, 0.32, 0, -0.12, 0.32, 0, -0.24, 0, 0, 0.04];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); return (chevGeo.g = g); }   // 링 만들 때(로드 중) 쓰이므로 함수로
+function ringDecor(cp) {
+  const m = cp.mesh; if (!m || cp.decor) return; const D = new THREE.Group(); m.add(D); cp.decor = D;
+  const ent = new THREE.Mesh(new THREE.CircleGeometry(0.93, 32), new THREE.MeshBasicMaterial({ color: 0x40ff80, transparent: true, opacity: 0.16, side: THREE.FrontSide, depthWrite: false })); ent.rotation.y = Math.PI; D.add(ent);
+  const bad = new THREE.Mesh(new THREE.CircleGeometry(0.93, 32), new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: 0.22, side: THREE.FrontSide, depthWrite: false })); D.add(bad);
+  cp.chev = []; for (let k = 0; k < 4; k++) { const c = new THREE.Mesh(chevGeo(), new THREE.MeshBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })); c.scale.setScalar(1.3); D.add(c); cp.chev.push(c); }
+}
+function ringsTick() {   // 지난 링은 감추고, 지금·다음 링에만 방향 표시
+  if (!isMission() || !MS.list) return; const t = S.simT;
+  MS.list.forEach((o, i) => { if (!o.mesh) return; o.mesh.visible = !o.done; if (!o.decor) return; const show = !o.done && i <= MS.idx + 1; o.decor.visible = show; if (!show) return;
+    const cur = i === MS.idx; o.chev.forEach((c, k) => { const u = ((t * 0.6 + k / o.chev.length) % 1); c.position.set(0, 0, -2.2 + u * 3.2); c.material.opacity = (cur ? 0.95 : 0.45) * Math.sin(u * Math.PI); }); });
 }
 // 구조 키트가 땅에 닿았을 때
 function sarKit(pos) {
@@ -2241,7 +2256,7 @@ function vrMenuDraw() {
   row(y, L2('시간대', 'Time')); [['day', L2('낮', 'Day'), SET.tod === 'day' && !ENV.ir], ['dusk', L2('해질녘', 'Dusk'), SET.tod === 'dusk' && !ENV.ir], ['night', L2('밤', 'Night'), SET.tod === 'night' && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('날씨', 'Weather')); [['clear', L2('맑음', 'Clear')], ['rain', L2('비', 'Rain')], ['snow', L2('눈', 'Snow')]].forEach(([v, n], i) => btn('wx:' + v, 190 + i * 200, y, 188, RW, n, (SET.wx || 'clear') === v)); btn('wxfx', 790, y, 188, RW, L2('기상 영향 ', 'Effects ') + (SET.wxFx ? L2('켬', 'on') : L2('끔', 'off')), !!SET.wxFx); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
-  btn('map', 590, y, 188, RW, L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
+  btn('map', 590, y, 188, RW, SET.vrMap === false ? L2('지도 끔', 'Map off') : MAPZ.on ? L2('지도 전체', 'Map: all') : L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
   row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
   row(y, L2('계기', 'Instruments')); [['auto', L2('자동', 'Auto')], ['fpv', L2('간단 (FPV)', 'Simple (FPV)')], ['uas', L2('항공 (UAS)', 'Aviation (UAS)')]].forEach(([v, n], i) => btn('hud:' + v, 190 + i * 200, y, 188, RW, n + (v === 'auto' ? ' · ' + (hudMode() === 'uas' ? 'UAS' : 'FPV') : ''), (SET.hud || 'auto') === v)); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
@@ -2276,7 +2291,7 @@ function vrMenuClick(hand) {
   if (id === 'vtest') { vrVoiceTest(); return; }
   if (id === 'replay') { if (REC) LAST_REC = recFinish(); XR.menu = false; replayStart(LAST_REC, 'menu'); vrApplyCam(); if (SET.vrCam !== 'chase' && S.cam !== 0) S.cam = 0; return; }
   if (id === 'video') { if (REC) LAST_REC = recFinish(); XR.afterExit = 'video'; vrStop(); return; }
-  if (id === 'map') { SET.vrMap = SET.vrMap === false; saveSet(); return; }
+  if (id === 'map') { if (SET.vrMap === false) { SET.vrMap = true; mapZoom(false); } else if (!MAPZ.on) mapZoom(true); else { mapZoom(false); SET.vrMap = false; } saveSet(); return; }   // 지도 → 전체 → 끔
   if (id === 'guide') { SET.guide = !SET.guide; saveSet(); return; }
   if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); return; }
   if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
