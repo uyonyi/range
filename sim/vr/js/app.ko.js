@@ -4075,9 +4075,10 @@ function passCross(o, prev, cur) {
   const h = x.y - terrainAt(x.x, x.z); return Math.abs(lat) <= o.hw && h >= o.y0 && h <= o.y1;
 }
 // 통과점 하나만 실패로 두고 다음 목표로
+const RACE_PEN = 8;   // 레이스: 놓친 링 하나당 +8 s
 function msSkip() {
   const o = msObj(); if (!o) return;
-  o.done = true; o.miss = true; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
+  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
   comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
@@ -4086,12 +4087,13 @@ function msSkip() {
 function msStep(prev, cur, dt) {
   const o = msObj(); if (!o || !DR.alive) return;
   if (o.t === 'pass') {
-    // 숲길·능선: 놓치고 지나가면 그 통과점만 실패(✗)로 두고 다음으로 (레이스는 되돌아와야 함)
-    if (S.kind !== 'race') {
+    /* 숲길·능선·레이스: 놓치고 지나가면 그 통과점만 실패(✗)로 두고 다음으로 (레이스는 링마다 +벌점) */
+    {
       for (let j = MS.idx + 1; j <= Math.min(MS.idx + 2, MS.list.length - 1); j++) {
         const q = MS.list[j]; if (q.t !== 'pass' || passCross(q, prev, cur) !== true) continue;
         const missed = []; for (let k = MS.idx; k < j; k++) if (!MS.list[k].done) { MS.list[k].miss = true; missed.push(MS.list[k].label); }
         for (let k = MS.idx; k < j; k++) MS.list[k].done = true;
+        if (S.kind === 'race') S.pen += RACE_PEN * missed.length;
         MS.idx = j; comm(`${CS}, CONTROL. You missed a checkpoint. Press on.`, `${missed.join(', ')} 실패 · 계속 진행`);
         msNext(`${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40'); return;
       }
@@ -4327,6 +4329,7 @@ function msFinish() {
     if (S.kind === 'sar' && S.kitErr !== undefined) rows.push(['키트 오차', S.kitErr.toFixed(1) + ' m']);
     if (S.kind === 'field' && S.padErr && S.padErr.length) rows.push([L2('착륙 오차', 'Landing error'), S.padErr.map(e => e.toFixed(2)).join(' / ') + ' m']);
     if (S.kind === 'track') rows.push(['추적 유지', S.trT.toFixed(0) + ' / ' + S.trWin.toFixed(0) + ' s'], [L2('최대 노출', 'Peak exposure'), Math.round(TRACK.susMax || 0) + '%'], [L2('발각', 'Spotted'), TRACK.burn ? L2('예 (-30)', 'yes (-30)') : L2('아니오', 'no')], ['판정', S.trackOK ? '성공' : '실패']);
+    if (S.kind === 'race') rows.push([L2('놓친 링', 'Missed rings'), MS.list.filter(x => x.miss).length + ' / ' + MS.list.length + L2(' (링당 +8 s)', ' (+8 s each)')]);
     if (S.kind === 'ridge' && RIDGE) rows.push(['정상 해발', RIDGE.top.toFixed(0) + ' m']);
     if (S.kind === 'fire') (S.fireRep || []).forEach((xy, i) => xy && rows.push(['불씨 ' + (i + 1) + ' (EPSG:5186)', xy[0].toFixed(0) + ', ' + xy[1].toFixed(0)]));
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
@@ -4954,7 +4957,7 @@ function radio(text) { const el = $('radio'); if (!el) return; el.innerHTML = '<
 // 브리핑
 const BRIEF = window.SIM_LANG === 'en' ? {
   forest: ['Forest trail', 'Follow a narrow trail cut through the forest beside the main route: gates, tight gaps and fallen trunks to the finish.', 'Trees are 2–3 m apart. Stay low, under the canopy (below 3 m AGL).'],
-  race: ['Valley time race', 'Fly through the rings along the valley, in order, as fast as you can.', 'Boost (BST) takes you to the airframe top speed. Miss a ring and you must come back through it.'],
+  race: ['Valley time race', 'Fly through the rings along the valley, in order, as fast as you can.', 'Boost (BST) takes you to the airframe top speed. Miss a ring and it is skipped with an 8 s penalty.'],
   recon: ['Building recon', 'Find and photograph 4 random real buildings from the topo map.', 'Hold each building centered on screen or in the belly cam for 1.5 s. Targets change every run.'],
   strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
   fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow), switch to thermal (T), center the hotspot and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
@@ -4964,7 +4967,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   field: ['Field airstrip', 'Runway, taxiway and three H pads. Quads hop between the pads with precise landings; fixed wings fly a traffic pattern and land.', 'Land within 1.5 m of the pad centre, gently. Wings: take off, fly the pattern rings, land on the runway.']
 } : {
   forest: ['숲 속 좁은 길', '주 경로 옆 숲 속에 낸 좁은 길을 따라 게이트·좁은 틈·쓰러진 나무를 지나 결승까지.', '나무 사이는 2~3 m. 수관 아래(지면 3 m 이하)로 낮게 날 것.'],
-  race: ['계곡 타임 레이스', '계곡을 따라 놓인 링을 순서대로 최단 시간에 통과.', '부스트(BST)로 기체 최고 속도까지. 링을 빗나가면 되돌아와 다시 통과.'],
+  race: ['계곡 타임 레이스', '계곡을 따라 놓인 링을 순서대로 최단 시간에 통과.', '부스트(BST)로 기체 최고 속도까지. 링을 놓치면 다음 링으로 넘어가며 1개당 +8초 벌점.'],
   recon: ['건물 정찰', '수치지형도에 있는 실제 건물 중 무작위 4곳을 찾아 촬영.', '건물을 화면 가운데나 아래 카메라에 1.5초 담기. 매번 대상이 바뀜.'],
   strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
   fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 열화상(T)으로 불씨를 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
