@@ -5,7 +5,7 @@
 import json, base64, re, sys, os, shutil
 from en import EN
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
-FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game4.js', 'game5.js']
+FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game4.js', 'game5.js', 'game6.js']
 TITLES = {
     'public': {'TITLE': 'FPV Terrain Trainer', 'H1': 'FPV TERRAIN TRAINER',
                'H2': {'ko': '실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)', 'en': 'Real-terrain drone obstacle course · web simulator (prototype v0.5)'}},
