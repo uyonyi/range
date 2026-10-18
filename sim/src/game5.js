@@ -24,7 +24,8 @@ const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: 
 if (!AF[SET.af]) SET.af = 'x2d';
 const MS_NAME = { forest: '숲길 통과', race: '타임 레이스', recon: '정찰', strike: '타격', fire: '산불 감시', sar: '수색·구조', track: '차량 추적', ridge: '능선 종주' };
 function AFc() { return AF[SET.af] || AF.x2d; }
-function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' || k === 'recon' || k === 'strike' || k === 'fire' || k === 'sar' || k === 'track' || k === 'ridge'; }
+function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' || k === 'recon' || k === 'strike' || k === 'fire' || k === 'sar' || k === 'track' || k === 'ridge' || k === 'field'; }
+MS_OK.field = ['x2d', 'anafi', 'fpv', 'fw', 'puma']; MS_NAME.field = window.SIM_LANG === 'en' ? 'Field airstrip' : '야전 착륙장';
 // 난이도 + 기체 -> 비행 특성
 function effMode() {
   const m = MODES[SET.diff], a = AFc(); if (a.id === 'x2d') return m;
@@ -247,8 +248,24 @@ const RWY = (function () {
     for (let t = -L / 2; t <= L / 2 + 0.1; t += 13) for (const w of [-Wd / 2 - 0.6, Wd / 2 + 0.6]) { const q = at(t, w); const m = new THREE.Mesh(USPH, Math.abs(t + L / 2) < 1 ? lg : Math.abs(t - L / 2) < 1 ? lr : lw); m.scale.setScalar(0.16); m.position.set(q.x, groundAt(q.x, q.z) + 0.3, q.z); g.add(m); }
     const ws = at(-L / 2 + 15, Wd / 2 + 8), wy = groundAt(ws.x, ws.z), pole = new THREE.Mesh(UCYL, mat(0xd8d8d8)); pole.scale.set(0.05, 4, 0.05); pole.position.set(ws.x, wy + 2, ws.z); g.add(pole);
     const sock = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.8, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0xff7a1a, side: THREE.DoubleSide, roughness: 0.8 })); sock.position.set(ws.x, wy + 3.8, ws.z); g.add(sock);
-    window.__RWY = { a: at(-L / 2, 0), b: at(L / 2, 0) };
-    return { cx, cz, h, ux, uz, L, Wd, at, g, sock };
+    // 야전 착륙장: 활주로 옆 계류장(쿼드 H 패드 3개) + 유도로 · 평탄한 쪽으로
+    const flat = sg => { let mx = -1e9, mn = 1e9; for (let t = -22; t <= 22; t += 6) for (let w = 0; w <= 46; w += 6) { const q = at(t, sg * (Wd / 2 + 8 + w)), y = groundAt(q.x, q.z); mx = Math.max(mx, y); mn = Math.min(mn, y); _rv.set(q.x, y + 2, q.z); if (collide(_rv, 1.5)) return 1e9; } return mx - mn; };
+    const sg = flat(1) <= flat(-1) ? 1 : -1, AW = 20, AL = 40, aw0 = Wd / 2 + 30, ac = at(0, sg * (aw0 + AW / 2));
+    STREES.hideRect && STREES.hideRect(ac.x, ac.z, ux, uz, AL + 16, AW + 16); { const tw = at(0, sg * (Wd / 2 + 15)); STREES.hideRect && STREES.hideRect(tw.x, tw.z, -uz * sg, ux * sg, 34, 14); }
+    const deck = (t0, t1, w0, w1, nt, nw, mtl, lift) => { const gg = new THREE.PlaneGeometry(1, 1, nw, nt), pa = gg.attributes.position;
+      for (let i = 0; i < pa.count; i++) { const u = pa.getX(i) + 0.5, v = pa.getY(i) + 0.5, q = at(t0 + (t1 - t0) * v, w0 + (w1 - w0) * u); pa.setXYZ(i, q.x, groundAt(q.x, q.z) + lift, q.z); }
+      gg.computeVertexNormals(); const m = new THREE.Mesh(gg, mtl); m.receiveShadow = true; g.add(m); return m; };
+    const concM = new THREE.MeshStandardMaterial({ color: 0x8d8d86, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+    const taxM = new THREE.MeshStandardMaterial({ color: 0x45474a, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
+    deck(-AL / 2, AL / 2, sg * aw0, sg * (aw0 + AW), 8, 4, concM, 0.08);                         // 계류장
+    deck(-3, 3, sg * (Wd / 2 - 0.5), sg * (aw0 + 0.5), 1, 6, taxM, 0.075);                     // 유도로
+    const yl = new THREE.MeshBasicMaterial({ color: 0xf2c230 }); for (let w = Wd / 2 + 1; w < aw0; w += 3) { const q = at(0, sg * w); const m = new THREE.Mesh(UBOX, yl); m.scale.set(0.25, 0.03, 1.6); m.position.set(q.x, groundAt(q.x, q.z) + 0.1, q.z); m.rotation.y = -h + Math.PI / 2; g.add(m); }   // 유도로 노란 중앙선
+    const padTex = n => { const c = document.createElement('canvas'); c.width = c.height = 256; const x2 = c.getContext('2d'); x2.fillStyle = '#2f3134'; x2.beginPath(); x2.arc(128, 128, 126, 0, 6.283); x2.fill(); x2.strokeStyle = '#f0f0ea'; x2.lineWidth = 10; x2.beginPath(); x2.arc(128, 128, 112, 0, 6.283); x2.stroke();
+      x2.fillStyle = '#f0f0ea'; x2.font = 'bold 150px sans-serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('H', 128, 136); x2.fillStyle = '#f2c230'; x2.font = 'bold 40px sans-serif'; x2.fillText(String(n), 200, 60); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; };
+    const pads = [-13, 0, 13].map((t, i) => { const q = at(t, sg * (aw0 + AW / 2)); q.y = groundAt(q.x, q.z); let top = q.y; for (const [dx, dz] of [[2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6], [1.8, 1.8], [-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8]]) top = Math.max(top, groundAt(q.x + dx, q.z + dz)); const m = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshStandardMaterial({ map: padTex(i + 1), roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -4 }));
+      m.rotation.x = -Math.PI / 2; m.rotation.z = -h; m.position.set(q.x, top + 0.16, q.z); /* 패드는 바닥면보다 위로 */ m.receiveShadow = true; g.add(m); return q; });
+    window.__RWY = { a: at(-L / 2, 0), b: at(L / 2, 0), apron: [at(-AL / 2, sg * aw0), at(AL / 2, sg * aw0), at(AL / 2, sg * (aw0 + AW)), at(-AL / 2, sg * (aw0 + AW))], pads };
+    return { cx, cz, h, ux, uz, L, Wd, at, g, sock, pads, sg };
   } catch (e) { console.warn('runway', e); return null; }
 })();
 // 활주로가 생기기 전에 그려 둔 코스 지도에 다시 그려 넣음
@@ -388,6 +405,7 @@ function msObj() { return MS.list[MS.idx] || null; }
 function missionMapPts(kind, run) {   // run: 이번 비행에 정해진 위치만 (산불·수색·정찰·추적은 매번 다름)
   const P = [], add = (p, r) => { if (p) P.push([-p.z, p.x, r || 0]); }, st = startPos(); add(st, 30);
   if (RWY && AFc().cls === 'wing' && !AFc().kam) { add(RWY.at(-RWY.L / 2 - 120, 0), 20); add(RWY.at(RWY.L / 2, 0), 20); }   // 고정익: 활주로·접근로
+  if (kind === 'field' && RWY) { if (AFc().cls === 'wing') { add(RWY.at(-RWY.L / 2 - 250, 0), 30); add(RWY.at(RWY.L / 2 + 190, -RWY.sg * 220), 30); } RWY.pads.forEach(p => add(p, 15)); add(RWY.at(-RWY.L / 2, 0), 15); add(RWY.at(RWY.L / 2, 0), 15); return P; }
   if (run && kind === 'fire') { MS.list.forEach(f => { add(f.mk, 115); add(f.tp, 20); }); return P; }
   if (run && kind === 'sar' && SAR) { add(SAR.area, 125); add(SAR.tp, 70); add(SAR.pkP, 20); return P; }
   if (run && kind === 'recon') { MS.list.forEach(o => add(o.tp, 40)); return P; }
@@ -417,14 +435,14 @@ function msStart(kind) {
   if (wingRwyOK(a) && ['recon', 'fire', 'ridge'].includes(kind)) L = L.concat([rtbObj(a)]);   // 고정익: 임무 끝에 활주로 착륙
   L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; MS.list = L; MS.kind = kind; MS.t0 = 0; MS.events = []; S.decoyHit = 0;
   // 시작 위치: 고정익·자폭 고정익은 공중에서
-  const p0 = startPos(), o = msObj(); let h = startHead();
+  const p0 = kind === 'field' && RWY && a.cls !== 'wing' ? RWY.pads[0].clone().setY(RWY.pads[0].y + 0.06) : startPos(), o = msObj(); let h = startHead();
   if (o) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
   if (wingRwyOK(a) && kind !== 'strike') wingGround(); else if (a.cls === 'wing') { p0.y = groundAt(p0.x, p0.z) + (a.kam ? 45 : 30); wingAir(p0, h); } else resetDrone(p0, h);
   MS.launch = { p: DR.p.clone(), h: DR.gnd ? DR.h : h };
   S.respawn = null;
   if (ENV.ir) { irSet(false); irSet(true); }   // 바뀐 열 세기 반영
   MS.par = msPar(kind, L); briefShow(kind, L);
-  try { const run = ['fire', 'sar', 'recon', 'track'].includes(kind); mapView('ms_' + kind, missionMapPts(kind, run), run); } catch (e) { mapView('course'); }
+  try { const run = ['fire', 'sar', 'recon', 'track', 'field'].includes(kind); mapView('ms_' + kind, missionMapPts(kind, run), run); } catch (e) { mapView('course'); }
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
@@ -473,6 +491,9 @@ function msStep(prev, cur, dt) {
     }
     const r = passCross(o, prev, cur);
     if (r === true) msNext(); else if (r === false && S.bumpT <= 0) { showMsg(L2('MISS · 다시 통과', 'MISS · fly through again'), '#ff9a40', 1); sfx('bad'); S.bumpT = 0.6; }
+  } else if (o.t === 'padland') {
+    const e = Math.hypot(DR.p.x - o.pad.x, DR.p.z - o.pad.z);
+    if (DR.landed && DR.v.length() < 0.6) { if (e <= 1.5) { (S.padErr = S.padErr || []).push(e); msNext(L2(`착륙 ✓ 오차 ${e.toFixed(2)} m`, `Landed ✓ ${e.toFixed(2)} m off`), '#5dff9a'); } else if (e < 6 && S.bumpT <= 0) { showMsg(L2(`패드 밖 ${e.toFixed(1)} m · 다시 떠서 가운데로`, `Off the pad ${e.toFixed(1)} m · lift and recentre`), '#ff9a40', 1.4); S.bumpT = 1.5; } }
   } else if (o.t === 'rwyland') { if (DR.gnd && (DR.as || 0) < 2) msNext(L2('활주로 착륙 ✓', 'Landed on the runway ✓'), '#5dff9a'); }
   else if (o.t === 'fire') fireStep(cur, dt);
   else if (o.t === 'strikeAll') strikeAim(o, cur);
@@ -690,6 +711,7 @@ function msFinish() {
     else if (S.lost) rows.push(['기체 손실', S.lost + ' 대']);
     if (S.kind === 'sar' && S.sarXY) rows.push(['실종자 위치 (EPSG:5186)', S.sarXY[0].toFixed(0) + ', ' + S.sarXY[1].toFixed(0)]);
     if (S.kind === 'sar' && S.kitErr !== undefined) rows.push(['키트 오차', S.kitErr.toFixed(1) + ' m']);
+    if (S.kind === 'field' && S.padErr && S.padErr.length) rows.push([L2('착륙 오차', 'Landing error'), S.padErr.map(e => e.toFixed(2)).join(' / ') + ' m']);
     if (S.kind === 'track') rows.push(['추적 유지', S.trT.toFixed(0) + ' / ' + S.trWin.toFixed(0) + ' s'], [L2('최대 노출', 'Peak exposure'), Math.round(TRACK.susMax || 0) + '%'], [L2('발각', 'Spotted'), TRACK.burn ? L2('예 (-30)', 'yes (-30)') : L2('아니오', 'no')], ['판정', S.trackOK ? '성공' : '실패']);
     if (S.kind === 'ridge' && RIDGE) rows.push(['정상 해발', RIDGE.top.toFixed(0) + ' m']);
     if (S.kind === 'fire') (S.fireRep || []).forEach((xy, i) => xy && rows.push(['불씨 ' + (i + 1) + ' (EPSG:5186)', xy[0].toFixed(0) + ', ' + xy[1].toFixed(0)]));
@@ -739,7 +761,7 @@ function afUI() {
     b.onclick = () => { MENU.afNote = ''; setAirframe(id); afUI(); };
     box.appendChild(b);
   }
-  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
+  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE, field: !!RWY };
   document.querySelectorAll('#msGrid [data-ms]').forEach(b => { b.dataset.site = HAS[b.dataset.ms] !== false ? '1' : '0'; b.classList.remove('off'); b.title = ''; });
   if (typeof msVis === 'function') msVis();
   // 훈련장 고르기 (두 곳 이상일 때만)
@@ -1114,7 +1136,7 @@ const RIDGE = (function () {
   return { list, top: mx + SITE.base, len: all.length * st };
 })();
 function scenStart(kind, a) {
-  ['sar', 'track', 'ridge'].forEach(k => MSG[k] && (MSG[k].visible = false)); if (STREES.unscorch) STREES.unscorch();
+  ['sar', 'track', 'ridge', 'field'].forEach(k => MSG[k] && (MSG[k].visible = false)); if (STREES.unscorch) STREES.unscorch();
   if (kind === 'sar' && SAR) {
     MSG.sar.visible = true; SAR.kit = null; sarRandom();
     S.kits = 2; SAR.pkFound = false;
@@ -1130,6 +1152,23 @@ function scenStart(kind, a) {
     const L = [{ kind: 'ms', t: 'track', label: L2('차량 추적 · 들키지 말고 60초 관측', 'Vehicle track · 60 s unseen'), mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
     L.push(rtbObj(a));
     return L;
+  }
+  if (kind === 'field' && RWY) {
+    MSG.field = MSG.field || new THREE.Group(); if (!MSG.field.parent) scene.add(MSG.field); MSG.field.clear(); MSG.field.visible = true; S.padErr = [];
+    if (a.cls === 'wing') {   // 장주: 이륙 → 상승 → 옆바람 → 바람 따라 → 활주로 착륙 (왼쪽 장주, 40 m)
+      const side = -RWY.sg, P = [[RWY.L / 2 + 170, 0, 1, 0], [RWY.L / 2 + 170, side * 200, 0, 1], [-RWY.L / 2 - 170, side * 200, -1, 0], [-RWY.L / 2 - 200, 0, 1, 0]];
+      const names = [L2('장주 1 · 상승', 'Pattern 1 · upwind'), L2('장주 2 · 옆바람', 'Pattern 2 · crosswind'), L2('장주 3 · 바람 따라', 'Pattern 3 · downwind'), L2('장주 4 · 최종 접근', 'Pattern 4 · final')];
+      const L = P.map(([t, w, dt0, dw], i) => { const q = RWY.at(t, w), dx = RWY.ux * dt0 - RWY.uz * dw * 0, dz = RWY.uz * dt0 + RWY.ux * dw * 0;
+        let tx = dt0 ? RWY.ux * dt0 : -RWY.uz * dw, tz = dt0 ? RWY.uz * dt0 : RWY.ux * dw; if (i === 1) { tx = -RWY.uz * side; tz = RWY.ux * side; }
+        const cp = passCP(names[i], { d: -q.z, s: q.x, td: -tz, ts: tx }, 0, i === 3 ? 25 : 40, i === 3 ? 25 : 40, 14); cp.c = cp.mk.clone();   // 링 판정은 링 중심 기준
+        const tor = new THREE.Mesh(new THREE.TorusGeometry(14, 0.35, 8, 48), mat(0xffc828, { emissive: 0x332200 })); tor.position.copy(cp.mk); tor.lookAt(cp.mk.clone().add(cp.n)); MSG.field.add(tor); return cp; });
+      L.push(rtbObj(a)); return L;
+    }
+    const pl = (i, lab) => { const p = RWY.pads[i]; return { kind: 'ms', t: 'padland', label: lab, pad: p, mk: p.clone().setY(p.y + 3), pts(q) { return [q.clone(), this.pad.clone().setY(Math.max(q.y, this.pad.y + 6)), this.pad.clone().setY(this.pad.y + 1)]; } }; };
+    const fly = passCP(L2('활주로 상공 통과 · 10 m', 'Fly over the runway · 10 m'), (() => { const q = RWY.at(RWY.L / 2 - 20, 0); return { d: -q.z, s: q.x, td: -RWY.uz, ts: RWY.ux }; })(), 8, 10, 10, 6);
+    fly.c = fly.mk.clone();
+    { const tor = new THREE.Mesh(new THREE.TorusGeometry(6, 0.18, 8, 40), mat(0x4fe3ff, { emissive: 0x002233 })); tor.position.copy(fly.mk); tor.lookAt(fly.mk.clone().add(fly.n)); MSG.field.add(tor); }
+    return [pl(1, L2('H2 패드에 착륙', 'Land on pad H2')), pl(2, L2('H3 패드에 착륙', 'Land on pad H3')), fly, pl(0, L2('H1 패드로 복귀 · 착륙', 'Return to pad H1 · land'))];
   }
   if (kind === 'ridge' && RIDGE) {
     MSG.ridge.visible = true; const k = a.cls === 'wing' ? 2.2 : 1;
@@ -1267,6 +1306,7 @@ function msPar(kind, L) {
   if (kind === 'forest') return (FLANE ? FLANE.total : 400) / Math.min(v, 6) + 15;
   if (kind === 'race') return (PATHL ? PATHL.total : 500) / (v * 0.85) + 10;
   if (kind === 'ridge') return (RIDGE ? RIDGE.len : 900) / (v * 0.8) + 20;
+  if (kind === 'field') return AFc().cls === 'wing' ? 150 : 90;
   if (kind === 'recon') return 60 + L.length * 45;
   if (kind === 'fire') return 260;
   if (kind === 'strike') return 150;
@@ -1291,7 +1331,8 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow), switch to thermal (T), center the hotspot and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
   sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. 2 rescue kits: drop one within 5 m.'],
   track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in the driver\'s view (ahead, low angle), close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay behind it and high. At night turn your light off (L) to stay hidden.'],
-  ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.']
+  ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.'],
+  field: ['Field airstrip', 'Runway, taxiway and three H pads. Quads hop between the pads with precise landings; fixed wings fly a traffic pattern and land.', 'Land within 1.5 m of the pad centre, gently. Wings: take off, fly the pattern rings, land on the runway.']
 } : {
   forest: ['숲 속 좁은 길', '주 경로 옆 숲 속에 낸 좁은 길을 따라 게이트·좁은 틈·쓰러진 나무를 지나 결승까지.', '나무 사이는 2~3 m. 수관 아래(지면 3 m 이하)로 낮게 날 것.'],
   race: ['계곡 타임 레이스', '계곡을 따라 놓인 링을 순서대로 최단 시간에 통과.', '부스트(BST)로 기체 최고 속도까지. 링을 빗나가면 되돌아와 다시 통과.'],
@@ -1300,7 +1341,8 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 열화상(T)으로 불씨를 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
   sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 구조 키트 2개 · 5 m 안에 투하.'],
   track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '운전자 시야(차 앞쪽·낮은 각도)·근접·저고도면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 차 뒤쪽 높이 유지 권장. 밤에는 드론 조명을 끄면(L) 덜 들킴.'],
-  ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.']
+  ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.'],
+  field: ['야전 착륙장', '활주로·유도로·H 패드 3개. 쿼드는 패드 사이를 옮겨 다니며 정밀 착륙, 고정익은 장주(트래픽 패턴)를 돌고 활주로 착륙.', '패드 가운데 1.5 m 안에 살살 내려앉기. 고정익: 이륙 → 장주 링 → 활주로 착륙.']
 };
 function briefShow(kind, L) {
   const b = BRIEF[kind], el = $('brief'); if (!b || !el) return;
@@ -1574,7 +1616,8 @@ function commStart(kind) {
     fire: [`${CS}, CONTROL. Fire watch requested. Smoke reports coming in, locate each fire, confirm with thermal and report. ${w}Over.`, '산불 감시 요청. 연기 신고가 들어옴. 직접 찾아 열화상으로 확인 후 보고.'],
     sar: (() => { const b = kind === 'sar' && SAR ? fromLaunch(SAR.area) : null; return [`${CS}, CONTROL. Missing hiker, last seen near the trail. ${b ? `Search area bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} Sweep the area, look for his pack and signal flashes, use thermal under the trees. ${n}Over.`, `실종자 수색.${b ? ` 수색 구역: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m.` : ''} 구역을 훑으며 배낭·신호 반짝임, 나무 아래는 열화상.`]; })(),
     track: [`${CS}, CONTROL. Target vehicle on the forest road. Do not get spotted. Stay out of its front, keep high and well back, and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 들키지 말 것 · 차 앞쪽 피하고 높게, 멀찍이 뒤에서 60초 관측.'],
-    ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 비행 승인. 능선 위 돌풍 주의.']
+    ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 비행 승인. 능선 위 돌풍 주의.'],
+    field: [`${CS}, CONTROL. Field strip is yours. ${AFc().cls === 'wing' ? 'Take off, fly the pattern and land on the runway.' : 'Hop the pads, land gently on the centre of each.'} ${w}`, AFc().cls === 'wing' ? '야전 착륙장 사용 승인. 이륙 후 장주 비행, 활주로 착륙.' : '야전 착륙장 사용 승인. 패드를 옮겨 다니며 가운데에 살살 착륙.']
   }[kind];
   if (T) { comm(T[0], T[1]); if (isMission(kind)) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); }
 }
@@ -1704,7 +1747,7 @@ document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle(
 // =====================================================================
 const MENU = { ms: 'course', cf: null, cR: 60, cH: 20, a: 0, ri: 0, tt: 0, models: {}, dbl: 0 };
 try { const v = localStorage.getItem('hroc_menu_ms'); if (v) MENU.ms = v; } catch (e) { }
-const MS_CAT = { course: 'train', forest: 'train', race: 'train', ridge: 'train', tutorial: 'train', free: 'train', demo: 'train', recon: 'recon', track: 'recon', fire: 'rescue', sar: 'rescue', strike: 'strike' };
+const MS_CAT = { course: 'train', forest: 'train', race: 'train', ridge: 'train', field: 'train', tutorial: 'train', free: 'train', demo: 'train', recon: 'recon', track: 'recon', fire: 'rescue', sar: 'rescue', strike: 'strike' };
 const CAT_C = { train: '#4fe3ff', recon: '#5dff9a', rescue: '#ffaa4d', strike: '#ff5d5d' };
 const AF_C = { quad: '#5aa9ff', fpv: '#b48cff', wing: '#4fe3c0', kam: '#ff6a5d' };
 const CAT_N = () => ({ train: L2('비행 훈련', 'FLIGHT TRAINING'), recon: L2('정찰·감시', 'RECON · SURVEILLANCE'), rescue: L2('재난·구조', 'DISASTER · RESCUE'), strike: L2('타격', 'STRIKE') });
@@ -1716,7 +1759,7 @@ const MDESC = () => ({
 });
 function msInfo(k) { const b = BRIEF[k] || MDESC()[k] || [k, '', '']; return { t: b[0], d: b[1], tip: b[2] }; }
 function msAvail(k) {
-  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE };
+  const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE, field: !!RWY };
   const site = HAS[k] !== false, af = (MS_OK[k] || []).includes(SET.af), wx = !(k === 'fire' && (SET.wx === 'rain' || SET.wx === 'snow'));   // 비·눈 오는 날은 산불 감시 없음
   return { ok: site && af && wx, site, af, wx, why: !site ? L2('이 훈련장에는 없는 임무', 'Not available at this site') : !wx ? L2('비·눈 오는 날에는 산불 감시를 하지 않습니다 · 날씨를 맑음으로', 'No wildfire watch in rain or snow · set the weather to clear') : !af ? L2('선택한 기체로는 할 수 없는 임무 · 아래 추천 기체를 고르세요', 'Not possible with this airframe · pick a recommended one below') : '' };
 }
@@ -1910,6 +1953,7 @@ function menuPrev(k) {
   const P = (d, s, y, R, h, spd) => ({ f: W(d, s, y), d, s, R, h, spd: spd || 0.06 });
   if (k === 'forest' && FLANE) { const q = FLANE.at(FLANE.total * 0.2); return P(q.d, q.s, 3, 16, 9, 0.05); }
   if (k === 'race' && RACE.length) { const r = RACE[4]; return P(r.q.d, r.q.s, r.alt, 34, 8); }
+  if (k === 'field' && RWY) { const c = RWY.at(0, RWY.sg * 18); return P(-c.z, c.x, 8, 75, 32, 0.05); }
   if (k === 'ridge' && RIDGE) { const t = RIDGE.list.find(c => c.top) || RIDGE.list[0]; return P(t.q.d, t.q.s, 15, 80, 30, 0.035); }
   if (k === 'recon' && RECON.length) { const r = RECON[MENU.ri % RECON.length]; return P(r.d, r.s, 6, 60, 34, 0.05); }
   if (k === 'fire' && FIRE.length) { const f = FIRE[0]; return P(f.d, f.s, 5, 50, 26, 0.05); }
