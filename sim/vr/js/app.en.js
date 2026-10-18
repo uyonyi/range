@@ -1777,18 +1777,18 @@ function rumble(strong, weak, ms) {
 //  game state
 // =====================================================================
 const MODES = {
-  train: { name: 'TRAINING', maxTilt: 25 * DEG, vmax: 9, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
-  easy: { name: 'EASY', maxTilt: 32 * DEG, vmax: 12, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
+  train: { name: 'TRAINING', gps: true, maxTilt: 25 * DEG, vmax: 9, yawRate: 95 * DEG, althold: true, brake: 2.6, assist: 1.0, autoYaw: true, margin: 0.22, hitPen: 2 },
+  easy: { name: 'EASY', gps: true, maxTilt: 32 * DEG, vmax: 12, yawRate: 120 * DEG, althold: true, brake: 1.3, assist: 0.45, autoYaw: false, margin: 0.1, hitPen: 3 },
   // ATTI: 위치 유지(GPS) None · 놓아도 안 멈추고 관성·바람으로 흐름 · altitude hold만 · Boost None → 스틱을 민 만큼(기울기) 속도가 남
   atti: { name: 'ATTI', maxTilt: 30 * DEG, vmax: 12, yawRate: 110 * DEG, althold: true, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 3, atti: true },
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.4, h: 0.8, fov: 56 }];   // 추적 Camera distance (멀리·보통·가까이)
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -1814,7 +1814,7 @@ function startRun(kind) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
   resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
-  if (!isMission(kind)) mapView('course');
+  if (!isMission(kind)) { if (kind === 'free' && AFc().cls === 'wing' && typeof rwyMapView === 'function') rwyMapView(); else mapView('course'); }
   dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset();   // 이전 FLIGHT 기록·명령·무전이 섞이지 않게
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing' && typeof wingRwyOK === 'function' && wingRwyOK(AFc())) { wingGround(); MS.launch = { p: DR.p.clone(), h: DR.h }; } else if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
@@ -1826,7 +1826,7 @@ function startRun(kind) {
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
   if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (Replay·영상)
-  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? (XR_ON && SET.vrMode === 1 ? 'READY · Right stick 위로 Takeoff' : 'READY · left stick up to take off') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
+  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? (XR_ON && vrStickMode() === 1 ? 'READY · Right stick 위로 Takeoff' : 'READY · left stick up to take off') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
   COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 None · Takeoff 허가'), 1500);
 }
@@ -1968,11 +1968,11 @@ function stepDrone(dt) {
   let vyAssist = 0;
   if (!grounded) {
     const af = G * Math.tan(DR.pitch), ar = G * Math.tan(DR.roll);
-    const wv = windAt(DR.p);   // 바람: 공기에 대한 속도로 저항
+    const wv = windAt(DR.p); if (md.gps && SET.assist) wv.multiplyScalar(0.06);   // 바람: 공기에 대한 속도로 저항 · GPS 모드(Training·Easy)는 기체가 바람을 거슬러 기울여 위치를 지킴
     DR.v.x += ((FWD.x * af + RGT.x * ar) * ksc - kk * (DR.v.x - wv.x)) * dt;
     DR.v.z += ((FWD.z * af + RGT.z * ar) * ksc - kk * (DR.v.z - wv.z)) * dt;
     // 브레이크 (스틱을 놓으면 멈춤)
-    if (md.brake > 0 && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : SET.diff === 'train' ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
+    if (md.brake > 0 && Math.abs(ip) < 0.05 && Math.abs(ir) < 0.05) { const f = Math.exp(-md.brake * dt), w2 = windAt(DR.p), ww = !SET.assist ? 1 : md.gps ? 0 : 0.3; DR.v.x = w2.x * ww + (DR.v.x - w2.x * ww) * f; DR.v.z = w2.z * ww + (DR.v.z - w2.z * ww) * f; }
     // 통과 assist: 열린 곳 가운데로 살짝 끌어당김
     if (assistOn && o) {
       const op = openingOf(o);
@@ -2349,7 +2349,14 @@ function drawMapBg() {
     const col = { pad: '#fff', gate_sq: '#ffc828', gate_tri: '#ffc828', ring: '#ffc828', pole: '#e0b020', bunker: '#c09060', tunnel: '#9aa', tank: '#a3b26a', mit: '#a3b26a', ivan_group: '#a3b26a' }[o.type] || 'rgba(200,200,200,.45)';
     g.fillStyle = col; const s = ['building', 'hipbld', 'pavilion', 'bleacher', 'shelter', 'tank'].includes(o.type) ? 5 : 3; g.fillRect(p[0] - s / 2, p[1] - s / 2, s, s);
   }
-  if (window.__RWY) { const A = window.__RWY.a, B = window.__RWY.b, p = mxy(-A.z, A.x), q = mxy(-B.z, B.x); g.strokeStyle = 'rgba(230,230,225,.9)'; g.lineWidth = 3.5; g.setLineDash([]); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }   // 활주로
+  if (window.__RWY) {   // 활주로: 테두리 있는 흰 띠 + Takeoff 방향 시단 표시 + RWY 글자
+    const A = window.__RWY.a, B = window.__RWY.b, p = mxy(-A.z, A.x), q = mxy(-B.z, B.x), w = Math.max(3, 12 / (MAPV.s1 - MAPV.s0) * 180 * 1.6);
+    g.setLineDash([]); g.lineCap = 'butt'; g.strokeStyle = 'rgba(10,12,14,.9)'; g.lineWidth = w + 2.5; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
+    g.strokeStyle = '#e8e8e2'; g.lineWidth = w; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
+    g.fillStyle = '#40ff70'; g.beginPath(); g.arc(p[0], p[1], 2.4, 0, 6.283); g.fill();
+    const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, nx = -(q[1] - p[1]), ny = q[0] - p[0], nl = Math.hypot(nx, ny) || 1;
+    g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,.7)'; g.fillText('RWY', mx + nx / nl * 11 + 0.8, my + ny / nl * 11 + 3.8); g.fillStyle = '#ffffff'; g.fillText('RWY', mx + nx / nl * 11, my + ny / nl * 11 + 3);
+  }
   // FLIGHT 구역 경계 (점선 원)
   { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
 }
@@ -3054,8 +3061,8 @@ function updateGuide(subj) {
     x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
   });
   // ---- 조작 안내 문구 ----
-  const T = XR_ON && SET.vrMode === 3 ? { up: 'right stick ↑', down: 'right stick ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: 'left stick ↑', back: 'left stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'R트리거', boost: 'L트리거' }
-    : XR_ON && SET.vrMode === 1 ? { up: 'right stick ↑', down: 'right stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'left stick ↑', back: 'left stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'R트리거', boost: 'L트리거' }
+  const T = XR_ON && vrStickMode() === 3 ? { up: 'right stick ↑', down: 'right stick ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: 'left stick ↑', back: 'left stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'R트리거', boost: 'L트리거' }
+    : XR_ON && vrStickMode() === 1 ? { up: 'right stick ↑', down: 'right stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'left stick ↑', back: 'left stick ↓', left: 'right stick ←', right: 'right stick →', drop: 'R트리거', boost: 'L트리거' }
     : (IS_TOUCH || XR_ON) ? { up: 'left stick ↑', down: 'left stick ↓', yawL: 'left stick ←', yawR: 'left stick →', fwd: 'right stick ↑', back: 'right stick ↓', left: 'right stick ←', right: 'right stick →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
   const K = a => T ? T[a] : keyName(KB[a]);
   const tgt = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
@@ -3638,14 +3645,24 @@ function wingAir(p, h) {   // 공중에서 시작 (손 투척·발사 직후)
   const a = AFc(); DR.p.copy(p); DR.p.y = Math.max(DR.p.y, groundAt(p.x, p.z) + 25); DR.h = h; DR.as = a.cruise; DR.pitch = 0; DR.roll = 0; DR.landed = false; DR.alive = true; DR.gnd = false; DR.liftT = -99;
   DR.v.set(Math.sin(h) * a.cruise, 0, -Math.cos(h) * a.cruise); DR.altT = DR.p.y;
 }
+const WARN = { t: 0 };
 function stepWing(dt) {
-  const a = AFc(), assist = SET.assist && SET.diff !== 'sport';
+  // 조종 단계: Training·Easy = 자동조종(고도·속도 유지, 지형 피, 실속 보호) · ATTI = 자세 안정 수동(스로틀 직접, 실속 가능) · Sport = 완전 수동(기울기 유지, 실속·스핀)
+  const a = AFc(), assist = SET.assist && (SET.diff === 'train' || SET.diff === 'easy'), rate = SET.diff === 'sport';
   if (DR.gnd) return wingRoll(dt, a);
   const appr = rwyApproach();
   const stun = S.stun > 0 ? 0.3 : 1; if (S.stun > 0) S.stun -= dt;
-  const ip = IN.pitch * stun, ir = IN.roll * stun, iy = IN.yaw * stun;
+  let ip = IN.pitch * stun, ir = IN.roll * stun; const iy = IN.yaw * stun;
   let V = DR.as || a.cruise;
-  const stall = V < a.stall;
+  // 실속 속도는 하중 배수의 제곱근에 비례: 기울여 선하면 더 빠른 속도에서 실속 (60° 기울기 = 1.41배)
+  const n0 = 1 / Math.max(0.2, Math.cos(DR.roll)), vsE = a.stall * Math.sqrt(Math.min(n0, a.nmax * 1.4));
+  const stall = DR.stalled ? V < vsE * 1.06 : V < vsE, warn = !stall && V < vsE * 1.15;
+  if (stall && !DR.stalled && !assist) { DR.wdrop = (Math.random() < 0.5 ? -1 : 1); DR.roll += DR.wdrop * (14 + Math.random() * 16) * DEG; }   // 실속 순간 한쪽 날개가 떨어짐
+  DR.stalled = stall;
+  if (stall) ir *= 0.35;   // 실속: assist익이 잘 안 먹음
+  WARN.t -= dt; if ((warn || stall) && WARN.t <= 0) { WARN.t = stall ? 0.45 : 0.8; sfx('bad'); if (typeof rumble === 'function') rumble(stall ? 0.6 : 0.25, 0.4, 120); }
+  S.stallWarn = warn;
+  if (stall || warn) shake = Math.max(shake, stall ? 0.05 : 0.018);   // 버핏(떨림)
   if (assist) {
     // altitude hold: 스틱 놓으면 그 고도, 땅이 가까우면 자동 Climb
     if (Math.abs(ip) > 0.05) DR.altT = DR.p.y;
@@ -3654,15 +3671,25 @@ function stepWing(dt) {
     if (appr && DR.p.y - groundAt(DR.p.x, DR.p.z) < 4) gt = Math.max(gt, -Math.asin(Math.min(1, 0.7 / Math.max(V, 6))));   // 플레어: 바닥 가까이선 초당 0.7 m 로만 내려앉게   // 접근: 바닥 가까이서 살짝 기수 들기 (플레어)
     if (DR.p.y - ahead < a.minAgl && !a.kam && !appr) { gt = Math.max(gt, 0.25 + (a.minAgl - (DR.p.y - ahead)) * 0.03); DR.altT = Math.max(DR.altT, ahead + a.minAgl); }
     // 실속 보호: 속도가 실속 속도 가까이 떨어지면 Climb각을 줄임
-    const mg = (V - a.stall * 1.12) / (a.stall * 0.35); if (mg < 1) gt = Math.min(gt, Math.max(-0.15, mg) * 28 * DEG);
+    const mg = (V - vsE * 1.12) / (a.stall * 0.35); if (mg < 1) gt = Math.min(gt, Math.max(-0.15, mg) * 28 * DEG);
     DR.pitch += (gt - DR.pitch) * (1 - Math.exp(-dt * 2.2));
-    DR.roll += (ir * a.bank * DEG - DR.roll) * (1 - Math.exp(-dt * 2.8));
+    // 기울기 한계: Training 35° · 느릴 때는 실속하지 않을 만큼만 (V ≥ 1.15·Vs·√n)
+    const bMax = Math.min(SET.diff === 'train' ? 35 * DEG : a.bank * DEG, V > a.stall * 1.15 ? Math.acos(Math.min(1, Math.pow(a.stall * 1.15 / V, 2))) : 0);
+    DR.roll += (ir * bMax - DR.roll) * (1 - Math.exp(-dt * 2.8));
     S.boosting = !!IN.boost;
     const vt = IN.boost ? a.top : IN.thr >= 0 ? a.cruise + IN.thr * (a.top - a.cruise) : a.cruise + IN.thr * (a.cruise - a.stall - 2);
     V += clamp(vt - V, -4, 4) * dt * 0.9;
+  } else if (rate) {
+    // 완전 수동: 스틱 = yaw 속도. 놓으면 그 자세 그대로 (수평 복귀 None) · 실속에서 기수를 Resume 당기면 스핀
+    DR.roll = clamp(DR.roll + ir * a.rrate * DEG * dt, -85 * DEG, 85 * DEG); DR.pitch = clamp(DR.pitch - ip * a.prate * 0.8 * DEG * dt, -70 * DEG, 60 * DEG);
+    if (stall && ip < -0.3) { DR.roll = clamp(DR.roll + (DR.wdrop || 1) * 110 * DEG * dt, -85 * DEG, 85 * DEG); DR.h += (DR.wdrop || 1) * 1.6 * dt; }
+    S.boosting = !!IN.boost;
+    const thr = IN.boost ? 1 : clamp(0.55 + IN.thr * 0.45, 0, 1), thrust = thr * a.top * 0.42, drag = 0.42 * a.top * (V / a.top) * (V / a.top);
+    V += (thrust - drag) * dt;
   } else {
-    // 수동(자세 안정): 스틱 = 기울기·Climb각, 놓으면 수평으로 돌아옴 (altitude hold·지면 피 None, 실속 가능)
-    const gt = -ip * 40 * DEG, rt = ir * Math.min(70, a.bank * 1.3) * DEG;
+    // 자세 안정 수동(ATTI): 스틱 = 기울기·Climb각, 놓으면 수평으로 돌아옴 (altitude hold·지면 피·실속 보호 None)
+    let gt = -ip * 40 * DEG; const rt = ir * Math.min(70, a.bank * 1.3) * DEG;
+    if (stall) gt = Math.min(gt, DR.pitch);   // 실속 중엔 자세 안정이 기수를 들어 올리지 못함
     DR.pitch += clamp(gt - DR.pitch, -a.prate * DEG * dt, a.prate * DEG * dt);
     DR.roll += clamp(rt - DR.roll, -a.rrate * DEG * dt, a.rrate * DEG * dt);
     S.boosting = !!IN.boost;
@@ -3671,7 +3698,7 @@ function stepWing(dt) {
   }
   // 오르면 느려지고 내려가면 빨라짐 (에너지)
   V -= G * Math.sin(DR.pitch) * dt * 0.85;
-  if (stall) { DR.pitch -= (0.9 + (a.stall - V) * 0.12) * dt; DR.roll *= Math.exp(-dt * 0.5); }
+  if (stall) { DR.pitch -= (1.3 + (vsE - V) * 0.25) * dt; DR.pitch = Math.max(DR.pitch, -55 * DEG); }   // 실속: 기수가 떨어지며 속도를 되찾아야 복
   V = clamp(V, 3, a.kam ? a.top * 1.12 : a.top * 1.18); DR.as = V;
   // 선: 하중 배수 한계 (nmax) 안에서만 돌고, 넘게 기울이면 양력이 모자라 기수가 내려감
   const nreq = 1 / Math.max(0.05, Math.cos(DR.roll)), nl = Math.min(nreq, a.nmax);
@@ -3682,8 +3709,8 @@ function stepWing(dt) {
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
   if (l > 680) { const dh = wrapA(Math.atan2(-rx, rz) - DR.h); DR.h += clamp(dh, -1, 1) * 0.6 * dt; if (S.msgCD <= 0) { showMsg('AREA LIMIT · turning', '#ff9a40', 1); S.msgCD = 2; } }
   const cg = Math.cos(DR.pitch);
-  DR.v.set(Math.sin(DR.h) * V * cg, Math.sin(DR.pitch) * V - (stall ? 2.5 : 0), -Math.cos(DR.h) * V * cg);
-  DR.v.add(windAt(DR.p)); DR.p.addScaledVector(DR.v, dt); DR.thrust = assist ? clamp(0.5 + IN.thr * 0.5, 0.2, 1) : clamp(0.55 + IN.thr * 0.45, 0, 1);
+  DR.v.set(Math.sin(DR.h) * V * cg, Math.sin(DR.pitch) * V - (stall ? Math.min(7, 3.5 + (vsE - V) * 1.2) : 0), -Math.cos(DR.h) * V * cg);   // 실속: 양력이 모자라 가라앉음
+  DR.v.add(windAt(DR.p)); DR.p.addScaledVector(DR.v, dt); DR.thrust = assist ? clamp(0.5 + IN.thr * 0.5, 0.2, 1) : IN.boost ? 1 : clamp(0.55 + IN.thr * 0.45, 0, 1);
   if (DR.p.y > groundAt(DR.p.x, DR.p.z) + 150) { DR.p.y = groundAt(DR.p.x, DR.p.z) + 150; DR.altT = Math.min(DR.altT, DR.p.y); }
   S.stallW = stall;
   // 지면·장애물·나무 = 추락 (자폭기는 기폭)
@@ -3747,6 +3774,10 @@ const RWY = (function () {
     return { cx, cz, h, ux, uz, L, Wd, at, g, sock };
   } catch (e) { console.warn('runway', e); return null; }
 })();
+// 활주로가 생기기 전에 그려 둔 코스 지도에 Restart 그려 넣음
+if (RWY && typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const kb = mapBg, kv = MAPV; mapBg = MAP_CACHE.course; MAPV = MAP_CACHE.course.V || MAPV_COURSE || MAPV; drawMapBg(); mapBg = kb; MAPV = kv; } catch (e) { } }
+// 고정익 Free Flight: 코스 지도에 활주로까지 들어오게
+function rwyMapView() { if (!RWY) return; const V = MAP_CACHE.course && MAP_CACHE.course.V || MAPV, A = RWY.at(-RWY.L / 2 - 60, 0), B = RWY.at(RWY.L / 2, 0); mapView('free_wing', [[V.d0 + 40, V.s0 + 40], [V.d1 - 40, V.s1 - 40], [-A.z, A.x, 10], [-B.z, B.x, 10]]); }
 function rwyLocal(p) { const dx = p.x - RWY.cx, dz = p.z - RWY.cz; return { t: dx * RWY.ux + dz * RWY.uz, w: -dx * RWY.uz + dz * RWY.ux }; }
 function wingRwyOK(a) { return !!RWY && a && a.cls === 'wing' && !a.kam; }
 function wingGround() {   // 활주로 시단에서 Pause 상태로 시작
@@ -4094,7 +4125,8 @@ function snapPhoto(cap, tp) {
     const seen = (c) => { const q = tp.clone().project(c); return q.z < 1 && q.z > -1 && Math.abs(q.x) < 0.8 && Math.abs(q.y) < 0.8; };
     if (tp && !seen(camera)) { const lc = XR_ON && (SET.vrPip | 0) > 0 ? VR_PIP.cam : (typeof bellyMode === 'function' && bellyMode() !== null ? bellyCam : null); if (lc && seen(lc)) { cam = lc; PH.via = 'lower'; } }
     if (tp && cam === camera && !seen(camera)) { PH.via = 'gimbal'; { cam = PH.cam || (PH.cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 4000)); cam.position.copy(DR.p).add(new V3(0, -0.15, 0)); cam.lookAt(tp); cam.updateMatrixWorld(); } }
-    renderer.setRenderTarget(PH.rt); renderer.clear(); renderer.render(scene, cam); const px = new Uint8Array(W0 * H0 * 4); renderer.readRenderTargetPixels(PH.rt, 0, 0, W0, H0, px);
+    const hid = []; const hide = o => { if (o && o.visible) { o.visible = false; hid.push(o); } }; GUIDE.meshes.forEach(m => hide(m.g)); hide(marker); hide(impactRing);   // 사진엔 안내 표시 없이
+    renderer.setRenderTarget(PH.rt); renderer.clear(); renderer.render(scene, cam); hid.forEach(o => o.visible = true); const px = new Uint8Array(W0 * H0 * 4); renderer.readRenderTargetPixels(PH.rt, 0, 0, W0, H0, px);
     renderer.setRenderTarget(cur); renderer.xr.enabled = xe; camera.aspect = asp; camera.updateProjectionMatrix();
     const c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d'), id = g.createImageData(W0, H0), lin = PH.rt.texture.encoding !== THREE.sRGBEncoding;
     for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) { const s = ((H0 - 1 - y) * W0 + x) * 4, d = (y * W0 + x) * 4; for (let k = 0; k < 3; k++) id.data[d + k] = lin ? PH.lut[px[s + k]] : px[s + k]; id.data[d + 3] = 255; }
@@ -4196,7 +4228,7 @@ function msFinish() {
 }
 function msOsd() {
   const o = msObj(), a = AFc(); let h = '';
-  if (a.cls === 'wing') h += `<div><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼</div>' : '');
+  if (a.cls === 'wing') h += `<div><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼ · ' + L2('기수 내리고 스로틀', 'nose down, power') + '</div>' : S.stallWarn ? '<div style="color:#ffb030">' + L2('실속 주의 · 속도', 'STALL WARNING · speed') + '</div>' : '');
   if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
   else if (isMission()) h += `<div><b>HIT</b>${S.impacts}</div>`;
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
@@ -5598,6 +5630,8 @@ function xrPads() {
   for (const s of srcs) if (s && s.gamepad) { if (s.handedness === 'left') L = s.gamepad; else if (s.handedness === 'right') R = s.gamepad; }
   return { L, R };
 }
+// VR 스틱 모드: 쿼드·고정익 따로 기억 (고정익 기본 = 모드 1: Right stick 위아래가 스로틀)
+function vrStickMode() { return AFc().cls === 'wing' ? (SET.vrModeW || 1) : (SET.vrMode || 2); }
 function xrInput(dt) {
   const { L: Lg, R: Rg } = xrPads();
   const ax = (g, i) => (g && g.axes && g.axes.length > i ? g.axes[i] || 0 : 0), bt = (g, i) => !!(g && g.buttons && g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.5));
@@ -5612,11 +5646,11 @@ function xrInput(dt) {
     return;
   }
   const lx = ax(Lg, 2), ly = -ax(Lg, 3), rx = ax(Rg, 2), ry = -ax(Rg, 3);
-  let st = SET.vrMode === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
-  if (SET.vrMode === 3) st = vrHeadSteer(dt, lx, ly, rx, ry);
+  const vm = vrStickMode(); let st = vm === 1 ? { thr: ry, yaw: lx, pitch: ly, roll: rx } : { thr: ly, yaw: lx, pitch: ry, roll: rx };
+  if (vm === 3) st = vrHeadSteer(dt, lx, ly, rx, ry);
   else IN.head = false;
   let any = false;
-  for (const k in st) { const v = SET.vrMode === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
+  for (const k in st) { const v = vm === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
   if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
   if (rt) pressed.push('Space');
@@ -5680,7 +5714,7 @@ function vrMenuDraw() {
   const RH = 60, RW = 50, row = (yy, lbl) => { g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 22px system-ui, sans-serif'; g.fillText(lbl, 36, yy + 14); };
   const afN = id => ({ x2d: 'Skydio X2D', anafi: 'ANAFI', fpv: L2('FPV racer', 'FPV racer'), kfpv: L2('Kamikaze FPV', 'Kamikaze FPV'), fw: 'RQ-11 Raven', puma: 'RQ-20 Puma', kfw: L2('Loitering fixed-wing', 'Loitering wing') })[id];
   row(y, L2('FLIGHT 모드', 'Flight mode')); [['train', L2('Training', 'Training')], ['easy', L2('Easy (P)', 'Easy (P)')], ['atti', 'ATTI'], ['sport', L2('Sport', 'Sport')]].forEach(([v, n], i) => btn('diff:' + v, 190 + i * 200, y, 188, RW, n, SET.diff === v)); y += RH;
-  row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrMode || 2) === v)); y += RH;
+  row(y, L2('스틱', 'Sticks')); [[2, L2('모드 2', 'Mode 2')], [1, L2('모드 1', 'Mode 1')], [3, L2('머리 방향', 'Head steer')]].forEach(([v, n], i) => btn('mode:' + v, 190 + i * 200, y, 188, RW, n, vrStickMode() === v)); y += RH;
   row(y, L2('Camera', 'Camera')); [['fpv', 'FPV', SET.vrCam !== 'chase'], ['c0', L2('추적 멀리', 'Chase far'), SET.vrCam === 'chase' && (SET.zoom | 0) === 0], ['c1', L2('추적 보통', 'Chase mid'), SET.vrCam === 'chase' && (SET.zoom | 0) === 1], ['c2', L2('추적 가까이', 'Chase near'), SET.vrCam === 'chase' && (SET.zoom | 0) === 2]].forEach(([v, n, on], i) => btn('cam:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('하부 Camera', 'Lower cam')); [[0, L2('Off', 'Off')], [90, '90°'], [60, '60°'], [45, '45°']].forEach(([v, n], i) => btn('pip:' + v, 190 + i * 200, y, 188, RW, n, (SET.vrPip | 0) === v)); y += RH;
   row(y, L2('시간대', 'Time')); [['day', L2('낮', 'Day'), SET.tod === 'day' && !ENV.ir], ['dusk', L2('Dusk', 'Dusk'), SET.tod === 'dusk' && !ENV.ir], ['night', L2('밤', 'Night'), SET.tod === 'night' && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
@@ -5690,7 +5724,7 @@ function vrMenuDraw() {
   row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
   row(y, L2('계기', 'Instruments')); [['auto', L2('자동', 'Auto')], ['fpv', L2('간단 (FPV)', 'Simple (FPV)')], ['uas', L2('항공 (UAS)', 'Aviation (UAS)')]].forEach(([v, n], i) => btn('hud:' + v, 190 + i * 200, y, 188, RW, n + (v === 'auto' ? ' · ' + (hudMode() === 'uas' ? 'UAS' : 'FPV') : ''), (SET.hud || 'auto') === v)); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
-  g.fillText((SET.vrMode === 3 ? L2('머리 방향: 보는 쪽으로 FLIGHT · Left stick 앞뒤 속도 · Right stick 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : (SET.vrMode || 2) === 2 ? L2('모드 2: Left stick Climb·yaw / Right stick 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: Left stick 전후·yaw / Right stick Climb·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
+  g.fillText((AFc().cls === 'wing' ? L2('[고정익] ', '[Fixed-wing] ') : '') + (vrStickMode() === 3 ? L2('머리 방향: 보는 쪽으로 FLIGHT · Left stick 앞뒤 속도 · Right stick 옆·고도', 'Head steer: fly where you look · L-stick fwd/back speed · R-stick side·height') : vrStickMode() === 2 ? L2('모드 2: Left stick Climb·yaw / Right stick 전후·좌우', 'Mode 2: left stick climb·yaw / right stick fwd·side') : L2('모드 1: Left stick 전후·yaw / Right stick Climb·좌우', 'Mode 1: left stick fwd·yaw / right stick climb·side')), 36, y);
   g.fillText(L2('R트리거 Drop · L트리거 Boost · A 확인·사진 보고 · B Menu/Resume', 'R-trigger drop · L-trigger boost · A ok/photo report · B menu/resume'), 36, y + 26);
   g.fillText(L2('X Light · Y 하부 Camera · Left stick 누르기 Camera · Right stick 누르기 열화상', 'X light · Y lower cam · L-stick click camera · R-stick click thermal'), 36, y + 52);
   const vi = voiceInfo(), eng = commEngine(), au = AU.ctx ? AU.ctx.state : L2('None', 'none');
@@ -5724,7 +5758,7 @@ function vrMenuClick(hand) {
   if (id === 'map') { SET.vrMap = SET.vrMap === false; saveSet(); return; }
   if (id === 'guide') { SET.guide = !SET.guide; saveSet(); return; }
   if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); return; }
-  if (id.startsWith('mode:')) { SET.vrMode = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
   if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
   if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); saveSet(); return; }
@@ -5908,6 +5942,11 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
     segMusic: { 1: ['Music On · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['Music Off', 'Music off'] },
     segKeys: { A: ['W/S climb·descend · A/D yaw · 방향키 move', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·yaw, WASD로 move', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 set manually합니다', 'Assign every key yourself'] },
   };
+  const HW = { segDiff: {   // 고정익일 때 설명
+    train: ['자동조종: 고도·속도 유지, 지형 피, 실속 보호 · 기울기 35°까지', 'Autopilot: holds height and speed, avoids terrain, stall protection · bank ≤35°'],
+    easy: ['자동조종 + 최대 기울기 · 느릴 땐 실속 안 나게 기울기 제한', 'Autopilot with full bank · bank limited at low speed to prevent stall'],
+    atti: ['자세 안정 수동: 놓으면 수평 · 스로틀 직접 · altitude hold·실속 보호 None', 'Stabilised manual: levels when released · direct throttle · no height hold or stall protection'],
+    sport: ['완전 수동: 놓아도 기운 채 유지 · 실속·스핀 가능', 'Full manual: stays banked when released · stalls and spins possible'] } };
   const segV = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.dataset.v : null; };
   const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
   Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
@@ -5915,8 +5954,8 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
   const QS = [['segDiff', '🎚', 'Difficulty', 'Mode'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', 'Guide', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
   const bar = $('qsBar');
   const draw = () => {
-    P.querySelectorAll('small.oh').forEach(h => { const m = H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
-    if (bar) bar.querySelectorAll('button[data-s]').forEach(b => { b.querySelector('b').textContent = segT(b.dataset.s); const m = H[b.dataset.s], t = m && m[segV(b.dataset.s)]; b.title = t ? L2(t[0], t[1]) : ''; });
+    P.querySelectorAll('small.oh').forEach(h => { const m = (AFc().cls === 'wing' && HW[h.dataset.for]) || H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
+    if (bar) bar.querySelectorAll('button[data-s]').forEach(b => { b.querySelector('b').textContent = segT(b.dataset.s); const m = (AFc().cls === 'wing' && HW[b.dataset.s]) || H[b.dataset.s], t = m && m[segV(b.dataset.s)]; b.title = t ? L2(t[0], t[1]) : ''; });
   };
   if (bar) {
     bar.innerHTML = QS.map(([id, ic, ko, en]) => `<button data-s="${id}">${ic} ${L2(ko, en)}<b></b></button>`).join('') + `<button class="all">⚙ ${L2('모든 옵션', 'All options')}</button>`;
