@@ -27,6 +27,8 @@ function orbitDir(c, p) {
   const a = Math.atan2(p.z - c.z, p.x - c.x), tx = -Math.sin(a), tz = Math.cos(a);   // 각도가 커지는 쪽 접선
   return (Math.sin(DR.h) * tx - Math.cos(DR.h) * tz) >= 0 ? 1 : -1;                // 기체가 향한 쪽으로 돌기
 }
+// 게이트·링 앞 정렬 거리: 빠를수록 멀리서 줄을 맞춤 (쿼드 5~20 m · 고정익 25~60 m)
+function guideLead() { const v = Math.hypot(DR.v.x, DR.v.z); return AFc().cls === 'wing' ? clamp(v * 2.5, 25, 60) : clamp(4 + v * 0.9, 5, 20); }
 function guidePoints(o, p) {
   GUIDE.detour = false;
   if (!o) return null;
@@ -66,9 +68,9 @@ function guidePoints(o, p) {
   }
   const A = (op.side ? b.world(-1, 0, 0) : b.world(0, 1, 0)).sub(b.world(0, 0, 0)).normalize();
   const along = (o.kind === 'pass' && b.pass && b.pass.kind === 'tunnel') ? b.pass.L + 3 : 3;
-  const lead = C.clone().addScaledVector(A, -5), exit = C.clone().addScaledVector(A, along);
+  const ld = guideLead(), lead = C.clone().addScaledVector(A, -ld), exit = C.clone().addScaledVector(A, along);
   const before = p.clone().sub(C).dot(A);
-  return before < -3 ? [p.clone(), lead, C, exit] : [p.clone(), C, exit];
+  return before < -3 ? (before < -ld - 2 ? [p.clone(), lead, C, exit] : [p.clone(), C.clone().addScaledVector(A, Math.min(-2, before * 0.5)), C, exit]) : [p.clone(), C, exit];
 }
 const _gt = new V3(), _gq = new V3();
 function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); $('guide').classList.add('hidden'); }
@@ -81,14 +83,21 @@ function updateGuide(subj) {
     hideGuide(); if (!SET.guide) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
   }
-  const pts = guidePoints(o, subj.p);
+  let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
   if (!SET.guide) { hideGuide(); return; }
+  // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
+  { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
+    const to = pts[1].clone().sub(pts[0]); to.y = 0; const dist = to.length(); if (dist > 0.5) to.divideScalar(dist);
+    const turnR = wing ? Math.max(15, sp * sp / (9.8 * Math.tan((AFc().bank || 45) * DEG * 0.8))) : sp * 0.6;
+    const ang = Math.acos(clamp(hd.dot(to), -1, 1));
+    if ((wing || sp > 2) && ang > 15 * DEG && dist > turnR * 1.2) { const k = Math.min(turnR * (0.4 + ang / Math.PI), dist * 0.45); const a = pts[0].clone().addScaledVector(hd, k); a.y = pts[0].y + (pts[1].y - pts[0].y) * 0.15; pts = [pts[0], a].concat(pts.slice(1)); } }
   const curve = pts.length > 2 ? new THREE.CatmullRomCurve3(pts, false, 'centripetal') : new THREE.LineCurve3(pts[0], pts[1]);
-  const L = curve.getLength(), phase = (S.simT * 3.2) % GUIDE.sp;
+  const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
+  const L = curve.getLength(), phase = (S.simT * 3.2) % GSP;
   GUIDE.meshes.forEach((x, i) => {
-    const d = 2.4 + phase + i * GUIDE.sp;
+    const d = 2.4 + phase + i * GSP;
     if (d > L - 0.2 || L < 1.2) { x.g.visible = false; return; }
     const u = d / L; curve.getPointAt(u, _gt); curve.getPointAt(Math.min(1, u + 0.02), _gq);
     x.g.visible = true; x.g.position.copy(_gt); x.g.lookAt(_gq);
