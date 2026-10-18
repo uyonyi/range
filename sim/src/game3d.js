@@ -109,12 +109,25 @@ function updateGuide(subj) {
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
     : XR_ON && vrStickMode() === 1 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
     : (IS_TOUCH || XR_ON) ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
-  const K = a => T ? T[a] : keyName(KB[a]);
-  const tgt = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
+  const wingF = AFc().cls === 'wing', vm0 = XR_ON ? vrStickMode() : 2;
+  /* 고정익: 선회 = 기울이기(롤) · 상승 = 스틱 당기기(뒤) · 속도 = 스로틀. 모드에 따라 스틱 위치가 다름 */
+  const WL = T ? (XR_ON && vm0 === 1 ? { pu: '왼쪽 스틱 ↓', pd: '왼쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '오른쪽 스틱 ↑', tl: '오른쪽 스틱 ↓' } : { pu: '오른쪽 스틱 ↓', pd: '오른쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '왼쪽 스틱 ↑', tl: '왼쪽 스틱 ↓' })
+    : { pu: keyName(KB.back), pd: keyName(KB.fwd), bl: keyName(KB.left), br: keyName(KB.right), th: keyName(KB.up), tl: keyName(KB.down) };
+  const K = a => (wingF && WL[a]) ? WL[a] : T ? T[a] : keyName(KB[a]);
+  const tgt0 = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);
+  /* 조작 안내도 화면에 그려진 곡선 위의 앞쪽 점을 기준으로 (목표 지점이 아니라 가이드를 따라가도록) */
+  const vs = Math.hypot(DR.v.x, DR.v.z), lookD = wingF ? clamp(vs * 2.5, 30, 70) : clamp(3 + vs * 0.9, 4, 14), cL = curve.getLength();
+  const tgtC = curve.getPointAt(Math.min(1, lookD / Math.max(cL, 0.1)));
+  const tgt = (o.kind === 'drop' || o.kind === 'land') ? tgt0 : tgtC;
   const d = tgt.clone().sub(subj.p), fwd = new V3(Math.sin(DR.h), 0, -Math.cos(DR.h)), rgt = new V3(Math.cos(DR.h), 0, Math.sin(DR.h));
   const df = d.dot(fwd), dr = d.dot(rgt), dy = d.y, hd = Math.hypot(df, dr), ang = Math.atan2(dr, df) / DEG;
   const lines = [];
   const steer = () => {
+    if (wingF) {
+      if (Math.abs(dy) > 2) lines.push([`${dy > 0 ? '고도 올리기' : '고도 내리기'} ${Math.abs(dy).toFixed(0)} m (${K(dy > 0 ? 'pu' : 'pd')})`, '']);
+      if (Math.abs(ang) > 6) lines.push([`${ang > 0 ? '오른쪽으로 기울여 선회' : '왼쪽으로 기울여 선회'} (${K(ang > 0 ? 'br' : 'bl')})`, '']);
+      return;
+    }
     if (Math.abs(dy) > 0.3) lines.push([`${dy > 0 ? '고도 올리기' : '고도 내리기'} ${Math.abs(dy).toFixed(1)} m (${K(dy > 0 ? 'up' : 'down')})`, '']);
     if (hd > 2.5 && Math.abs(ang) > 12) lines.push([`${ang > 0 ? '오른쪽으로 돌기' : '왼쪽으로 돌기'} (${K(ang > 0 ? 'yawR' : 'yawL')})`, '']);
     else if (hd <= 12 && Math.abs(dr) > 0.3) lines.push([`${dr > 0 ? '오른쪽으로 이동' : '왼쪽으로 이동'} ${Math.abs(dr).toFixed(1)} m (${K(dr > 0 ? 'right' : 'left')})`, '']);
