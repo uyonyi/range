@@ -576,6 +576,11 @@ function drawMapBg() {
     g.fillStyle = col; const s = ['building', 'hipbld', 'pavilion', 'bleacher', 'shelter', 'tank'].includes(o.type) ? 5 : 3; g.fillRect(p[0] - s / 2, p[1] - s / 2, s, s);
   }
   if (window.__RWY) {   // 활주로: 테두리 있는 흰 띠 + 이륙 방향 시단 표시 + RWY 글자
+    if (window.__RWY.apron) {   // 계류장(회색) + 유도로 + H 패드(노란 점)
+      const ap = window.__RWY.apron.map(v => mxy(-v.z, v.x)); g.fillStyle = 'rgba(170,170,160,.85)'; g.beginPath(); ap.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); g.fill();
+      const A0 = window.__RWY.a, B0 = window.__RWY.b, m0 = mxy(-(A0.z + B0.z) / 2, (A0.x + B0.x) / 2), m1 = [(ap[0][0] + ap[1][0]) / 2, (ap[0][1] + ap[1][1]) / 2]; g.strokeStyle = 'rgba(80,80,80,.95)'; g.lineWidth = 2; g.beginPath(); g.moveTo(m0[0], m0[1]); g.lineTo(m1[0], m1[1]); g.stroke();
+      g.fillStyle = '#ffc828'; window.__RWY.pads.forEach(p => { const q = mxy(-p.z, p.x); g.beginPath(); g.arc(q[0], q[1], 1.8, 0, 6.283); g.fill(); });
+    }
     const A = window.__RWY.a, B = window.__RWY.b, p = mxy(-A.z, A.x), q = mxy(-B.z, B.x), w = Math.max(3, 12 / (MAPV.s1 - MAPV.s0) * 180 * 1.6);
     g.setLineDash([]); g.lineCap = 'butt'; g.strokeStyle = 'rgba(10,12,14,.9)'; g.lineWidth = w + 2.5; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
     g.strokeStyle = '#e8e8e2'; g.lineWidth = w; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
