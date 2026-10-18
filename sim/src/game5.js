@@ -185,7 +185,7 @@ function stepWing(dt) {
   V -= (nl - 1) * 1.1 * dt;
   // 비행 구역 밖이면 자동 선회
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
-  if (l > 680) { const dh = wrapA(Math.atan2(-rx, rz) - DR.h); DR.h += clamp(dh, -1, 1) * 0.6 * dt; if (S.msgCD <= 0) { showMsg('AREA LIMIT · 선회', '#ff9a40', 1); S.msgCD = 2; } }
+  if (l > FLY_R + 30) { const dh = wrapA(Math.atan2(-rx, rz) - DR.h); DR.h += clamp(dh, -1, 1) * 0.6 * dt; if (S.msgCD <= 0) { showMsg('AREA LIMIT · 선회', '#ff9a40', 1); S.msgCD = 2; } }
   const cg = Math.cos(DR.pitch);
   DR.v.set(Math.sin(DR.h) * V * cg, Math.sin(DR.pitch) * V - (stall ? Math.min(7, 3.5 + (vsE - V) * 1.2) : 0), -Math.cos(DR.h) * V * cg);   // 실속: 양력이 모자라 가라앉음
   DR.v.add(windAt(DR.p)); DR.p.addScaledVector(DR.v, dt); DR.thrust = assist ? clamp(0.5 + IN.thr * 0.5, 0.2, 1) : IN.boost ? 1 : clamp(0.55 + IN.thr * 0.45, 0, 1);
@@ -2498,5 +2498,4 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
   if ($('bSet')) $('bSet').onclick = () => optOpen('gis');
   new MutationObserver(() => draw()).observe(P, { subtree: true, attributes: true, attributeFilter: ['class'] });
   draw();
-})();
 })();

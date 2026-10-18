@@ -254,8 +254,8 @@ function stepDrone(dt) {
   }
   // 비행 구역 경계: 밀어냄
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
-  if (l > 650) {
-    const nx = rx / l, nz = rz / l; DR.p.x -= nx * (l - 650); DR.p.z -= nz * (l - 650);
+  if (l > FLY_R) {
+    const nx = rx / l, nz = rz / l; DR.p.x -= nx * (l - FLY_R); DR.p.z -= nz * (l - FLY_R);
     const vo = DR.v.x * nx + DR.v.z * nz; if (vo > 0) { DR.v.x -= nx * vo * 1.5; DR.v.z -= nz * vo * 1.5; }
     if (S.msgCD <= 0) { showMsg('AREA LIMIT', '#ff9a40', 1); S.msgCD = 2; }
   }
@@ -530,7 +530,7 @@ function updateTags() {
 }
 // 미니맵
 // 비행 구역: 중심 (down 150, side 0), 반지름 650 m (쿼드 경계) · 임무 사건은 이 안 (FLY_R_SAFE) 에만 둠
-const FLY_C = { x: 0, z: -150 }, FLY_R = 650, FLY_R_SAFE = 560;
+const FLY_C = { x: 0, z: -150 }, FLY_R = MID ? 1000 : 650, FLY_R_SAFE = MID ? 900 : 560;   // 중간 지형이 있으면 반경 1 km
 function flyL(p) { return Math.hypot(p.x - FLY_C.x, p.z - FLY_C.z); }
 const MAPV_COURSE = (function () {
   if (!CRS_C) return { d0: -24, d1: 340, s0: -112, s1: 90 };
@@ -587,6 +587,11 @@ function drawMapBg() {
     g.fillStyle = '#40ff70'; g.beginPath(); g.arc(p[0], p[1], 2.4, 0, 6.283); g.fill();
     const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, nx = -(q[1] - p[1]), ny = q[0] - p[0], nl = Math.hypot(nx, ny) || 1;
     g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,.7)'; g.fillText('RWY', mx + nx / nl * 11 + 0.8, my + ny / nl * 11 + 3.8); g.fillStyle = '#ffffff'; g.fillText('RWY', mx + nx / nl * 11, my + ny / nl * 11 + 3);
+  }
+  if (window.__OUTER) {   // 바깥 지역(임의): 길 · 건물
+    const O = window.__OUTER; g.setLineDash([]); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const rd of O.roads) { g.strokeStyle = rd.w >= 6 ? 'rgba(235,225,200,.8)' : 'rgba(210,200,175,.6)'; g.lineWidth = rd.w >= 6 ? 1.6 : 1; g.beginPath(); rd.p.forEach(([x, z], i) => { const q = mxy(-z, x); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
+    for (const [x, z, k] of O.blds) { const q = mxy(-z, x); g.fillStyle = k === 'gh' ? 'rgba(230,240,245,.85)' : k === 'shop' ? '#e0a040' : '#d8d0c0'; g.fillRect(q[0] - 1, q[1] - 1, 2, 2); }
   }
   // 비행 구역 경계 (점선 원)
   { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
