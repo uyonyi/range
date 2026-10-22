@@ -34,6 +34,7 @@ function startHead() { return -num(BY.pad_start.yaw, 0) * DEG; }
 function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0); p.y = groundAt(p.x, p.z) + 0.06; return p; }
 function startRun(kind) {
   enterFull();
+  if (typeof c1Menu === 'function') c1Menu(kind);
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
   S.objState = OBJS.map(() => 0); S.objNear = -1; S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
@@ -159,6 +160,7 @@ function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a
 function stepDrone(dt) {
   if (!DR.alive) { deadTick(dt); return; }
   if (AFc().cls === 'wing') { stepWing(dt); return; }
+  if (typeof isC1 === 'function' && isC1() && AFc().c1) { c1Phys(dt); return; }
   const md = effMode(), afc = AFc();
   const grounded = DR.landed && IN.thr <= 0.05;
   const boost = !!IN.boost && !grounded && boostZone() && !md.atti; S.boosting = boost;
@@ -457,6 +459,7 @@ function insideBunker(p) {
 const camPos = new V3(), camLook = new V3(), qBody = new THREE.Quaternion(), qTilt = new THREE.Quaternion(), eul = new THREE.Euler(0, 0, 0, 'YXZ');
 let shake = 0, topH = 0;
 function updateCamera(dt, subj) {
+  if (typeof c1Camera === 'function' && c1Camera(dt, subj)) { if (shake > 0) { camera.position.add(new V3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0)); shake *= Math.exp(-dt * 8); } camera.updateProjectionMatrix(); return; }
   const mode = CAMS[S.cam];
   eul.set(-visPitch(subj), -subj.h, -subj.roll); qBody.setFromEuler(eul);
   const fwd = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h));
@@ -774,6 +777,7 @@ function handleKeys() {
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
+    if (!S.brief && typeof c1Key === 'function' && c1Key(k)) continue;
     if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA')) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }

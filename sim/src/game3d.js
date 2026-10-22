@@ -78,7 +78,7 @@ function updateGuide(subj) {
   const active = S.state === 'run' && DR.alive && !(S.tut && S.tut.st !== 'fly');
   const o = active ? curObj() : null;
   GUIDE.next = null;
-  if (!o) { hideGuide(); return; }
+  if (!o || (typeof isC1 === 'function' && isC1())) { hideGuide(); return; }
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
     hideGuide(); if (!SET.guide) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
