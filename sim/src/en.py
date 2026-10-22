@@ -1,4 +1,4 @@
-EN = {
+EN = {'확인·사진': 'Confirm/photo', '확인 · 사진 보고': 'Confirm · photo report', '자격 시험 연습': 'Licence practice', '무인멀티콥터 1종 실기': 'Multicopter class 1 practical', '처음엔 학습부터': 'Start with learning', '1종 실기 · 학습': 'Class 1 · learn', '평탄 시험장 · 경로·허용구역 표시 · 기동 골라 연습': 'Flat test field · path and tolerance shown · pick a manoeuvre', '1종 모의평가': 'Class 1 · mock check', '보조 표시 없이 전체 순서 · 항목별 S/U': 'Full sequence without aids · S/U per item', '정찰 · 산불 · 수색': 'Recon · wildfire · search', '숲 속 실종자 찾아 위치 보고 · 복귀': 'Find the missing person in the forest, report the position, return', '게이트 · 슬라롬 · 선회 · 착륙': 'Gates · slalom · orbit · landing', 
 '✈️ 비행': '✈️ Flight',
 '🌤 날씨·시간': '🌤 Weather·time',
 '🖥 화면': '🖥 Display',
@@ -347,7 +347,7 @@ EN.update({
 '패드 쪽으로 이동 ${hd.toFixed(1)} m': 'Move toward the pad ${hd.toFixed(1)} m',
 "패드 위 · 천천히 내려가기 (${K(": "Over the pad · descend slowly (${K(",
 "올라가기 (${K(": "Climb (${K(",
-'고도 올리기': 'Climb', '고도 내리기': 'Descend',
+'오른쪽으로 기울여 선회': 'Bank right to turn', '왼쪽으로 기울여 선회': 'Bank left to turn', '고도 올리기': 'Climb', '고도 내리기': 'Descend',
 '오른쪽으로 돌기': 'Turn right', '왼쪽으로 돌기': 'Turn left',
 '오른쪽으로 이동': 'Strafe right', '왼쪽으로 이동': 'Strafe left',
 "정렬 OK · 전진 (${K(": "Aligned · fly forward (${K(",

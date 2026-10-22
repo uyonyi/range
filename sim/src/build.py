@@ -7,6 +7,8 @@ from en import EN
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game4.js', 'game5.js', 'game6.js']
 TITLES = {
+    'civil': {'TITLE': 'FPV Terrain Trainer · Civil', 'H1': 'FPV TERRAIN TRAINER',
+              'H2': {'ko': '민간 비행 연습 · 무인멀티콥터 1종 실기 기준 참고 연습 (시제품, 공식 시험 아님)', 'en': 'Civil flight practice · class-1 multicopter practical reference (prototype, not an official test)'}},
     'public': {'TITLE': 'FPV Terrain Trainer', 'H1': 'FPV TERRAIN TRAINER',
                'H2': {'ko': '실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)', 'en': 'Real-terrain drone obstacle course · web simulator (prototype v0.5)'}},
 }
@@ -16,6 +18,14 @@ LIBS = {'THREE': 'node_modules/three/build/three.min.js', 'GEOTIFF': 'node_modul
 def sources(lang, mode):
     t = open('template.html', encoding='utf-8').read()
     game = ''.join(open(f, encoding='utf-8').read() for f in FILES)
+    if mode in ('hroc', 'civil'):   # 1종 연습은 내부판·민간판에만 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
+        i = game.rstrip().rfind('})();'); game = game[:i] + open('game7.js', encoding='utf-8').read() + '\n' + game[i:]
+    if mode not in ('hroc', 'civil'):
+        t = re.sub(r'<!--C1TAB-->.*?<!--/C1TAB-->', '', t, flags=re.S); t = re.sub(r'\n[^\n]*data-g="exam"[^\n]*', '', t)
+    if mode == 'civil':   # 민간판: 타격·차량 추적 메뉴 없음, 투하 문구 정리
+        t = re.sub(r'\n[^\n]*data-ms="(strike|track)"[^\n]*', '', t)
+        game = game.replace("${n(KB.drop)} ${'투하'}", "${n(KB.drop)} ${'확인·사진'}").replace("drop: '투하', boost", "drop: 'OK', boost").replace("one('drop', '탑재물 투하')", "one('drop', '확인 · 사진 보고')")
+        t = t.replace('<small>정찰 · 구조 · 타격</small>', '<small>정찰 · 산불 · 수색</small>').replace('숲 속 실종자 찾고 구조 키트 투하 · 복귀', '숲 속 실종자 찾아 위치 보고 · 복귀').replace('게이트 · 슬라롬 · 투하 · 착륙', '게이트 · 슬라롬 · 선회 · 착륙')
     game = game.replace("'use strict';\n", "'use strict';\n" + open('game0t.js', encoding='utf-8').read(), 1)
     if lang == 'en':
         segs = json.load(open('ko_segs.json', encoding='utf-8'))
@@ -28,6 +38,7 @@ def sources(lang, mode):
         left = set(re.findall(r'[가-힣]+', g2 + t2))
         if left: print('LEFTOVER', list(left)[:30])
     T = PRIV['titles'] if mode == 'hroc' else TITLES[mode]
+    if mode == 'civil': game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리 (내부판 기록과 섞이지 않게)
     t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang])
     return t, game
 
@@ -51,6 +62,19 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
         if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
     pre += "window.SIM_DEFAULT_SITE='flat';"
     pre += 'window.SIM_SITES=' + json.dumps(sites, ensure_ascii=False) + ';'
+    o = t.replace('/*PROJ4*/', lib['PROJ4']).replace('/*THREE*/', lib['THREE']).replace('/*GEOTIFF*/', lib['GEOTIFF']).replace('/*DATA*/', pre).replace('/*GAME*/', game)
+    open(out, 'w', encoding='utf-8').write(o); print(out, len(o) // 1024, 'KB')
+
+
+def build_civil(lang='ko', out='civil.html'):
+    """민간 일반 비행판 한 파일: 공개 현장(영인산)만 · 사격장 코스·좌표 없음 · 1종 연습 포함"""
+    t, game = sources(lang, 'civil')
+    lib = {k: open(v, encoding='utf-8').read().replace('</script>', '<\\/script>') for k, v in LIBS.items()}
+    s = [x for x in json.load(open('sites.json', encoding='utf-8')) if x['id'] == 'yeongin'][0]
+    op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+    if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
+    data = {'objs': s['course']['objs'], 'wp': s['course']['wp']}
+    pre = 'window.SIM_CIVIL=true;window.SIM_UNLOCKED=true;window.SIM_NOFLAT=true;window.SIM_LANG=' + json.dumps(lang) + ';window.SIM_SITES=' + json.dumps([s], ensure_ascii=False) + ';window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';'
     o = t.replace('/*PROJ4*/', lib['PROJ4']).replace('/*THREE*/', lib['THREE']).replace('/*GEOTIFF*/', lib['GEOTIFF']).replace('/*DATA*/', pre).replace('/*GAME*/', game)
     open(out, 'w', encoding='utf-8').write(o); print(out, len(o) // 1024, 'KB')
 
@@ -105,11 +129,12 @@ def build_pages(outdir, site_ids, vr):
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
 
 
-def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False):
+def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False, civil=False):
     """내부용 한 파일에 한국어·영어 둘 다 (첫 화면 오른쪽 위에서 바꿈, 브라우저에 기억)"""
     pages = {}
     for lang in ('ko', 'en'):
-        build(lang, mobile, '_tmp_' + lang + '.html', vr)
+        if civil: build_civil(lang, '_tmp_' + lang + '.html')
+        else: build(lang, mobile, '_tmp_' + lang + '.html', vr)
         h = open('_tmp_' + lang + '.html', encoding='utf-8').read(); os.remove('_tmp_' + lang + '.html')
         pages[lang] = h
     def split(h):
@@ -138,7 +163,9 @@ if(L==='en'){window.SIM_LANG='en';if(window.SIM_FLAT_SITE)window.SIM_FLAT_SITE.n
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == 'public':
+    if len(sys.argv) > 1 and sys.argv[1] == 'civil':
+        build_dual(False, 'fpv_civil_class1_test.html', civil=True)
+    elif len(sys.argv) > 1 and sys.argv[1] == 'public':
         build_public(sys.argv[2])
     else:
         build('ko', False, 'hroc_fpv_simulator_KO.html')

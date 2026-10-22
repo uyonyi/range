@@ -555,7 +555,9 @@ function buildPad(o) {
   b.box(0, 0, zt, Hw - 2 * st + 0.02, st * 0.95, 0.005, M.white, { col: false, shadow: false });
   PADS.push({ b, r: dia / 2, top: PH + 0.02, half: [dia * 0.42 + 0.55, 0.6] });
 }
+let C1ON = false;   // 1종 시험장 (평탄) 사용 중
 function groundAt(x, z) {
+  if (C1ON) return 0;
   let h = terrainAt(x, z);
   for (const p of PADS) {
     const l = p.b.local(_p.set(x, 0, z));
