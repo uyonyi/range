@@ -713,20 +713,28 @@ body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.
 #c1m td button{margin:0 2px;padding:6px 10px;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3}#c1m td button.on{background:#2c5a36;border-color:#5dff9a}
 #c1m .primary{margin-top:6px;padding:9px 16px;border-radius:8px;border:0;background:#ffc828;color:#111;font-weight:700}#c1m .primary:disabled{opacity:.4}
 #c1m .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border-radius:8px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3;font-size:14px}#c1m .q{font-size:16px;font-weight:600}#c1m .dim{color:#8f9aa3;font-size:12px}
+body.touch #c1p{left:150px;right:280px;top:36px;width:auto;max-height:110px;overflow:hidden;padding:4px 8px;font-size:11px;line-height:1.25}
+body.touch #c1p .r,body.touch #c1p canvas,body.touch #c1p .note{display:none}body.touch #c1p .m{font-size:12px;margin:0}body.touch #c1p .s{margin:1px 0}
+body.touch #c1p .bt{flex-wrap:nowrap;margin-top:3px;gap:3px}body.touch #c1p .bt button{min-width:0;padding:5px 3px;font-size:11px}
+body.touch #c1p.chk .t,body.touch #c1p.chk .cl{display:none}body.touch #c1p.chk .r{display:flex;flex-wrap:wrap;gap:0 6px;font-size:10px}body.touch #c1p.chk .r span{margin-right:6px}body.touch #c1p.mini{max-height:34px}
+body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
 @media (max-width:700px),(max-height:500px){#c1p{width:230px;font-size:11px;top:86px;left:6px;padding:6px 8px;max-height:calc(100vh - 96px)}#c1p canvas,#c1p .note{display:none}#c1p .m{font-size:13px}#c1p .bt button{padding:8px 4px}}`;
     document.head.appendChild(css);
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
 <div class="cl" id="c1Cl"></div>
-<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
+<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1An">📢</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
     tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
+    $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 끔 (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 켬', 'Examiner announcements on'), '#ffc828', 1.6); };
+    $('c1T').onpointerdown = e => { if (IS_TOUCH) { e.stopPropagation(); el.classList.toggle('mini'); } };
     $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
-  el.classList.toggle('hidden', !show);
+  el.classList.toggle('hidden', !show); c1AnnBtn();
 }
+function c1AnnBtn() { const b = $('c1An'); if (b) { b.classList.toggle('on', SET.c1ann !== false); b.title = L2('시험위원 지시 방송 켜기/끄기', 'Examiner announcements on/off'); } }
 let _c1ui = 0;
 function c1Tick(dt) {
   if (!isC1() || !C1G) return;
@@ -777,7 +785,7 @@ function c1Tick(dt) {
   if (st && st.k === 'rc') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r = `<b>${L2('스로틀', 'Throttle')}</b><span>↑${ck('thr+')} ↓${ck('thr-')}</span><b>${L2('러더', 'Rudder')}</b><span>←${ck('yaw-')} →${ck('yaw+')}</span><b>${L2('엘리베이터', 'Elevator')}</b><span>↑${ck('pitch+')} ↓${ck('pitch-')}</span><b>${L2('에일러론', 'Aileron')}</b><span>←${ck('roll-')} →${ck('roll+')}</span><b>${L2('모드 스위치', 'Mode switch')}</b><span class="${C1.mode === 'gps' ? 'ok' : 'bad'}">${C1.mode.toUpperCase()}</span>`; }
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (키보드 S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
-  $('c1R').innerHTML = r;
+  $('c1R').innerHTML = r; el.classList.toggle('chk', !!st && (st.k === 'rc' || st.k === 'ctl' || (st.k === 'arm' && st.csc)));
   $('c1Note').textContent = L2('1종 실기시험 기준 참고 연습용 · 공식 시험·교육시간 인정 여부 미확인 · 기체 계수는 가정값', 'Reference practice for the class-1 practical test · not an official test or training hours · aircraft values assumed') + (C1.exam ? '' : L2(' · 숫자 1~9 = 기동 바로가기 · N = 다음 단계', ' · keys 1–9 jump to a manoeuvre · N = next step'));
   const cv = $('c1Map'); if (cv && !C1.exam) c1DrawMap(cv, st, M); else if (cv) cv.style.display = 'none';
 }
@@ -1006,7 +1014,7 @@ function c1OralAns(st, a) {
 function c1OralAuto(nOk) { const st = c1Cur(); if (!st || st.k !== 'oral' || !st.qs) return; for (let i = 0; i < 5 && !st.done; i++) c1OralAns(st, i < nOk ? 0 : 1); }
 
 Object.assign(C1EV, {
-  ann(st) { if (st.t1 == null) { st.t1 = C1.t + c1Say(L2(st.ko, st.en), 'ex'); if (C1.M[C1.mi] && C1.M[C1.mi].id === 'pre' && C1.si === 0) C1.introCam = true; } if (C1.t >= st.t1) { C1.introCam = false; return true; } return false; },
+  ann(st) { if (SET.c1ann === false) { C1.introCam = false; if (!st.skipLogged) { st.skipLogged = true; c1Ev('annOff'); } return true; } if (st.t1 == null) { st.t1 = C1.t + c1Say(L2(st.ko, st.en), 'ex'); if (C1.M[C1.mi] && C1.M[C1.mi].id === 'pre' && C1.si === 0) C1.introCam = true; } if (C1.t >= st.t1) { C1.introCam = false; return true; } return false; },
   inspect(st) { if (!st.open) { st.open = true; st.fault = Math.random() < (C1.exam ? 0.4 : 0.5) ? C1INS[Math.floor(Math.random() * C1INS.length)].id : null; if (window.C1_FAULT !== undefined) st.fault = window.C1_FAULT; c1InspectUI(st); } return !!st.done; },
   rc(st) {
     const sn = st.seen || (st.seen = {}), a = { thr: IN.thr, yaw: IN.yaw, pitch: IN.pitch, roll: IN.roll };
