@@ -2724,7 +2724,7 @@ function frame(now, noRender) {
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 Camera 영상을 화면 텍스처로 먼저 그림
-  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon()) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
 }
 
 // =====================================================================
@@ -5753,7 +5753,7 @@ async function vrStart() {
   XR.sess = sess; XR.userExit = false; renderer.xr.enabled = true;
   renderer.xr.setFramebufferScaleFactor(window.XR_FB || 1.0); renderer.xr.setReferenceSpaceType('local-floor');
   try { await renderer.xr.setSession(sess); }
-  catch (e) { try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
+  catch (e) { try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); XR.local = true; } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
   try { renderer.xr.setFoveation(1); } catch (e) { }
   XR_ON = true; XR.prev = {}; vrApplyCam();
   sess.addEventListener('end', vrEnded);
@@ -5822,6 +5822,7 @@ function xrInput(dt) {
   let any = false;
   for (const k in st) { const v = vm === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
+  if (typeof isC1 === 'function' && isC1() && S.state !== 'result') { if (A) pressed.push('Enter'); if (B) vrMenuOpen(); if (Y) pressed.push('KeyY'); if (X) pressed.push('KeyE'); if (rt) pressed.push('KeyQ'); return; }   // 1종 연습 버튼
   if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 A = 사진
@@ -6021,6 +6022,7 @@ function xrTick(dt) {
     if (hv !== XR.hover || (XR.mT -= dt) <= 0) { XR.hover = hv; XR.mT = 0.3; vrMenuDraw(); }
   }
   XR.ctl.forEach(c => c.userData.ln.visible = !!c.userData.hand && (XR.menu || S.state === 'result'));
+  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 (고글 화면 None)
   VR_SCR.visible = true;
   // 지형 장면을 드론 Camera(게임 Camera)로 화면 텍스처에 그림
   renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true;   // 그림자는 2프레임에 한 번
@@ -6948,7 +6950,7 @@ function c1Start(a) {
   C1.M = c1Build(C1.side);
   C1.M.forEach(m => { m.done = false; m.miss = false; m.fail = false; m.why = []; m.label = m.name; m.steps.forEach(s => { s.T = s.T || c1R('hoverT'); }); });
   S.cam = 1; ui.map.style.display = 'none'; document.body.classList.add('c1on');
-  c1Panel(true);
+  c1Panel(true); c1ALoad();
   c1Ev('start', { exam: C1.exam, side: C1.side < 0 ? 'left-first' : 'right-first', profile: C1P.ver, rules: C1RULES.ver, wind: WIND.lv });
   return C1.M;
 }
@@ -6995,6 +6997,9 @@ function c1Key(k, fromVoice) {
   if (!isC1() || S.state !== 'run') return false;
   const st = c1Cur();
   if (k === 'KeyY') { c1Mode(); return true; }
+  if (st && st.k === 'inspect' && st.open && !st.done && (XR_ON || window.C1_VRTEST) && (k === 'Enter' || k === 'KeyE' || k === 'Space')) {   // VR: 항목마다 A 정상 / X 불량
+    const it = C1INS.find(x => !st.ans[x.id]); if (it) { st.ans[it.id] = k === 'KeyE' ? 'bad' : 'ok'; sfx('good'); } if (C1INS.every(x => st.ans[x.id])) c1InspectDone(st); return true; }
+  if (st && st.k === 'oral' && st.qs && !st.done && (XR_ON || window.C1_VRTEST) && k === 'Enter') { c1OralAns(st, st.qs[st.qi].ord[C1XR.sel]); C1XR.sel = 0; return true; }
   if (k === 'KeyQ') { if (!c1CallDo('btn') && st && st.call && !C1.exam) showMsg(L2('이 단계 구호는 이미 했습니다', 'Call already made for this step'), '#9aa6ad', 1); return true; }
   if (k === 'KeyE') { if (st && st.k === 'callout' && !st.wait2) { st.wait2 = true; c1CallDo(fromVoice ? 'voice' : 'btn'); c1Ev('callout'); showMsg(L2('"비상!"', '"EMERGENCY!"'), '#ff5050', 1.2); sfx('bad'); c1Next(); const n = c1Cur(); if (n) n.t0 = C1.t; } return true; }
   if (k === 'KeyC' || k === 'PadRB') { if (!C1.exam) { C1.view = C1.view === 'pilot' ? 'chase' : 'pilot'; showMsg(C1.view === 'pilot' ? L2('조종자 시점', 'Pilot view') : L2('추적 시점 (학습용)', 'Chase view (learning)'), '#4fe3ff', 1); } else showMsg(L2('모의평가는 조종자 시점만', 'Mock check uses the pilot view only'), '#ffc828', 1); return true; }
@@ -7241,12 +7246,39 @@ function c1VoicePick() {
   try { const vs = speechSynthesis.getVoices(), lang = window.SIM_LANG === 'en' ? 'en' : 'ko'; return vs.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang)); } catch (e) { return []; }
 }
 // who: 'ex' 시험위원 (낮고 차분) · 'me' 응시자 구호 (높고 빠르게, 다른 목SOUND가 있으면 그것)
+// ---- 미리 만든 음성 묶음 (한국어: Mimic3 KSS 음성 · 영어: Kokoro) · 없거나 못 찾으면 기기 음성 합성 ----
+const C1A = { st: 'none', idx: null, buf: null, ab: {}, until: 0 };
+function c1ALoad() {
+  if (C1A.st !== 'none') return; C1A.st = 'loading';
+  const ib = document.getElementById('c1vb'), ii = document.getElementById('c1vi');
+  if (ib && ii) { try { const s = atob(ib.textContent.trim()), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); C1A.buf = u.buffer; C1A.idx = JSON.parse(ii.textContent); C1A.st = 'ready'; } catch (e) { C1A.st = 'fail'; } return; }
+  if (location.protocol === 'file:') { C1A.st = 'fail'; return; }
+  const base = (window.SIM_BASE || '') + 'lib/c1_voice';
+  Promise.all([fetch(base + '.json').then(r => r.json()), fetch(base + '.bin').then(r => r.arrayBuffer())]).then(([i, b]) => { C1A.idx = i; C1A.buf = b; C1A.st = 'ready'; }).catch(() => { C1A.st = 'fail'; });
+}
+function c1AKey(text, who) {
+  const L = window.SIM_LANG === 'en' ? 'en' : 'ko', k = `${L}|${who}|${text}`; if (!C1A.idx) return null;
+  if (C1A.idx[k]) return k;
+  const g = `${L}|${who}|` + (L === 'ko' ? text.replace(/^응시자 [^,]+,/, '응시자,') : text.replace(/^Candidate [^,]+,/, 'Candidate,')); return C1A.idx[g] ? g : null;
+}
+function c1APlay(k) {
+  const ctx = AU.ctx; if (!ctx) return false;
+  try { if (ctx.state !== 'running') ctx.resume(); } catch (e) { }
+  const [o, l] = C1A.idx[k];
+  const go = b => { const s = ctx.createBufferSource(); s.buffer = b; const gn = ctx.createGain(); gn.gain.value = 1.6; s.connect(gn); gn.connect(AU.master || ctx.destination);
+    const t0 = Math.max(ctx.currentTime + 0.02, C1A.until); s.start(t0); C1A.until = t0 + b.duration + 0.15; };
+  if (C1A.ab[k]) go(C1A.ab[k]); else ctx.decodeAudioData(C1A.buf.slice(o, o + l)).then(b => { C1A.ab[k] = b; go(b); }).catch(() => { });
+  return true;
+}
 function c1Say(text, who) {
-  const dur = Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
+  if (C1A.st === 'none') c1ALoad();
+  const ak = C1A.st === 'ready' ? c1AKey(text, who) : null;
+  const dur = ak ? C1A.idx[ak][2] + 0.35 : Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
   c1Caption(text, who, dur);
-  (C1V.log = C1V.log || []).push((who === 'me' ? 'ME: ' : 'EX: ') + text); if (C1V.log.length > 300) C1V.log.shift();
+  (C1V.log = C1V.log || []).push((ak ? '' : '[NOKEY] ') + (who === 'me' ? 'ME: ' : 'EX: ') + text); if (C1V.log.length > 300) C1V.log.shift();
   try {
-    if (window.speechSynthesis && !TEST && SET.c1voice !== false) {   // 무전 음성 SETTINGS과 따로 (무전을 꺼도 시험장 안내는 나옴)
+    if (ak && SET.c1voice !== false) { if (!TEST) c1APlay(ak); C1V.nRec = (C1V.nRec || 0) + 1; }
+    else if (window.speechSynthesis && !TEST && SET.c1voice !== false) {   // 무전 음성 SETTINGS과 따로 (무전을 꺼도 시험장 안내는 나옴)
       const u = new SpeechSynthesisUtterance(text), vs = c1VoicePick();
       u.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR';
       if (vs.length) u.voice = who === 'me' && vs.length > 1 ? vs[1] : vs[0];
@@ -7263,11 +7295,13 @@ function c1Say(text, who) {
 }
 // 휴대폰(특히 아이폰)·일부 브라우저는 화면을 한 번 누른 뒤에야 음성이 나옴 → 첫 터치·키 입력 때 빈 음성으로 열어 둠
 function c1VoiceUnlock() {
+  try { if (typeof initAudio === 'function') initAudio(); if (AU.ctx && AU.ctx.state !== 'running') AU.ctx.resume(); } catch (e) { }
   if (C1V.unlocked || !window.speechSynthesis) return; C1V.unlocked = true;
   try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR'; speechSynthesis.speak(u); speechSynthesis.resume(); } catch (e) { }
 }
 ['pointerdown', 'keydown', 'touchend'].forEach(ev => document.addEventListener(ev, () => { if (isC1() || S.state === 'menu') c1VoiceUnlock(); }, { capture: true, passive: true }));
 function c1VoiceStatus() {
+  if (C1A.st === 'ready') return SET.c1voice === false ? L2('🔇 시험장 음성 꺼짐 (🔊 버튼)', '🔇 Test-field voice off (🔊)') : (!AU.ctx || AU.ctx.state !== 'running' ? L2('🔈 화면을 한 번 누르면 SOUND가 납니다', '🔈 Tap the screen once to enable sound') : '');
   if (!window.speechSynthesis) return L2('🔇 이 브라우저는 음성 합성을 지원하지 않습니다', '🔇 No speech synthesis in this browser');
   if (SET.c1voice === false) return L2('🔇 시험장 음성 꺼짐 (🔊 버튼)', '🔇 Test-field voice off (🔊)');
   if (C1V.err) return L2(`🔇 음성 오류 (${C1V.err}) · 화면을 한 번 누른 뒤 🔊 로 시험`, `🔇 Voice error (${C1V.err}) · tap the screen, then test with 🔊`);
@@ -7402,7 +7436,61 @@ Object.assign(C1EV, {
   oral(st) { if (!st.open) { st.open = true; c1OralUI(st); } return !!st.done; }
 });
 
+// =====================================================================
+//  VR (Quest 등): 1종 연습은 고글 화면이 아니라 조종자 자리(P)에 서서 맨눈으로 기체를 보는 방식
+//  · 머리를 돌려 기체를 따라 봄 · 왼손 앞 아래에 안내판 · A 확인 · X 비상(점검 때는 불량) · Y 모드 · R트리거 구호 · B Menu
+// =====================================================================
+var C1XR = { rig: null, cam: null, board: null, t: 0, sel: 0, selT: 0 };
+function c1VRon() { return ((typeof XR_ON !== 'undefined' && XR_ON && !XR.menu) || window.C1_VRTEST) && isC1() && S.state !== 'menu'; }
+function c1XRInit() {
+  if (C1XR.rig) return;
+  const rig = new THREE.Group(); scene.add(rig); const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 9000); rig.add(cam);
+  const b = vrPlane(0.62, 0.42, 1024, 694, { depthTest: false }); b.m.position.set(-0.32, 1.02, -0.5); b.m.rotation.set(-0.62, 0.42, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);
+  Object.assign(C1XR, { rig, cam, board: b });
+}
+function c1XRUpdate(dt) {
+  c1XRInit(); const R = C1XR.rig;
+  const at = C1.introCam ? c1W(-9, -7.5, 0) : c1W(0, 0, 0);
+  const raise = XR.local ? c1p('eye') : 0;   // 바닥 기준 공간이 없으면 눈높이만큼 올림 (안내판은 그만큼 내림)
+  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.02 - raise;
+  R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
+  if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
+  C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';
+  // 점검·구술 고르기: Right stick 위아래
+  const st = c1Cur(); C1XR.selT -= dt;
+  if (st && st.k === 'oral' && st.qs && C1XR.selT <= 0) { if (IN.pitch > 0.6) { C1XR.sel = (C1XR.sel + 3) % 4; C1XR.selT = 0.3; } else if (IN.pitch < -0.6) { C1XR.sel = (C1XR.sel + 1) % 4; C1XR.selT = 0.3; } }
+  C1XR.t -= dt; if (C1XR.t > 0) return; C1XR.t = 0.2; c1BoardDraw();
+}
+function c1BoardDraw() {
+  const B = C1XR.board, g = B.cv.getContext('2d'), W2 = B.cv.width, H2 = B.cv.height, st = c1Cur(), m = C1.M[C1.mi];
+  g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(10,14,20,.9)'; vrRR(g, 0, 0, W2, H2, 26); g.fill(); g.strokeStyle = '#c9a2ff'; g.lineWidth = 4; vrRR(g, 2, 2, W2 - 4, H2 - 4, 24); g.stroke();
+  let y = 22; const line = (t, col, sz, wt) => { g.fillStyle = col || '#e8eef3'; g.font = `${wt || 600} ${sz || 30}px system-ui, sans-serif`; const ws = String(t).split(' '); let ln = ''; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > W2 - 56 && ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; ln = w; } else ln = tl; } if (ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; } };
+  g.textBaseline = 'top';
+  line((C1.exam ? L2('Class 1 · mock check', 'CLASS 1 · MOCK') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + C1.mode.toUpperCase() + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ' · ' + L2('기준', 'REF') + ' ' + C1.ref.toFixed(1) + ' m' : ''), '#c9a2ff', 24, 700);
+  if (m) line(`${C1.mi + 1}. ${m.name}`, '#fff', 34, 800);
+  if (st) line(st.lab, '#ffc828', 27);
+  if (st && st.k === 'inspect' && st.open && !st.done) {
+    const i = C1INS.findIndex(it => !st.ans[it.id]), it = C1INS[i];
+    if (it) { const bad = st.fault === it.id; line(`${i + 1}/${C1INS.length} ${L2(it.ko, it.en)}: ${L2((bad ? it.bad : it.ok)[0], (bad ? it.bad : it.ok)[1])}`, '#fff', 28); line(L2('A = 정상 · X = 불량', 'A = OK · X = faulty'), '#7fd0ff', 26); }
+  } else if (st && st.k === 'oral' && st.qs && !st.done) {
+    const x = st.qs[st.qi], lang = window.SIM_LANG === 'en' ? 1 : 0; line(x.q.q[lang], '#fff', 27, 700);
+    x.ord.forEach((ai, k) => line(`${k === C1XR.sel ? '▶ ' : '   '}${x.q.a[ai][lang]}`, k === C1XR.sel ? '#5dff9a' : '#cfd6da', 24));
+    line(L2('Right stick 위아래로 고르고 A', 'Right stick up/down, then A'), '#7fd0ff', 22);
+  } else {
+    if (st && st.call) { const c = L2(st.call.ko, st.call.en); line((st.callSaid ? '✓ ' : '📣 ') + (st.call.count ? (c ? c + ' → ' : '') + L2('Pause. 하나…다섯', 'hold, one…five') : c), st.callSaid ? '#5dff9a' : '#7fd0ff', 24); }
+    const M = c1M(), e = st && st.err; let r = `${L2('스키드', 'Skid')} ${M.alt.toFixed(1)} m · ${L2('기수', 'Hdg')} ${c1Wrap(M.hdg).toFixed(0)}°`;
+    if (!C1.exam && e) { if (e.lat != null) r += ` · ${L2('위치', 'Pos')} ${e.lat.toFixed(1)}`; if (e.alt != null && st.k !== 'land' && st.k !== 'emg') r += ` · ${L2('고도', 'Ht')} ${(e.alt >= 0 ? '+' : '') + e.alt.toFixed(1)}`; if (st.k === 'hold') r += ` · ${L2('Pause', 'Hold')} ${st.armedEval ? st.t.toFixed(1) : '–'}/${st.T}s`; }
+    line(r, '#cfd6da', 24);
+    if (st && st.k === 'rc') { const sn = st.seen || {}; line(['thr+', 'thr-', 'yaw-', 'yaw+', 'pitch+', 'pitch-', 'roll-', 'roll+'].map(k => (sn[k] ? '✓' : '·') + k.replace('thr', 'T').replace('yaw', 'R').replace('pitch', 'E').replace('roll', 'A')).join(' '), '#cfd6da', 22); }
+  }
+  const cap = $('c1cap'); if (cap && cap.classList.contains('on')) line(cap.textContent, '#ffd27a', 24);
+  if (S.state === 'result') line(L2('결과는 웹 화면 · B Menu', 'Results on the web page · B menu'), '#fff', 26);
+  g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 20px system-ui, sans-serif'; g.fillText(L2('A 확인 · X 비상 · Y 모드 · R트리거 구호 · B Menu', 'A ok · X emergency · Y mode · R-trigger call · B menu'), 28, H2 - 58);
+  g.fillText(C1DISC(), 28, H2 - 32);
+  B.tex.needsUpdate = true;
+}
+
 c1Place();
-if (window.__sim) Object.assign(window.__sim, { C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, AF, AF_IDS, MS_OK, TOUCH, isC1 });
+if (window.__sim) Object.assign(window.__sim, { WIND, C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, C1XR, c1XRUpdate, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, AF, AF_IDS, MS_OK, TOUCH, isC1 });
 
 })();

@@ -2133,7 +2133,7 @@ async function vrStart() {
   XR.sess = sess; XR.userExit = false; renderer.xr.enabled = true;
   renderer.xr.setFramebufferScaleFactor(window.XR_FB || 1.0); renderer.xr.setReferenceSpaceType('local-floor');
   try { await renderer.xr.setSession(sess); }
-  catch (e) { try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
+  catch (e) { try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(sess); XR.local = true; } catch (e2) { try { sess.end(); } catch (e3) { } XR.sess = null; renderer.xr.enabled = false; return; } }
   try { renderer.xr.setFoveation(1); } catch (e) { }
   XR_ON = true; XR.prev = {}; vrApplyCam();
   sess.addEventListener('end', vrEnded);
@@ -2202,6 +2202,7 @@ function xrInput(dt) {
   let any = false;
   for (const k in st) { const v = vm === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
+  if (typeof isC1 === 'function' && isC1() && S.state !== 'result') { if (A) pressed.push('Enter'); if (B) vrMenuOpen(); if (Y) pressed.push('KeyY'); if (X) pressed.push('KeyE'); if (rt) pressed.push('KeyQ'); return; }   // 1종 연습 버튼
   if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
   if (rt) pressed.push('Space');
   if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 A = 사진
@@ -2401,6 +2402,7 @@ function xrTick(dt) {
     if (hv !== XR.hover || (XR.mT -= dt) <= 0) { XR.hover = hv; XR.mT = 0.3; vrMenuDraw(); }
   }
   XR.ctl.forEach(c => c.userData.ln.visible = !!c.userData.hand && (XR.menu || S.state === 'result'));
+  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 (고글 화면 없음)
   VR_SCR.visible = true;
   // 지형 장면을 드론 카메라(게임 카메라)로 화면 텍스처에 그림
   renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true;   // 그림자는 2프레임에 한 번
