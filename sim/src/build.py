@@ -85,7 +85,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
-    for f in ('radio_voice.bin', 'radio_voice.json'):   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json'):   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
@@ -113,7 +113,7 @@ def build_pages(outdir, site_ids, vr):
     up = '../' if vr else ''
     import hashlib
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
-        t, game = sources(lang, 'public', c1=not vr)
+        t, game = sources(lang, 'public', c1=True)
         game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(game)
         tags = {'THREE': up + 'lib/three.min.js', 'GEOTIFF': up + 'lib/geotiff.js', 'PROJ4': up + 'lib/proj4.js'}
@@ -154,6 +154,9 @@ def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False, civil=Fals
     if os.path.exists('radio_voice.bin'):   # 무전 음성 조각을 파일 안에
         import base64
         o += '<script type="text/plain" id="rvb">' + base64.b64encode(open('radio_voice.bin', 'rb').read()).decode() + '</script><script type="application/json" id="rvi">' + open('radio_voice.json').read() + '</script>'
+    if os.path.exists('c1_voice.bin'):   # 1종 시험장 음성 묶음 (Mimic3 KSS 한국어 · Kokoro 영어)
+        import base64
+        o += '<script type="text/plain" id="c1vb">' + base64.b64encode(open('c1_voice.bin', 'rb').read()).decode() + '</script><script type="application/json" id="c1vi">' + open('c1_voice.json', encoding='utf-8').read() + '</script>'
     o += '<script type="text/plain" id="g_ko">' + esc(sk[4]) + '</script><script type="text/plain" id="g_en">' + esc(se[4]) + '</script>'
     o += '<script>window.SIM_DUAL=true;window.SIM_PAGES=' + json.dumps({'ko': {'body': bk, 'title': tk}, 'en': {'body': be, 'title': te}}, ensure_ascii=False).replace('</', '<\\/') + ';' + """
 (function(){var L='ko';try{L=localStorage.getItem('fpvsim_lang')||'ko'}catch(e){}if(L!=='en')L='ko';
