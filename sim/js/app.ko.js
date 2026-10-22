@@ -1837,7 +1837,7 @@ const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', gho
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
