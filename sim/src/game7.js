@@ -71,19 +71,66 @@ MS_NAME.class1 = L2('1종 실기 학습', 'Class-1 practice (learn)'); MS_NAME.c
 MS_CAT.class1 = MS_CAT.class1x = 'exam'; CAT_C.exam = '#c9a2ff';
 BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multicopter class 1 · learn'),
   L2('평탄 시험장에서 이륙·호버링·전후진·삼각·원주·비상·정상접근·측풍접근 순서로 연습합니다. 경로·허용구역·타이머를 보여 줍니다.', 'Practise takeoff, hover, forward/back, triangle, circle, emergency, normal and crosswind approach on a flat test field, with path, tolerance box and timers shown.'),
-  L2('조종자 위치(P)에서 보는 시점 · Enter 확인 · Y 비행모드 · E "비상" · C 시점 · 기준 문서 참고 연습용이며 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Pilot-position view · Enter confirm · Y flight mode · E "emergency" · C view · Reference practice only; not an official test and not counted as training time.')];
+  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · Q 구호(기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · Enter 확인 · Y 비행모드 · E "비상" · C 시점 · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · Q call-out (device voice) · 🎤 say it yourself (speech recognition) · Enter confirm · Y flight mode · E "emergency" · C view · Not an official test or training hours.')];
 BRIEF.class1x = [L2('무인멀티콥터 1종 · 모의평가', 'Unmanned multicopter class 1 · mock check'),
-  L2('보조 표시 없이 전체 기동을 순서대로 수행하고 항목별 S/U 모의판정을 받습니다. 구술·공중경계·판단력은 미평가로 남습니다.', 'Fly the whole sequence without aids and get a per-item S/U mock verdict. Oral, lookout and judgement stay unrated.'),
+  L2('호명·비행 전 점검·조종기 점검·시동부터 전체 기동, 구술 5문항까지 실제 시험 순서로 진행하고 항목별 S/U 모의판정을 받습니다. 공중경계·판단력은 미평가로 남습니다.', 'Run the real order — call-up, pre-flight and transmitter checks, start, all manoeuvres and a 5-question oral — and get a per-item S/U mock verdict. Lookout and judgement stay unrated.'),
   L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.')];
 function isC1(k) { k = k || S.kind; return k === 'class1' || k === 'class1x'; }
 
 // ---- 시험장 좌표 (u = 조종자 오른쪽, v = 전방, 단위 m) ----
 // 세부평가기준 배치도: P→H 15 m, H→A 7.5 m, A→E 40 m, A→B·D 7.5 m, F 는 H 와 같은 줄의 좌·우 7.5 m, H·F 2×2 m
-const C1S = { x: 14000, z: 14000, y: 0 };
+var C1S = { x: 14000, z: 14000, y: 0, h: 0, real: false };   // h: 전방(v) 방위 · real: 실제 지형 위에 다져 넣은 시험장
 const C1PT = { P: [0, 0], H: [0, 15], A: [0, 22.5], B: [-7.5, 22.5], C: [0, 30], D: [7.5, 22.5], E: [0, 62.5], FB: [-7.5, 15], FD: [7.5, 15] };
 const C1FIELD = { u0: -17.5, u1: 17.5, v0: -2.4, v1: 77.6, src: 'app' };   // 80×35 m 부지 경계 (P 와 경계 사이 여백은 앱 설정)
-function c1W(u, v, h) { return new V3(C1S.x + u, C1S.y + (h || 0), C1S.z - v); }
-function c1UV(p) { return [p.x - C1S.x, C1S.z - p.z]; }
+function c1W(u, v, h) { const fx = Math.sin(C1S.h), fz = -Math.cos(C1S.h), rx = Math.cos(C1S.h), rz = Math.sin(C1S.h); return new V3(C1S.x + rx * u + fx * v, C1S.y + (h || 0), C1S.z + rz * u + fz * v); }
+function c1UV(p) { const dx = p.x - C1S.x, dz = p.z - C1S.z; return [dx * Math.cos(C1S.h) + dz * Math.sin(C1S.h), dx * Math.sin(C1S.h) - dz * Math.cos(C1S.h)]; }
+function c1Gnd() { return C1S.real ? groundAt(DR.p.x, DR.p.z) : C1S.y; }
+// ---- 영인산 야전 착륙장 옆에 시험장 자리 찾기: 80×35 m(+여백) 가 가장 평평하고, 활주로·계류장·코스 물체와 겹치지 않는 곳 → 지형을 그 높이로 다짐 ----
+function c1Place() {
+  try {
+    if (!RWY || !TER.h || window.SIM_C1_FAR) return false;
+    const ap = RWY.at(0, RWY.sg * (RWY.Wd / 2 + 40)), n = TER.n, st = TER.step, hu = 22.5, v0 = -10, v1 = 85;   // 다질 범위 (u ±22.5, v -10~85)
+    const inTer = (x, z) => { const fx = (x - GS0) / st, fy = (GD1 + z) / st; return fx > 3 && fy > 3 && fx < n - 4 && fy < n - 4; };
+    const rl = p => rwyLocal(p);
+    let best = null;
+    for (let R = 50; R <= 260; R += 15) for (let a = 0; a < 360; a += 15) for (let hd = 0; hd < 360; hd += 15) {
+      const h = hd * DEG, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h);
+      const px = ap.x + Math.sin(a * DEG) * R, pz = ap.z - Math.cos(a * DEG) * R;   // P(조종자) 위치
+      const W2 = (u, v) => [px + rx * u + fx * v, pz + rz * u + fz * v];
+      if (Math.hypot(px - FLY_C.x, pz - FLY_C.z) > FLY_R_SAFE - 120) continue;
+      let ok = true, mn = 1e9, mx = -1e9, sum = 0, cnt = 0, tr = 0;
+      for (let v = v0; v <= v1 && ok; v += 5) for (let u = -hu; u <= hu; u += 5) {
+        const [x, z] = W2(u, v); if (!inTer(x, z)) { ok = false; break; }
+        const q = rl({ x, z }); if (Math.abs(q.t) < RWY.L / 2 + 175 && Math.abs(q.w) < 20) { ok = false; break; }   // 활주로·접근로
+        if (q.w * RWY.sg > RWY.Wd / 2 - 2 && q.w * RWY.sg < RWY.Wd / 2 + 66 && Math.abs(q.t) < 36) { ok = false; break; }   // 유도로·계류장
+        const y = terrainAt(x, z); mn = Math.min(mn, y); mx = Math.max(mx, y); sum += y; cnt++;
+        _c1r.set(x, y + 1.5, z); if (collide(_c1r, 2)) { ok = false; break; }
+        if (STREES.col && STREES.col(_c1r.set(x, y + 3, z), 1.5)) tr++;
+      }
+      if (!ok) continue;
+      // 조종자(P)가 계류장 쪽을 등지고 서도록: P 가 시험장 끝(계류장에 가까운 쪽)에 오게
+      const [cx, cz] = W2(0, 37.6), dP = Math.hypot(px - ap.x, pz - ap.z), dC = Math.hypot(cx - ap.x, cz - ap.z);
+      if (dP > dC) continue;
+      const sc = (mx - mn) * 1.0 + tr * 0.04 + R * 0.01;
+      if (!best || sc < best.sc) best = { sc, px, pz, h, y: sum / cnt, range: mx - mn };
+    }
+    if (!best || best.range > 14) return false;
+    // 지형 다짐: 안쪽은 평평하게, 바깥 18 m 는 원래 지형으로 부드럽게 이어짐 (흙 비탈)
+    const { px, pz, h } = best, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h), mg = 18;
+    let ys = []; for (let v = v0; v <= v1; v += 5) for (let u = -hu; u <= hu; u += 5) ys.push(terrainAt(px + rx * u + fx * v, pz + rz * u + fz * v));
+    ys.sort((a, b) => a - b); const y0 = ys[ys.length >> 1];
+    const H = TER.h; let changed = 0;
+    for (let iy = 0; iy < n; iy++) for (let ix = 0; ix < n; ix++) {
+      const x = GS0 + ix * st, z = -GD1 + iy * st, dx = x - px, dz = z - pz, u = dx * rx + dz * rz, v = dx * fx + dz * fz;
+      const ou = Math.max(0, Math.abs(u) - hu), ov = Math.max(0, v0 - v, v - v1), o = Math.hypot(ou, ov); if (o >= mg) continue;
+      const k = o <= 0 ? 1 : 1 - smooth01(0, 1, o / mg); const i = iy * n + ix; H[i] = H[i] * (1 - k) + y0 * k; changed++;
+    }
+    applyTerrain(H);
+    if (STREES.hideRect) { const c = [px + fx * 37.6, pz + fz * 37.6]; STREES.hideRect(c[0], c[1], fx, fz, (v1 - v0) + 2 * mg, 2 * hu + 2 * mg); }
+    Object.assign(C1S, { x: px, z: pz, y: y0, h, real: true, range: +best.range.toFixed(1), cells: changed });
+    return true;
+  } catch (e) { console.warn('class1 site', e); return false; }
+}
 
 var C1 = { on: false, exam: false, side: -1, mode: 'gps', view: 'pilot', armed: false, ref: null, refDesc: null, mi: 0, si: 0, M: [], ev: [], t: 0, az: 0, yr: 0, hold: null, ei: new V3(), touch: null, over: false };
 
@@ -93,71 +140,79 @@ function c1Build(side) {
   const L = side < 0, s = side, P = C1PT, SB = L ? P.B : P.D, SD = L ? P.D : P.B, F = L ? P.FB : P.FD;
   const nm = (ko, en) => L2(ko, en), sideKo = L ? '좌' : '우', sideEn = L ? 'left' : 'right', oKo = L ? '우' : '좌', oEn = L ? 'right' : 'left';
   const H0 = (at, hdg, T, lab, o) => Object.assign({ k: 'hold', at, r: 0, hdg, T: T || c1R('hoverT'), lab }, o || {});
+  // 구호(call): 교육기관에서 흔히 쓰는 응시자 구호 예시 (김포신문 기고 참고) · '비상'만 기준서 필수 · 나머지는 기록만
+  const C = (ko, en, kw) => ({ ko, en, kw });
+  const A = (ko, en) => ({ k: 'ann', ko, en, lab: nm('시험위원 지시', 'Examiner instruction') });   // 시험위원 방송 (앱 작성 문구)
+  const nB = L ? 'B' : 'D', nD = L ? 'D' : 'B';
   return [
-    { id: 'pre', name: nm('비행 전 절차', 'Pre-flight'), unrated: true, steps: [
-      { k: 'prep', lab: nm('비행 전 점검 (볼트·너트 조임, 파손 등) · Enter', 'Pre-flight inspection (bolts, damage…) · Enter') },
-      { k: 'prep', lab: nm('기체 시동 · Enter', 'Start the aircraft · Enter'), arm: true },
-      { k: 'prep', lab: nm('이륙 전 점검 (계기·장비 작동) · Enter', 'Before-takeoff check (instruments) · Enter') }] },
-    { id: 'to', name: nm('이륙비행', 'Takeoff'), steps: [
-      { k: 'climb', at: P.H, lab: nm('H 에서 수직 상승 → 3~5 m 에서 정지 (기준고도 설정)', 'Climb vertically from H → stop at 3–5 m (sets reference height)') },
-      H0(P.H, 0, 0, nm('정지 호버링 5초', 'Hover 5 s'), { posWatch: true }),
-      H0(P.H, 0, 0, nm('호버링 중 조작계통 점검 (에일러론·엘리베이터·러더) 후 정지', 'Control check while hovering, then hold'), { posWatch: true, ctl: true }),
-      { k: 'xfer', to: P.A, lab: nm('A 지점으로 전진 이동 (평가 제외)', 'Move forward to A (not scored)') }] },
-    { id: 'hov', name: nm('공중 정지비행 (호버링)', 'Hovering'), steps: [
+    { id: 'pre', name: nm('비행 전 절차', 'Pre-flight'), steps: [
+      A(`응시자 ${pilotName()}, 조종자 위치로 이동하여 비행 전 점검을 실시하십시오.`, `Candidate ${pilotName()}, go to the pilot position and carry out the pre-flight inspection.`),
+      { k: 'inspect', lab: nm('비행 전 점검: 항목마다 정상/불량 판정', 'Pre-flight inspection: judge each item OK / faulty') },
+      { k: 'rc', lab: nm('조종기 점검: 네 축을 끝까지 움직이고 모드 스위치 GPS 확인', 'Transmitter check: move all four axes to full travel, mode switch on GPS') },
+      { k: 'arm', csc: true, lab: nm('시동: 두 스틱을 아래 안쪽(또는 바깥쪽)으로 · 또는 Enter', 'Start: both sticks down-in (or down-out) · or Enter'), call: C('시동!', 'Start!', ['시동']) },
+      { k: 'prep', lab: nm('이륙 전 점검 (모터 소리·계기·배터리) · Enter', 'Before-takeoff check (motors, instruments, battery) · Enter'), call: C('이륙 전 점검 이상 무!', 'Before-takeoff check, all normal!', ['이상', '점검']) }] },
+    { id: 'to', name: nm('이륙비행', 'Takeoff'), ann: ['이륙하십시오.', 'Take off.'], steps: [
+      { k: 'climb', at: P.H, lab: nm('H 에서 수직 상승 → 3~5 m 에서 정지 (기준고도 설정)', 'Climb vertically from H → stop at 3–5 m (sets reference height)'), call: C('이륙!', 'Takeoff!', ['이륙']) },
+      H0(P.H, 0, 0, nm('정지 호버링 5초', 'Hover 5 s'), { posWatch: true, call: C('정지, 하나, 둘, 셋, 넷, 다섯!', 'Hold, one, two, three, four, five!', ['정지', '하나', '다섯']) }),
+      { k: 'ctl', at: P.H, lab: nm('이륙 후 점검: 호버링 중 엘리베이터(전·후)·에일러론(좌·우)·러더(좌·우)를 살짝 움직여 확인', 'After-takeoff check: small elevator (fwd/back), aileron (L/R) and rudder (L/R) inputs while hovering'), call: C('이륙 후 점검, 전, 후, 좌, 우, 이상 무!', 'After-takeoff check: forward, back, left, right — normal!', ['점검', '이상']) },
+      H0(P.H, 0, 0, nm('정지 호버링', 'Hold'), { posWatch: true }),
+      { k: 'xfer', to: P.A, lab: nm('A 지점으로 전진 이동 (평가 제외)', 'Move forward to A (not scored)'), call: C('호버링 위치로!', 'To the hover point!', ['호버링', '위치']) }] },
+    { id: 'hov', name: nm('공중 정지비행 (호버링)', 'Hovering'), ann: ['공중 정지비행을 실시하십시오.', 'Carry out the hovering task.'], steps: [
       H0(P.A, 0, 0, nm('A 에서 기준고도·기수 전방 정지', 'Hold at A, reference height, nose forward')),
-      H0(P.A, 90 * s, 0, nm(`${sideKo}로 90° 회전 → 정지`, `Turn 90° ${sideEn} → hold`), { posWatch: true, rot: true }),
-      H0(P.A, -90 * s, 0, nm(`${oKo}로 180° 회전 → 정지`, `Turn 180° ${oEn} → hold`), { posWatch: true, rot: true }),
-      H0(P.A, 0, 0, nm(`${sideKo}로 90° 회전해 기수 전방 → 정지`, `Turn 90° ${sideEn} to face forward → hold`), { posWatch: true, rot: true })] },
-    { id: 'fb', name: nm('직진 및 후진 수평비행', 'Forward & backward'), steps: [
-      { k: 'move', from: P.A, to: P.E, hdg: 0, lab: nm('A → E 40 m 수평 전진', 'A → E, 40 m forward'), alongTol: c1R('eAlong') },
+      H0(P.A, 90 * s, 0, nm(`${sideKo}로 90° 회전 → 정지`, `Turn 90° ${sideEn} → hold`), { posWatch: true, rot: true, call: C(`${L ? '좌' : '우'}측면 호버링!`, `${L ? 'Left' : 'Right'} side hover!`, ['측면', '호버링']) }),
+      H0(P.A, -90 * s, 0, nm(`${oKo}로 180° 회전 → 정지`, `Turn 180° ${oEn} → hold`), { posWatch: true, rot: true, call: C(`${L ? '우' : '좌'}측면 호버링!`, `${L ? 'Right' : 'Left'} side hover!`, ['측면', '호버링']) }),
+      H0(P.A, 0, 0, nm(`${sideKo}로 90° 회전해 기수 전방 → 정지`, `Turn 90° ${sideEn} to face forward → hold`), { posWatch: true, rot: true, call: C('기수 정렬!', 'Nose aligned!', ['기수', '정렬']) })] },
+    { id: 'fb', name: nm('직진 및 후진 수평비행', 'Forward & backward'), ann: ['직진 및 후진 수평비행을 실시하십시오.', 'Carry out level forward and backward flight.'], steps: [
+      { k: 'move', from: P.A, to: P.E, hdg: 0, lab: nm('A → E 40 m 수평 전진', 'A → E, 40 m forward'), alongTol: c1R('eAlong'), call: C('40미터 전 후진 비행, 전진!', '40 m forward-back, forward!', ['전진']) },
       H0(P.E, 0, c1R('hoverTE'), nm('E 정지 3초 이상 (전후 5 m 인정)', 'Hold at E ≥ 3 s (±5 m along)'), { alongTol: c1R('eAlong') }),
-      { k: 'move', from: P.E, to: P.A, hdg: 0, lab: nm('E → A 40 m 수평 후진 (기수 전방)', 'E → A, 40 m backward (nose forward)') },
+      { k: 'move', from: P.E, to: P.A, hdg: 0, lab: nm('E → A 40 m 수평 후진 (기수 전방)', 'E → A, 40 m backward (nose forward)'), call: C('후진!', 'Backward!', ['후진']) },
       H0(P.A, 0, 0, nm('A 정지', 'Hold at A'))] },
-    { id: 'tri', name: nm('삼각비행', 'Triangle'), steps: [
-      { k: 'move', from: P.A, to: SB, hdg: 0, lab: nm(`A → ${L ? 'B' : 'D'} 수평 이동`, `A → ${L ? 'B' : 'D'} level`) },
+    { id: 'tri', name: nm('삼각비행', 'Triangle'), ann: ['삼각비행을 실시하십시오.', 'Carry out the triangle.'], steps: [
+      { k: 'move', from: P.A, to: SB, hdg: 0, lab: nm(`A → ${nB} 수평 이동`, `A → ${nB} level`), call: C(`삼각비행, ${L ? '좌' : '우'}로 이동!`, `Triangle, move ${sideEn}!`, ['삼각', '이동']) },
       H0(SB, 0, 0, nm('정지', 'Hold')),
-      { k: 'move', from: SB, to: P.A, r1: c1R('triRise'), hdg: 0, lab: nm('A 상공 기준고도+7.5 m 로 45° 상승', '45° climb to reference +7.5 m above A') },
+      { k: 'move', from: SB, to: P.A, r1: c1R('triRise'), hdg: 0, lab: nm('A 상공 기준고도+7.5 m 로 45° 상승', '45° climb to reference +7.5 m above A'), call: C('상승 비행!', 'Climbing!', ['상승']) },
       H0(P.A, 0, 0, nm('정지 (최고점)', 'Hold (apex)'), { r: c1R('triRise') }),
-      { k: 'move', from: P.A, r0: c1R('triRise'), to: SD, hdg: 0, lab: nm(`${L ? 'D' : 'B'} 로 45° 하강`, `45° descent to ${L ? 'D' : 'B'}`), desc: true },
+      { k: 'move', from: P.A, r0: c1R('triRise'), to: SD, hdg: 0, lab: nm(`${nD} 로 45° 하강`, `45° descent to ${nD}`), desc: true, call: C('하강 비행!', 'Descending!', ['하강']) },
       H0(SD, 0, 0, nm('정지', 'Hold')),
       { k: 'move', from: SD, to: P.A, hdg: 0, lab: nm('A 로 수평 이동', 'Level to A') },
       H0(P.A, 0, 0, nm('정지', 'Hold')),
       { k: 'xfer', to: P.H, lab: nm('H 로 후진 이동 (평가 제외)', 'Back up to H (not scored)') }] },
-    { id: 'cir', name: nm('원주비행 (러더턴)', 'Circle (rudder turn)'), steps: [
+    { id: 'cir', name: nm('원주비행 (러더턴)', 'Circle (rudder turn)'), ann: ['원주비행을 실시하십시오.', 'Carry out the circle.'], steps: [
       H0(P.H, 0, 0, nm('H 상공 기준고도·기수 전방 정지', 'Hold over H, nose forward')),
-      H0(P.H, 90 * s, 0, nm(`기수 ${sideKo}로 90° → 정지`, `Nose 90° ${sideEn} → hold`), { posWatch: true, rot: true }),
-      { k: 'arc', c: P.A, R: 7.5, dir: s, start: P.H, lab: nm(`반경 7.5 m 원주: H → ${L ? 'B' : 'D'} → C → ${L ? 'D' : 'B'} → H`, `7.5 m circle: H → ${L ? 'B' : 'D'} → C → ${L ? 'D' : 'B'} → H`) },
+      H0(P.H, 90 * s, 0, nm(`기수 ${sideKo}로 90° → 정지`, `Nose 90° ${sideEn} → hold`), { posWatch: true, rot: true, call: C('원주비행 준비!', 'Circle, ready!', ['원주', '준비']) }),
+      { k: 'arc', c: P.A, R: 7.5, dir: s, start: P.H, lab: nm(`반경 7.5 m 원주: H → ${nB} → C → ${nD} → H`, `7.5 m circle: H → ${nB} → C → ${nD} → H`), call: C('원주비행 출발!', 'Circle, go!', ['출발']) },
       H0(P.H, 90 * s, 0, nm('H 상공 복귀 정지', 'Back over H, hold')),
-      H0(P.H, 0, 0, nm(`${oKo}로 90° 회전해 기수 전방 → 정지`, `Turn 90° ${oEn} to face forward → hold`), { posWatch: true, rot: true })] },
-    { id: 'emg', name: nm('비상조작', 'Emergency'), steps: [
-      H0(P.H, 0, 0, nm('H 상공 기준고도 +2 m 이상 상승 → 정지', 'Climb ≥ 2 m above reference over H → hold'), { altWin: [c1R('emgRise'), c1R('emgRise') + 2.5], posWatch: 'xy' }),
-      { k: 'callout', lab: nm('"비상" 구호 (E 키 · 버튼)', 'Call "emergency" (E key · button)') },
-      { k: 'emg', pad: F, lab: nm(`즉시 하강하며 F(${L ? 'B' : 'D'}쪽)로 빠르게 비상 강하 → 착지`, `Descend at once and move fast to F (${L ? 'B' : 'D'} side) → touch down`) },
+      H0(P.H, 0, 0, nm(`${oKo}로 90° 회전해 기수 전방 → 정지`, `Turn 90° ${oEn} to face forward → hold`), { posWatch: true, rot: true, call: C('기수 정렬!', 'Nose aligned!', ['기수', '정렬']) })] },
+    { id: 'emg', name: nm('비상조작', 'Emergency'), ann: ['비상조작을 실시하십시오.', 'Carry out the emergency procedure.'], steps: [
+      H0(P.H, 0, 0, nm('H 상공 기준고도 +2 m 이상 상승 → 정지', 'Climb ≥ 2 m above reference over H → hold'), { altWin: [c1R('emgRise'), c1R('emgRise') + 2.5], posWatch: 'xy', call: C('비상착륙 실시, 고도 2미터 상승!', 'Emergency landing, climb 2 metres!', ['비상', '상승']) }),
+      { k: 'callout', lab: nm('"비상" 구호 (E 키·버튼은 기기 음성으로 대신 외침)', 'Call "emergency" (E key / button speaks it for you)'), call: C('정지, 비상!', 'Stop — emergency!', ['비상']) },
+      { k: 'emg', pad: F, lab: nm(`즉시 하강하며 F(${nB}쪽)로 빠르게 비상 강하 → 착지`, `Descend at once and move fast to F (${nB} side) → touch down`) },
       { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter') }] },
-    { id: 'nrm', name: nm('정상접근 및 착륙 (자세모드)', 'Normal approach & landing (attitude mode)'), needMode: true, steps: [
-      { k: 'mode', lab: nm('비행모드를 자세제어(ATTI) 또는 수동으로 전환 (Y)', 'Switch to attitude (ATTI) or manual mode (Y)') },
-      { k: 'arm', lab: nm('시동 · Enter', 'Start · Enter') },
-      H0(F, 0, 0, nm('F 에서 기수 전방으로 이륙 → 기준고도 정지', 'Take off from F nose forward → hold at reference height'), { posWatch: 'xy' }),
-      { k: 'move', from: F, to: P.H, hdg: 0, lab: nm('H 상공까지 수평 횡이동', 'Sideways level move to over H') },
+    { id: 'nrm', name: nm('정상접근 및 착륙 (자세모드)', 'Normal approach & landing (attitude mode)'), needMode: true, ann: ['자세모드로 전환하여 정상접근 및 착륙을 실시하십시오.', 'Switch to attitude mode and carry out the normal approach and landing.'], steps: [
+      { k: 'mode', lab: nm('비행모드를 자세제어(ATTI) 또는 수동으로 전환 (Y)', 'Switch to attitude (ATTI) or manual mode (Y)'), call: C('자세모드 전환! 전환 확인!', 'Attitude mode! Confirmed!', ['자세', '전환']) },
+      { k: 'arm', csc: true, lab: nm('시동 · 스틱 또는 Enter', 'Start · sticks or Enter'), call: C('시동!', 'Start!', ['시동']) },
+      H0(F, 0, 0, nm('F 에서 기수 전방으로 이륙 → 기준고도 정지', 'Take off from F nose forward → hold at reference height'), { posWatch: 'xy', call: C('이륙!', 'Takeoff!', ['이륙']) }),
+      { k: 'move', from: F, to: P.H, hdg: 0, lab: nm('H 상공까지 수평 횡이동', 'Sideways level move to over H'), call: C('착륙장으로!', 'To the pad!', ['착륙장']) },
       H0(P.H, 0, 0, nm('정지', 'Hold')),
-      { k: 'land', pad: P.H, hdg: 0, lab: nm('착륙장 안 착륙지점으로 강하 → 착륙 (중심축 기준)', 'Descend to the touchdown point → land (centre axis)') },
+      { k: 'land', pad: P.H, hdg: 0, lab: nm('착륙장 안 착륙지점으로 강하 → 착륙 (중심축 기준)', 'Descend to the touchdown point → land (centre axis)'), call: C('착륙!', 'Landing!', ['착륙']) },
       { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter') }] },
-    { id: 'xw', name: nm('측풍접근 및 착륙', 'Crosswind approach & landing'), steps: [
-      { k: 'mode', gps: true, lab: nm('GPS 모드로 전환 (Y) · 평가 제외', 'Back to GPS mode (Y) · not scored') },
-      { k: 'arm', lab: nm('시동 · Enter (평가 제외)', 'Start · Enter (not scored)') },
-      { k: 'xfer', to: SB, lab: nm(`이륙 후 기수 전방으로 ${L ? 'B' : 'D'} 지점 이동 (평가 제외)`, `Take off and move nose-forward to ${L ? 'B' : 'D'} (not scored)`) },
-      H0(SB, 0, 0, nm(`${L ? 'B' : 'D'} 에서 기준고도·기수 전방 정지`, `Hold at ${L ? 'B' : 'D'}, nose forward`)),
-      H0(SB, 90 * s, 0, nm(`바람 쪽(${sideKo})으로 90° 회전 → 정지`, `Turn 90° into the wind (${sideEn}) → hold`), { posWatch: true, rot: true }),
-      { k: 'move', from: SB, to: P.H, hdg: 90 * s, lab: nm('측면 상태로 H 상공까지 직선 이동', 'Straight sideways to over H') },
+    { id: 'xw', name: nm('측풍접근 및 착륙', 'Crosswind approach & landing'), ann: ['GPS 모드로 전환 후 측풍접근 및 착륙을 실시하십시오.', 'Switch back to GPS mode and carry out the crosswind approach and landing.'], steps: [
+      { k: 'mode', gps: true, lab: nm('GPS 모드로 전환 (Y) · 평가 제외', 'Back to GPS mode (Y) · not scored'), call: C('GPS 모드 전환!', 'GPS mode!', ['gps', '지피에스', '전환']) },
+      { k: 'arm', csc: true, lab: nm('시동 · 스틱 또는 Enter (평가 제외)', 'Start · sticks or Enter (not scored)'), call: C('시동!', 'Start!', ['시동']) },
+      { k: 'xfer', to: SB, lab: nm(`이륙 후 기수 전방으로 ${nB} 지점 이동 (평가 제외)`, `Take off and move nose-forward to ${nB} (not scored)`), call: C('측풍접근 기준위치로!', 'To the crosswind start point!', ['측풍', '기준']) },
+      H0(SB, 0, 0, nm(`${nB} 에서 기준고도·기수 전방 정지`, `Hold at ${nB}, nose forward`)),
+      H0(SB, 90 * s, 0, nm(`바람 쪽(${sideKo})으로 90° 회전 → 정지`, `Turn 90° into the wind (${sideEn}) → hold`), { posWatch: true, rot: true, call: C('측풍접근 준비!', 'Crosswind approach, ready!', ['준비']) }),
+      { k: 'move', from: SB, to: P.H, hdg: 90 * s, lab: nm('측면 상태로 H 상공까지 직선 이동', 'Straight sideways to over H'), call: C('측풍접근 실시!', 'Crosswind approach, go!', ['실시', '측풍']) },
       H0(P.H, 90 * s, 0, nm('정지', 'Hold')),
-      { k: 'land', pad: P.H, hdg: 90 * s, lab: nm('강하 → 착륙 (중심축 기준)', 'Descend → land (centre axis)') },
+      { k: 'land', pad: P.H, hdg: 90 * s, lab: nm('강하 → 착륙 (중심축 기준)', 'Descend → land (centre axis)'), call: C('착륙!', 'Landing!', ['착륙']) },
       { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter') }] },
-    { id: 'post', name: nm('비행 후 점검 · 비행기록', 'Post-flight · logbook'), unrated: true, steps: [
-      { k: 'prep', lab: nm('비행 후 점검 · Enter', 'Post-flight inspection · Enter') },
-      { k: 'prep', lab: nm('비행기록 작성 · Enter (기록 내보내기는 결과 화면)', 'Write the flight log · Enter (export on the result screen)') }] }
-  ];
+    { id: 'post', name: nm('비행 후 점검 · 비행기록', 'Post-flight · logbook'), unrated: true, ann: ['비행 후 점검과 비행기록 작성을 실시하십시오.', 'Carry out the post-flight inspection and write the flight log.'], steps: [
+      { k: 'prep', lab: nm('비행 후 점검 (볼트·너트·파손) · Enter', 'Post-flight inspection (bolts, damage) · Enter') },
+      { k: 'prep', lab: nm('비행기록 작성 · Enter (기록 내보내기는 결과 화면)', 'Write the flight log · Enter (export on the result screen)') }] },
+    { id: 'oral', name: nm('구술시험 (5문항)', 'Oral exam (5 questions)'), ann: ['구술시험을 시작하겠습니다.', 'The oral exam begins.'], steps: [
+      { k: 'oral', lab: nm('구술: 항목별 1문항씩 5문항 (앱 작성 예시 문항)', 'Oral: one question per area, 5 in total (app-written examples)') }] }
+  ].map(m => { if (m.ann) m.steps.unshift(A(m.ann[0], m.ann[1])); return m; });
 }
-
 // ---- 기체 형상: X2D 형상과 별도로 굵은 팔·스키드·큰 프롭 ----
 function makeC1(ghost) {
   const K = partsKit(ghost);
@@ -185,11 +240,12 @@ function c1Label(t, col, sz) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
   g.fillStyle = col || '#fff'; g.font = 'bold 96px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, 64, 70);
   const tx = new THREE.CanvasTexture(c); const m = new THREE.Mesh(new THREE.PlaneGeometry(sz || 1.4, sz || 1.4), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false }));
-  m.rotation.x = -Math.PI / 2; return m;
+  m.rotation.set(-Math.PI / 2, 0, -C1S.h); return m;
 }
 function c1Site() {
   if (C1G) return C1G;
   const G0 = new THREE.Group(); C1G = G0; scene.add(G0); G0.visible = false;
+  if (!C1S.real) {   // 지형과 떨어진 독립 시험장일 때만 넓은 바닥
   const gc = document.createElement('canvas'); gc.width = gc.height = 256; const gg = gc.getContext('2d');
   gg.fillStyle = '#6d8a4a'; gg.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 2600; i++) { gg.fillStyle = `rgba(${40 + Math.random() * 60 | 0},${70 + Math.random() * 70 | 0},${30 + Math.random() * 30 | 0},0.35)`; gg.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); }
@@ -197,9 +253,10 @@ function c1Site() {
   // 아주 큰 삼각형은 깊이 정밀도가 떨어져 위의 표지를 덮으므로 잘게 나누고 살짝 아래·뒤로 밀어 둠
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(18000, 18000, 90, 90), new THREE.MeshStandardMaterial({ map: gt, roughness: 1, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 4 }));
   ground.rotation.x = -Math.PI / 2; ground.position.copy(c1W(0, 30, -0.03)); ground.receiveShadow = true; G0.add(ground);
+  }
   // 시험 구역 (짧게 깎은 잔디)
   const fld = new THREE.Mesh(new THREE.PlaneGeometry(C1FIELD.u1 - C1FIELD.u0, C1FIELD.v1 - C1FIELD.v0), new THREE.MeshStandardMaterial({ color: 0x7f9b56, roughness: 1 }));
-  fld.rotation.x = -Math.PI / 2; fld.position.copy(c1W((C1FIELD.u0 + C1FIELD.u1) / 2, (C1FIELD.v0 + C1FIELD.v1) / 2, 0.003)); fld.receiveShadow = true; G0.add(fld);
+  fld.rotation.set(-Math.PI / 2, 0, -C1S.h); fld.material.polygonOffset = true; fld.material.polygonOffsetFactor = -1; fld.position.copy(c1W((C1FIELD.u0 + C1FIELD.u1) / 2, (C1FIELD.v0 + C1FIELD.v1) / 2, 0.003)); fld.receiveShadow = true; G0.add(fld);
   const line = (pts, col, op) => { const g = new THREE.BufferGeometry().setFromPoints(pts); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: op < 1, opacity: op || 1 })); G0.add(l); return l; };
   const F = C1FIELD; line([c1W(F.u0, F.v0, 0.02), c1W(F.u1, F.v0, 0.02), c1W(F.u1, F.v1, 0.02), c1W(F.u0, F.v1, 0.02), c1W(F.u0, F.v0, 0.02)], 0xffffff, 0.8);
   // 안전라인 (조종자 어깨와 평행) · 권고 안전거리 원 14 m
@@ -211,22 +268,23 @@ function c1Site() {
   { const pts = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * Math.PI * 2; pts.push(c1W(Math.sin(a) * 7.5, 22.5 + Math.cos(a) * 7.5, 0.02)); } line(pts, 0xffffff, 0.45); }
   // 착륙장 H·F (2×2 m)
   const pad = (uv, t, col) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 })); m.rotation.x = -Math.PI / 2; m.position.copy(c1W(uv[0], uv[1], 0.01)); m.receiveShadow = true; G0.add(m);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.9 })); m.rotation.set(-Math.PI / 2, 0, -C1S.h); m.material.polygonOffset = true; m.material.polygonOffsetFactor = -2; m.position.copy(c1W(uv[0], uv[1], 0.01)); m.receiveShadow = true; G0.add(m);
     line([c1W(uv[0] - 1, uv[1] - 1, 0.015), c1W(uv[0] + 1, uv[1] - 1, 0.015), c1W(uv[0] + 1, uv[1] + 1, 0.015), c1W(uv[0] - 1, uv[1] + 1, 0.015), c1W(uv[0] - 1, uv[1] - 1, 0.015)], 0xffffff, 1);
-    const l = c1Label(t, '#ffffff', 1.5); l.position.copy(c1W(uv[0], uv[1], 0.02)); l.rotation.z = 0; G0.add(l);
+    const l = c1Label(t, '#ffffff', 1.5); l.position.copy(c1W(uv[0], uv[1], 0.02)); G0.add(l);
   };
   pad(C1PT.H, 'H', 0x3a4048); pad(C1PT.FB, 'F', 0x8a3030); pad(C1PT.FD, 'F', 0x8a3030);
   // 지점 표지 (A·B·C·D·E 원판 + 글자) · 조종자 P
   const cone = mat(0xff8a1e, { roughness: 0.7 });
   for (const k of ['A', 'B', 'C', 'D', 'E', 'P']) {
-    const uv = C1PT[k], d = new THREE.Mesh(new THREE.CircleGeometry(0.6, 24), new THREE.MeshStandardMaterial({ color: k === 'P' ? 0x2e6bd6 : 0xf0f0f0, roughness: 0.9 }));
+    const uv0 = C1PT[k], uv = k === 'P' ? uv0 : [uv0[0] + 1.3, uv0[1]], d = new THREE.Mesh(new THREE.CircleGeometry(0.5, 24), new THREE.MeshStandardMaterial({ color: k === 'P' ? 0x2e6bd6 : 0xf0f0f0, roughness: 0.9 }));
     d.rotation.x = -Math.PI / 2; d.position.copy(c1W(uv[0], uv[1], 0.012)); G0.add(d);
     const l = c1Label(k, k === 'P' ? '#ffffff' : '#222', 1.0); l.position.copy(c1W(uv[0], uv[1], 0.02)); G0.add(l);
-    if (k !== 'P' && k !== 'A') { const c = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 12), cone); c.position.copy(c1W(uv[0] + 0.9, uv[1], 0.22)); c.castShadow = true; G0.add(c); }
+    if (k !== 'P') c1Cone(G0, uv0, cone);   // 지점 위 고깔 + 리본 (기체가 바로 위에 오면 바람에 눌림)
   }
   // 바람 자루 (풍향 참고)
   const pole = new THREE.Mesh(UCYL, mat(0xdddddd)); pole.scale.set(0.04, 4, 0.04); pole.position.copy(c1W(-16, 10, 2)); G0.add(pole);
   const sock = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.4, 10, 1, true), mat(0xff6020, { side: THREE.DoubleSide })); sock.position.copy(c1W(-16, 10, 3.9)); G0.add(sock); C1.sock = sock;
+  if (!C1S.real) {
   // 주변 나무 (깊이 감각용 · 배치 임의)
   const tm = mat(0x3c5e2c), trk = mat(0x5a4632); let sd = 7;
   const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
@@ -235,6 +293,8 @@ function c1Site() {
     const t = new THREE.Mesh(UCYL, trk); t.scale.set(0.25, h * 0.4, 0.25); t.position.copy(c1W(u, v, h * 0.2)); G0.add(t);
     const c = new THREE.Mesh(new THREE.ConeGeometry(h * 0.28, h * 0.8, 8), tm); c.position.copy(c1W(u, v, h * 0.55)); c.castShadow = true; G0.add(c);
   }
+  }
+  c1Props(G0);
   // 학습용 보조 표시: 목표 허용 상자 · 경로 선
   C1.aidBox = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
   G0.add(C1.aidBox);
@@ -243,6 +303,34 @@ function c1Site() {
   C1.aidArrow = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.7, 10), new THREE.MeshBasicMaterial({ color: 0xffc828, transparent: true, opacity: 0.85, depthWrite: false })); C1.aidArrow.rotation.x = -Math.PI / 2; G0.add(C1.aidArrow);
   return G0;
 }
+function c1Cone(G0, uv, cm) {
+  const c = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 14), cm); c.position.copy(c1W(uv[0], uv[1], 0.25)); c.castShadow = true; G0.add(c);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.1, 14), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })); band.position.copy(c1W(uv[0], uv[1], 0.3)); G0.add(band);
+  const rb = new THREE.Group(); rb.position.copy(c1W(uv[0], uv[1], 0.5)); G0.add(rb);
+  const strips = [0xff3b3b, 0xffe14a, 0x3bb0ff].map((col, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.55), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.7 })); m.geometry.translate(0, 0.275, 0); m.rotation.y = i * 2.1; rb.add(m); return m; });
+  (C1.ribbons = C1.ribbons || []).push({ g: rb, strips, uv, ph: Math.random() * 6 });
+}
+// 시험장 소품: 천막·책상·시험위원·응시자·안전펜스 (위치는 앱 설정)
+function c1Props(G0) {
+  const W2 = (u, v, h) => c1W(u, v, h), mk = (geo, m, u, v, h, sx, sy, sz, ry) => { const o = new THREE.Mesh(geo, m); o.position.copy(W2(u, v, h)); if (sx) o.scale.set(sx, sy, sz); o.rotation.y = -C1S.h + (ry || 0); o.castShadow = true; G0.add(o); return o; };
+  // 안전펜스 (조종자 앞 기준선 · 높이 1 m)
+  const post = mat(0xff7a1a, { roughness: 0.6 }), rope = mat(0xf2f2f2, { roughness: 0.8 });
+  for (let u = -17.5; u <= 17.5; u += 3.5) if (Math.abs(u) > 1) mk(UCYL, post, u, 1.2, 0.5, 0.035, 1, 0.035);   // 조종자 바로 앞은 비움
+  for (const h of [0.55, 0.95]) mk(UBOX, rope, 0, 1.2, h, 35, 0.015, 0.015);
+  // 천막 (대기·시험위원석)
+  const tw = mat(0xf4f4f0, { roughness: 0.7 }), tb = mat(0x2b5fb3, { roughness: 0.7 }), leg = mat(0x9aa0a6, { roughness: 0.4, metalness: 0.5 });
+  for (const [u, v] of [[-12, -6], [-6, -6], [-12, -11], [-6, -11]]) mk(UCYL, leg, u, v, 1.25, 0.04, 2.5, 0.04);
+  mk(UBOX, tw, -9, -8.5, 2.55, 6.4, 0.12, 5.4); const roof = mk(new THREE.ConeGeometry(4.3, 1.1, 4), tb, -9, -8.5, 3.15, 1, 1, 1, Math.PI / 4); roof.scale.set(1.05, 1, 0.88);
+  mk(UBOX, tw, -9, -7.2, 0.75, 2.4, 0.05, 0.8); for (const u of [-10, -8]) mk(UCYL, leg, u, -7.2, 0.37, 0.03, 0.74, 0.03);
+  // 시험위원 (조종자 뒤 · 기록판)
+  const person = (u, v, vest, sit) => { const g = new THREE.Group(); g.position.copy(W2(u, v, 0)); g.rotation.y = -C1S.h; G0.add(g);
+    const body = new THREE.Mesh(UCYL, mat(0x2d3640)); body.scale.set(0.2, 0.75, 0.15); body.position.y = 0.38 + 0.45; g.add(body);
+    const top = new THREE.Mesh(UBOX, mat(vest)); top.scale.set(0.42, 0.6, 0.26); top.position.y = 1.2; g.add(top);
+    const head = new THREE.Mesh(USPH || UCYL, mat(0xe2b897)); head.scale.setScalar(0.12); head.position.y = 1.62; g.add(head);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf5f5f5)); cap.position.y = 1.64; g.add(cap);
+    g.traverse(o => { o.castShadow = true; }); return g; };
+  person(2.6, -2.2, 0xd8f02a); C1.pilotFig = person(0, -0.15, 0xff8a1e);
+}
 // 메뉴·출격 시 시험장 보이기/감추기
 function c1Menu(k) {
   if (!C1) return;
@@ -250,7 +338,7 @@ function c1Menu(k) {
   if (on) c1Site();
   if (C1G) C1G.visible = on;
   if (!on) C1.on = false;
-  C1ON = on;
+  C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
   if (ui.map) ui.map.style.display = on ? 'none' : '';
   const kh = $('keys'); if (kh) kh.style.display = on ? 'none' : '';
@@ -261,6 +349,7 @@ function c1Menu(k) {
 function c1Wind(p) {
   const base = WIND.lv === 1 ? 3 : WIND.lv === 2 ? 7 : 0;
   if (!base) return _c1w.set(0, 0, 0);
+  if (C1S.real) return windAt(p);   // 실제 지형 위: 지형 따라 바뀌는 바람 (다른 임무와 같은 모델)
   const t = C1.t, agl = Math.max(0.5, p.y - C1S.y);
   const prof = clamp(Math.log((agl + 1) / 0.03) / Math.log(11 / 0.03), 0.4, 1.15);   // 지면 거칠기 0.03 m 가정 · 10 m 에서 1
   const gust = 1 + 0.22 * Math.sin(t * 0.9) * Math.sin(t * 0.37) + 0.1 * Math.sin(t * 2.3 + 1.1);   // 반복 가능한 돌풍 (시각 = 이번 비행 경과시간)
@@ -271,7 +360,7 @@ function c1Wind(p) {
 const _c1w = new V3(), _c1a = new V3(), _c1f = new V3(), _c1r = new V3();
 function c1Phys(dt) {
   const m = c1p('flightKg'), Tmax = c1p('thrustMaxN'), g = G, aUpMax = Tmax / m - g, md = C1.mode;
-  const gy = C1S.y + c1p('skidDrop');
+  const gy = c1Gnd() + c1p('skidDrop');
   const onG = DR.p.y <= gy + 0.005;
   const ip = IN.pitch, ir = IN.roll, iy = IN.yaw, it = IN.thr;
   const FW = _c1f.set(Math.sin(DR.h), 0, -Math.cos(DR.h)), RT = _c1r.set(Math.cos(DR.h), 0, Math.sin(DR.h));
@@ -339,13 +428,13 @@ function c1Phys(dt) {
     DR.landed = true;
   } else if (DR.p.y > gy + 0.02) DR.landed = false;
   if (!C1.armed && !onG) C1.crash = C1.crash || { why: 'disarm' };
-  if (DR.p.y > C1S.y + 60) { DR.p.y = C1S.y + 60; DR.v.y = Math.min(0, DR.v.y); }
+  if (DR.p.y > c1Gnd() + 60) { DR.p.y = c1Gnd() + 60; DR.v.y = Math.min(0, DR.v.y); }
 }
 
 // ---- 측정값 ----
 function c1M() {
   const uv = c1UV(DR.p);
-  return { u: uv[0], v: uv[1], alt: DR.p.y - C1S.y - c1p('skidDrop'), hdg: DR.h / DEG, hs: Math.hypot(DR.v.x, DR.v.z), vy: DR.v.y, yr: Math.abs(C1.yr) / DEG };
+  return { u: uv[0], v: uv[1], alt: DR.p.y - C1S.y - c1p('skidDrop'), hdg: c1Wrap((DR.h - C1S.h) / DEG), hs: Math.hypot(DR.v.x, DR.v.z), vy: DR.v.y, yr: Math.abs(C1.yr) / DEG };
 }
 const c1Wrap = d => { d = ((d + 180) % 360 + 360) % 360 - 180; return d; };   // +179 와 -179 의 차이 = 2°
 function c1Still(M) { return M.hs < c1R('stillV') && Math.abs(M.vy) < 0.25 && M.yr < c1R('stillYaw'); }
@@ -363,7 +452,7 @@ function c1WhyTxt(w) {
     stops: L2('기동 중 멈춤', 'stops during manoeuvre'), mode: L2('GPS 모드로 수행', 'flown in GPS mode'), pad: L2('착륙장 밖', 'outside the pad'), slow: L2('비상 강하 속도 부족', 'emergency descent too slow'),
     pause: L2('비상 강하 중 일시정지 3초 이상', 'emergency pause ≥ 3 s'), pauseAlt: L2('1 m 위에서 일시정지', 'paused above 1 m'), crash: L2('충돌·추락', 'crash'), late: L2('시동·이륙 5분 초과', 'start-to-takeoff over 5 min'),
     ref: L2('기준고도 3~5 m 밖', 'reference height outside 3–5 m'), skip: L2('지점 미통과', 'checkpoint missed'), climbStop: L2('상승 중 멈춤', 'stopped while climbing'), rotStop: L2('회전 중 멈춤', 'stopped while turning'),
-    safe: L2('안전거리(14 m)·안전라인 침범', 'inside the 14 m safety radius / line'), hard: L2('거친 접지', 'hard touchdown') })[w] || w;
+    safe: L2('안전거리(14 m)·안전라인 침범', 'inside the 14 m safety radius / line'), hard: L2('거친 접지', 'hard touchdown'), inspect: L2('점검 판정 오류', 'inspection misjudged'), ctl: L2('이륙 후 점검 미실시', 'after-takeoff check not done'), oral: L2('구술 오답', 'oral answer wrong') })[w] || w;
 }
 // 허용범위 이탈 추적: 짧은 이탈은 기록만, 연속 grace 초 넘으면 U
 function c1Dev(st, key, bad, d, dt) {
@@ -522,7 +611,7 @@ function c1SkidOnPad(t, pad) {
 
 // ---- 진행 ----
 function c1Start(a) {
-  c1Site(); C1G.visible = true; C1ON = true;
+  c1Site(); C1G.visible = true; C1ON = !C1S.real;
   Object.assign(C1, { on: true, exam: S.kind === 'class1x', mode: 'gps', view: 'pilot', armed: false, ref: null, refDesc: null, mi: 0, si: 0, ev: [], t: 0, az: 0, yr: 0, hold: null, touch: null, crash: null, over: false, tArm: null, altT: null, modeLog: [] });
   C1.ei.set(0, 0, 0);
   C1.side = SET.c1side === 1 ? 1 : -1;
@@ -533,7 +622,7 @@ function c1Start(a) {
   c1Ev('start', { exam: C1.exam, side: C1.side < 0 ? 'left-first' : 'right-first', profile: C1P.ver, rules: C1RULES.ver, wind: WIND.lv });
   return C1.M;
 }
-function c1StartPose() { return { p: c1W(C1PT.H[0], C1PT.H[1], c1p('skidDrop')), h: 0 }; }
+function c1StartPose() { return { p: c1W(C1PT.H[0], C1PT.H[1], c1p('skidDrop')), h: C1S.h }; }
 function c1Next() {
   const m = C1.M[C1.mi]; if (!m) return;
   C1.si++; c1Ev('stepDone');
@@ -560,14 +649,15 @@ function c1Step(prev, cur, dt) {
   // 종합: 안전거리 14 m · 안전라인 (조종자 앞쪽 기준선 뒤로 오면 침범)
   if (!DR.landed && (Math.hypot(M.u, M.v) < c1R('safeR') || M.v < 0.6)) { C1.safeT = (C1.safeT || 0) + dt; if (C1.safeT > 0.5 && !C1.safeLogged) { C1.safeLogged = true; c1Ev('safe', { u: +M.u.toFixed(1), v: +M.v.toFixed(1) }); C1.safeBad = true; if (!C1.exam) showMsg(c1WhyTxt('safe'), '#ff5050', 1.4); } } else { C1.safeT = 0; C1.safeLogged = false; }
   // 정상접근: 모든 세부 기동을 자세·수동 모드로 (모드 전환 단계 이후)
-  if (m.needMode && C1.si > 0 && C1.mode === 'gps' && !st.fails?.includes('mode')) c1Fail(st, 'mode');
+  if (m.needMode && C1.si > m.steps.findIndex(x => x.k === 'mode') && C1.mode === 'gps' && !st.fails?.includes('mode')) c1Fail(st, 'mode');
   const fn = C1EV[st.k]; if (fn && fn(st, M, dt)) c1Next();
 }
-function c1Key(k) {
+function c1Key(k, fromVoice) {
   if (!isC1() || S.state !== 'run') return false;
   const st = c1Cur();
   if (k === 'KeyY') { c1Mode(); return true; }
-  if (k === 'KeyE') { if (st && st.k === 'callout' && !st.wait2) { st.wait2 = true; c1Ev('callout'); showMsg(L2('"비상!"', '"EMERGENCY!"'), '#ff5050', 1.2); sfx('bad'); c1Next(); const n = c1Cur(); if (n) n.t0 = C1.t; } return true; }
+  if (k === 'KeyQ') { if (!c1CallDo('btn') && st && st.call && !C1.exam) showMsg(L2('이 단계 구호는 이미 했습니다', 'Call already made for this step'), '#9aa6ad', 1); return true; }
+  if (k === 'KeyE') { if (st && st.k === 'callout' && !st.wait2) { st.wait2 = true; c1CallDo(fromVoice ? 'voice' : 'btn'); c1Ev('callout'); showMsg(L2('"비상!"', '"EMERGENCY!"'), '#ff5050', 1.2); sfx('bad'); c1Next(); const n = c1Cur(); if (n) n.t0 = C1.t; } return true; }
   if (k === 'KeyC' || k === 'PadRB') { if (!C1.exam) { C1.view = C1.view === 'pilot' ? 'chase' : 'pilot'; showMsg(C1.view === 'pilot' ? L2('조종자 시점', 'Pilot view') : L2('추적 시점 (학습용)', 'Chase view (learning)'), '#4fe3ff', 1); } else showMsg(L2('모의평가는 조종자 시점만', 'Mock check uses the pilot view only'), '#ffc828', 1); return true; }
   if (k === 'Enter' || k === 'Space' || k === 'PadA') { c1Confirm(); return true; }
   if (k === 'KeyR' || k === 'PadY') { if (!C1.exam) { c1Jump(C1.mi, true); showMsg(L2('이 기동 다시', 'Restart this manoeuvre'), '#c9a2ff', 1); } return true; }
@@ -577,8 +667,8 @@ function c1Key(k) {
 }
 function c1Confirm() {
   const st = c1Cur(); if (!st) return;
-  if (st.k === 'prep') { if (st.arm) { C1.armed = true; C1.tArm = C1.t; c1Ev('arm'); sfx('good'); } c1Ev('confirm'); c1Next(); }
-  else if (st.k === 'arm') { if (DR.landed) { C1.armed = true; C1.tArm = C1.t; c1Ev('arm'); sfx('good'); c1Next(); } }
+  if (st.k === 'prep') { if (st.call) c1CallDo('btn'); c1Ev('confirm'); c1Next(); }
+  else if (st.k === 'arm') { if (DR.landed) { c1Arm('btn'); c1Next(); } }
   else if (st.k === 'disarm') { if (DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3) { C1.armed = false; c1Ev('disarm'); c1Next(); } else showMsg(L2('착지 후 시동 종료', 'Land first, then shut down'), '#ffc828', 1); }
 }
 function c1Mode() {
@@ -594,10 +684,10 @@ function c1Jump(i, again) {
   C1.mi = i; C1.si = 0; MS.idx = i; C1.ref = C1.ref || 4; C1.hold = null; C1.altT = null; C1.ei.set(0, 0, 0); C1.touch = null; C1.crash = null;
   const ref = C1.ref, sb = C1.side < 0 ? C1PT.B : C1PT.D, f = C1.side < 0 ? C1PT.FB : C1PT.FD;
   const air = (uv, r) => ({ p: c1W(uv[0], uv[1], ref + (r || 0) + c1p('skidDrop')), gnd: false });
-  const pose = [{ p: c1W(0, 15, c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }, air(C1PT.A), air(C1PT.A), air(C1PT.A), air(C1PT.H), air(C1PT.H), { p: c1W(f[0], f[1], c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }, air(C1PT.H)][i] || air(C1PT.H);
-  resetDrone(pose.p, 0); DR.landed = pose.gnd; C1.az = 0; C1.yr = 0;
-  C1.armed = i > 0 && !pose.gnd; if (i === 0) { C1.ref = null; C1.tArm = null; }
-  if (i === 6) C1.mode = 'atti'; else if (i !== 7) C1.mode = 'gps';
+  const pose = [{ p: c1W(0, 15, c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }, air(C1PT.A), air(C1PT.A), air(C1PT.A), air(C1PT.H), air(C1PT.H), { p: c1W(f[0], f[1], c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }, { p: c1W(0, 15, c1p('skidDrop')), gnd: true }][i] || air(C1PT.H);
+  resetDrone(pose.p, C1S.h); DR.landed = pose.gnd; C1.az = 0; C1.yr = 0;
+  C1.armed = (i > 0 && !pose.gnd) || i === 1; if (i === 0) { C1.ref = null; C1.tArm = null; } C1.introCam = false; c1ModalClose();
+  C1.mode = 'gps';
   c1Ev('jump', { to: C1.M[i].id, again: !!again }); renderList();
   const st = c1Cur(); if (st) { st.t0 = C1.t; st.wait = true; }
   if (!again) showMsg(C1.M[i].name, '#c9a2ff', 1.2);
@@ -614,21 +704,38 @@ function c1Panel(show) {
 #c1p .bt{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#c1p .bt button{flex:1 1 auto;min-width:56px;padding:6px 4px;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3;font-size:12px}
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
+#c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1cap{position:fixed;left:50%;top:58px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
+#c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
+#c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
+#c1m .box{background:#11161c;border:1px solid #c9a2ff;border-radius:12px;padding:14px 16px;max-width:min(640px,94vw);max-height:90vh;overflow:auto;color:#e8eef3;font:14px/1.45 system-ui,sans-serif}
+#c1m h3{margin:0 0 6px;color:#c9a2ff}#c1m table{width:100%;border-collapse:collapse;margin:8px 0}#c1m td{padding:5px 4px;border-bottom:1px solid #26303a;vertical-align:middle}
+#c1m td button{margin:0 2px;padding:6px 10px;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3}#c1m td button.on{background:#2c5a36;border-color:#5dff9a}
+#c1m .primary{margin-top:6px;padding:9px 16px;border-radius:8px;border:0;background:#ffc828;color:#111;font-weight:700}#c1m .primary:disabled{opacity:.4}
+#c1m .opt{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;border-radius:8px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3;font-size:14px}#c1m .q{font-size:16px;font-weight:600}#c1m .dim{color:#8f9aa3;font-size:12px}
 @media (max-width:700px),(max-height:500px){#c1p{width:230px;font-size:11px;top:86px;left:6px;padding:6px 8px;max-height:calc(100vh - 96px)}#c1p canvas,#c1p .note{display:none}#c1p .m{font-size:13px}#c1p .bt button{padding:8px 4px}}`;
     document.head.appendChild(css);
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
-<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
+<div class="cl" id="c1Cl"></div>
+<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
-    tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC');
+    tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
+    $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
   el.classList.toggle('hidden', !show);
 }
 let _c1ui = 0;
 function c1Tick(dt) {
   if (!isC1() || !C1G) return;
+  if (C1.pilotFig) C1.pilotFig.visible = C1.view !== 'pilot' || !!C1.introCam || S.state === 'menu';
+  if (C1V.heardT > 0) C1V.heardT -= dt;
+  if (C1.ribbons) { const t = S.simT, w = c1Wind(c1W(0, 20, 1)), ws = Math.hypot(w.x, w.z), wa = Math.atan2(w.x, w.z);
+    for (const rb of C1.ribbons) { const c = c1W(rb.uv[0], rb.uv[1], 0.5), d = Math.hypot(DR.p.x - c.x, DR.p.z - c.z), hh = DR.p.y - c.y;
+      const wash = (S.state === 'run' && hh > 0 && hh < 9 && d < 1.8) ? (1 - d / 1.8) * clamp(1 - hh / 9, 0, 1) * Math.min(1, DR.thrust * 1.6) : 0;
+      rb.g.rotation.y = wa; rb.strips.forEach((m, i) => { const fl = Math.sin(t * (7 + i) + rb.ph + i) * (0.12 + 0.25 * Math.min(1, ws / 5) + wash * 0.5); m.rotation.x = Math.min(2.9, 0.15 + Math.min(1, ws / 6) * 0.9 + wash * 2.6) + fl; }); } }
   if (C1.sock) { const w = c1Wind(c1W(-16, 10, 4)); const sp = Math.hypot(w.x, w.z); C1.sock.rotation.set(0, 0, 0); C1.sock.lookAt(C1.sock.position.clone().add(new V3(w.x || 0.001, -Math.max(0, 3 - sp) * 0.6, w.z))); C1.sock.rotateX(Math.PI / 2); }
   const run = S.state === 'run' || S.state === 'pause';
   const st = run ? c1Cur() : null, aids = !C1.exam && run && st;
@@ -637,9 +744,9 @@ function c1Tick(dt) {
     const ref = C1.ref || 4;
     if (st.k === 'hold' || st.k === 'xfer') {
       const at = st.at || st.to, h0 = st.altWin ? ref + st.altWin[0] : ref + (st.r || 0) - c1R('altTol'), h1 = st.altWin ? ref + st.altWin[1] : ref + (st.r || 0) + c1R('altTol');
-      C1.aidBox.visible = true; C1.aidBox.scale.set(c1R('posTol'), Math.max(0.05, h1 - h0), st.alongTol ? st.alongTol : c1R('posTol'));
+      C1.aidBox.visible = true; C1.aidBox.rotation.y = -C1S.h; C1.aidBox.scale.set(c1R('posTol'), Math.max(0.05, h1 - h0), st.alongTol ? st.alongTol : c1R('posTol'));
       C1.aidBox.position.copy(c1W(at[0], at[1], (h0 + h1) / 2 + c1p('skidDrop')));
-      C1.aidArrow.visible = st.hdg != null; if (st.hdg != null) { const hd = st.hdg * DEG; C1.aidArrow.position.copy(c1W(at[0] + Math.sin(hd) * 1.6, at[1] + Math.cos(hd) * 1.6, h1 + c1p('skidDrop') + 0.2)); C1.aidArrow.rotation.set(-Math.PI / 2, 0, -hd); }
+      C1.aidArrow.visible = st.hdg != null; if (st.hdg != null) { const hd = st.hdg * DEG; C1.aidArrow.position.copy(c1W(at[0] + Math.sin(hd) * 1.6, at[1] + Math.cos(hd) * 1.6, h1 + c1p('skidDrop') + 0.2)); C1.aidArrow.rotation.set(-Math.PI / 2, 0, -(hd + C1S.h)); }
     } else if (st.k === 'move' || st.k === 'arc' || st.k === 'climb' || st.k === 'land' || st.k === 'emg') {
       const pts = [], sd = c1p('skidDrop');
       if (st.k === 'move') { for (let i = 0; i <= 20; i++) { const s = i / 20; pts.push(c1W(st.from[0] + (st.to[0] - st.from[0]) * s, st.from[1] + (st.to[1] - st.from[1]) * s, ref + (st.r0 || 0) + ((st.r1 || 0) - (st.r0 || 0)) * s + sd)); } }
@@ -654,6 +761,10 @@ function c1Tick(dt) {
   $('c1T').textContent = (C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + { gps: 'GPS', atti: 'ATTI', manual: 'MANUAL' }[C1.mode] + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ` · ${L2('기준', 'REF')} ${C1.ref.toFixed(1)} m` : '');
   $('c1Mn').textContent = m ? `${C1.mi + 1}. ${m.name}` : '';
   $('c1St').textContent = st ? st.lab : '';
+  { const cl = $('c1Cl'); let h = '';
+    if (st && st.call) h = st.callSaid ? `✓ ${L2('구호', 'Call')}: ${L2(st.call.ko, st.call.en)} <i>(${st.callSaid === 'voice' ? L2('음성', 'voice') : L2('버튼', 'button')})</i>` : (C1.exam ? `${L2('구호 ▶ 📣 Q 또는 말하기', 'Call ▶ 📣 Q or say it')}` : `${L2('구호', 'Call')}: “${L2(st.call.ko, st.call.en)}” <i>(Q · 🎤)</i>`);
+    if (C1V.heardT > 0) h += `<br><i>🎤 ${C1V.heard}</i>`;
+    cl.innerHTML = h; }
   const e = st && st.err, f = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d || 1), cls = (x, t) => Math.abs(x) <= t ? 'ok' : 'bad';
   let r = `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>`;
   if (!C1.exam && e) {
@@ -663,6 +774,9 @@ function c1Tick(dt) {
     if (st.k === 'hold') r += `<b>${L2('정지', 'Hold')}</b><span class="${st.armedEval && st.t >= st.T ? 'ok' : ''}">${st.armedEval ? st.t.toFixed(1) : '–'} / ${st.T} s</span>`;
   }
   if (!C1.exam && m && m.fail) r += `<b>${L2('판정', 'Verdict')}</b><span class="bad">U · ${m.why.map(w => c1WhyTxt(w.why)).filter((x, i, a) => a.indexOf(x) === i).join(', ')}</span>`;
+  if (st && st.k === 'rc') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r = `<b>${L2('스로틀', 'Throttle')}</b><span>↑${ck('thr+')} ↓${ck('thr-')}</span><b>${L2('러더', 'Rudder')}</b><span>←${ck('yaw-')} →${ck('yaw+')}</span><b>${L2('엘리베이터', 'Elevator')}</b><span>↑${ck('pitch+')} ↓${ck('pitch-')}</span><b>${L2('에일러론', 'Aileron')}</b><span>←${ck('roll-')} →${ck('roll+')}</span><b>${L2('모드 스위치', 'Mode switch')}</b><span class="${C1.mode === 'gps' ? 'ok' : 'bad'}">${C1.mode.toUpperCase()}</span>`; }
+  if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
+  if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (키보드 S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
   $('c1R').innerHTML = r;
   $('c1Note').textContent = L2('1종 실기시험 기준 참고 연습용 · 공식 시험·교육시간 인정 여부 미확인 · 기체 계수는 가정값', 'Reference practice for the class-1 practical test · not an official test or training hours · aircraft values assumed') + (C1.exam ? '' : L2(' · 숫자 1~9 = 기동 바로가기 · N = 다음 단계', ' · keys 1–9 jump to a manoeuvre · N = next step'));
   const cv = $('c1Map'); if (cv && !C1.exam) c1DrawMap(cv, st, M); else if (cv) cv.style.display = 'none';
@@ -687,6 +801,9 @@ function c1Camera(dt, subj) {
     const fw = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h)), want = subj.p.clone().addScaledVector(fw, -7).add(new V3(0, 3, 0)); want.y = Math.max(want.y, C1S.y + 0.8);
     camPos.lerp(want, 1 - Math.exp(-dt * 5)); camera.position.copy(camPos); camLook.lerp(subj.p, 1 - Math.exp(-dt * 9)); camera.lookAt(camLook); camera.fov = 60; camera.near = 0.05; return true;
   }
+  if (C1.introCam) {   // 대기 천막에서 시험장을 바라봄 (호명 방송 중)
+    camera.position.copy(c1W(-9, -7.5, 1.7)); camLook.copy(c1W(0, 24, 2)); camera.up.set(0, 1, 0); camera.lookAt(camLook); camera.fov = 55; camera.near = 0.1; return true;
+  }
   camera.position.copy(c1W(0, 0, c1p('eye')));
   camLook.lerp(subj.p, 1 - Math.exp(-dt * 7)); if (camLook.distanceTo(subj.p) > 30) camLook.copy(subj.p);
   camera.up.set(0, 1, 0); camera.lookAt(camLook);
@@ -708,6 +825,10 @@ function c1Finish(why) {
     const rows = C1.M.map((m, i) => [`${i + 1}. ${m.name}`, `<b style="color:${m.unrated || m.skipped || !m.done ? '#c9a2ff' : m.fail ? '#ff7a5a' : '#5dff9a'}">${V(m)}</b>` + (m.fail ? ` <span class="dim">${m.why.map(w => c1WhyTxt(w.why)).filter((x, j, a) => a.indexOf(x) === j).join(', ')}</span>` : '')]);
     rows.push([L2('구술 (기체·조종자·공역·일반지식·이륙중 엔진고장 · 각 1문)', 'Oral (aircraft · pilot · airspace · general · engine failure on takeoff)'), L2('미평가 · 교관 확인 필요', 'Unrated · instructor')]);
     rows.push([L2('공중경계 · 계획성 · 판단력 · 규칙 준수 · 조작 원활성', 'Lookout · planning · judgement · rules · smoothness'), L2('미평가 · 교관 확인 필요', 'Unrated · instructor')]);
+    { const calls = []; C1.M.forEach(m => m.steps.forEach(s => { if (s.call) calls.push(s); })); const v = calls.filter(s => s.callSaid === 'voice').length, b = calls.filter(s => s.callSaid === 'btn').length;
+      rows.push([L2('구호 (교육 관행 예시 · 채점 외, "비상"만 기준서 필수)', 'Calls (training practice · not scored, only "emergency" is required)'), `${v + b} / ${calls.length} · ${L2('음성', 'voice')} ${v} · ${L2('버튼', 'button')} ${b}`]); }
+    { const ins = C1.ev.find(e => e.type === 'inspect'); if (ins) rows.push([L2('비행 전 점검 판정', 'Pre-flight inspection'), (ins.fault ? L2('이상 항목: ', 'Fault: ') + ins.fault : L2('이상 없음', 'No fault')) + ' · ' + (ins.wrong.length ? `<b style="color:#ff7a5a">${L2('오판정 ', 'misjudged ')}${ins.wrong.join(', ')}</b>` : L2('판정 정확', 'judged correctly'))]); }
+    { const o = C1.ev.filter(e => e.type === 'oral'); if (o.length) rows.push([L2('구술 (앱 예시 문항 · 앱 채점)', 'Oral (app examples · app-scored)'), `${o.filter(x => x.ok).length} / ${o.length}`]); }
     rows.push([L2('안전거리 14 m · 안전라인', 'Safety radius 14 m · line'), C1.safeBad ? `<b style="color:#ff7a5a">${L2('침범 기록 있음', 'Infringed')}</b>` : L2('침범 기록 없음', 'No infringement logged')]);
     rows.push([L2('비행 시간', 'Flight time'), fmt(S.t)], [L2('비상 강하 기준 속도', 'Emergency descent reference'), C1.refDesc ? C1.refDesc.toFixed(2) + ' m/s (' + L2('삼각 하강 평균', 'triangle descent mean') + ')' : c1R('emgRefDefault') + ' m/s (' + L2('앱 기본값', 'app default') + ')']);
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
@@ -759,4 +880,154 @@ if (window.SIM_CIVIL) {
   const _ss = scenStart; scenStart = function (k, a) { const L = _ss(k, a); return L && k === 'sar' ? L.filter(o => o.t !== 'sarkit') : L; };   // 수색: 키트 투하 단계 없음
   strikePick = function () { return []; };
 }
-if (window.__sim) Object.assign(window.__sim, { C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, AF, AF_IDS, MS_OK, TOUCH, isC1 });
+// =====================================================================
+//  시험장 진행: 시험위원 방송 · 응시자 구호 · 비행 전 점검 · 조종기 점검 · 시동 · 구술
+//  음성은 기기 음성 합성(speechSynthesis)만 씀 · 시험위원 지시문과 구호는 앱이 쓴 예시 문구
+// =====================================================================
+const C1V = { micOn: false, rec: null, heard: '', heardT: 0 };
+function c1VoicePick() {
+  try { const vs = speechSynthesis.getVoices(), lang = window.SIM_LANG === 'en' ? 'en' : 'ko'; return vs.filter(v => v.lang && v.lang.toLowerCase().startsWith(lang)); } catch (e) { return []; }
+}
+// who: 'ex' 시험위원 (낮고 차분) · 'me' 응시자 구호 (높고 빠르게, 다른 목소리가 있으면 그것)
+function c1Say(text, who) {
+  const dur = Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
+  c1Caption(text, who, dur);
+  try {
+    if (window.speechSynthesis && !TEST && SET.voice !== false) {
+      const u = new SpeechSynthesisUtterance(text), vs = c1VoicePick();
+      u.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR';
+      if (vs.length) u.voice = who === 'me' && vs.length > 1 ? vs[1] : vs[0];
+      u.pitch = who === 'me' ? 1.25 : 0.85; u.rate = who === 'me' ? 1.15 : 0.98; u.volume = 1;
+      speechSynthesis.speak(u);
+    } else if (who === 'ex') sfx('good');
+  } catch (e) { }
+  return dur;
+}
+function c1Caption(text, who, dur) {
+  let el = $('c1cap'); if (!el) { el = document.createElement('div'); el.id = 'c1cap'; document.body.appendChild(el); }
+  el.innerHTML = `<b>${who === 'me' ? L2('🗣 응시자', '🗣 Candidate') : L2('📢 시험위원', '📢 Examiner')}</b> ${text}`; el.className = who === 'me' ? 'me on' : 'on';
+  clearTimeout(c1Caption.t); c1Caption.t = setTimeout(() => el.classList.remove('on'), (dur + 1.2) * 1000);
+}
+// 구호: 지금 단계의 구호를 버튼·키(Q)로 → 기기 음성이 대신 외침 · 마이크(음성인식)로 직접 말하면 그대로 기록
+function c1CallDo(how) {
+  const st = c1Cur(); if (!st || !st.call || st.callSaid) return false;
+  if (how !== 'voice') c1Say(L2(st.call.ko, st.call.en), 'me');
+  st.callSaid = how; c1Ev('call', { how, text: st.call.ko }); return true;
+}
+function c1Heard(text) {
+  const t = text.replace(/\s+/g, '').toLowerCase(); C1V.heard = text; C1V.heardT = 3;
+  const st = c1Cur(); if (!st) return;
+  if (st.call && !st.callSaid && st.call.kw.some(k => t.includes(k.toLowerCase()))) c1CallDo('voice');
+  if (st.k === 'callout' && /비상|emergency/.test(t)) c1Key('KeyE', true);
+}
+function c1Mic(on) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (on && !SR) { showMsg(L2('이 브라우저는 음성인식을 지원하지 않습니다 · 버튼(Q)으로 구호', 'No speech recognition in this browser · use the call button (Q)'), '#ffc828', 2.5); C1V.micOn = false; return; }
+  C1V.micOn = !!on;
+  if (!on) { try { C1V.rec && C1V.rec.stop(); } catch (e) { } C1V.rec = null; return; }
+  const r = new SR(); r.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR'; r.continuous = true; r.interimResults = true;
+  r.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) c1Heard(e.results[i][0].transcript); };
+  r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { C1V.micOn = false; showMsg(L2('마이크 권한이 없습니다', 'Microphone permission denied'), '#ff9a40', 2); } };
+  r.onend = () => { if (C1V.micOn && C1V.rec === r) try { r.start(); } catch (e) { } };
+  try { r.start(); C1V.rec = r; showMsg(L2('🎤 음성 구호 인식 켬 (인터넷 필요할 수 있음)', '🎤 Voice calls on (may need internet)'), '#5dff9a', 2); } catch (e) { C1V.micOn = false; }
+}
+function c1Arm(how) {
+  if (C1.armed) return; C1.armed = true; C1.tArm = C1.t; c1Ev('arm', { how }); sfx('good');
+  if (how === 'btn') c1CallDo('btn');
+}
+
+// ---- 비행 전 점검 (상태를 보고 정상/불량 판정 · 모의평가는 40% 확률로 이상 한 가지) ----
+const C1INS = [
+  { id: 'prop', ko: '프로펠러 체결·파손', en: 'Propellers: fixed, undamaged', ok: ['단단히 고정 · 손상 없음', 'Tight · no damage'], bad: ['한 장 끝에 금 · 손으로 흔들면 유격', 'Crack at one tip · play when shaken'] },
+  { id: 'arm', ko: '암·폴딩 잠금', en: 'Arms / folding locks', ok: ['4개 모두 잠김', 'All four locked'], bad: ['오른쪽 뒤 암 잠금 풀림', 'Rear-right arm lock open'] },
+  { id: 'skid', ko: '스키드·볼트·너트', en: 'Skids, bolts, nuts', ok: ['조임 정상', 'Tight'], bad: ['왼쪽 스키드 볼트 풀림', 'Left skid bolt loose'] },
+  { id: 'bat', ko: '기체 배터리', en: 'Flight battery', ok: ['장착·잠금 · 셀당 4.18 V', 'Seated, locked · 4.18 V/cell'], bad: ['셀당 3.62 V (충전 부족)', '3.62 V/cell (not charged)'] },
+  { id: 'tx', ko: '조종기 배터리', en: 'Transmitter battery', ok: ['85 %', '85 %'], bad: ['9 % · 저전압 경고', '9 % · low-voltage warning'] },
+  { id: 'gps', ko: 'GPS·컴퍼스', en: 'GPS / compass', ok: ['위성 16개 · 컴퍼스 정상', '16 satellites · compass OK'], bad: ['위성 5개 · 컴퍼스 교정 필요', '5 satellites · compass calibration needed'] }
+];
+function c1Modal(html) {
+  let el = $('c1m'); if (!el) { el = document.createElement('div'); el.id = 'c1m'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="box">${html}</div>`; el.classList.remove('hidden'); return el;
+}
+function c1ModalClose() { const el = $('c1m'); if (el) el.classList.add('hidden'); }
+function c1InspectUI(st) {
+  const ans = st.ans = {};
+  const row = it => { const bad = st.fault === it.id; return `<tr><td>${L2(it.ko, it.en)}</td><td class="${bad ? 'warn' : ''}">${L2((bad ? it.bad : it.ok)[0], (bad ? it.bad : it.ok)[1])}</td><td><button data-i="${it.id}" data-v="ok">${L2('정상', 'OK')}</button><button data-i="${it.id}" data-v="bad">${L2('불량', 'Fault')}</button></td></tr>`; };
+  const el = c1Modal(`<h3>${L2('비행 전 점검', 'Pre-flight inspection')}</h3><p class="dim">${L2('기체와 조종기를 확인하고 항목마다 상태를 판정하십시오. 이상이 있으면 불량을 고르면 조치(기체 교체) 후 진행합니다.', 'Check the aircraft and transmitter and judge each item. Mark a fault and it is fixed (aircraft swap) before you continue.')}</p>
+<table>${C1INS.map(row).join('')}</table><button class="primary" id="c1InsGo" disabled>${L2('점검 완료', 'Inspection done')}</button>`);
+  el.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => { ans[b.dataset.i] = b.dataset.v; el.querySelectorAll(`button[data-i="${b.dataset.i}"]`).forEach(x => x.classList.toggle('on', x === b)); $('c1InsGo').disabled = Object.keys(ans).length < C1INS.length; });
+  $('c1InsGo').onclick = () => c1InspectDone(st);
+}
+function c1InspectDone(st) {
+  if (st.done) return; st.done = true; c1ModalClose();
+  const wrong = C1INS.filter(it => (st.ans[it.id] === 'bad') !== (st.fault === it.id)).map(it => it.id);
+  c1Ev('inspect', { fault: st.fault, answers: st.ans, wrong });
+  if (wrong.length) c1Fail(st, 'inspect', { wrong, fault: st.fault });
+  if (st.fault && st.ans[st.fault] === 'bad') c1Say(L2('이상 확인. 조치 후 진행하십시오.', 'Fault confirmed. Fix it, then continue.'), 'ex');
+}
+function c1InspectAuto(correct) { const st = c1Cur(); if (!st || st.k !== 'inspect' || st.done) return; st.ans = {}; C1INS.forEach(it => st.ans[it.id] = correct ? (st.fault === it.id ? 'bad' : 'ok') : 'ok'); if (!correct && !st.fault) st.ans[C1INS[0].id] = 'bad'; c1InspectDone(st); }
+
+// ---- 구술 문항 (앱 작성 예시 · 공식 출제 문항 아님 · 세부평가기준의 5개 항목 분류를 따름) ----
+const C1Q = [
+  { cat: 'ac', q: ['무인멀티콥터 1종의 구분 기준으로 맞는 것은?', 'Which defines a class-1 unmanned multicopter?'], a: [['최대이륙중량 25 kg 초과, 연료 제외 자체중량 150 kg 이하', 'MTOW over 25 kg, empty weight (excl. fuel) up to 150 kg'], ['최대이륙중량 7 kg 초과 25 kg 이하', 'MTOW over 7 kg up to 25 kg'], ['자체중량 25 kg 초과 기체만', 'Empty weight over 25 kg only'], ['최대이륙중량 2 kg 초과 7 kg 이하', 'MTOW over 2 kg up to 7 kg']] },
+  { cat: 'ac', q: ['리튬폴리머 배터리 셀 1개의 완충 전압은 대략?', 'Roughly what is a full-charge LiPo cell voltage?'], a: [['4.2 V', '4.2 V'], ['3.7 V', '3.7 V'], ['3.0 V', '3.0 V'], ['5.0 V', '5.0 V']] },
+  { cat: 'ac', q: ['비행제어기에서 기수 방향(방위)을 알려 주는 센서는?', 'Which flight-controller sensor gives heading?'], a: [['지자기 센서(컴퍼스)', 'Magnetometer (compass)'], ['기압 센서', 'Barometer'], ['자이로 센서', 'Gyroscope'], ['GPS 수신기만', 'GPS receiver alone']] },
+  { cat: 'pi', q: ['실기시험표준서의 응시 요건으로 맞는 것은?', 'Which is a practical-test requirement in the standard?'], a: [['최근 2년 이내 학과시험 합격', 'Passed the written test within the last 2 years'], ['학과시험은 기간 제한 없이 인정', 'Written test valid with no time limit'], ['비행경력 없이 응시 가능', 'No flight experience needed'], ['구술시험 면제', 'Oral exam waived']] },
+  { cat: 'pi', q: ['조종자 준수사항으로 맞는 것은?', 'Which is a pilot rule?'], a: [['주류 등을 섭취한 상태로 비행하지 않는다', 'Never fly under the influence of alcohol'], ['인구 밀집 지역 상공에서 물건을 떨어뜨려도 된다', 'Dropping objects over crowds is allowed'], ['비행 중 휴대폰으로 영상 통화를 해도 된다', 'Video calls while flying are fine'], ['안전성 인증은 선택 사항이다', 'Safety certification is optional']] },
+  { cat: 'pi', q: ['시험 당일 표준서가 요구하는 소지 서류는?', 'Which document does the standard require on test day?'], a: [['유효한 항공신체검사증명서', 'A valid aviation medical certificate'], ['비행기록 원본 전체', 'All original flight logs'], ['기체 구매 영수증', 'Aircraft purchase receipt'], ['보험 증서 원본', 'Original insurance policy']] },
+  { cat: 'as', q: ['NOTAM(항공고시보)이란?', 'What is a NOTAM?'], a: [['항공 시설·절차·위험 등 운항에 필요한 정보를 알리는 고시', 'Notice of facilities, procedures or hazards relevant to flight'], ['조종자 자격 시험 일정표', 'A licence exam timetable'], ['기체 정비 기록부', 'An aircraft maintenance log'], ['드론 판매 허가증', 'A drone sales permit']] },
+  { cat: 'as', q: ['승인 없이 비행할 수 없는 고도 기준은?', 'Above what height is approval required?'], a: [['지표·수면 또는 물건 상단에서 150 m 이상', '150 m or more above ground, water or structure'], ['50 m 이상', '50 m or more'], ['300 m 이상', '300 m or more'], ['고도 제한 없음', 'No limit']] },
+  { cat: 'as', q: ['관제권 안에서 비행하려면?', 'To fly inside a control zone you need…'], a: [['비행 승인을 받아야 한다', 'Flight approval'], ['신고 없이 낮게 날면 된다', 'Nothing if you stay low'], ['GPS 모드면 자유롭게 가능하다', 'Nothing in GPS mode'], ['야간에만 가능하다', 'Night-only flying']] },
+  { cat: 'gk', q: ['유인 항공기와 마주쳤을 때 무인비행장치는?', 'Meeting a crewed aircraft, the unmanned aircraft must…'], a: [['진로를 양보하고 피한다', 'Give way and keep clear'], ['고도를 높여 위로 지나간다', 'Climb over it'], ['그대로 진행한다', 'Carry on'], ['속도를 높여 먼저 지나간다', 'Speed up to pass first']] },
+  { cat: 'gk', q: ['비행 중 GPS 신호를 잃었을 때 알맞은 조치는?', 'GPS lost in flight — what do you do?'], a: [['자세모드로 직접 조종해 안전한 곳에 착륙', 'Fly manually in attitude mode and land somewhere safe'], ['스틱을 놓고 기다린다', 'Let go of the sticks and wait'], ['최대 속도로 이륙 지점까지 직진', 'Fly flat out to the takeoff point'], ['시동을 바로 끈다', 'Shut the motors off at once']] },
+  { cat: 'gk', q: ['비행 중 기체 배터리 저전압 경고가 뜨면?', 'Low-battery warning in flight — what next?'], a: [['가까운 안전한 곳에 즉시 착륙', 'Land at the nearest safe spot now'], ['남은 기동을 끝내고 착륙', 'Finish the remaining tasks first'], ['고도를 높여 기다린다', 'Climb and wait'], ['경고를 끈다', 'Silence the warning']] },
+  { cat: 'eo', q: ['이륙 중 모터 이상(소음·진동·한쪽 쏠림)을 느끼면?', 'Abnormal motor (noise, vibration, yaw) during takeoff?'], a: [['즉시 이륙을 포기하고 착륙 후 시동을 끈다', 'Abort, land and shut down at once'], ['출력을 높여 빨리 올라간다', 'Add power and climb away'], ['기준고도까지 올라간 뒤 판단한다', 'Climb to reference height, then decide'], ['조종기를 끈다', 'Switch the transmitter off']] },
+  { cat: 'eo', q: ['이륙 직후 기체가 한쪽으로 쏠려 제어가 어려우면?', 'Just after liftoff the aircraft drifts and is hard to control?'], a: [['주변에 크게 알리고 가장 가까운 안전한 곳에 바로 착륙', 'Warn people loudly and land at the nearest safe spot'], ['계속 상승해 바람을 피한다', 'Keep climbing out of the wind'], ['시험위원에게 조종기를 넘긴다', 'Hand the transmitter to the examiner'], ['기수를 계속 돌려 본다', 'Keep spinning the nose']] },
+  { cat: 'eo', q: ['이륙을 포기한 뒤 해야 할 일은?', 'After aborting a takeoff you should…'], a: [['시동을 끄고 배터리를 분리한 뒤 원인을 점검', 'Shut down, disconnect the battery and find the cause'], ['바로 다시 이륙해 본다', 'Try another takeoff at once'], ['기록 없이 넘어간다', 'Move on without noting it'], ['프로펠러를 손으로 돌려 본다', 'Spin the props by hand while armed']] }
+];
+const C1QCAT = { ac: ['기체', 'Aircraft'], pi: ['조종자', 'Pilot'], as: ['공역·비행장', 'Airspace & aerodrome'], gk: ['일반지식·비상절차', 'General & emergency'], eo: ['이륙 중 엔진 고장·이륙 포기', 'Engine failure on takeoff'] };
+function c1OralUI(st) {
+  const pick = Object.keys(C1QCAT).map(c => { const L = C1Q.filter(q => q.cat === c); return L[Math.floor(Math.random() * L.length)]; });
+  st.qs = pick.map(q => { const ord = [0, 1, 2, 3].sort(() => Math.random() - 0.5); return { q, ord, ans: null }; }); st.qi = 0;
+  const show = () => {
+    const x = st.qs[st.qi], lang = window.SIM_LANG === 'en' ? 1 : 0;
+    if (st.qi === 0 || !st.spoke) { }
+    c1Say(x.q.q[lang], 'ex');
+    const el = c1Modal(`<h3>${L2('구술시험', 'Oral exam')} ${st.qi + 1} / 5 · ${C1QCAT[x.q.cat][lang]}</h3><p class="q">${x.q.q[lang]}</p>${x.ord.map(i => `<button class="opt" data-a="${i}">${x.q.a[i][lang]}</button>`).join('')}<p class="dim">${L2('앱이 쓴 예시 문항입니다 · 실제 구술은 시험위원이 묻고 답을 듣고 판단합니다.', 'App-written example questions · the real oral exam is asked and judged by the examiner.')}</p>`);
+    el.querySelectorAll('.opt').forEach(b => b.onclick = () => c1OralAns(st, +b.dataset.a));
+  };
+  st.show = show; show();
+}
+function c1OralAns(st, a) {
+  const x = st.qs[st.qi]; if (!x || x.ans != null) return; x.ans = a; c1Ev('oral', { cat: x.q.cat, q: x.q.q[0], ok: a === 0 });
+  if (a !== 0) c1Fail(st, 'oral', { cat: x.q.cat });
+  st.qi++; if (st.qi < st.qs.length) st.show(); else { st.done = true; c1ModalClose(); }
+}
+function c1OralAuto(nOk) { const st = c1Cur(); if (!st || st.k !== 'oral' || !st.qs) return; for (let i = 0; i < 5 && !st.done; i++) c1OralAns(st, i < nOk ? 0 : 1); }
+
+Object.assign(C1EV, {
+  ann(st) { if (st.t1 == null) { st.t1 = C1.t + c1Say(L2(st.ko, st.en), 'ex'); if (C1.M[C1.mi] && C1.M[C1.mi].id === 'pre' && C1.si === 0) C1.introCam = true; } if (C1.t >= st.t1) { C1.introCam = false; return true; } return false; },
+  inspect(st) { if (!st.open) { st.open = true; st.fault = Math.random() < (C1.exam ? 0.4 : 0.5) ? C1INS[Math.floor(Math.random() * C1INS.length)].id : null; if (window.C1_FAULT !== undefined) st.fault = window.C1_FAULT; c1InspectUI(st); } return !!st.done; },
+  rc(st) {
+    const sn = st.seen || (st.seen = {}), a = { thr: IN.thr, yaw: IN.yaw, pitch: IN.pitch, roll: IN.roll };
+    for (const k in a) { if (a[k] > 0.85) sn[k + '+'] = 1; if (a[k] < -0.85) sn[k + '-'] = 1; }
+    st.err = null; return Object.keys(sn).length >= 8 && C1.mode === 'gps' && Math.abs(IN.thr) < 0.3 && Math.abs(IN.pitch) < 0.3;
+  },
+  arm(st, M, dt) {
+    if (C1.armed) return true;
+    if (st.csc) { const g = IN.thr < -0.8 && IN.pitch < -0.8 && Math.abs(IN.yaw) > 0.8 && Math.abs(IN.roll) > 0.8 && Math.sign(IN.yaw) !== Math.sign(IN.roll); st.g = g ? (st.g || 0) + dt : 0; if (st.g > 0.5) { c1Arm('csc'); return true; } }
+    return false;
+  },
+  ctl(st, M, dt) {
+    const lat = Math.hypot(M.u - st.at[0], M.v - st.at[1]); st.err = { lat, alt: M.alt - (C1.ref || 4), hdg: c1Wrap(M.hdg) };
+    c1Dev(st, 'pos', lat > c1R('posTol'), { lat: +lat.toFixed(2) }, dt); c1Dev(st, 'alt', Math.abs(st.err.alt) > c1R('altTol'), { alt: +M.alt.toFixed(2) }, dt);
+    const sn = st.seen || (st.seen = {}); for (const [k, v] of [['p', IN.pitch], ['r', IN.roll], ['y', IN.yaw]]) { if (v > 0.12) sn[k + '+'] = 1; if (v < -0.12) sn[k + '-'] = 1; }
+    st.okT = Object.keys(sn).length >= 6 && c1Still(M) ? (st.okT || 0) + dt : 0;
+    if (C1.t - (st.t0 || 0) > 40 && !st.late) { st.late = true; c1Fail(st, 'ctl', { seen: Object.keys(sn) }); }
+    return st.okT > 0.8 || (st.late && c1Still(M));
+  },
+  oral(st) { if (!st.open) { st.open = true; c1OralUI(st); } return !!st.done; }
+});
+
+c1Place();
+if (window.__sim) Object.assign(window.__sim, { C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, AF, AF_IDS, MS_OK, TOUCH, isC1 });

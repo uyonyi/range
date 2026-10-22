@@ -4059,7 +4059,7 @@ function msStart(kind) {
   // 시작 위치: 고정익·Loitering fixed-wing은 공중에서
   const c1s = typeof isC1 === 'function' && isC1(kind) ? c1StartPose() : null;
   const p0 = c1s ? c1s.p : kind === 'field' && RWY && a.cls !== 'wing' ? RWY.pads[0].clone().setY(RWY.pads[0].y + 0.06) : startPos(), o = msObj(); let h = startHead();
-  if (c1s) h = 0; else if (o && o.mk) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
+  if (c1s) h = c1s.h; else if (o && o.mk) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
   if (wingRwyOK(a) && kind !== 'strike') wingGround(); else if (a.cls === 'wing') { p0.y = groundAt(p0.x, p0.z) + (a.kam ? 45 : 30); wingAir(p0, h); } else resetDrone(p0, h);
   MS.launch = { p: DR.p.clone(), h: DR.gnd ? DR.h : h };
   S.respawn = null;
