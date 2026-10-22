@@ -15,12 +15,13 @@ TITLES = {
 LIBS = {'THREE': 'node_modules/three/build/three.min.js', 'GEOTIFF': 'node_modules/geotiff/dist-browser/geotiff.js', 'PROJ4': 'node_modules/proj4/dist/proj4.js'}
 
 
-def sources(lang, mode):
+def sources(lang, mode, c1=None):
+    if c1 is None: c1 = mode in ('hroc', 'civil', 'public')   # 1종 연습: 내부판·민간판·공개 PC판 (VR판 제외)
     t = open('template.html', encoding='utf-8').read()
     game = ''.join(open(f, encoding='utf-8').read() for f in FILES)
-    if mode in ('hroc', 'civil'):   # 1종 연습은 내부판·민간판에만 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
+    if c1:   # 1종 연습 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
         i = game.rstrip().rfind('})();'); game = game[:i] + open('game7.js', encoding='utf-8').read() + '\n' + game[i:]
-    if mode not in ('hroc', 'civil'):
+    if not c1:
         t = re.sub(r'<!--C1TAB-->.*?<!--/C1TAB-->', '', t, flags=re.S); t = re.sub(r'\n[^\n]*data-g="exam"[^\n]*', '', t)
     if mode == 'civil':   # 민간판: 타격·차량 추적 메뉴 없음, 투하 문구 정리
         t = re.sub(r'\n[^\n]*data-ms="(strike|track)"[^\n]*', '', t)
@@ -112,7 +113,7 @@ def build_pages(outdir, site_ids, vr):
     up = '../' if vr else ''
     import hashlib
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
-        t, game = sources(lang, 'public')
+        t, game = sources(lang, 'public', c1=not vr)
         game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(game)
         tags = {'THREE': up + 'lib/three.min.js', 'GEOTIFF': up + 'lib/geotiff.js', 'PROJ4': up + 'lib/proj4.js'}

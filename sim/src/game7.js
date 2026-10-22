@@ -38,7 +38,7 @@ const c1R = k => C1RULES[k].v;
 // ---- 기체: 1종 연습용 대형 멀티콥터 (가정값 · 실기체 보정 전) ----
 // 특정 제조사·모델 아님. 질량·추력·관성(회전 응답)·항력·모터 응답을 따로 둔 최소 모델.
 const C1P = {
-  ver: 'c1p-0.1', label: { ko: '1종 연습용 대형 멀티콥터 (가정값 · 실기체 보정 전)', en: 'Class-1 practice multicopter (assumed values · not calibrated)' },
+  ver: 'c1p-0.1', label: { ko: '1종 연습용 대형 멀티콥터', en: 'Class-1 practice multicopter' },
   selfKg: { v: 22, u: 'kg', a: true, note: '자체중량(연료·배터리 제외 정의는 기체별 확인 필요)' },
   mtowKg: { v: 30, u: 'kg', a: true, note: '최대이륙중량 · 법령 1종 구분(25 kg 초과)은 이 값 기준' },
   flightKg: { v: 27, u: 'kg', a: true, note: '현재 시뮬레이션 비행질량 (배터리 포함 가정)' },
@@ -62,19 +62,20 @@ const C1P = {
 };
 const c1p = k => C1P[k].v;
 
-AF.c1 = { tag: 'C1', name: L2('1종 연습기 (가정값)', 'Class-1 trainer (assumed)'), sub: L2('대형 멀티콥터 · 최대이륙중량 30 kg 가정 · 실기체 보정 전', 'Large multicopter · 30 kg MTOW assumed · not calibrated'), cls: 'quad', c1: true,
+AF.c1 = { tag: 'C1', name: L2('1종 연습기', 'Class-1 trainer'), sub: L2('대형 멀티콥터 · 1종 실기시험 연습용', 'Large multicopter · class-1 practical practice'), cls: 'quad', c1: true,
   top: 10, vmax: { train: 5, easy: 5, sport: 10 }, tilt: { train: 18, easy: 18, sport: 25 }, climb: 2, sink: 1.5, yaw: 70, tw: 2.0, R: 0.75, endur: 20,
-  note: L2('1종 실기 연습 전용 · 계수는 가정값', 'Class-1 practice only · coefficients are assumptions') };
+  note: L2('1종 실기 연습 전용 · ※ 제원·비행 특성은 실제 기체 정보가 아닙니다', 'Class-1 practice only · ※ specs and handling are not real aircraft data') };
 AF.c1.id = 'c1'; AF_IDS.push('c1');
 MS_OK.class1 = ['c1']; MS_OK.class1x = ['c1'];
 MS_NAME.class1 = L2('1종 실기 학습', 'Class-1 practice (learn)'); MS_NAME.class1x = L2('1종 모의평가', 'Class-1 mock check');
 MS_CAT.class1 = MS_CAT.class1x = 'exam'; CAT_C.exam = '#c9a2ff';
+const C1DISC = () => L2('※ 기체 제원과 비행 특성은 실제 기체 정보가 아닌 연습용 설정입니다.', '※ Aircraft specs and handling are practice settings, not real aircraft data.');
 BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multicopter class 1 · learn'),
   L2('평탄 시험장에서 이륙·호버링·전후진·삼각·원주·비상·정상접근·측풍접근 순서로 연습합니다. 경로·허용구역·타이머를 보여 줍니다.', 'Practise takeoff, hover, forward/back, triangle, circle, emergency, normal and crosswind approach on a flat test field, with path, tolerance box and timers shown.'),
-  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · Q 구호(기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · Enter 확인 · Y 비행모드 · E "비상" · C 시점 · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · Q call-out (device voice) · 🎤 say it yourself (speech recognition) · Enter confirm · Y flight mode · E "emergency" · C view · Not an official test or training hours.')];
+  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · Q 구호(기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · Enter 확인 · Y 비행모드 · E "비상" · C 시점 · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · Q call-out (device voice) · 🎤 say it yourself (speech recognition) · Enter confirm · Y flight mode · E "emergency" · C view · Not an official test or training hours.') + ' ' + C1DISC()];
 BRIEF.class1x = [L2('무인멀티콥터 1종 · 모의평가', 'Unmanned multicopter class 1 · mock check'),
   L2('호명·비행 전 점검·조종기 점검·시동부터 전체 기동, 구술 5문항까지 실제 시험 순서로 진행하고 항목별 S/U 모의판정을 받습니다. 공중경계·판단력은 미평가로 남습니다.', 'Run the real order — call-up, pre-flight and transmitter checks, start, all manoeuvres and a 5-question oral — and get a per-item S/U mock verdict. Lookout and judgement stay unrated.'),
-  L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.')];
+  L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.') + ' ' + C1DISC()];
 function isC1(k) { k = k || S.kind; return k === 'class1' || k === 'class1x'; }
 
 // ---- 시험장 좌표 (u = 조종자 오른쪽, v = 전방, 단위 m) ----
@@ -723,12 +724,14 @@ body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
 <div class="cl" id="c1Cl"></div>
-<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1An">📢</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
-<canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div>`;
+<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
+<canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
     tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
     $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 끔 (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 켬', 'Examiner announcements on'), '#ffc828', 1.6); };
+    $('c1Vo').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); if (SET.c1voice === false) { SET.c1voice = true; saveSet(); } c1VoiceUnlock(); c1VoiceTest(); };
+    $('c1Vo').oncontextmenu = e => { e.preventDefault(); SET.c1voice = SET.c1voice === false; saveSet(); showMsg(SET.c1voice === false ? L2('시험장 음성 끔', 'Test-field voice off') : L2('시험장 음성 켬', 'Test-field voice on'), '#ffc828', 1.4); };
     $('c1T').onpointerdown = e => { if (IS_TOUCH) { e.stopPropagation(); el.classList.toggle('mini'); } };
     $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
@@ -772,6 +775,7 @@ function c1Tick(dt) {
   { const cl = $('c1Cl'); let h = '';
     if (st && st.call) h = st.callSaid ? `✓ ${L2('구호', 'Call')}: ${L2(st.call.ko, st.call.en)} <i>(${st.callSaid === 'voice' ? L2('음성', 'voice') : L2('버튼', 'button')})</i>` : (C1.exam ? `${L2('구호 ▶ 📣 Q 또는 말하기', 'Call ▶ 📣 Q or say it')}` : `${L2('구호', 'Call')}: “${L2(st.call.ko, st.call.en)}” <i>(Q · 🎤)</i>`);
     if (C1V.heardT > 0) h += `<br><i>🎤 ${C1V.heard}</i>`;
+    const vs = c1VoiceStatus(); if (vs) h += `<br><i style="color:#ffb070">${vs}</i>`;
     cl.innerHTML = h; }
   const e = st && st.err, f = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d || 1), cls = (x, t) => Math.abs(x) <= t ? 'ok' : 'bad';
   let r = `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>`;
@@ -786,7 +790,7 @@ function c1Tick(dt) {
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (키보드 S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
   $('c1R').innerHTML = r; el.classList.toggle('chk', !!st && (st.k === 'rc' || st.k === 'ctl' || (st.k === 'arm' && st.csc)));
-  $('c1Note').textContent = L2('1종 실기시험 기준 참고 연습용 · 공식 시험·교육시간 인정 여부 미확인 · 기체 계수는 가정값', 'Reference practice for the class-1 practical test · not an official test or training hours · aircraft values assumed') + (C1.exam ? '' : L2(' · 숫자 1~9 = 기동 바로가기 · N = 다음 단계', ' · keys 1–9 jump to a manoeuvre · N = next step'));
+  $('c1Note').textContent = L2('1종 실기시험 기준 참고 연습용 · 공식 시험·교육시간 인정 여부 미확인', 'Reference practice for the class-1 practical test · not an official test or training hours') + (C1.exam ? '' : L2(' · 숫자 1~9 = 기동 바로가기 · N = 다음 단계', ' · keys 1–9 jump to a manoeuvre · N = next step'));
   const cv = $('c1Map'); if (cv && !C1.exam) c1DrawMap(cv, st, M); else if (cv) cv.style.display = 'none';
 }
 function c1DrawMap(cv, st, M) {
@@ -840,7 +844,7 @@ function c1Finish(why) {
     rows.push([L2('안전거리 14 m · 안전라인', 'Safety radius 14 m · line'), C1.safeBad ? `<b style="color:#ff7a5a">${L2('침범 기록 있음', 'Infringed')}</b>` : L2('침범 기록 없음', 'No infringement logged')]);
     rows.push([L2('비행 시간', 'Flight time'), fmt(S.t)], [L2('비상 강하 기준 속도', 'Emergency descent reference'), C1.refDesc ? C1.refDesc.toFixed(2) + ' m/s (' + L2('삼각 하강 평균', 'triangle descent mean') + ')' : c1R('emgRefDefault') + ' m/s (' + L2('앱 기본값', 'app default') + ')']);
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
-    const sc = $('resScore'); if (sc) sc.innerHTML = `<div style="color:#c9a2ff;font-size:13px;margin:6px 0">${L2('앱 모의판정 (규칙 ', 'App mock verdict (rules ')}${C1RULES.ver}) · ${L2('공식 시험 합격·자격 판정이 아닙니다', 'not an official pass or certificate')}</div>`;
+    const sc = $('resScore'); if (sc) sc.innerHTML = `<div style="color:#c9a2ff;font-size:13px;margin:6px 0">${L2('앱 모의판정 (규칙 ', 'App mock verdict (rules ')}${C1RULES.ver}) · ${L2('공식 시험 합격·자격 판정이 아닙니다', 'not an official pass or certificate')}<br>${C1DISC()}</div>`;
     const db = $('resDebrief'); if (db) db.innerHTML = `<h4>${L2('판정 근거 (이벤트)', 'Evidence (events)')}</h4>` + C1.ev.filter(e => e.type === 'U').slice(0, 30).map(e => `<div class="ln"><span>${fmt(e.t)} ${e.step}</span><span class="bad">${c1WhyTxt(e.why)}</span></div>`).join('') || '';
     ui.resBest.textContent = '';
     let b = $('c1Exp'); if (!b) { b = document.createElement('button'); b.id = 'c1Exp'; b.textContent = L2('기록 JSON 내보내기', 'Export log (JSON)'); $('bMenu2').parentNode.insertBefore(b, $('bMenu2')); b.onclick = c1Export; }
@@ -901,16 +905,36 @@ function c1Say(text, who) {
   const dur = Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
   c1Caption(text, who, dur);
   try {
-    if (window.speechSynthesis && !TEST && SET.voice !== false) {
+    if (window.speechSynthesis && !TEST && SET.c1voice !== false) {   // 무전 음성 설정과 따로 (무전을 꺼도 시험장 안내는 나옴)
       const u = new SpeechSynthesisUtterance(text), vs = c1VoicePick();
       u.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR';
       if (vs.length) u.voice = who === 'me' && vs.length > 1 ? vs[1] : vs[0];
       u.pitch = who === 'me' ? 1.25 : 0.85; u.rate = who === 'me' ? 1.15 : 0.98; u.volume = 1;
+      u.onstart = () => { C1V.ok = true; C1V.err = null; };
+      u.onerror = e => { if (e.error === 'interrupted' || e.error === 'canceled') return; C1V.err = e.error || 'error'; c1Ev('ttsErr', { err: C1V.err }); };
+      (C1V.utts = C1V.utts || []).push(u); if (C1V.utts.length > 8) C1V.utts.shift();   // 크롬: 참조가 없으면 말하다 끊기는 문제 방지
+      try { speechSynthesis.resume(); } catch (e) { }
       speechSynthesis.speak(u);
+      if (who === 'ex') sfx('good');   // 안내 시작음 (음성이 안 나오는 기기에서도 알림)
     } else if (who === 'ex') sfx('good');
   } catch (e) { }
   return dur;
 }
+// 휴대폰(특히 아이폰)·일부 브라우저는 화면을 한 번 누른 뒤에야 음성이 나옴 → 첫 터치·키 입력 때 빈 음성으로 열어 둠
+function c1VoiceUnlock() {
+  if (C1V.unlocked || !window.speechSynthesis) return; C1V.unlocked = true;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = window.SIM_LANG === 'en' ? 'en-US' : 'ko-KR'; speechSynthesis.speak(u); speechSynthesis.resume(); } catch (e) { }
+}
+['pointerdown', 'keydown', 'touchend'].forEach(ev => document.addEventListener(ev, () => { if (isC1() || S.state === 'menu') c1VoiceUnlock(); }, { capture: true, passive: true }));
+function c1VoiceStatus() {
+  if (!window.speechSynthesis) return L2('🔇 이 브라우저는 음성 합성을 지원하지 않습니다', '🔇 No speech synthesis in this browser');
+  if (SET.c1voice === false) return L2('🔇 시험장 음성 꺼짐 (🔊 버튼)', '🔇 Test-field voice off (🔊)');
+  if (C1V.err) return L2(`🔇 음성 오류 (${C1V.err}) · 화면을 한 번 누른 뒤 🔊 로 시험`, `🔇 Voice error (${C1V.err}) · tap the screen, then test with 🔊`);
+  let all = []; try { all = speechSynthesis.getVoices(); } catch (e) { }
+  if (all.length && !c1VoicePick().length) return L2('🔇 기기에 한국어 음성이 없습니다 · 기기 설정에서 한국어 음성(TTS) 데이터를 설치하세요', '🔇 No English voice on this device');
+  return '';
+}
+function c1VoiceTest() { C1V.err = null; c1VoiceUnlock(); const vs = c1VoicePick(); c1Say(L2('음성 안내 시험입니다. 잘 들리십니까?', 'Voice check. Can you hear me?') + (vs.length ? '' : ''), 'ex'); }
 function c1Caption(text, who, dur) {
   let el = $('c1cap'); if (!el) { el = document.createElement('div'); el.id = 'c1cap'; document.body.appendChild(el); }
   el.innerHTML = `<b>${who === 'me' ? L2('🗣 응시자', '🗣 Candidate') : L2('📢 시험위원', '📢 Examiner')}</b> ${text}`; el.className = who === 'me' ? 'me on' : 'on';

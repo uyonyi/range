@@ -1891,6 +1891,7 @@ function wizGo(n) {
   MENU.step = n; c.dataset.step = n; closePanels();
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
+  if (n === 3 && typeof isC1 === 'function') { if (SET.af === 'c1' && !isC1(MENU.ms)) MENU.ms = 'class1'; else if (SET.af !== 'c1' && isC1(MENU.ms)) MENU.ms = 'course'; }   // 1종 연습기 → 1종 코스로
   if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
   const md = $('wzMode'); if (md) { md.style.display = HAS_INTRO ? '' : 'none'; md.textContent = MENU.mode === 'vr' ? '🥽 VR' : '🖥 PC'; }
   if ($('wz1Back')) $('wz1Back').style.visibility = HAS_INTRO ? '' : 'hidden';

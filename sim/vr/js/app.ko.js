@@ -1837,7 +1837,7 @@ const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', gho
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -5511,6 +5511,7 @@ function wizGo(n) {
   MENU.step = n; c.dataset.step = n; closePanels();
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
+  if (n === 3 && typeof isC1 === 'function') { if (SET.af === 'c1' && !isC1(MENU.ms)) MENU.ms = 'class1'; else if (SET.af !== 'c1' && isC1(MENU.ms)) MENU.ms = 'course'; }   // 1종 연습기 → 1종 코스로
   if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
   const md = $('wzMode'); if (md) { md.style.display = HAS_INTRO ? '' : 'none'; md.textContent = MENU.mode === 'vr' ? '🥽 VR' : '🖥 PC'; }
   if ($('wz1Back')) $('wz1Back').style.visibility = HAS_INTRO ? '' : 'hidden';
