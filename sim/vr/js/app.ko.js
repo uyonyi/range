@@ -7125,12 +7125,99 @@ function c1Mode() {
   c1Ev('mode', { mode: C1.mode }); showMsg(c1ModeName(), '#c9a2ff', 1.2);
 }
 function c1ModeName() { return { gps: L2('GPS 모드 (위치·고도 유지)', 'GPS mode (position + height hold)'), atti: L2('자세제어 ATTI (고도 유지 · 위치 유지 없음)', 'ATTI (height hold · no position hold)'), manual: L2('수동 (고도 유지 없음)', 'Manual (no height hold)') }[C1.mode]; }
+// ---- 공간 가이드 (학습·시범): 3D 목표 기체(반투명) · 기체 아래 수직선 · 위에서 본 위치 게이지 ----
+function c1Aid3D(st) {
+  const G0 = C1G; if (!G0) return;
+  if (!C1.ghost) {
+    const gm = makeC1(true); C1.ghost = gm.g; C1.ghost.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.opacity = 0.32; o.material.color && o.material.color.set(0x7fe0ff); } o.castShadow = false; }); G0.add(C1.ghost);
+    C1.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.75 })); C1.drop.frustumCulled = false; G0.add(C1.drop);
+    C1.dropRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide })); C1.dropRing.rotation.x = -Math.PI / 2; G0.add(C1.dropRing);
+    C1.tgtRing = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 40), new THREE.MeshBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide })); C1.tgtRing.rotation.x = -Math.PI / 2; G0.add(C1.tgtRing);
+    C1.tgtPole = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]), new THREE.LineBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.8 })); C1.tgtPole.frustumCulled = false; G0.add(C1.tgtPole);
+  }
+  const air = st && !DR.landed && C1.armed, sd = c1p('skidDrop');
+  C1.drop.visible = C1.dropRing.visible = !!air;
+  if (air) { const gy = c1Gnd() + 0.03; C1.drop.geometry.setFromPoints([DR.p.clone(), new V3(DR.p.x, gy, DR.p.z)]); C1.drop.computeLineDistances(); C1.dropRing.position.set(DR.p.x, gy, DR.p.z); }
+  const T = st && c1Tgt(st);
+  C1.ghost.visible = C1.tgtRing.visible = C1.tgtPole.visible = !!T;
+  if (!T) return;
+  const p = c1W(T.u, T.v, T.alt + sd); C1.ghost.position.copy(p); C1.ghost.rotation.set(0, -(C1S.h + (T.hdg || 0) * DEG), 0);
+  const gp = c1W(T.u, T.v, 0.04); C1.tgtRing.position.copy(gp); const r = st.alongTol ? 1 : c1R('posTol'); C1.tgtRing.scale.set(r, r, 1);
+  C1.tgtPole.geometry.setFromPoints([gp.clone(), p.clone()]);
+}
+// 지금 단계의 목표 (u, v, 고도, 기수) — 없으면 null
+function c1Tgt(st) {
+  const ref = C1.ref || 4;
+  if (st.k === 'hold') return { u: st.at[0], v: st.at[1], alt: st.altWin ? ref + st.altWin[0] + 0.5 : c1AltTgt(st), hdg: st.hdg };
+  if (st.k === 'climb') return { u: st.at[0], v: st.at[1], alt: 4, hdg: 0 };
+  if (st.k === 'xfer') return { u: st.to[0], v: st.to[1], alt: ref, hdg: 0 };
+  if (st.k === 'move') return { u: st.to[0], v: st.to[1], alt: ref + (st.r1 || 0), hdg: st.hdg };
+  if (st.k === 'land' || st.k === 'emg') return { u: st.pad[0], v: st.pad[1], alt: 0, hdg: st.hdg || 0 };
+  if (st.k === 'arc') return { u: st.start[0], v: st.start[1], alt: ref, hdg: null };
+  return null;
+}
+function c1Gauge(st, M) {
+  let cv = $('c1g'); if (!cv) { cv = document.createElement('canvas'); cv.id = 'c1g'; document.body.appendChild(cv); }
+  const show = !!st && !C1.exam && S.state !== 'menu' && ['climb', 'hold', 'move', 'arc', 'emg', 'land', 'xfer'].includes(st.k) && !C1.over;
+  cv.classList.toggle('hidden', !show); if (!show) return;
+  const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const small = W < 200, fs = small ? 9 : 11, foot = small ? 13 : 18, SZ = H - foot - 6, cx = 4 + SZ / 2, cy = 4 + SZ / 2, Rr = SZ / 2 - 2;
+  const ref = C1.ref || 4, T = c1Tgt(st), pT = c1R('posTol'), aT = c1R('altTol');
+  // 기준점: 이동·원주는 경로 위 가장 가까운 점, 나머지는 목표점
+  let c = [T.u, T.v], span, dist = Math.hypot(M.u - T.u, M.v - T.v), info = '';
+  if (st.k === 'move') { const a = st.from, b = st.to, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), al = clamp(((M.u - a[0]) * dx + (M.v - a[1]) * dy) / L, 0, L); c = [a[0] + dx / L * al, a[1] + dy / L * al]; span = 4; info = `${L2('남은', 'to go')} ${Math.max(0, L - al).toFixed(1)} m`; }
+  else if (st.k === 'arc') { const du = M.u - st.c[0], dv = M.v - st.c[1], r = Math.hypot(du, dv) || 1; c = [st.c[0] + du / r * st.R, st.c[1] + dv / r * st.R]; span = 4; info = `◯ ${Math.min(360, Math.round(st.sweep || 0))}°`; }
+  else { span = clamp(dist * 1.35, 2.4, 30); info = `${L2('목표까지', 'to target')} ${dist.toFixed(1)} m`; }
+  const X = u => cx + (u - c[0]) / span * Rr, Y = v => cy - (v - c[1]) / span * Rr;
+  g.save(); g.beginPath(); g.arc(cx, cy, Rr, 0, Math.PI * 2); g.clip();
+  g.fillStyle = 'rgba(40,70,40,.55)'; g.fillRect(cx - Rr, cy - Rr, Rr * 2, Rr * 2);
+  // 1 m · 5 m 눈금 원
+  g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 1; g.setLineDash([3, 3]);
+  for (const k of [1, 2, 5, 10, 20]) { const rr = k / span * Rr; if (rr > 8 && rr < Rr * 0.98) { g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.stroke(); } }
+  g.setLineDash([]);
+  // 경로·허용범위
+  g.fillStyle = 'rgba(93,255,154,.18)'; g.strokeStyle = 'rgba(93,255,154,.85)'; g.lineWidth = 1.5;
+  if (st.k === 'move') { const a = st.from, b = st.to, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), nx = -dy / L * pT, ny = dx / L * pT;
+    g.beginPath(); g.moveTo(X(a[0] + nx), Y(a[1] + ny)); g.lineTo(X(b[0] + nx), Y(b[1] + ny)); g.lineTo(X(b[0] - nx), Y(b[1] - ny)); g.lineTo(X(a[0] - nx), Y(a[1] - ny)); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(79,227,255,.9)'; g.beginPath(); g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(b[0]), Y(b[1])); g.stroke(); }
+  else if (st.k === 'arc') { g.lineWidth = 2 * pT / span * Rr; g.strokeStyle = 'rgba(93,255,154,.22)'; g.beginPath(); g.arc(X(st.c[0]), Y(st.c[1]), st.R / span * Rr, 0, Math.PI * 2); g.stroke(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(79,227,255,.9)'; g.beginPath(); g.arc(X(st.c[0]), Y(st.c[1]), st.R / span * Rr, 0, Math.PI * 2); g.stroke(); }
+  if (st.k !== 'arc') { const tx = X(T.u), ty = Y(T.v);
+    if (st.alongTol) { const w = pT / span * Rr, h = st.alongTol / span * Rr; g.fillRect(tx - w, ty - h, w * 2, h * 2); g.strokeRect(tx - w, ty - h, w * 2, h * 2); }
+    else { const rr = (st.k === 'emg' ? 1.5 : pT) / span * Rr; g.beginPath(); g.arc(tx, ty, rr, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    g.strokeStyle = '#5dff9a'; g.beginPath(); g.moveTo(tx - 5, ty); g.lineTo(tx + 5, ty); g.moveTo(tx, ty - 5); g.lineTo(tx, ty + 5); g.stroke(); }
+  // 지나온 길
+  const tr = C1.gtr || (C1.gtr = []); tr.push([M.u, M.v]); if (tr.length > 60) tr.shift();
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); tr.forEach((q, i) => i ? g.lineTo(X(q[0]), Y(q[1])) : g.moveTo(X(q[0]), Y(q[1]))); g.stroke();
+  // 기체 (삼각형 = 기수 방향)
+  const off = st.k === 'move' || st.k === 'arc' ? Math.hypot(M.u - c[0], M.v - c[1]) : dist, ratio = off / (st.k === 'emg' ? 1.5 : pT);
+  const col = ratio < 0.5 ? '#7dffa8' : ratio < 1 ? '#ffd166' : '#ff7a6a', th = M.hdg * DEG, fx = Math.sin(th), fy = -Math.cos(th);
+  let dx = X(M.u), dy = Y(M.v); const outR = Math.hypot(dx - cx, dy - cy) > Rr - 6; if (outR) { const k = (Rr - 8) / Math.hypot(dx - cx, dy - cy); dx = cx + (dx - cx) * k; dy = cy + (dy - cy) * k; }
+  g.fillStyle = col; g.strokeStyle = '#000'; g.lineWidth = 1; g.beginPath(); g.moveTo(dx + fx * 9, dy + fy * 9); g.lineTo(dx - fx * 6 + fy * 6, dy - fy * 6 - fx * 6); g.lineTo(dx - fx * 6 - fy * 6, dy - fy * 6 + fx * 6); g.closePath(); g.fill(); g.stroke();
+  g.restore();
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(cx, cy, Rr, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.75)'; g.font = `${fs}px system-ui,sans-serif`; g.textAlign = 'center'; g.fillText(L2('먼 쪽', 'far'), cx, 4 + fs); g.fillText(L2('조종자', 'pilot'), cx, cy + Rr - 3);
+  // 고도 막대
+  const bx = 4 + SZ + (small ? 8 : 14), bw = small ? 12 : 16, top = 8 + fs, bot = 4 + SZ, tgtA = st.k === 'climb' ? 4 : T.alt, hmax = Math.max(8, tgtA + 3, M.alt + 1), yA = a => bot - clamp(a, 0, hmax) / hmax * (bot - top);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(bx, top, bw, bot - top);
+  const band = st.k === 'climb' ? [c1R('refMin'), c1R('refMax')] : st.altWin ? [ref + st.altWin[0], ref + st.altWin[1]] : (st.k === 'land' || st.k === 'emg') ? null : [tgtA - aT, tgtA + aT];
+  if (band) { g.fillStyle = 'rgba(93,255,154,.45)'; g.fillRect(bx, yA(band[1]), bw, yA(band[0]) - yA(band[1])); }
+  const aOk = !band || (M.alt >= band[0] && M.alt <= band[1]); g.fillStyle = aOk ? '#7dffa8' : '#ffd166';
+  const ay = yA(M.alt); g.beginPath(); g.moveTo(bx + bw + 7, ay - 5); g.lineTo(bx + bw + 1, ay); g.lineTo(bx + bw + 7, ay + 5); g.fill(); g.fillRect(bx - 2, ay - 1, bw + 4, 2);
+  g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(M.alt.toFixed(1) + 'm', bx + bw + 9, ay + 4);
+  g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText(L2('고도', 'alt'), bx - 2, 4 + fs);
+  // 아래 글: 목표까지 · 기수
+  const he = T.hdg == null ? null : c1Wrap(T.hdg - M.hdg);
+  g.font = `${small ? 10 : 12}px system-ui,sans-serif`; g.textAlign = 'left'; g.fillStyle = col; g.fillText(info, 6, H - 5);
+  if (he != null) { g.textAlign = 'right'; g.fillStyle = Math.abs(he) <= c1R('hdgTol') * 0.5 ? '#7dffa8' : Math.abs(he) <= c1R('hdgTol') ? '#ffd166' : '#ff7a6a'; g.fillText(Math.abs(he) < 1 ? `${L2('기수', 'nose')} 0°` : `${L2('기수', 'nose')} ${Math.round(Math.abs(he))}° ${he > 0 ? L2('좌', 'L') : L2('우', 'R')}`, W - 6, H - 5); }
+}
 // ---- 연습 코치: 지금 무엇을 얼마나 고치면 되는지 (모드2 스틱 기준 · 기체 기준 방향) ----
 function c1Coach(st, M) {
   const out = [], th = M.hdg * DEG, F = [Math.sin(th), Math.cos(th)], Rt = [Math.cos(th), -Math.sin(th)], wrap = c1Wrap;
   const ref = C1.ref || 4, pT = c1R('posTol'), aT = c1R('altTol'), hT = st.k === 'emg' ? c1R('hdgTolEmg') : c1R('hdgTol');
   const f1 = x => Math.abs(x).toFixed(Math.abs(x) < 10 ? 1 : 0);
-  const lv = r => r < 0.5 ? 'g' : r < 1 ? 'y' : 'r';
+  const lv = r => r < 0.5 ? 'cg' : r < 1 ? 'cy' : 'cr';
   const add = (ratio, html) => out.push({ ratio, html: `<div class="${lv(ratio)}">${html}</div>` });
   const side = Math.abs(wrap(M.hdg)) > 45 ? ` <i>(${L2('기체 기준', 'from the aircraft')})</i>` : '';
   // 위치: 목표점까지 차이를 기체 앞/옆으로 나눠 스틱으로
@@ -7143,18 +7230,18 @@ function c1Coach(st, M) {
   };
   const alt = (tgt, tol) => { const e = tgt - M.alt; if (Math.abs(e) < 0.08) return; add(Math.abs(e) / tol, `${L2('고도', 'Height')} <b>${f1(e)} m ${e > 0 ? L2('낮음', 'low') : L2('높음', 'high')}</b> → ${e > 0 ? L2('스로틀 ↑ 살짝', 'throttle ↑ a little') : L2('스로틀 ↓ 살짝', 'throttle ↓ a little')} <i>(${L2('목표', 'target')} ${tgt.toFixed(1)} m ±${tol})</i>`); };
   const hdg = (tgt, tol) => { const e = wrap(tgt - M.hdg); if (Math.abs(e) < 3) return; add(Math.abs(e) / tol, `${L2('기수가', 'Nose')} <b>${f1(e)}° ${e > 0 ? L2('왼쪽으로', 'left') : L2('오른쪽으로', 'right')}</b> ${L2('틀어짐', 'of target')} → ${e > 0 ? L2('러더 → (오른쪽으로)', 'rudder → (right)') : L2('러더 ← (왼쪽으로)', 'rudder ← (left)')} <i>(±${tol}°)</i>`); };
-  const good = t => `<div class="g">✓ ${t}</div>`;
+  const good = t => `<div class="cg">✓ ${t}</div>`;
   let lead = '';
   if (st.k === 'climb') {
     const lo = c1R('refMin'), hi = c1R('refMax');
-    if (M.alt < lo - aT) { lead = M.vy < 0.2 && M.alt > 0.6 ? `<div class="r">⚠ ${L2('상승이 멈췄어요 — 기준고도(3~5 m)까지 한 번에 올리기', 'Climb stalled — go up to 3–5 m in one go')}</div>` : `<div class="y">⬆ ${L2('스로틀 ↑ 로 3~5 m 까지 멈추지 말고 상승', 'Throttle ↑ — climb to 3–5 m without stopping')} <i>(${L2('지금', 'now')} ${M.alt.toFixed(1)} m)</i></div>`; }
-    else if (M.alt > hi + aT) lead = `<div class="r">⬇ ${L2('5 m 넘음 → 스로틀 ↓ 로 범위 안으로', 'Above 5 m → throttle ↓ back into range')}</div>`;
+    if (M.alt < lo - aT) { lead = M.vy < 0.2 && M.alt > 0.6 ? `<div class="cr">⚠ ${L2('상승이 멈췄어요 — 기준고도(3~5 m)까지 한 번에 올리기', 'Climb stalled — go up to 3–5 m in one go')}</div>` : `<div class="cy">⬆ ${L2('스로틀 ↑ 로 3~5 m 까지 멈추지 말고 상승', 'Throttle ↑ — climb to 3–5 m without stopping')} <i>(${L2('지금', 'now')} ${M.alt.toFixed(1)} m)</i></div>`; }
+    else if (M.alt > hi + aT) lead = `<div class="cr">⬇ ${L2('5 m 넘음 → 스로틀 ↓ 로 범위 안으로', 'Above 5 m → throttle ↓ back into range')}</div>`;
     else lead = good(L2('기준고도 범위 안 — 스로틀 중립으로 멈추면 이 높이가 기준고도가 됩니다', 'In range — centre the throttle; this height becomes your reference'));
     pos(st.at[0] - M.u, st.at[1] - M.v, pT); hdg(0, hT);
   } else if (st.k === 'hold') {
     const du = st.at[0] - M.u, dv = st.at[1] - M.v, d = Math.hypot(du, dv);
-    if (!st.armedEval && d > 1.5) lead = `<div class="y">➜ ${L2('목표 지점까지', 'To the point')} <b>${d.toFixed(1)} m</b> — ${L2('2 m 전부터 천천히 감속', 'ease off from 2 m out')}</div>`;
-    else if (st.armedEval) { const left = Math.max(0, st.T - st.t); lead = left > 0 ? `<div class="g">⏱ ${L2('정지 중', 'Holding')} ${st.t.toFixed(1)} / ${st.T} s — ${L2('스틱은 중립, 아주 작은 수정만', 'sticks centred, tiny corrections only')}</div>` : good(L2('정지 완료', 'Hold complete')); }
+    if (!st.armedEval && d > 1.5) lead = `<div class="cy">➜ ${L2('목표 지점까지', 'To the point')} <b>${d.toFixed(1)} m</b> — ${L2('2 m 전부터 천천히 감속', 'ease off from 2 m out')}</div>`;
+    else if (st.armedEval) { const left = Math.max(0, st.T - st.t); lead = left > 0 ? `<div class="cg">⏱ ${L2('정지 중', 'Holding')} ${st.t.toFixed(1)} / ${st.T} s — ${L2('스틱은 중립, 아주 작은 수정만', 'sticks centred, tiny corrections only')}</div>` : good(L2('정지 완료', 'Hold complete')); }
     if (st.altWin) { const lo = ref + st.altWin[0], hi = ref + st.altWin[1]; if (M.alt < lo) add((lo - M.alt) / aT, `${L2('고도', 'Height')} <b>${(lo - M.alt).toFixed(1)} m ${L2('더 올리기', 'more')}</b> → ${L2('스로틀 ↑', 'throttle ↑')} <i>(${L2('기준+2 m 이상', 'ref +2 m or more')})</i>`); else if (M.alt > hi) alt(hi, aT); }
     else alt(c1AltTgt(st), aT);
     pos(du, dv, st.posWatch === 'xy' ? pT : pT); hdg(st.hdg, hT);
@@ -7163,32 +7250,32 @@ function c1Coach(st, M) {
     const al = (M.u - a[0]) * ux + (M.v - a[1]) * uy, cr = -(M.u - a[0]) * uy + (M.v - a[1]) * ux, sp = clamp(al / L, 0, 1);
     const vAl = DR.v.x * (Math.cos(C1S.h) * ux + Math.sin(C1S.h) * uy) + DR.v.z * (Math.sin(C1S.h) * ux - Math.cos(C1S.h) * uy);
     const pc = Math.round(sp * 100), rem = Math.max(0, L - al);
-    if (st.alongTol && Math.abs(al - L) <= st.alongTol) lead = `<div class="g">✓ ${L2('E 인정 범위(전후 ±5 m) 안 — 여기서 멈추면 정지로 넘어갑니다', 'Inside the E zone (±5 m) — stop here to start the hold')} <i>(E ${al - L >= 0 ? '+' : ''}${(al - L).toFixed(1)} m)</i></div>`;
-    else if (sp > 0.06 && sp < 0.94 && Math.abs(vAl) < c1R('stopV') + 0.1) lead = `<div class="r">⚠ ${L2('멈추면 감점 — 같은 속도로 계속 이동', 'Stopping costs points — keep moving at the same speed')}</div>`;
-    else if (vAl > 2.6) lead = `<div class="y">🐢 ${L2('조금 천천히 — 지나치기 쉬워요', 'A bit slower — easy to overshoot')} <i>(${vAl.toFixed(1)} m/s)</i></div>`;
-    else lead = `<div class="g">➜ ${pc}% · ${L2('남은 거리', 'to go')} ${rem.toFixed(1)} m · ${Math.max(0, vAl).toFixed(1)} m/s${rem < 3 && rem > 0.3 ? ' — ' + L2('감속 준비', 'start easing off') : ''}</div>`;
+    if (st.alongTol && Math.abs(al - L) <= st.alongTol) lead = `<div class="cg">✓ ${L2('E 인정 범위(전후 ±5 m) 안 — 여기서 멈추면 정지로 넘어갑니다', 'Inside the E zone (±5 m) — stop here to start the hold')} <i>(E ${al - L >= 0 ? '+' : ''}${(al - L).toFixed(1)} m)</i></div>`;
+    else if (sp > 0.06 && sp < 0.94 && Math.abs(vAl) < c1R('stopV') + 0.1) lead = `<div class="cr">⚠ ${L2('멈추면 감점 — 같은 속도로 계속 이동', 'Stopping costs points — keep moving at the same speed')}</div>`;
+    else if (vAl > 2.6) lead = `<div class="cy">🐢 ${L2('조금 천천히 — 지나치기 쉬워요', 'A bit slower — easy to overshoot')} <i>(${vAl.toFixed(1)} m/s)</i></div>`;
+    else lead = `<div class="cg">➜ ${pc}% · ${L2('남은 거리', 'to go')} ${rem.toFixed(1)} m · ${Math.max(0, vAl).toFixed(1)} m/s${rem < 3 && rem > 0.3 ? ' — ' + L2('감속 준비', 'start easing off') : ''}</div>`;
     // 경로 옆으로 벗어남 (기체 기준 좌우/앞뒤로 바꿔 안내)
     const pu = -uy * cr, pv = ux * cr; pos(-pu, -pv, pT, L2('경로에서', 'Off the line by'));
     alt(ref + (st.r0 || 0) + ((st.r1 || 0) - (st.r0 || 0)) * clamp(al / L, 0, 1), aT); hdg(st.hdg, hT);
   } else if (st.k === 'arc') {
     const du = M.u - st.c[0], dv = M.v - st.c[1], r = Math.hypot(du, dv), e = r - st.R, sw = Math.round(st.sweep || 0);
-    lead = `<div class="g">◯ ${Math.min(360, sw)}° / 360° · ${L2('반경', 'radius')} ${r.toFixed(1)} m (${st.R} m)</div>`;
+    lead = `<div class="cg">◯ ${Math.min(360, sw)}° / 360° · ${L2('반경', 'radius')} ${r.toFixed(1)} m (${st.R} m)</div>`;
     if (Math.abs(e) > 0.12) pos(-du / r * e, -dv / r * e, pT, e > 0 ? L2('원 바깥으로', 'Outside the circle') : L2('원 안쪽으로', 'Inside the circle'));
     const tang = c1Wrap(Math.atan2(du, dv) / DEG + 90 * (st.dir < 0 ? 1 : -1)); hdg(tang, hT); alt(ref, aT);
-    if (M.hs < 0.35 && sw > 10 && sw < 340) lead = `<div class="r">⚠ ${L2('원주 중간에 멈추지 않기 — 에일러론+러더를 함께 계속', 'Don\'t stop mid-circle — keep aileron and rudder going together')}</div>`;
+    if (M.hs < 0.35 && sw > 10 && sw < 340) lead = `<div class="cr">⚠ ${L2('원주 중간에 멈추지 않기 — 에일러론+러더를 함께 계속', 'Don\'t stop mid-circle — keep aileron and rudder going together')}</div>`;
   } else if (st.k === 'emg') {
     const need = Math.max(c1R('emgRefDefault'), C1.refDesc || 0) * c1R('emgRatio'), vs = -M.vy;
-    lead = M.alt > 0.3 ? `<div class="${vs >= need ? 'g' : 'r'}">⬇ ${L2('하강', 'Descent')} <b>${Math.max(0, vs).toFixed(1)} m/s</b> ${vs >= need ? '✓' : '— ' + L2('더 빠르게 (스로틀 ↓ 크게)', 'faster (throttle ↓ more)')} <i>(${L2('필요', 'need')} ≥ ${need.toFixed(1)} m/s)</i></div>` : '';
+    lead = M.alt > 0.3 ? `<div class="${vs >= need ? 'cg' : 'cr'}">⬇ ${L2('하강', 'Descent')} <b>${Math.max(0, vs).toFixed(1)} m/s</b> ${vs >= need ? '✓' : '— ' + L2('더 빠르게 (스로틀 ↓ 크게)', 'faster (throttle ↓ more)')} <i>(${L2('필요', 'need')} ≥ ${need.toFixed(1)} m/s)</i></div>` : '';
     pos(st.pad[0] - M.u, st.pad[1] - M.v, 2.5, L2('비상 착륙장(F)까지', 'To the emergency pad (F)'));
   } else if (st.k === 'land') {
     const du = st.pad[0] - M.u, dv = st.pad[1] - M.v, d = Math.hypot(du, dv);
-    lead = d > 0.4 ? `<div class="y">⬇ ${L2('먼저 패드 중앙 위로 맞추고 내려오기', 'Line up over the pad centre first, then descend')}</div>` : M.alt > 1 ? `<div class="g">⬇ ${L2('천천히 강하', 'Descend slowly')} <i>(${M.alt.toFixed(1)} m)</i></div>` : `<div class="g">⬇ ${L2('1 m 아래 — 아주 천천히, 접지하면 스로틀 끝까지 ↓', 'Below 1 m — very gently; on touchdown throttle fully ↓')}</div>`;
+    lead = d > 0.4 ? `<div class="cy">⬇ ${L2('먼저 패드 중앙 위로 맞추고 내려오기', 'Line up over the pad centre first, then descend')}</div>` : M.alt > 1 ? `<div class="cg">⬇ ${L2('천천히 강하', 'Descend slowly')} <i>(${M.alt.toFixed(1)} m)</i></div>` : `<div class="cg">⬇ ${L2('1 m 아래 — 아주 천천히, 접지하면 스로틀 끝까지 ↓', 'Below 1 m — very gently; on touchdown throttle fully ↓')}</div>`;
     pos(du, dv, pT, L2('패드 중심에서', 'From the pad centre')); hdg(st.hdg, hT);
   } else if (st.k === 'xfer') {
-    const du = st.to[0] - M.u, dv = st.to[1] - M.v; lead = `<div class="g">➜ ${L2('다음 위치로 이동 (평가 제외)', 'Move to the next position (not scored)')} · ${Math.hypot(du, dv).toFixed(1)} m</div>`;
-  } else if (st.k === 'arm' && st.csc && !C1.armed) lead = `<div class="y">🔑 ${L2('두 스틱을 아래·안쪽으로 0.5초 (또는 다음 ▶)', 'Both sticks down-and-in for 0.5 s (or NEXT ▶)')}</div>`;
-  else if (st.k === 'mode') lead = `<div class="y">🔀 ${st.gps ? L2('GPS 스위치 ON (H 또는 GPS 버튼)', 'GPS switch ON (H or the GPS button)') : L2('GPS 스위치 OFF → ATTI (H 또는 GPS 버튼) · 이제 바람에 흐르는 것을 직접 잡아야 함', 'GPS switch OFF → ATTI (H or the GPS button) · you now correct drift yourself')}</div>`;
-  else if (st.k === 'callout') lead = `<div class="r">📣 ${L2('"비상!" 외치기 (🚨 비상 버튼 또는 E)', 'Call "Emergency!" (🚨 button or E)')}</div>`;
+    const du = st.to[0] - M.u, dv = st.to[1] - M.v; lead = `<div class="cg">➜ ${L2('다음 위치로 이동 (평가 제외)', 'Move to the next position (not scored)')} · ${Math.hypot(du, dv).toFixed(1)} m</div>`;
+  } else if (st.k === 'arm' && st.csc && !C1.armed) lead = `<div class="cy">🔑 ${L2('두 스틱을 아래·안쪽으로 0.5초 (또는 다음 ▶)', 'Both sticks down-and-in for 0.5 s (or NEXT ▶)')}</div>`;
+  else if (st.k === 'mode') lead = `<div class="cy">🔀 ${st.gps ? L2('GPS 스위치 ON (H 또는 GPS 버튼)', 'GPS switch ON (H or the GPS button)') : L2('GPS 스위치 OFF → ATTI (H 또는 GPS 버튼) · 이제 바람에 흐르는 것을 직접 잡아야 함', 'GPS switch OFF → ATTI (H or the GPS button) · you now correct drift yourself')}</div>`;
+  else if (st.k === 'callout') lead = `<div class="cr">📣 ${L2('"비상!" 외치기 (🚨 비상 버튼 또는 E)', 'Call "Emergency!" (🚨 button or E)')}</div>`;
   if (!lead && !out.length) return '';
   out.sort((x, y) => y.ratio - x.ratio);
   const fixes = out.filter(o => o.ratio >= 0.3).slice(0, 3).map(o => o.html).join('');
@@ -7300,7 +7387,7 @@ function c1Panel(show) {
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
 #c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
-#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .co{margin:3px 0;font-size:12.5px;line-height:1.45}#c1p .co:empty{display:none}#c1p .co div{padding:1px 0}#c1p .co .g{color:#7dffa8}#c1p .co .y{color:#ffd166}#c1p .co .r{color:#ff7a6a}#c1p .co i{font-style:normal;color:#9fb3c8;font-size:11px}#c1p .co b{color:#fff}body.touch #c1p .co{font-size:11px;margin:1px 0}body.touch #c1p .co div:nth-child(n+3){display:none}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.72);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:auto;cursor:pointer}#c1demo.small{padding:3px 10px;font-size:12px}#c1demo.small span{display:none}#c1demo.small b::after{content:' ▸';opacity:.7}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .co{margin:3px 0;font-size:12.5px;line-height:1.45}#c1p .co:empty{display:none}#c1p .co div{padding:1px 0}#c1p .co .cg{color:#7dffa8}#c1p .co .cy{color:#ffd166}#c1p .co .cr{color:#ff7a6a}#c1p .co i{font-style:normal;color:#9fb3c8;font-size:11px}#c1p .co b{color:#fff}body.touch #c1p .co{font-size:11px;margin:1px 0}body.touch #c1p .co div:nth-child(n+2){display:none}body.touch #c1p .co div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.72);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:auto;cursor:pointer}#c1demo.small{padding:3px 10px;font-size:12px}#c1demo.small span{display:none}#c1demo.small b::after{content:' ▸';opacity:.7}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
 #c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
@@ -7316,15 +7403,32 @@ body.touch #c1An,body.touch #c1Mic,body.touch #c1Md,body.touch #c1Vw{display:non
 body.touch #c1p .bt{flex-wrap:nowrap;margin-top:3px;gap:3px}body.touch #c1p .bt button{min-width:0;padding:5px 3px;font-size:11px}
 body.touch #c1p.chk .t,body.touch #c1p.chk .cl{display:none}body.touch #c1p.chk .r{display:flex;flex-wrap:wrap;gap:0 6px;font-size:10px}body.touch #c1p.chk .r span{margin-right:6px}body.touch #c1p.mini{max-height:none}
 body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
+body.c1on #objNext,body.c1on #list,body.c1on #bottom,body.c1on #c1demo{display:none!important}
+#c1p{top:108px;width:300px;max-height:calc(100vh - 120px)}
+#c1p .m{display:flex;justify-content:space-between;align-items:baseline;gap:6px}#c1p .m .dots{font-size:10px;letter-spacing:1px;color:#c9a2ff;white-space:nowrap}
+#c1p .tip{margin:3px 0;padding:4px 7px;border-left:3px solid #c9a2ff;background:rgba(201,162,255,.10);border-radius:4px;font-size:12px;line-height:1.45;color:#e6dcff;cursor:pointer}#c1p .tip:empty{display:none}#c1p .tip:not(.open) span{display:none}#c1p .tip b{color:#c9a2ff}
+#c1p .s{font-size:14px;font-weight:600}
+#c1p:not(.more) .bt.sub{display:none}#c1p #c1More{flex:0 0 34px}#c1p.more #c1More{background:#2f3a46}
+#c1p .bt.main{flex-wrap:nowrap}#c1p .bt.main button{font-size:12.5px;white-space:nowrap;min-width:0;padding:7px 3px}#c1p .bt.main button small{display:none}#c1p canvas{display:none}#c1p.map canvas{display:block}#c1p .note{display:none}#c1p.map .note{display:block}
+#c1cap{top:10px;font-size:14px;padding:6px 12px}
+#c1g{position:fixed;right:12px;bottom:14px;z-index:6;width:236px;height:168px;pointer-events:none;border-radius:10px;background:rgba(10,14,20,.6);border:1px solid rgba(127,208,255,.35)}#c1g.hidden{display:none}
+body.touch #c1g{right:auto;left:6px;top:104px;bottom:auto;width:150px;height:107px}
+body.touch #c1p .tip,body.touch #c1p .cl{display:none}
+body.touch #c1p .bts{flex-wrap:wrap}body.touch #c1p .bts .bt.main{flex:1 1 100%}body.touch #c1p .bts .bt.sub{flex:1 1 100%;margin-top:2px}body.touch #c1p:not(.more) .bts .bt.sub{display:none}
+body.touch #c1p #c1More{flex:0 0 26px}
+body.touch #c1cap{top:auto;bottom:6px}
 @media (max-width:700px),(max-height:500px){#c1p{width:230px;font-size:11px;top:86px;left:6px;padding:6px 8px;max-height:calc(100vh - 96px)}#c1p canvas,#c1p .note{display:none}#c1p .m{font-size:13px}#c1p .bt button{padding:8px 4px}}`;
     document.head.appendChild(css);
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
-    el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
-<div class="cl" id="c1Cl"></div><div class="co" id="c1Co"></div>
-<div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 다음 단계로 (키보드 Enter)', 'Done, go to next step (Enter key)')}">${L2('다음 ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목소리로 대신 말함 · 마이크로 직접 말해도 됨 (키보드 Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1Em" title="${L2('비상 선언 (키보드 E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button></div><div class="bt sub"><button id="c1Gp">GPS</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button></div></div><div class="r" id="c1R"></div>
+    el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="tip" id="c1Tip"></div><div class="s" id="c1St"></div>
+<div class="cl" id="c1Cl"></div><div class="co" id="c1Co"></div><div class="r" id="c1R"></div>
+<div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 다음 단계로 (키보드 Enter)', 'Done, go to next step (Enter key)')}">${L2('다음 ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목소리로 대신 말함 · 마이크로 직접 말해도 됨 (키보드 Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1Em" title="${L2('비상 선언 (키보드 E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button><button id="c1Gp" title="${L2('GPS 스위치 (H)', 'GPS switch (H)')}">GPS</button><button id="c1More" title="${L2('설정 더보기', 'More settings')}">⋯</button></div><div class="bt sub"><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1MapB" title="${L2('시험장 지도 보기', 'Show the field map')}">🗺</button></div></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
+    $('c1More').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); el.classList.toggle('more'); };
+    $('c1MapB').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1map = !SET.c1map; saveSet(); };
+    $('c1Tip').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); C1.tipOpen = !$('c1Tip').classList.contains('open'); };
     tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Gp', 'KeyH');
     $('c1Hr').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const L = [9, 11, 13, 15, 17]; SET.c1hour = L[(L.indexOf(SET.c1hour | 0) + 1) % L.length] || 11; saveSet(); c1Sun(); showMsg(L2('시험 시각 ', 'Test time ') + SET.c1hour + L2('시 · 해 위치·그림자 반영', ':00 · sun and shadows updated'), '#ffc828', 1.6); }; tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
     $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 끔 (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 켬', 'Examiner announcements on'), '#ffc828', 1.6); };
@@ -7365,6 +7469,8 @@ function c1Tick(dt) {
   const run = S.state === 'run' || S.state === 'pause';
   const st = run ? c1Cur() : null, aids = !C1.exam && run && st;
   C1.aidBox.visible = C1.aidLine.visible = C1.aidArrow.visible = false;
+  c1Aid3D(aids ? st : null);
+  c1Gauge(run ? st : null, c1M());
   if (aids) {
     const ref = C1.ref || 4;
     if (st.k === 'hold' || st.k === 'xfer') {
@@ -7384,7 +7490,13 @@ function c1Tick(dt) {
   const el = $('c1p'); if (!el || el.classList.contains('hidden')) return;
   const m = C1.M[C1.mi], M = c1M();
   $('c1T').textContent = (C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : C1.demo ? L2('1종 시범비행', 'CLASS 1 · DEMO') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + { gps: 'GPS', atti: 'ATTI', manual: 'MANUAL' }[C1.mode] + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ` · ${L2('기준', 'REF')} ${C1.ref.toFixed(1)} m` : '');
-  $('c1Mn').textContent = m ? `${C1.mi + 1}. ${m.name}` : '';
+  { const dots = m ? m.steps.map((x, i) => i < C1.si ? '●' : i === C1.si ? '◉' : '○').join('') : '';
+    $('c1Mn').innerHTML = m ? `<span>${C1.mi + 1}/${C1.M.length} · ${m.name}</span><span class="dots">${dots}</span>` : '';
+    const tp = $('c1Tip'), tip = m && C1TIP[m.id], key = m ? m.id + C1.mi : '';
+    if (C1.tipKey !== key) { C1.tipKey = key; C1.tipT = C1.t; C1.tipOpen = null; }
+    const open = C1.demo || (C1.tipOpen != null ? C1.tipOpen : C1.t - C1.tipT < 15);
+    if (tip && !C1.exam) { tp.innerHTML = `<b>📘 ${L2('요령', 'How to')}${open ? '' : ' ▸'}</b> <span>${L2(tip[0], tip[1])}</span>`; tp.classList.toggle('open', open); } else tp.innerHTML = ''; }
+  el.classList.toggle('map', !!SET.c1map && !C1.exam);
   $('c1St').textContent = st ? st.lab : '';
   { const cl = $('c1Cl'); let h = '';
     const ctx = st && st.call ? (st.call.count ? (L2(st.call.ko, st.call.en) ? L2(st.call.ko, st.call.en) + ' → ' : '') + L2('(도착 후) 정지. 하나, 둘, 셋, 넷, 다섯', '(on arrival) hold, one … five') : L2(st.call.ko, st.call.en)) : '';
@@ -7395,8 +7507,8 @@ function c1Tick(dt) {
     cl.innerHTML = h; }
   { const co = $('c1Co'); if (co) co.innerHTML = (!C1.exam && !C1.demo && st) ? c1Coach(st, M) : ''; }
   const e = st && st.err, f = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d || 1), cls = (x, t) => Math.abs(x) <= t ? 'ok' : 'bad';
-  let r = `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>`;
-  if (!C1.exam && e) {
+  let r = C1.exam ? `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>` : '';
+  if (false) {
     if (e.lat != null) r += `<b>${L2('위치 오차', 'Pos err')}</b><span class="${cls(e.lat, c1R('posTol'))}">${f(e.lat, 2)} m</span>`;
     if (e.alt != null && st.k !== 'land' && st.k !== 'emg') r += `<b>${L2('고도 오차', 'Height err')}</b><span class="${cls(e.alt, c1R('altTol'))}">${f(e.alt, 2)} m</span>`;
     if (e.hdg != null) r += `<b>${L2('기수 오차', 'Hdg err')}</b><span class="${cls(e.hdg, st.k === 'emg' ? 45 : 15)}">${f(e.hdg, 0)}°</span>`;
