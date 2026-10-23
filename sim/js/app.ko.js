@@ -6930,11 +6930,13 @@ const C1EV = {
       c1Dev(st, 'hdg', Math.abs(he) > c1R('hdgTol'), { hdg: +M.hdg.toFixed(0) }, dt);
       if (st.desc && M.vy < -0.1) { st.vys += -M.vy * dt; st.vyn += dt; }
       // 기동 중 멈춤
-      const near = dEnd < 1.5 && Math.abs(altErr) < 0.8;
+      const near = (st.alongTol ? Math.abs(along - L) <= st.alongTol && Math.abs(lat) < c1R('posTol') + 0.5 : dEnd < 1.5) && Math.abs(altErr) < 0.8;
       if (!near && M.hs < c1R('stopV') && Math.abs(M.vy) < c1R('stopV')) st.stopT = (st.stopT || 0) + dt;
       else if (st.stopT) { c1StopEnd(st); }
     }
-    if (st.dep && dEnd < (st.alongTol ? 1.2 : 1.0) * c1R('posTol') + 0.5 && Math.abs(altErr) < 1.0) {
+    // 도착: 끝점 1.5 m 안 · E 처럼 전후 인정 범위(±5 m)가 있으면 그 범위 안에서 멈추면 도착 (짧게 멈춰도·조금 지나쳐도 진행)
+    const arrived = st.alongTol ? (Math.abs(along - L) <= st.alongTol && Math.abs(lat) < c1R('posTol') + 0.5 && (dEnd < 1.5 || M.hs < c1R('stillV'))) : dEnd < c1R('posTol') + 0.5;
+    if (st.dep && arrived && Math.abs(altErr) < 1.0) {
       if (st.stopT) c1StopEnd(st);
       if (st.desc && st.vyn > 0.5) { C1.refDesc = st.vys / st.vyn; c1Ev('refDesc', { v: +C1.refDesc.toFixed(2), basis: 'triangle 45° descent mean |vy|' }); }
       return true;
@@ -7161,7 +7163,8 @@ function c1Coach(st, M) {
     const al = (M.u - a[0]) * ux + (M.v - a[1]) * uy, cr = -(M.u - a[0]) * uy + (M.v - a[1]) * ux, sp = clamp(al / L, 0, 1);
     const vAl = DR.v.x * (Math.cos(C1S.h) * ux + Math.sin(C1S.h) * uy) + DR.v.z * (Math.sin(C1S.h) * ux - Math.cos(C1S.h) * uy);
     const pc = Math.round(sp * 100), rem = Math.max(0, L - al);
-    if (sp > 0.06 && sp < 0.94 && Math.abs(vAl) < c1R('stopV') + 0.1) lead = `<div class="r">⚠ ${L2('멈추면 감점 — 같은 속도로 계속 이동', 'Stopping costs points — keep moving at the same speed')}</div>`;
+    if (st.alongTol && Math.abs(al - L) <= st.alongTol) lead = `<div class="g">✓ ${L2('E 인정 범위(전후 ±5 m) 안 — 여기서 멈추면 정지로 넘어갑니다', 'Inside the E zone (±5 m) — stop here to start the hold')} <i>(E ${al - L >= 0 ? '+' : ''}${(al - L).toFixed(1)} m)</i></div>`;
+    else if (sp > 0.06 && sp < 0.94 && Math.abs(vAl) < c1R('stopV') + 0.1) lead = `<div class="r">⚠ ${L2('멈추면 감점 — 같은 속도로 계속 이동', 'Stopping costs points — keep moving at the same speed')}</div>`;
     else if (vAl > 2.6) lead = `<div class="y">🐢 ${L2('조금 천천히 — 지나치기 쉬워요', 'A bit slower — easy to overshoot')} <i>(${vAl.toFixed(1)} m/s)</i></div>`;
     else lead = `<div class="g">➜ ${pc}% · ${L2('남은 거리', 'to go')} ${rem.toFixed(1)} m · ${Math.max(0, vAl).toFixed(1)} m/s${rem < 3 && rem > 0.3 ? ' — ' + L2('감속 준비', 'start easing off') : ''}</div>`;
     // 경로 옆으로 벗어남 (기체 기준 좌우/앞뒤로 바꿔 안내)
