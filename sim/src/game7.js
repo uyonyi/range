@@ -66,9 +66,9 @@ AF.c1 = { tag: 'C1', name: L2('1종 연습기', 'Class-1 trainer'), sub: L2('대
   top: 10, vmax: { train: 5, easy: 5, sport: 10 }, tilt: { train: 18, easy: 18, sport: 25 }, climb: 2, sink: 1.5, yaw: 70, tw: 2.0, R: 0.75, endur: 20,
   note: L2('1종 실기 연습 전용 · ※ 제원·비행 특성은 실제 기체 정보가 아닙니다', 'Class-1 practice only · ※ specs and handling are not real aircraft data') };
 AF.c1.id = 'c1'; AF_IDS.push('c1');
-MS_OK.class1 = ['c1']; MS_OK.class1x = ['c1'];
-MS_NAME.class1 = L2('1종 실기 학습', 'Class-1 practice (learn)'); MS_NAME.class1x = L2('1종 모의평가', 'Class-1 mock check');
-MS_CAT.class1 = MS_CAT.class1x = 'exam'; CAT_C.exam = '#c9a2ff';
+MS_OK.class1 = ['c1']; MS_OK.class1x = ['c1']; MS_OK.class1d = ['c1'];
+MS_NAME.class1 = L2('1종 실기 학습', 'Class-1 practice (learn)'); MS_NAME.class1d = L2('1종 시범비행', 'Class-1 demo flight'); MS_NAME.class1x = L2('1종 모의평가', 'Class-1 mock check');
+MS_CAT.class1 = MS_CAT.class1x = MS_CAT.class1d = 'exam'; CAT_C.exam = '#c9a2ff';
 const C1DISC = () => L2('※ 기체 제원과 비행 특성은 실제 기체 정보가 아닌 연습용 설정입니다.', '※ Aircraft specs and handling are practice settings, not real aircraft data.');
 BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multicopter class 1 · learn'),
   L2('평탄 시험장에서 이륙·호버링·전후진·삼각·원주·비상·정상접근·측풍접근 순서로 연습합니다. 경로·허용구역·타이머를 보여 줍니다.', 'Practise takeoff, hover, forward/back, triangle, circle, emergency, normal and crosswind approach on a flat test field, with path, tolerance box and timers shown.'),
@@ -76,7 +76,10 @@ BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multico
 BRIEF.class1x = [L2('무인멀티콥터 1종 · 모의평가', 'Unmanned multicopter class 1 · mock check'),
   L2('호명·비행 전 점검·조종기 점검·시동부터 전체 기동, 구술 5문항까지 실제 시험 순서로 진행하고 항목별 S/U 모의판정을 받습니다. 공중경계·판단력은 미평가로 남습니다.', 'Run the real order — call-up, pre-flight and transmitter checks, start, all manoeuvres and a 5-question oral — and get a per-item S/U mock verdict. Lookout and judgement stay unrated.'),
   L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.') + ' ' + C1DISC()];
-function isC1(k) { k = k || S.kind; return k === 'class1' || k === 'class1x'; }
+BRIEF.class1d = [L2('무인멀티콥터 1종 · 시범비행', 'Unmanned multicopter class 1 · demo flight'),
+  L2('자동 조종으로 시험 전체 순서를 보여 줍니다. 시험위원 지시, 응시자 구호, 정지 5초 세기, 각 기동의 관전 포인트를 화면 위에 안내합니다. 직접 조종할 필요는 없습니다.', 'An autopilot flies the whole test order: examiner instructions, candidate calls, the 5-second hold count, and what to watch in each manoeuvre are shown on screen. No flying needed.'),
+  L2('시점(C) · 시야(Z) · 일시정지(Esc) · 숫자키로 기동 건너뛰기. 시범은 앱의 연습 기준으로 비행하며 실제 시험의 모범답안이 아닙니다.', 'View (C) · width (Z) · pause (Esc) · number keys jump to a manoeuvre. The demo flies to the app\'s practice rules; it is not an official model answer.') + ' ' + C1DISC()];
+function isC1(k) { k = k || S.kind; return k === 'class1' || k === 'class1x' || k === 'class1d'; }
 
 // ---- 시험장 좌표 (u = 조종자 오른쪽, v = 전방, 단위 m) ----
 // 세부평가기준 배치도: P→H 15 m, H→A 7.5 m, A→E 40 m, A→B·D 7.5 m, F 는 H 와 같은 줄의 좌·우 7.5 m, H·F 2×2 m
@@ -438,6 +441,7 @@ function c1Phys(dt) {
   const m = c1p('flightKg'), Tmax = c1p('thrustMaxN'), g = G, aUpMax = Tmax / m - g, md = C1.mode;
   const gy = c1Gnd() + c1p('skidDrop');
   const onG = DR.p.y <= gy + 0.005;
+  if (C1.demo && S.state === 'run') c1DemoCtl();
   const ip = IN.pitch, ir = IN.roll, iy = IN.yaw, it = IN.thr;
   const FW = _c1f.set(Math.sin(DR.h), 0, -Math.cos(DR.h)), RT = _c1r.set(Math.cos(DR.h), 0, Math.sin(DR.h));
   const wv = c1Wind(DR.p);
@@ -704,7 +708,7 @@ function c1Sun() {
 // ---- 진행 ----
 function c1Start(a) {
   c1Site(); C1G.visible = true; C1ON = !C1S.real;
-  Object.assign(C1, { on: true, exam: S.kind === 'class1x', mode: 'gps', view: 'pilot', armed: false, ref: null, refDesc: null, mi: 0, si: 0, ev: [], t: 0, az: 0, yr: 0, hold: null, touch: null, crash: null, over: false, tArm: null, altT: null, modeLog: [] });
+  Object.assign(C1, { on: true, exam: S.kind === 'class1x', demo: S.kind === 'class1d', dm: null, sayUntil: 0, mode: 'gps', view: 'pilot', armed: false, ref: null, refDesc: null, mi: 0, si: 0, ev: [], t: 0, az: 0, yr: 0, hold: null, touch: null, crash: null, over: false, tArm: null, altT: null, modeLog: [] });
   C1.ei.set(0, 0, 0);
   C1.side = SET.c1side === 1 ? 1 : -1;
   C1.M = c1Build(C1.side);
@@ -759,9 +763,13 @@ function c1Step(prev, cur, dt) {
   c1Count(st); if (C1V.cst && C1V.cst !== st) { if (M.hs > 0.6 || (C1V.cst.cnt || 0) >= 5 || C1.t - C1V.cst.arrT > 6.5) C1V.cst = null; else c1Count(C1V.cst); }
   if (done) { if (st.call && st.call.count && st.arrT != null && (st.cnt || 0) < 5) C1V.cst = st; if (st.call && st.call.after && st.callSaid === 'btn') c1Say(L2(st.call.after[0], st.call.after[1]), 'me'); c1OkFlash(st); c1Next(); }
 }
+let _c1dk = false;
+function fromDemo(k) { return _c1dk || ['KeyC', 'PadRB', 'KeyZ', 'KeyR'].includes(k) || /^Digit[1-9]$/.test(k); }
+function c1DK(k) { _c1dk = true; try { c1Key(k); } finally { _c1dk = false; } }
 function c1Key(k, fromVoice) {
   if (!isC1() || S.state !== 'run') return false;
   const st = c1Cur();
+  if (C1.demo && !fromDemo(k)) return !['Escape', 'KeyP', 'KeyM', 'Tab', 'KeyF'].includes(k);   // 시범비행: 시점·시야·건너뛰기만 사용자 입력
   if (k === 'KeyY') { c1Mode(); return true; }
   if (k === 'KeyH' || k === 'KeyG') { c1GpsToggle(); return true; }   // GPS 스위치 (보조 버튼·H 키)
   if (st && st.k === 'inspect' && st.open && !st.done && (XR_ON || window.C1_VRTEST) && (k === 'Enter' || k === 'KeyE' || k === 'Space')) {   // VR: 항목마다 A 정상 / X 불량
@@ -777,7 +785,9 @@ function c1Key(k, fromVoice) {
   if (/^Digit[1-9]$/.test(k) && !C1.exam) { c1Jump(+k.slice(5)); return true; }
   return false;
 }
-function c1Confirm() {
+let _c1conf = false;
+function c1Confirm() { if (_c1conf) return; _c1conf = true; try { c1Confirm0(); } finally { _c1conf = false; } }
+function c1Confirm0() {
   const st = c1Cur(); if (!st) return;
   if (st.k === 'prep') { if (st.call) c1CallDo('btn'); c1Ev('confirm'); c1Next(); }
   else if (st.k === 'arm') { if (DR.landed) { c1Arm('btn'); c1Next(); } }
@@ -792,6 +802,79 @@ function c1Mode() {
   c1Ev('mode', { mode: C1.mode }); showMsg(c1ModeName(), '#c9a2ff', 1.2);
 }
 function c1ModeName() { return { gps: L2('GPS 모드 (위치·고도 유지)', 'GPS mode (position + height hold)'), atti: L2('자세제어 ATTI (고도 유지 · 위치 유지 없음)', 'ATTI (height hold · no position hold)'), manual: L2('수동 (고도 유지 없음)', 'Manual (no height hold)') }[C1.mode]; }
+// ---- 시범비행: 자동 조종이 시험 순서대로 비행 (구호·정지 세기·관전 포인트 안내) ----
+const C1TIP = {
+  pre: ['호명 → 기체 점검 구호 → 조종기 점검(스틱 끝까지) 구호 → 공역·풍향·풍속 확인 구호. 구호를 외치면 다음 단계로 넘어갑니다.', 'Call-up → airframe check call → transmitter check (full stick travel) call → airspace and wind call. Each call moves you on.'],
+  to: ['시동 → 3~5 m 기준고도까지 한 번에 상승(중간에 멈추면 감점) → 정지 5초 → 조종면 점검 구호 → 호버링 위치(A)로.', 'Start → climb in one go to a 3–5 m reference height (no stopping) → hold 5 s → control check call → move to the hover point (A).'],
+  hov: ['제자리에서 기수만 90°씩 돌리고 각 방향에서 정지 5초. 위치 ±1 m · 고도 ±0.5 m · 기수 ±15° 안.', 'Turn only the nose 90° at a time and hold 5 s each way. Position ±1 m · height ±0.5 m · heading ±15°.'],
+  fb: ['A → E 40 m 전진, 다시 A 로 후진. 일정한 속도로 중간에 멈추지 않기, 끝에서 정지 5초.', 'Forward 40 m from A to E, then back to A. Steady speed with no stops; hold 5 s at each end.'],
+  tri: ['옆으로 수평 이동 → 45° 사선 상승(A 위 +7.5 m) → 반대쪽으로 45° 사선 하강 → A 로 복귀. 오르내리는 기울기가 일정해야 합니다.', 'Level sideways → 45° climb to A +7.5 m → 45° descent to the other side → back to A. Keep the slope steady.'],
+  cir: ['기수를 진행 방향으로 돌리며(러더턴) 반경 7.5 m 원을 일정한 속도로. 출발점에서 정지 후 기수 전방.', 'Fly a 7.5 m circle nose-first (rudder turn) at a steady speed. Hold at the start, then nose forward.'],
+  emg: ['2 m 상승 → "비상!" → 즉시 빠르게(평소 1.5배) 하강하며 비상 착륙장(F)에 착지. 내려오다 멈추지 않기.', 'Climb 2 m → "Emergency!" → descend at once, fast (1.5× normal), to the emergency pad (F). No pauses on the way down.'],
+  nrm: ['GPS 끄기(ATTI) → 위치 유지가 없어 바람에 흐르는 것을 직접 잡으며 H 로 접근 → 중심축 맞춰 착륙.', 'GPS off (ATTI) → no position hold, so correct the drift yourself on the way to H → land on the centre axis.'],
+  xw: ['GPS 다시 켜기 → 바람 쪽으로 기수를 돌린 측면 자세로 H 까지 직선 접근 → 착륙.', 'GPS back on → nose turned into the wind, fly sideways straight to H → land.'],
+  post: ['시동 끄고 아워미터·전원 OFF → 외관 점검 → 배터리 분리 구호.', 'Shut down, hour meter, power off → airframe check → battery removal call.'],
+  oral: ['구술 5문항. 시범에서는 정답을 골라 보여 줍니다.', 'Five oral questions. The demo picks the right answers.']
+};
+function c1DemoBanner(m) {
+  let b = $('c1demo'); if (!b) { b = document.createElement('div'); b.id = 'c1demo'; document.body.appendChild(b); }
+  const on = C1.demo && !C1.over && S.state !== 'menu' && m; b.classList.toggle('hidden', !on); if (!on) return;
+  const tip = C1TIP[m.id], key = m.id + '|' + (window.SIM_LANG || 'ko');
+  if (b._k !== key) { b._k = key; b.innerHTML = `<b>▶ ${L2('시범비행', 'DEMO')} ${C1.mi + 1}/${C1.M.length} · ${m.name}</b>${tip ? L2(tip[0], tip[1]) : ''}`; }
+}
+function c1DemoCtl() {
+  const st = c1Cur(); if (!st || C1.over) { IN.pitch = IN.roll = IN.yaw = 0; IN.thr = -1; return; }
+  const M = c1M(), ref = C1.ref || 4, g = G, wrap = d => ((d + 180) % 360 + 360) % 360 - 180, cl1 = x => clamp(x, -1, 1), cl01 = x => clamp(x, 0, 1);
+  const FW = [Math.sin(DR.h), -Math.cos(DR.h)], RT = [Math.cos(DR.h), Math.sin(DR.h)];
+  const D = C1.dm || (C1.dm = { cd: 0, si: -1 }); if (D.si !== C1.mi * 100 + C1.si) { D.si = C1.mi * 100 + C1.si; D.t0 = C1.t; D.n = 0; }
+  const idle = C1.t >= (C1.sayUntil || 0) - 0.05, age = C1.t - D.t0;
+  const press = (k, wait) => { if (C1.t >= D.cd && age >= (wait == null ? 1.0 : wait) && idle) { c1DK(k); D.cd = C1.t + 0.6; return true; } return false; };
+  let tu = M.u, tv = M.v, ta = M.alt, th = M.hdg, vmax = 1.2, vzO = null, ff = 0, still = false, fix = null;
+  const flight = ['climb', 'hold', 'move', 'arc', 'xfer', 'emg', 'land'].includes(st.k);
+  // 구호: 이동 전에 먼저 외치고(음성이 끝난 뒤) 움직임 · 정지 구호는 도착 후 세기는 앱이 함
+  const callFirst = st.call && !st.callSaid && ['move', 'arc', 'xfer', 'climb', 'mode'].includes(st.k);
+  if (st.call && !st.callSaid && st.k === 'hold') press('KeyQ', 0.2);
+  if (callFirst) press('KeyQ', 0.6);
+  if (st.k === 'inspect') { if (st.open && !st.done && age > 3 && idle) c1InspectAuto(true); still = true; }
+  else if (st.k === 'oral') { if (st.qs && !st.done && age > 3 && idle) c1OralAuto(5); still = true; }
+  else if (st.k === 'ann') still = true;
+  else if (st.k === 'rc') { if (!st.callSaid && age > 1) { const seq = [{ thr: 1 }, { thr: -1 }, { yaw: 1 }, { yaw: -1 }, { pitch: 1 }, { pitch: -1 }, { roll: 1 }, { roll: -1 }]; const i = Math.floor((age - 1) / 0.45); fix = i < seq.length ? Object.assign({ thr: 0, yaw: 0, pitch: 0, roll: 0 }, seq[i]) : null; if (i >= seq.length) press('KeyQ', 0); } if (!fix) fix = { thr: 0, yaw: 0, pitch: 0, roll: 0 }; if (C1.mode !== 'gps') press('KeyH', 0.5); still = true; }
+  else if (st.k === 'ctl') { const seq = [{ pitch: 0.25 }, { pitch: -0.25 }, { roll: 0.25 }, { roll: -0.25 }, { yaw: 0.3 }, { yaw: -0.3 }]; const i = Math.floor(age / 0.6); if (i < seq.length) fix = Object.assign({ pitch: 0, roll: 0, yaw: 0 }, seq[i]); else if (!st.callSaid) press('KeyQ', 0); }
+  else if (st.k === 'prep') { press(st.call ? 'KeyQ' : 'Enter', 1.2); still = true; }
+  else if (st.k === 'arm') { if (st.call && !st.callSaid) press('KeyQ', 1.0); else press('Enter', 1.0); still = true; }
+  else if (st.k === 'disarm') { if (DR.landed && M.hs < 0.2) { if (st.call && !st.callSaid) press('KeyQ', 0.8); else press('Enter', 0.8); } still = DR.landed; }
+  else if (st.k === 'mode') { if (st.callSaid && C1.t >= D.cd) { if (st.gps ? C1.mode !== 'gps' : C1.mode === 'gps') press('KeyH', 0.3); } still = DR.landed; }
+  else if (st.k === 'callout') { press('KeyE', 0.6); }
+  if (st.k === 'climb') { tu = st.at[0]; tv = st.at[1]; ta = 4.0; th = 0; }
+  else if (st.k === 'hold') { tu = st.at[0]; tv = st.at[1]; ta = st.altWin ? ref + st.altWin[0] + 0.8 : ref + (st.r || 0); th = st.hdg; }
+  else if (st.k === 'xfer') { tu = st.to[0]; tv = st.to[1]; ta = ref; th = 0; }
+  else if (st.k === 'move') {
+    const a = st.from, b = st.to, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const sp = cl01(((M.u - a[0]) * ux + (M.v - a[1]) * uy + 2.0) / L); tu = a[0] + dx * sp; tv = a[1] + dy * sp;
+    const sp0 = cl01(((M.u - a[0]) * ux + (M.v - a[1]) * uy) / L); ta = ref + (st.r0 || 0) + ((st.r1 || 0) - (st.r0 || 0)) * sp0; th = st.hdg; vmax = (st.r0 || st.r1) ? 0.7 : 1.3;
+    if (st.r0 || st.r1) { const vAl = DR.v.x * ux + (-DR.v.z) * uy; ff = ((st.r1 || 0) - (st.r0 || 0)) / L * vAl; }
+  } else if (st.k === 'arc') {
+    const dir = st.dir < 0 ? 1 : -1, thp = Math.atan2(M.u - st.c[0], M.v - st.c[1]) / DEG, ah = (thp + dir * 25) * DEG;
+    tu = st.c[0] + Math.sin(ah) * st.R; tv = st.c[1] + Math.cos(ah) * st.R; ta = ref; th = wrap(thp + 90 * dir); vmax = 1.4;
+    if (st.sweep > 320) { tu = st.start[0]; tv = st.start[1]; vmax = 0.8; }
+  } else if (st.k === 'emg') { tu = st.pad[0]; tv = st.pad[1]; ta = 0; th = 0; vmax = 3.5; vzO = -2.0; }
+  else if (st.k === 'land') { tu = st.pad[0]; tv = st.pad[1]; ta = 0; th = st.hdg; vmax = 0.8; vzO = Math.hypot(M.u - tu, M.v - tv) < 0.4 ? -0.6 : 0; }
+  if (callFirst && flight) { tu = M.u; tv = M.v; ta = DR.landed ? 0 : M.alt; th = M.hdg; vzO = DR.landed ? -1 : null; }
+  let vu = (tu - M.u) * 0.9, vv = (tv - M.v) * 0.9; const vl = Math.hypot(vu, vv); if (vl > vmax) { vu *= vmax / vl; vv *= vmax / vl; }
+  const hh = C1S.h, vx = Math.cos(hh) * vu + Math.sin(hh) * vv, vz = Math.sin(hh) * vu - Math.cos(hh) * vv;
+  let pit, rol;
+  if (C1.mode === 'gps') { pit = (vx * FW[0] + vz * FW[1]) / C1P.gpsV.v; rol = (vx * RT[0] + vz * RT[1]) / C1P.gpsV.v; }
+  else { const ax = (vx - DR.v.x) * 1.6, az = (vz - DR.v.z) * 1.6, tm = C1P.tiltMax.v * DEG; pit = Math.atan((ax * FW[0] + az * FW[1]) / g) / tm; rol = Math.atan((ax * RT[0] + az * RT[1]) / g) / tm; }
+  const he = wrap(th - M.hdg);
+  const vzd = vzO != null ? vzO : Math.max(-1.2, Math.min(1.5, ff + (ta - M.alt) * 1.5));
+  let thr;
+  if (C1.mode === 'manual') { const aUp = C1P.thrustMaxN.v / C1P.flightKg.v - g; thr = ((vzd - M.vy) * 2.5) / (vzd - M.vy >= 0 ? aUp * 0.6 : g * 0.55); }
+  else thr = vzd > 0 ? vzd / C1P.climb.v : vzd / C1P.sink.v;
+  if (still || (!flight && DR.landed)) { thr = DR.landed ? -1 : thr; pit = rol = 0; }
+  if (DR.landed && (st.k === 'land' || st.k === 'emg' || st.k === 'disarm')) { thr = -1; pit = rol = 0; }
+  IN.pitch = cl1(pit); IN.roll = cl1(rol); IN.yaw = cl1(he * 0.05); IN.thr = cl1(thr);
+  if (fix) for (const k in fix) IN[k] = fix[k];
+}
 // 학습: 기동 번호로 바로 이동 (1~9)
 function c1Jump(i, again) {
   i = clamp(i | 0, 0, C1.M.length - 1); if (!C1.M[i]) return;
@@ -821,7 +904,7 @@ function c1Panel(show) {
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
 #c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
-#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{50%{box-shadow:0 0 0 3px rgba(127,208,255,.55)}}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.88);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:none}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
 #c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
@@ -854,7 +937,7 @@ body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
     $('c1T').onpointerdown = e => { if (IS_TOUCH) { e.stopPropagation(); el.classList.toggle('mini'); } };
     $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
-  el.classList.toggle('hidden', !show); c1AnnBtn();
+  el.classList.toggle('hidden', !show); c1AnnBtn(); if (!show) { const b = $('c1demo'); if (b) b.classList.add('hidden'); }
 }
 function c1AnnBtn() { const b = $('c1An'); if (b) { b.classList.toggle('on', SET.c1ann !== false); b.title = L2('시험위원 지시 방송 켜기/끄기', 'Examiner announcements on/off'); } }
 let _c1ui = 0;
@@ -887,7 +970,7 @@ function c1Tick(dt) {
   _c1ui -= dt; if (_c1ui > 0) return; _c1ui = 0.1;
   const el = $('c1p'); if (!el || el.classList.contains('hidden')) return;
   const m = C1.M[C1.mi], M = c1M();
-  $('c1T').textContent = (C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + { gps: 'GPS', atti: 'ATTI', manual: 'MANUAL' }[C1.mode] + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ` · ${L2('기준', 'REF')} ${C1.ref.toFixed(1)} m` : '');
+  $('c1T').textContent = (C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : C1.demo ? L2('1종 시범비행', 'CLASS 1 · DEMO') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + { gps: 'GPS', atti: 'ATTI', manual: 'MANUAL' }[C1.mode] + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ` · ${L2('기준', 'REF')} ${C1.ref.toFixed(1)} m` : '');
   $('c1Mn').textContent = m ? `${C1.mi + 1}. ${m.name}` : '';
   $('c1St').textContent = st ? st.lab : '';
   { const cl = $('c1Cl'); let h = '';
@@ -908,8 +991,8 @@ function c1Tick(dt) {
   if (st && st.k === 'rc') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r = `<b>${L2('스로틀', 'Throttle')}</b><span>↑${ck('thr+')} ↓${ck('thr-')}</span><b>${L2('러더', 'Rudder')}</b><span>←${ck('yaw-')} →${ck('yaw+')}</span><b>${L2('엘리베이터', 'Elevator')}</b><span>↑${ck('pitch+')} ↓${ck('pitch-')}</span><b>${L2('에일러론', 'Aileron')}</b><span>←${ck('roll-')} →${ck('roll+')}</span><b>${L2('모드 스위치', 'Mode switch')}</b><span class="${C1.mode === 'gps' ? 'ok' : 'bad'}">${C1.mode.toUpperCase()}</span>`; }
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (키보드 S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
-  { const needCall = !!(st && st.call && !st.callSaid), needOk = !!(st && (st.k === 'prep' || ((st.k === 'arm' && !st.csc) || st.k === 'disarm') && DR.landed));
-    const ob = $('c1Ok'), cb = $('c1Cb'); if (ob) ob.classList.toggle('need', needOk && !needCall); if (cb) cb.classList.toggle('need', needCall); }
+  { const needCall = !!(st && st.call && !st.callSaid), needOk = !C1.demo && !!(st && (st.k === 'prep' || (st.k === 'arm' && DR.landed) || (st.k === 'disarm' && DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3)));
+    const ob = $('c1Ok'), cb = $('c1Cb'); if (ob) ob.classList.toggle('need', needOk); if (cb) cb.classList.toggle('need', needCall && !C1.demo); el.classList.toggle('demo', !!C1.demo); c1DemoBanner(m); }
   { const gp = $('c1Gp'); if (gp) { gp.textContent = C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF' : 'MANUAL'; gp.className = C1.mode === 'gps' ? 'on' : 'off'; } const hb = $('c1Hr'); if (hb) hb.textContent = '🕐 ' + (SET.c1hour || 11) + L2('시', ':00'); }
   if (st && st.k === 'hold' && st.armedEval) { const pc = Math.min(1, st.t / st.T); r += `<b>${L2('정지', 'Hold')}</b><span><i class="pb"><i style="width:${(pc * 100).toFixed(0)}%"></i></i> ${st.t.toFixed(1)} / ${st.T} s${pc >= 1 ? ' ✓' : ''}</span>`; }
   if (C1.ok && C1.ok.t > 0) r = `<span class="okf ${C1.ok.bad ? 'bad' : 'ok'}" style="grid-column:1/3">${C1.ok.text}</span>` + r;
@@ -1057,7 +1140,7 @@ function c1Say(text, who) {
   if (C1A.st === 'none') c1ALoad();
   const ak = C1A.st === 'ready' ? c1AKey(text, who) : null;
   const dur = ak ? C1A.idx[ak][2] + 0.35 : Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
-  c1Caption(text, who, dur);
+  c1Caption(text, who, dur); C1.sayUntil = Math.max(C1.sayUntil || 0, C1.t || 0) + dur;
   (C1V.log = C1V.log || []).push((ak ? '' : '[NOKEY] ') + (who === 'me' ? 'ME: ' : 'EX: ') + text); if (C1V.log.length > 300) C1V.log.shift();
   try {
     if (ak && SET.c1voice !== false) { if (!TEST) c1APlay(ak); C1V.nRec = (C1V.nRec || 0) + 1; }
@@ -1104,7 +1187,7 @@ function c1CallDo(how) {
   const tx = L2(st.call.ko, st.call.en); if (how !== 'voice' && tx) c1Say(tx, 'me');
   st.callSaid = how; c1Ev('call', { how, text: st.call.ko });
   // 실제 시험처럼: 구호(이상무)를 외치면 그 단계 완료 → 다음으로 (다음 버튼 따로 안 눌러도 됨)
-  if (st.k === 'prep' || (st.k === 'arm' && !st.csc) || st.k === 'disarm') c1Confirm();
+  if (!_c1conf && (st.k === 'prep' || (st.k === 'arm' && !st.csc) || st.k === 'disarm')) c1Confirm();
   return true;
 }
 function c1Heard(text) {
@@ -1252,7 +1335,7 @@ function c1BoardDraw() {
   g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(10,14,20,.9)'; vrRR(g, 0, 0, W2, H2, 26); g.fill(); g.strokeStyle = '#c9a2ff'; g.lineWidth = 4; vrRR(g, 2, 2, W2 - 4, H2 - 4, 24); g.stroke();
   let y = 22; const line = (t, col, sz, wt) => { g.fillStyle = col || '#e8eef3'; g.font = `${wt || 600} ${sz || 30}px system-ui, sans-serif`; const ws = String(t).split(' '); let ln = ''; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > W2 - 56 && ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; ln = w; } else ln = tl; } if (ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; } };
   g.textBaseline = 'top';
-  line((C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + C1.mode.toUpperCase() + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ' · ' + L2('기준', 'REF') + ' ' + C1.ref.toFixed(1) + ' m' : ''), '#c9a2ff', 24, 700);
+  line((C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : C1.demo ? L2('1종 시범비행', 'CLASS 1 · DEMO') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + C1.mode.toUpperCase() + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ' · ' + L2('기준', 'REF') + ' ' + C1.ref.toFixed(1) + ' m' : ''), '#c9a2ff', 24, 700);
   if (m) line(`${C1.mi + 1}. ${m.name}`, '#fff', 34, 800);
   if (st) line(st.lab, '#ffc828', 27);
   if (st && st.k === 'inspect' && st.open && !st.done) {

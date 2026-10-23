@@ -24,7 +24,7 @@ const MS_OK = { course: ['x2d'], forest: ['x2d', 'anafi', 'fpv', 'kfpv'], race: 
 if (!AF[SET.af]) SET.af = 'x2d';
 const MS_NAME = { forest: '숲길 통과', race: '타임 레이스', recon: '정찰', strike: '타격', fire: '산불 감시', sar: '수색·구조', track: '차량 추적', ridge: '능선 종주' };
 function AFc() { return AF[SET.af] || AF.x2d; }
-function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' || k === 'recon' || k === 'strike' || k === 'fire' || k === 'sar' || k === 'track' || k === 'ridge' || k === 'field' || k === 'class1' || k === 'class1x'; }
+function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' || k === 'recon' || k === 'strike' || k === 'fire' || k === 'sar' || k === 'track' || k === 'ridge' || k === 'field' || k === 'class1' || k === 'class1x' || k === 'class1d'; }
 MS_OK.field = ['x2d', 'anafi', 'fpv', 'fw', 'puma']; MS_NAME.field = window.SIM_LANG === 'en' ? 'Field airstrip' : '야전 착륙장';
 // 난이도 + 기체 -> 비행 특성
 function effMode() {
@@ -1327,7 +1327,7 @@ function strikePick() {
 function strikeAim(o, cur) { let b = null, bd = 1e9; for (const t of STRIKE) { if (t.dead) continue; const d = t.c.distanceTo(cur); if (d < bd) { bd = d; b = t; } } if (b) o.mk.copy(b.c); }
 // 기준 시간 · 등급
 function msPar(kind, L) {
-  if (kind === 'class1' || kind === 'class1x') return 900;
+  if (kind === 'class1' || kind === 'class1x' || kind === 'class1d') return 900;
   const a = AFc(), v = a.cls === 'wing' ? a.cruise : Math.min(a.top, 12);
   if (kind === 'forest') return (FLANE ? FLANE.total : 400) / Math.min(v, 6) + 15;
   if (kind === 'race') return (PATHL ? PATHL.total : 500) / (v * 0.85) + 10;
