@@ -1837,7 +1837,7 @@ const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', gho
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour, c1zoom: SET.c1zoom })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour, c1zoom: SET.c1zoom, c1posT: SET.c1posT, c1posP: SET.c1posP, c1mini: SET.c1mini })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -7123,6 +7123,75 @@ function c1Mode() {
   c1Ev('mode', { mode: C1.mode }); showMsg(c1ModeName(), '#c9a2ff', 1.2);
 }
 function c1ModeName() { return { gps: L2('GPS 모드 (위치·고도 유지)', 'GPS mode (position + height hold)'), atti: L2('자세제어 ATTI (고도 유지 · 위치 유지 없음)', 'ATTI (height hold · no position hold)'), manual: L2('수동 (고도 유지 없음)', 'Manual (no height hold)') }[C1.mode]; }
+// ---- 연습 코치: 지금 무엇을 얼마나 고치면 되는지 (모드2 스틱 기준 · 기체 기준 방향) ----
+function c1Coach(st, M) {
+  const out = [], th = M.hdg * DEG, F = [Math.sin(th), Math.cos(th)], Rt = [Math.cos(th), -Math.sin(th)], wrap = c1Wrap;
+  const ref = C1.ref || 4, pT = c1R('posTol'), aT = c1R('altTol'), hT = st.k === 'emg' ? c1R('hdgTolEmg') : c1R('hdgTol');
+  const f1 = x => Math.abs(x).toFixed(Math.abs(x) < 10 ? 1 : 0);
+  const lv = r => r < 0.5 ? 'g' : r < 1 ? 'y' : 'r';
+  const add = (ratio, html) => out.push({ ratio, html: `<div class="${lv(ratio)}">${html}</div>` });
+  const side = Math.abs(wrap(M.hdg)) > 45 ? ` <i>(${L2('기체 기준', 'from the aircraft')})</i>` : '';
+  // 위치: 목표점까지 차이를 기체 앞/옆으로 나눠 스틱으로
+  const pos = (du, dv, tol, what) => {
+    const fw = du * F[0] + dv * F[1], rt = du * Rt[0] + dv * Rt[1], d = Math.hypot(du, dv); if (d < 0.12) return;
+    const parts = [];
+    if (Math.abs(fw) >= 0.12) parts.push(fw > 0 ? L2(`엘리베이터 ↑ 앞으로 ${f1(fw)} m`, `elevator ↑ forward ${f1(fw)} m`) : L2(`엘리베이터 ↓ 뒤로 ${f1(fw)} m`, `elevator ↓ back ${f1(fw)} m`));
+    if (Math.abs(rt) >= 0.12) parts.push(rt > 0 ? L2(`에일러론 → 오른쪽 ${f1(rt)} m`, `aileron → right ${f1(rt)} m`) : L2(`에일러론 ← 왼쪽 ${f1(rt)} m`, `aileron ← left ${f1(rt)} m`));
+    add(d / tol, `${what || L2('위치', 'Position')} <b>${d.toFixed(1)} m</b> ${L2('벗어남', 'off')} → ${parts.join(' · ')}${side}`);
+  };
+  const alt = (tgt, tol) => { const e = tgt - M.alt; if (Math.abs(e) < 0.08) return; add(Math.abs(e) / tol, `${L2('고도', 'Height')} <b>${f1(e)} m ${e > 0 ? L2('낮음', 'low') : L2('높음', 'high')}</b> → ${e > 0 ? L2('스로틀 ↑ 살짝', 'throttle ↑ a little') : L2('스로틀 ↓ 살짝', 'throttle ↓ a little')} <i>(${L2('목표', 'target')} ${tgt.toFixed(1)} m ±${tol})</i>`); };
+  const hdg = (tgt, tol) => { const e = wrap(tgt - M.hdg); if (Math.abs(e) < 3) return; add(Math.abs(e) / tol, `${L2('기수가', 'Nose')} <b>${f1(e)}° ${e > 0 ? L2('왼쪽으로', 'left') : L2('오른쪽으로', 'right')}</b> ${L2('틀어짐', 'of target')} → ${e > 0 ? L2('러더 → (오른쪽으로)', 'rudder → (right)') : L2('러더 ← (왼쪽으로)', 'rudder ← (left)')} <i>(±${tol}°)</i>`); };
+  const good = t => `<div class="g">✓ ${t}</div>`;
+  let lead = '';
+  if (st.k === 'climb') {
+    const lo = c1R('refMin'), hi = c1R('refMax');
+    if (M.alt < lo - aT) { lead = M.vy < 0.2 && M.alt > 0.6 ? `<div class="r">⚠ ${L2('상승이 멈췄어요 — 기준고도(3~5 m)까지 한 번에 올리기', 'Climb stalled — go up to 3–5 m in one go')}</div>` : `<div class="y">⬆ ${L2('스로틀 ↑ 로 3~5 m 까지 멈추지 말고 상승', 'Throttle ↑ — climb to 3–5 m without stopping')} <i>(${L2('지금', 'now')} ${M.alt.toFixed(1)} m)</i></div>`; }
+    else if (M.alt > hi + aT) lead = `<div class="r">⬇ ${L2('5 m 넘음 → 스로틀 ↓ 로 범위 안으로', 'Above 5 m → throttle ↓ back into range')}</div>`;
+    else lead = good(L2('기준고도 범위 안 — 스로틀 중립으로 멈추면 이 높이가 기준고도가 됩니다', 'In range — centre the throttle; this height becomes your reference'));
+    pos(st.at[0] - M.u, st.at[1] - M.v, pT); hdg(0, hT);
+  } else if (st.k === 'hold') {
+    const du = st.at[0] - M.u, dv = st.at[1] - M.v, d = Math.hypot(du, dv);
+    if (!st.armedEval && d > 1.5) lead = `<div class="y">➜ ${L2('목표 지점까지', 'To the point')} <b>${d.toFixed(1)} m</b> — ${L2('2 m 전부터 천천히 감속', 'ease off from 2 m out')}</div>`;
+    else if (st.armedEval) { const left = Math.max(0, st.T - st.t); lead = left > 0 ? `<div class="g">⏱ ${L2('정지 중', 'Holding')} ${st.t.toFixed(1)} / ${st.T} s — ${L2('스틱은 중립, 아주 작은 수정만', 'sticks centred, tiny corrections only')}</div>` : good(L2('정지 완료', 'Hold complete')); }
+    if (st.altWin) { const lo = ref + st.altWin[0], hi = ref + st.altWin[1]; if (M.alt < lo) add((lo - M.alt) / aT, `${L2('고도', 'Height')} <b>${(lo - M.alt).toFixed(1)} m ${L2('더 올리기', 'more')}</b> → ${L2('스로틀 ↑', 'throttle ↑')} <i>(${L2('기준+2 m 이상', 'ref +2 m or more')})</i>`); else if (M.alt > hi) alt(hi, aT); }
+    else alt(c1AltTgt(st), aT);
+    pos(du, dv, st.posWatch === 'xy' ? pT : pT); hdg(st.hdg, hT);
+  } else if (st.k === 'move') {
+    const a = st.from, b = st.to, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const al = (M.u - a[0]) * ux + (M.v - a[1]) * uy, cr = -(M.u - a[0]) * uy + (M.v - a[1]) * ux, sp = clamp(al / L, 0, 1);
+    const vAl = DR.v.x * (Math.cos(C1S.h) * ux + Math.sin(C1S.h) * uy) + DR.v.z * (Math.sin(C1S.h) * ux - Math.cos(C1S.h) * uy);
+    const pc = Math.round(sp * 100), rem = Math.max(0, L - al);
+    if (sp > 0.06 && sp < 0.94 && Math.abs(vAl) < c1R('stopV') + 0.1) lead = `<div class="r">⚠ ${L2('멈추면 감점 — 같은 속도로 계속 이동', 'Stopping costs points — keep moving at the same speed')}</div>`;
+    else if (vAl > 2.6) lead = `<div class="y">🐢 ${L2('조금 천천히 — 지나치기 쉬워요', 'A bit slower — easy to overshoot')} <i>(${vAl.toFixed(1)} m/s)</i></div>`;
+    else lead = `<div class="g">➜ ${pc}% · ${L2('남은 거리', 'to go')} ${rem.toFixed(1)} m · ${Math.max(0, vAl).toFixed(1)} m/s${rem < 3 && rem > 0.3 ? ' — ' + L2('감속 준비', 'start easing off') : ''}</div>`;
+    // 경로 옆으로 벗어남 (기체 기준 좌우/앞뒤로 바꿔 안내)
+    const pu = -uy * cr, pv = ux * cr; pos(-pu, -pv, pT, L2('경로에서', 'Off the line by'));
+    alt(ref + (st.r0 || 0) + ((st.r1 || 0) - (st.r0 || 0)) * clamp(al / L, 0, 1), aT); hdg(st.hdg, hT);
+  } else if (st.k === 'arc') {
+    const du = M.u - st.c[0], dv = M.v - st.c[1], r = Math.hypot(du, dv), e = r - st.R, sw = Math.round(st.sweep || 0);
+    lead = `<div class="g">◯ ${Math.min(360, sw)}° / 360° · ${L2('반경', 'radius')} ${r.toFixed(1)} m (${st.R} m)</div>`;
+    if (Math.abs(e) > 0.12) pos(-du / r * e, -dv / r * e, pT, e > 0 ? L2('원 바깥으로', 'Outside the circle') : L2('원 안쪽으로', 'Inside the circle'));
+    const tang = c1Wrap(Math.atan2(du, dv) / DEG + 90 * (st.dir < 0 ? 1 : -1)); hdg(tang, hT); alt(ref, aT);
+    if (M.hs < 0.35 && sw > 10 && sw < 340) lead = `<div class="r">⚠ ${L2('원주 중간에 멈추지 않기 — 에일러론+러더를 함께 계속', 'Don\'t stop mid-circle — keep aileron and rudder going together')}</div>`;
+  } else if (st.k === 'emg') {
+    const need = Math.max(c1R('emgRefDefault'), C1.refDesc || 0) * c1R('emgRatio'), vs = -M.vy;
+    lead = M.alt > 0.3 ? `<div class="${vs >= need ? 'g' : 'r'}">⬇ ${L2('하강', 'Descent')} <b>${Math.max(0, vs).toFixed(1)} m/s</b> ${vs >= need ? '✓' : '— ' + L2('더 빠르게 (스로틀 ↓ 크게)', 'faster (throttle ↓ more)')} <i>(${L2('필요', 'need')} ≥ ${need.toFixed(1)} m/s)</i></div>` : '';
+    pos(st.pad[0] - M.u, st.pad[1] - M.v, 2.5, L2('비상 착륙장(F)까지', 'To the emergency pad (F)'));
+  } else if (st.k === 'land') {
+    const du = st.pad[0] - M.u, dv = st.pad[1] - M.v, d = Math.hypot(du, dv);
+    lead = d > 0.4 ? `<div class="y">⬇ ${L2('먼저 패드 중앙 위로 맞추고 내려오기', 'Line up over the pad centre first, then descend')}</div>` : M.alt > 1 ? `<div class="g">⬇ ${L2('천천히 강하', 'Descend slowly')} <i>(${M.alt.toFixed(1)} m)</i></div>` : `<div class="g">⬇ ${L2('1 m 아래 — 아주 천천히, 접지하면 스로틀 끝까지 ↓', 'Below 1 m — very gently; on touchdown throttle fully ↓')}</div>`;
+    pos(du, dv, pT, L2('패드 중심에서', 'From the pad centre')); hdg(st.hdg, hT);
+  } else if (st.k === 'xfer') {
+    const du = st.to[0] - M.u, dv = st.to[1] - M.v; lead = `<div class="g">➜ ${L2('다음 위치로 이동 (평가 제외)', 'Move to the next position (not scored)')} · ${Math.hypot(du, dv).toFixed(1)} m</div>`;
+  } else if (st.k === 'arm' && st.csc && !C1.armed) lead = `<div class="y">🔑 ${L2('두 스틱을 아래·안쪽으로 0.5초 (또는 다음 ▶)', 'Both sticks down-and-in for 0.5 s (or NEXT ▶)')}</div>`;
+  else if (st.k === 'mode') lead = `<div class="y">🔀 ${st.gps ? L2('GPS 스위치 ON (H 또는 GPS 버튼)', 'GPS switch ON (H or the GPS button)') : L2('GPS 스위치 OFF → ATTI (H 또는 GPS 버튼) · 이제 바람에 흐르는 것을 직접 잡아야 함', 'GPS switch OFF → ATTI (H or the GPS button) · you now correct drift yourself')}</div>`;
+  else if (st.k === 'callout') lead = `<div class="r">📣 ${L2('"비상!" 외치기 (🚨 비상 버튼 또는 E)', 'Call "Emergency!" (🚨 button or E)')}</div>`;
+  if (!lead && !out.length) return '';
+  out.sort((x, y) => y.ratio - x.ratio);
+  const fixes = out.filter(o => o.ratio >= 0.3).slice(0, 3).map(o => o.html).join('');
+  const ok = (['hold', 'move', 'arc', 'land', 'climb'].includes(st.k) && !fixes) ? good(L2('위치·고도·기수 모두 허용범위 안 — 그대로 유지', 'Position, height and heading all in limits — hold it')) : '';
+  return lead + fixes + ok;
+}
 // ---- 시범비행: 자동 조종이 시험 순서대로 비행 (구호·정지 세기·관전 포인트 안내) ----
 const C1TIP = {
   pre: ['호명 → 기체 점검 구호 → 조종기 점검(스틱 끝까지) 구호 → 공역·풍향·풍속 확인 구호. 구호를 외치면 다음 단계로 넘어갑니다.', 'Call-up → airframe check call → transmitter check (full stick travel) call → airspace and wind call. Each call moves you on.'],
@@ -7138,10 +7207,13 @@ const C1TIP = {
   oral: ['구술 5문항. 시범에서는 정답을 골라 보여 줍니다.', 'Five oral questions. The demo picks the right answers.']
 };
 function c1DemoBanner(m) {
-  let b = $('c1demo'); if (!b) { b = document.createElement('div'); b.id = 'c1demo'; document.body.appendChild(b); }
-  const on = C1.demo && !C1.over && S.state !== 'menu' && m; b.classList.toggle('hidden', !on); if (!on) return;
-  const tip = C1TIP[m.id], key = m.id + '|' + (window.SIM_LANG || 'ko');
-  if (b._k !== key) { b._k = key; b.innerHTML = `<b>▶ ${L2('시범비행', 'DEMO')} ${C1.mi + 1}/${C1.M.length} · ${m.name}</b>${tip ? L2(tip[0], tip[1]) : ''}`; }
+  let b = $('c1demo'); if (!b) { b = document.createElement('div'); b.id = 'c1demo'; document.body.appendChild(b); b.title = L2('누르면 접기/펴기', 'Tap to fold/unfold'); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); b._open = b.classList.contains('small'); b.classList.toggle('small', !b._open); }; }
+  const learn = !C1.demo && !C1.exam, key = m ? m.id + '|' + C1.mi + '|' + (window.SIM_LANG || 'ko') : '';
+  if (b._k !== key) { b._k = key; b._t = C1.t; }
+  const on = (C1.demo || learn) && !C1.over && S.state !== 'menu' && m && C1TIP[m.id]; b.classList.toggle('hidden', !on); if (!on) return;
+  const tip = C1TIP[m.id];
+  if (b._h !== key) { b._h = key; b.innerHTML = `<b>${C1.demo ? '▶ ' + L2('시범비행', 'DEMO') : '📘 ' + L2('요령', 'HOW TO')} ${C1.mi + 1}/${C1.M.length} · ${m.name}</b><span>${L2(tip[0], tip[1])}</span>`; b._open = null; }
+  b.classList.toggle('small', b._open != null ? !b._open : (C1.t - b._t > (C1.demo ? 10 : 15)));
 }
 function c1DemoCtl() {
   const st = c1Cur(); if (!st || C1.over) { IN.pitch = IN.roll = IN.yaw = 0; IN.thr = -1; return; }
@@ -7218,14 +7290,14 @@ function c1Panel(show) {
   let el = $('c1p');
   if (!el) {
     const css = document.createElement('style');
-    css.textContent = `#c1p{position:fixed;left:10px;top:112px;width:290px;max-height:calc(100vh - 230px);overflow:auto;z-index:6;background:rgba(10,14,20,.78);border:1px solid rgba(201,162,255,.5);border-radius:10px;color:#e8eef3;font:13px/1.35 system-ui,sans-serif;padding:8px 10px;pointer-events:auto}
-#c1p.hidden{display:none}#c1p .t{font-weight:700;color:#c9a2ff;font-size:12px;letter-spacing:.04em}#c1p .m{font-size:15px;font-weight:700;margin-top:2px}#c1p .s{color:#ffc828;margin:2px 0 4px}
+    css.textContent = `#c1p{position:fixed;left:10px;top:112px;width:290px;max-height:calc(100vh - 230px);overflow:auto;z-index:6;background:rgba(10,14,20,.64);border:1px solid rgba(201,162,255,.5);border-radius:10px;color:#e8eef3;font:13px/1.35 system-ui,sans-serif;padding:8px 10px;pointer-events:auto}
+#c1p.hidden{display:none}#c1p .t{cursor:move;user-select:none;-webkit-user-select:none;touch-action:none}#c1p .t::before{content:'⠿ ';opacity:.6}#c1p .t::after{content:'▾';float:right;opacity:.75;padding-left:6px}#c1p.mini .t::after{content:'▸'}#c1p.mini .s,#c1p.mini .cl,#c1p.mini .r,#c1p.mini canvas,#c1p.mini .note{display:none}#c1p.mini .co div:nth-child(n+2){display:none}#c1p .t{font-weight:700;color:#c9a2ff;font-size:12px;letter-spacing:.04em}#c1p .m{font-size:15px;font-weight:700;margin-top:2px}#c1p .s{color:#ffc828;margin:2px 0 4px}
 #c1p .r{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;font-variant-numeric:tabular-nums}#c1p .r b{font-weight:600;color:#9fb0bd}#c1p .bad{color:#ff7a5a}#c1p .ok{color:#5dff9a}
 #c1p .bt{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#c1p .bt button{flex:1 1 auto;min-width:56px;padding:6px 4px;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3;font-size:12px}
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
 #c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
-#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.88);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:none}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .co{margin:3px 0;font-size:12.5px;line-height:1.45}#c1p .co:empty{display:none}#c1p .co div{padding:1px 0}#c1p .co .g{color:#7dffa8}#c1p .co .y{color:#ffd166}#c1p .co .r{color:#ff7a6a}#c1p .co i{font-style:normal;color:#9fb3c8;font-size:11px}#c1p .co b{color:#fff}body.touch #c1p .co{font-size:11px;margin:1px 0}body.touch #c1p .co div:nth-child(n+3){display:none}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.72);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:auto;cursor:pointer}#c1demo.small{padding:3px 10px;font-size:12px}#c1demo.small span{display:none}#c1demo.small b::after{content:' ▸';opacity:.7}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
 #c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
@@ -7239,13 +7311,13 @@ body.touch #c1p{left:150px;right:280px;top:36px;width:auto;max-height:calc(38vh 
 body.touch #c1p .r,body.touch #c1p canvas,body.touch #c1p .note{display:none}body.touch #c1p .m{font-size:12px;margin:0}body.touch #c1p .s{margin:1px 0}
 body.touch #c1An,body.touch #c1Mic,body.touch #c1Md,body.touch #c1Vw{display:none}
 body.touch #c1p .bt{flex-wrap:nowrap;margin-top:3px;gap:3px}body.touch #c1p .bt button{min-width:0;padding:5px 3px;font-size:11px}
-body.touch #c1p.chk .t,body.touch #c1p.chk .cl{display:none}body.touch #c1p.chk .r{display:flex;flex-wrap:wrap;gap:0 6px;font-size:10px}body.touch #c1p.chk .r span{margin-right:6px}body.touch #c1p.mini{max-height:34px}
+body.touch #c1p.chk .t,body.touch #c1p.chk .cl{display:none}body.touch #c1p.chk .r{display:flex;flex-wrap:wrap;gap:0 6px;font-size:10px}body.touch #c1p.chk .r span{margin-right:6px}body.touch #c1p.mini{max-height:none}
 body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
 @media (max-width:700px),(max-height:500px){#c1p{width:230px;font-size:11px;top:86px;left:6px;padding:6px 8px;max-height:calc(100vh - 96px)}#c1p canvas,#c1p .note{display:none}#c1p .m{font-size:13px}#c1p .bt button{padding:8px 4px}}`;
     document.head.appendChild(css);
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
-<div class="cl" id="c1Cl"></div>
+<div class="cl" id="c1Cl"></div><div class="co" id="c1Co"></div>
 <div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 다음 단계로 (키보드 Enter)', 'Done, go to next step (Enter key)')}">${L2('다음 ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목소리로 대신 말함 · 마이크로 직접 말해도 됨 (키보드 Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1Em" title="${L2('비상 선언 (키보드 E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button></div><div class="bt sub"><button id="c1Gp">GPS</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button></div></div><div class="r" id="c1R"></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
@@ -7255,10 +7327,27 @@ body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
     $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 끔 (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 켬', 'Examiner announcements on'), '#ffc828', 1.6); };
     $('c1Vo').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); if (SET.c1voice === false) { SET.c1voice = true; saveSet(); } c1VoiceUnlock(); c1VoiceTest(); };
     $('c1Vo').oncontextmenu = e => { e.preventDefault(); SET.c1voice = SET.c1voice === false; saveSet(); showMsg(SET.c1voice === false ? L2('시험장 음성 끔', 'Test-field voice off') : L2('시험장 음성 켬', 'Test-field voice on'), '#ffc828', 1.4); };
-    $('c1T').onpointerdown = e => { if (IS_TOUCH) { e.stopPropagation(); el.classList.toggle('mini'); } };
+    // 제목줄: 끌어서 옮기기 · 짧게 누르면 접기/펴기 · 두 번 누르면 원래 자리 (자리·접힘은 기기별로 기억)
+    const tb = $('c1T'); let dg = null;
+    tb.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const r = el.getBoundingClientRect(); dg = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, w: r.width, mv: false }; try { tb.setPointerCapture(e.pointerId); } catch (_) { } };
+    tb.onpointermove = e => { if (!dg) return; const dx = e.clientX - dg.x, dy = e.clientY - dg.y; if (!dg.mv && Math.hypot(dx, dy) < 6) return; dg.mv = true; c1PanelPos(dg.l + dx, dg.t + dy, dg.w); };
+    tb.onpointerup = e => { if (!dg) return; const d = dg; dg = null; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
+      if (d.mv) { const r = el.getBoundingClientRect(); SET[k] = [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; saveSet(); return; }
+      const now = performance.now(); if (now - (tb._last || 0) < 350) { SET[k] = null; saveSet(); c1PanelPos(); tb._last = 0; return; } tb._last = now;
+      el.classList.toggle('mini'); SET.c1mini = el.classList.contains('mini'); saveSet(); };
+    tb.title = L2('끌어서 옮기기 · 누르면 접기/펴기 · 두 번 누르면 원래 자리', 'Drag to move · tap to fold/unfold · double-tap to reset');
+    el.classList.toggle('mini', !!SET.c1mini); c1PanelPos();
     $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
   el.classList.toggle('hidden', !show); c1AnnBtn(); if (!show) { const b = $('c1demo'); if (b) b.classList.add('hidden'); }
+}
+function c1PanelPos(x, y, w) {
+  const el = $('c1p'); if (!el) return; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
+  if (x == null && SET[k]) [x, y, w] = SET[k];
+  if (x == null) { el.style.left = el.style.top = el.style.right = el.style.width = ''; return; }
+  const W = innerWidth, H = innerHeight, ww = Math.min(w || el.offsetWidth, W - 8);
+  x = clamp(x, 4 - ww * 0.7, W - ww * 0.3); y = clamp(y, 0, H - 28);
+  el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.right = 'auto'; el.style.width = ww + 'px';
 }
 function c1AnnBtn() { const b = $('c1An'); if (b) { b.classList.toggle('on', SET.c1ann !== false); b.title = L2('시험위원 지시 방송 켜기/끄기', 'Examiner announcements on/off'); } }
 let _c1ui = 0;
@@ -7300,6 +7389,7 @@ function c1Tick(dt) {
     if (C1V.heardT > 0) h += `<br><i>🎤 ${C1V.heard}</i>`;
     const vs = c1VoiceStatus(); if (vs) h += `<br><i style="color:#ffb070">${vs}</i>`;
     cl.innerHTML = h; }
+  { const co = $('c1Co'); if (co) co.innerHTML = (!C1.exam && !C1.demo && st) ? c1Coach(st, M) : ''; }
   const e = st && st.err, f = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d || 1), cls = (x, t) => Math.abs(x) <= t ? 'ok' : 'bad';
   let r = `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>`;
   if (!C1.exam && e) {
