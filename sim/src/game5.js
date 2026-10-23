@@ -802,6 +802,7 @@ function envApply() {
   const n = ENV.night, ir = ENV.ir, dk = ENV.dusk && !n, wx = ENV.wx || 'clear', wet = wx !== 'clear';
   // 해질녘: 낮은 서쪽 해·주황 하늘·긴 그림자 / 비·눈: 흐림(해 약하게)·안개 짙게
   SUN_DIR.copy(dk ? new V3(-0.86, 0.2, -0.34).normalize() : SUN0);
+  if (typeof c1Sun === 'function' && typeof isC1 === 'function' && isC1() && S.state !== 'menu') c1Sun();   // 1종: 시험 시각의 해 위치
   sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? 0.85 : DAY0.sun * (wet ? 0.45 : 1); sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
   hemi.color.copy(n ? new THREE.Color(0x4a5f8a) : dk ? new THREE.Color(0x9a7a8e) : wet ? new THREE.Color(0xb9c2cc) : DAY0.hs); hemi.groundColor.copy(n ? new THREE.Color(0x0c0c10) : dk ? new THREE.Color(0x3a2a20) : DAY0.hg);
   const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? (n ? 0x0b0b0b : 0x2a2a2a) : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;

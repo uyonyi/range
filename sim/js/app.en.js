@@ -1837,7 +1837,7 @@ const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', gho
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -4422,6 +4422,7 @@ function envApply() {
   const n = ENV.night, ir = ENV.ir, dk = ENV.dusk && !n, wx = ENV.wx || 'clear', wet = wx !== 'clear';
   // Dusk: 낮은 서쪽 해·주황 하늘·긴 그림자 / 비·눈: 흐림(해 약하게)·안개 짙게
   SUN_DIR.copy(dk ? new V3(-0.86, 0.2, -0.34).normalize() : SUN0);
+  if (typeof c1Sun === 'function' && typeof isC1 === 'function' && isC1() && S.state !== 'menu') c1Sun();   // 1종: 시험 시각의 해 위치
   sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? 0.85 : DAY0.sun * (wet ? 0.45 : 1); sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
   hemi.color.copy(n ? new THREE.Color(0x4a5f8a) : dk ? new THREE.Color(0x9a7a8e) : wet ? new THREE.Color(0xb9c2cc) : DAY0.hs); hemi.groundColor.copy(n ? new THREE.Color(0x0c0c10) : dk ? new THREE.Color(0x3a2a20) : DAY0.hg);
   const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? (n ? 0x0b0b0b : 0x2a2a2a) : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;
@@ -6461,79 +6462,78 @@ function c1Build(side) {
   const L = side < 0, s = side, P = C1PT, SB = L ? P.B : P.D, SD = L ? P.D : P.B, F = L ? P.FB : P.FD;
   const nm = (ko, en) => L2(ko, en), sideKo = L ? '좌' : '우', sideEn = L ? 'left' : 'right', oKo = L ? '우' : '좌', oEn = L ? 'right' : 'left';
   const H0 = (at, hdg, T, lab, o) => Object.assign({ k: 'hold', at, r: 0, hdg, T: T || c1R('hoverT'), lab }, o || {});
-  // 구호(call): 사용자가 제공한 실기 구호·타임라인(교육 Site 관행, 공식 문서 아님) · '비상'만 기준서 필수 · 나머지는 기록만
-  // count: 버튼으로 구호하면 Pause 시간에 맞춰 "하나, 둘, 셋, 넷, 다섯"을 1초마다 셈
-  const C = (ko, en, kw, count) => ({ ko, en, kw, count: !!count });
-  const STOP = (pre, preEn) => C(pre || '', preEn || '', pre ? ['Pause', '하나', '다섯', pre.split(' ')[0]] : ['Pause', '하나', '다섯'], true);   // 앞 구호(있으면) → Pause 지점 도착 때 "Pause" → 1초마다 하나~다섯
+  // 구호(call): 교육원 게시판 "드론 FLIGHT 구호" 순서를 따름 (교육 Site 관행 · 공식 기준서 아님) · '비상'만 기준서 필수 · 나머지는 기록만
+  // count: 버튼으로 구호하면 Pause 지점 도착 때 "Pause" → 1초마다 하나~다섯 · after: 그 기동을 마칠 때 덧붙이는 "…완료"
+  const C = (ko, en, kw, count, after) => ({ ko, en, kw, count: !!count, after: after || null });
+  const STOP = (pre, preEn, after) => C(pre || '', preEn || '', pre ? ['Pause', '하나', '다섯', pre.split(' ')[0]] : ['Pause', '하나', '다섯'], true, after);
   const A = (ko, en) => ({ k: 'ann', ko, en, lab: nm('시험위원 지시', 'Examiner instruction') });   // 시험위원 방송 (앱 작성 문구 · 끌 수 있음)
-  const nB = L ? 'B' : 'D', nD = L ? 'D' : 'B', tvKo = L ? '우' : '좌', tvEn = L ? 'right' : 'left';   // 삼각FLIGHT climb·descend 때 진행 방향
-  const site = () => { const w = c1WindInfo(); return C(`전방 이상무, 좌측 이상무, 우측 이상무, 후방 이상무, 장애물 이상무, 사람 이상무, 풍향 ${w.dirKo}, 풍속 ${w.sp}미터 이상무, GPS 수신 이상무, Takeoff 준비 완료`, `Front clear, left clear, right clear, rear clear, obstacles clear, people clear, wind ${w.dirEn} ${w.sp} metres per second, GPS normal, ready for takeoff`, ['이상무', '준비'], false); };
+  const nB = L ? 'B' : 'D', nD = L ? 'D' : 'B', clkA = L ? '9시' : '3시', clkB = L ? '3시' : '9시', clkAen = L ? '9 o\'clock' : '3 o\'clock', clkBen = L ? '3 o\'clock' : '9 o\'clock';
+  const air = () => { const w = c1WindInfo(); return C(`좌측 숲, 전방 산, 우측 숲 이상무, ${w.sp ? `풍향 ${w.dirKo}, 풍속 ${w.sp}미터` : '풍향 및 풍속 무풍'}, 전방시계 300미터 확보, 공역확인 완료`, `Left: trees, front: hills, right: trees, clear. ${w.sp ? `Wind ${w.dirEn}, ${w.sp} metres per second` : 'Wind calm'}. Visibility 300 metres. Airspace check complete`, ['공역', '이상무', '시계'], false); };
   return [
     { id: 'pre', name: nm('FLIGHT 전 절차', 'Pre-flight'), steps: [
       A(`응시자 ${pilotName()}, 조종자 위치로 move하여 FLIGHT 전 점검을 실시하십시오.`, `Candidate ${pilotName()}, go to the pilot position and carry out the pre-flight inspection.`),
-      { k: 'prep', lab: nm('FLIGHT장 안전 점검 (전후좌우·장애물·사람·바람·GPS) · Enter', 'Field safety check (all round, obstacles, people, wind, GPS) · Enter'), call: site() },
-      { k: 'inspect', lab: nm('기체 점검: 항목마다 정상/불량 판정', 'Aircraft inspection: judge each item OK / faulty'), call: C('프로펠러 상태 이상무, 모터 결속 이상무, 암대 및 붐대 결속 이상무, 스키드 이상무, 안테나 및 GPS 수신기 이상무, 메인 배터리 장착 및 전원 ON', 'Propellers OK, motors secure, arms and booms secure, skids OK, antenna and GPS receiver OK, main battery in and power on', ['프로펠러', '이상무']) },
-      { k: 'rc', lab: nm('조종기 점검: 네 축을 끝까지 움직이고 모드 스위치 GPS 확인', 'Transmitter check: move all four axes to full travel, mode switch on GPS'), call: C('안테나 방향 이상무, 조종기 전원 ON, 배터리 잔량 이상무, 스위치 위치 이상무, 스틱 중립 이상무', 'Antenna direction OK, transmitter on, battery OK, switch positions OK, sticks centred', ['안테나', '스틱', '이상무']) },
+      { k: 'inspect', lab: nm('FLIGHT 전 기체점검: 항목마다 정상/불량 판정', 'Pre-flight aircraft check: judge each item OK / faulty'), call: C('배터리 설치, 프로펠러, 모터, 모터베이스, 변속기 이상무, 암대, 메인프레임, 랜딩스키드 이상무', 'Battery installed. Propellers, motors, motor mounts, ESCs OK. Arms, main frame, landing skids OK', ['프로펠러', '이상무']) },
+      { k: 'rc', lab: nm('조종기 점검: 구호하면 다음으로 (스틱 끝까지 움직여 보기는 선택) · 모드 스위치 GPS', 'Transmitter check: make the call to move on (full stick travel optional) · mode switch GPS'), call: C('안테나, GPS 모드, 조이스틱 이상무, 조종기 ON, 기체배터리 연결, 조종기 화면 작업 실행, GPS 수신 완료, 아워메타 확인, FLIGHT 전 기체점검 완료, 조종자 위치로', 'Antenna, GPS mode, sticks OK. Transmitter on, flight battery connected, ground-station task running, GPS fix complete, hour meter checked. Pre-flight check complete. To the pilot position', ['조이스틱', '기체점검', '완료', '조종자']) },
+      { k: 'prep', lab: nm('공역 확인 (좌·전방·우·바람·시계) · 구호 or Enter', 'Airspace check (left, front, right, wind, visibility) · call or Enter'), call: air() },
       { k: 'arm', csc: true, lab: nm('시동: 두 스틱을 아래 안쪽(or 바깥쪽)으로 · or Enter', 'Start: both sticks down-in (or down-out) · or Enter'), call: C('시동', 'Start', ['시동']) }] },
-    { id: 'to', name: nm('TakeoffFLIGHT', 'Takeoff'), ann: ['Takeoff하십시오.', 'Take off.'], steps: [
+    { id: 'to', name: nm('TakeoffFLIGHT · Takeoff 후 기체점검', 'Takeoff · after-takeoff check'), ann: ['Takeoff하십시오.', 'Take off.'], steps: [
       { k: 'climb', at: P.H, lab: nm('H 에서 수직 Climb → 3~5 m 에서 Pause (기준고도 SETTINGS)', 'Climb vertically from H → stop at 3–5 m (sets reference height)'), call: C('Takeoff', 'Takeoff', ['Takeoff']) },
-      H0(P.H, 0, 0, nm('Pause (기준고도)', 'Hold (reference height)'), { posWatch: true }),
-      { k: 'ctl', at: P.H, lab: nm('Takeoff 후 점검: 호버링 중 엘리베이터(전·후)·에일러론(좌·우)·러더(좌·우)를 살짝 움직여 확인', 'After-takeoff check: small elevator (fwd/back), aileron (L/R) and rudder (L/R) inputs while hovering'), call: C('Takeoff 완료, 전후좌우 에일러론 및 엘리베이터 이상무, 좌우 러더 이상무, 기체 이상무', 'Takeoff complete, aileron and elevator OK, rudder OK, aircraft OK', ['Takeoff', '러더', '이상무']) },
-      H0(P.H, 0, 0, nm('Pause 호버링', 'Hold'), { posWatch: true, call: STOP('Pause 호버링 실시', 'Hover hold') }),
-      { k: 'xfer', to: P.A, lab: nm('A 지점으로 Forward move (평가 제외)', 'Move forward to A (not scored)') }] },
-    { id: 'hov', name: nm('공중 PauseFLIGHT (호버링)', 'Hovering'), ann: ['공중 PauseFLIGHT을 실시하십시오.', 'Carry out the hovering task.'], steps: [
+      H0(P.H, 0, 0, nm('Pause (기준고도)', 'Hold (reference height)'), { posWatch: true, call: STOP('', '') }),
+      { k: 'ctl', at: P.H, lab: nm('Takeoff 후 기체점검: 구호하면 다음으로 (엘리베이터·에일러론·러더를 살짝 움직여 보기 권장)', 'After-takeoff check: make the call to move on (small elevator, aileron, rudder inputs recommended)'), call: C('엘리베이터 이상무, 에일러론 이상무, 러더 이상무, Takeoff 후 기체점검 완료', 'Elevator OK, aileron OK, rudder OK. After-takeoff check complete', ['엘리베이터', '러더', '점검', '완료']) },
+      { k: 'xfer', to: P.A, lab: nm('호버링 위치(A)로 move (평가 제외)', 'Move to the hover point A (not scored)'), call: C('호버링 위치로', 'To the hover point', ['호버링', '위치']) }] },
+    { id: 'hov', name: nm('좌우측 호버링', 'Side hovering'), ann: ['좌우측 호버링을 실시하십시오.', 'Carry out the side hovering.'], steps: [
       H0(P.A, 0, 0, nm('A 에서 기준고도·기수 전방 Pause', 'Hold at A, reference height, nose forward'), { call: STOP('', '') }),
-      H0(P.A, 90 * s, 0, nm(`${sideKo}로 90° yaw → Pause`, `Turn 90° ${sideEn} → hold`), { posWatch: true, rot: true, call: STOP(`${sideKo}측면 호버링 실시`, `${L ? 'Left' : 'Right'} side hover.`) }),
-      H0(P.A, -90 * s, 0, nm(`${oKo}로 180° yaw → Pause`, `Turn 180° ${oEn} → hold`), { posWatch: true, rot: true, call: STOP(`${oKo}측면 호버링 실시`, `${L ? 'Right' : 'Left'} side hover.`) }),
-      H0(P.A, 0, 0, nm(`${sideKo}로 90° yaw해 기수 전방 → Pause`, `Turn 90° ${sideEn} to face forward → hold`), { posWatch: true, rot: true, call: STOP('기수 정렬', 'Nose align') })] },
-    { id: 'fb', name: nm('직진 및 Back 수평FLIGHT', 'Forward & backward'), ann: ['직진 및 Back 수평FLIGHT을 실시하십시오.', 'Carry out level forward and backward flight.'], steps: [
-      { k: 'move', from: P.A, to: P.E, hdg: 0, lab: nm('A → E 40 m 수평 Forward', 'A → E, 40 m forward'), alongTol: c1R('eAlong'), call: C('Forward 수평FLIGHT 실시!', 'Forward level flight!', ['Forward']) },
+      H0(P.A, 90 * s, 0, nm(`${sideKo}로 90° yaw → Pause`, `Turn 90° ${sideEn} → hold`), { posWatch: true, rot: true, call: STOP(`${sideKo}측 호버링`, `${L ? 'Left' : 'Right'} side hover`) }),
+      H0(P.A, -90 * s, 0, nm(`${oKo}로 180° yaw → Pause`, `Turn 180° ${oEn} → hold`), { posWatch: true, rot: true, call: STOP(`${oKo}측 호버링`, `${L ? 'Right' : 'Left'} side hover`) }),
+      H0(P.A, 0, 0, nm(`${sideKo}로 90° yaw해 기수 전방 → Pause`, `Turn 90° ${sideEn} to face forward → hold`), { posWatch: true, rot: true, call: STOP('기수 전방', 'Nose forward', ['좌우측 호버링 완료', 'Side hovering complete']) })] },
+    { id: 'fb', name: nm('Forward 및 Back 수평FLIGHT', 'Forward & backward'), ann: ['Forward 및 Back 수평FLIGHT을 실시하십시오.', 'Carry out level forward and backward flight.'], steps: [
+      { k: 'move', from: P.A, to: P.E, hdg: 0, lab: nm('A → E 40 m 수평 Forward', 'A → E, 40 m forward'), alongTol: c1R('eAlong'), call: C('Forward', 'Forward', ['Forward']) },
       H0(P.E, 0, c1R('hoverTE'), nm('E Pause 3초 이상 (전후 5 m 인정)', 'Hold at E ≥ 3 s (±5 m along)'), { alongTol: c1R('eAlong'), call: STOP('', '') }),
-      { k: 'move', from: P.E, to: P.A, hdg: 0, lab: nm('E → A 40 m 수평 Back (기수 전방)', 'E → A, 40 m backward (nose forward)'), call: C('Back 수평FLIGHT 실시!', 'Backward level flight!', ['Back']) },
-      H0(P.A, 0, 0, nm('A Pause', 'Hold at A'), { call: STOP('', '') })] },
+      { k: 'move', from: P.E, to: P.A, hdg: 0, lab: nm('E → A 40 m 수평 Back (기수 전방)', 'E → A, 40 m backward (nose forward)'), call: C('Back', 'Backward', ['Back']) },
+      H0(P.A, 0, 0, nm('A Pause', 'Hold at A'), { call: STOP('', '', ['Forward 및 Back 수평FLIGHT 완료', 'Forward and backward flight complete']) })] },
     { id: 'tri', name: nm('삼각FLIGHT', 'Triangle'), ann: ['삼각FLIGHT을 실시하십시오.', 'Carry out the triangle.'], steps: [
-      { k: 'move', from: P.A, to: SB, hdg: 0, lab: nm(`A → ${nB} 수평 move`, `A → ${nB} level`), call: C('삼각FLIGHT 위치로 move!', 'To the triangle position!', ['삼각', 'move']) },
+      { k: 'move', from: P.A, to: SB, hdg: 0, lab: nm(`A → ${nB} 수평 move`, `A → ${nB} level`), call: C(`${clkA}방향으로 move`, `Moving to ${clkAen}`, ['방향', 'move']) },
       H0(SB, 0, 0, nm('Pause', 'Hold'), { call: STOP('', '') }),
-      { k: 'move', from: SB, to: P.A, r1: c1R('triRise'), hdg: 0, lab: nm('A 상공 기준고도+7.5 m 로 45° Climb', '45° climb to reference +7.5 m above A'), call: C(`${sideKo}Climb FLIGHT 실시!`, `${L ? 'Left' : 'Right'} climb!`, ['Climb']) },
+      { k: 'move', from: SB, to: P.A, r1: c1R('triRise'), hdg: 0, lab: nm('A 상공 기준고도+7.5 m 로 45° Climb', '45° climb to reference +7.5 m above A'), call: C('호버링 위치로 Climb', 'Climbing to the hover point', ['Climb']) },
       H0(P.A, 0, 0, nm('Pause (최고점)', 'Hold (apex)'), { r: c1R('triRise'), call: STOP('', '') }),
-      { k: 'move', from: P.A, r0: c1R('triRise'), to: SD, hdg: 0, lab: nm(`${nD} 로 45° Descend`, `45° descent to ${nD}`), desc: true, call: C(`${oKo}Descend FLIGHT 실시!`, `${L ? 'Right' : 'Left'} descent!`, ['Descend']) },
+      { k: 'move', from: P.A, r0: c1R('triRise'), to: SD, hdg: 0, lab: nm(`${nD} 로 45° Descend`, `45° descent to ${nD}`), desc: true, call: C(`${clkB} 방향으로 Descend`, `Descending to ${clkBen}`, ['Descend']) },
       H0(SD, 0, 0, nm('Pause', 'Hold'), { call: STOP('', '') }),
-      { k: 'move', from: SD, to: P.A, hdg: 0, lab: nm('A 로 수평 move', 'Level to A'), call: C('삼각FLIGHT 원위치 move!', 'Back to the start!', ['원위치', 'move']) },
-      H0(P.A, 0, 0, nm('Pause', 'Hold'), { call: STOP('', '') }),
+      { k: 'move', from: SD, to: P.A, hdg: 0, lab: nm('A 로 수평 move', 'Level to A'), call: C('호버링 위치로 move', 'Back to the hover point', ['호버링', 'move']) },
+      H0(P.A, 0, 0, nm('Pause', 'Hold'), { call: STOP('', '', ['삼각FLIGHT 완료', 'Triangle complete']) }),
       { k: 'xfer', to: P.H, lab: nm('H 로 Back move (평가 제외)', 'Back up to H (not scored)') }] },
     { id: 'cir', name: nm('원주FLIGHT (러더턴)', 'Circle (rudder turn)'), ann: ['원주FLIGHT을 실시하십시오.', 'Carry out the circle.'], steps: [
-      H0(P.H, 0, 0, nm('H 상공 기준고도·기수 전방 Pause', 'Hold over H, nose forward'), { call: STOP('원주FLIGHT 위치로 move', 'To the circle position') }),
-      H0(P.H, 90 * s, 0, nm(`기수 ${sideKo}로 90° → Pause`, `Nose 90° ${sideEn} → hold`), { posWatch: true, rot: true }),
-      { k: 'arc', c: P.A, R: 7.5, dir: s, start: P.H, lab: nm(`반경 7.5 m 원주: H → ${nB} → C → ${nD} → H`, `7.5 m circle: H → ${nB} → C → ${nD} → H`), call: C('원주FLIGHT 실시!', 'Circle!', ['원주']) },
-      H0(P.H, 90 * s, 0, nm('H 상공 복귀 Pause', 'Back over H, hold'), { call: STOP('원주FLIGHT 완료', 'Circle complete') }),
-      H0(P.H, 0, 0, nm(`${oKo}로 90° yaw해 기수 전방 → Pause`, `Turn 90° ${oEn} to face forward → hold`), { posWatch: true, rot: true, call: STOP('기수 정렬', 'Nose align') })] },
-    { id: 'emg', name: nm('비상조작', 'Emergency'), ann: ['비상조작을 실시하십시오.', 'Carry out the emergency procedure.'], steps: [
-      H0(P.H, 0, 0, nm('H 상공 기준고도 +2 m 이상 Climb → Pause', 'Climb ≥ 2 m above reference over H → hold'), { altWin: [c1R('emgRise'), c1R('emgRise') + 2.5], posWatch: 'xy', call: C('비상 조작 실시!', 'Emergency procedure!', ['비상', '조작']) }),
-      { k: 'callout', lab: nm('"비상" 구호 (E 키·버튼은 기기 음성으로 대신 외침)', 'Call "emergency" (E key / button speaks it for you)'), call: C('비상! 비상! 비상!', 'Emergency! Emergency! Emergency!', ['비상']) },
+      H0(P.H, 0, 0, nm('H 상공 기준고도·기수 전방 Pause', 'Hold over H, nose forward'), { call: STOP('원주FLIGHT 위치로', 'To the circle position') }),
+      H0(P.H, 90 * s, 0, nm(`기수 ${sideKo}로 90° → Pause`, `Nose 90° ${sideEn} → hold`), { posWatch: true, rot: true, call: STOP('원주FLIGHT 준비', 'Circle, ready') }),
+      { k: 'arc', c: P.A, R: 7.5, dir: s, start: P.H, lab: nm(`반경 7.5 m 원주: H → ${nB} → C → ${nD} → H`, `7.5 m circle: H → ${nB} → C → ${nD} → H`), call: C('원주FLIGHT 출발', 'Circle, go', ['출발', '원주']) },
+      H0(P.H, 90 * s, 0, nm('H 상공 복귀 Pause', 'Back over H, hold'), { call: STOP('', '') }),
+      H0(P.H, 0, 0, nm(`${oKo}로 90° yaw해 기수 전방 → Pause`, `Turn 90° ${oEn} to face forward → hold`), { posWatch: true, rot: true, call: STOP('기수전방', 'Nose forward', ['원주FLIGHT 완료', 'Circle complete']) })] },
+    { id: 'emg', name: nm('비상착륙 (비상조작)', 'Emergency landing'), ann: ['비상조작을 실시하십시오.', 'Carry out the emergency procedure.'], steps: [
+      H0(P.H, 0, 0, nm('H 상공 기준고도 +2 m 이상 Climb → Pause', 'Climb ≥ 2 m above reference over H → hold'), { altWin: [c1R('emgRise'), c1R('emgRise') + 2.5], posWatch: 'xy', call: C('2미터 Climb', 'Climb 2 metres', ['Climb', '미터']) }),
+      { k: 'callout', lab: nm('"비상" 구호 (E 키·버튼은 기기 음성으로 대신 외침)', 'Call "emergency" (E key / button speaks it for you)'), call: C('비상!', 'Emergency!', ['비상']) },
       { k: 'emg', pad: F, lab: nm(`즉시 Descend하며 F(${nB}쪽)로 빠르게 비상 강하 → 착지`, `Descend at once and move fast to F (${nB} side) → touch down`) },
-      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('시동 OFF!', 'Motors off!', ['시동', '오프', 'off']) }] },
+      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('비상착륙 완료', 'Emergency landing complete', ['비상착륙', '완료']) }] },
     { id: 'nrm', name: nm('정상접근 및 착륙 (자세모드)', 'Normal approach & landing (attitude mode)'), needMode: true, ann: ['자세모드로 전환하여 정상접근 및 착륙을 실시하십시오.', 'Switch to attitude mode and carry out the normal approach and landing.'], steps: [
-      { k: 'mode', lab: nm('FLIGHT모드를 자세제어(ATTI) or 수동으로 전환 (Y)', 'Switch to attitude (ATTI) or manual mode (Y)'), call: C('에티 모드 변경 확인!', 'ATTI mode confirmed!', ['에티', '모드', '변경']) },
+      { k: 'mode', lab: nm('FLIGHT모드를 자세제어(ATTI)로 전환 · GPS 스위치 끄기', 'Switch to attitude (ATTI) · GPS switch off'), call: C('ATTI 모드로 전환', 'Switching to ATTI mode', ['모드', '전환', '에티']) },
       { k: 'arm', csc: true, lab: nm('시동 · 스틱 or Enter', 'Start · sticks or Enter'), call: C('시동', 'Start', ['시동']) },
-      H0(F, 0, 0, nm('F 에서 기수 전방으로 Takeoff → 기준고도 Pause', 'Take off from F nose forward → hold at reference height'), { posWatch: 'xy', call: C('Takeoff', 'Takeoff', ['Takeoff']) }),
-      { k: 'move', from: F, to: P.H, hdg: 0, lab: nm('H 상공까지 수평 횡move', 'Sideways level move to over H') },
+      H0(F, 0, 0, nm('F 에서 기수 전방으로 Takeoff → 기준고도 Pause', 'Take off from F nose forward → hold at reference height'), { posWatch: 'xy', call: STOP('Takeoff', 'Takeoff') }),
+      { k: 'move', from: F, to: P.H, hdg: 0, lab: nm('H 상공까지 수평 횡move', 'Sideways level move to over H'), call: C('정상접근', 'Normal approach', ['정상', '접근']) },
       H0(P.H, 0, 0, nm('Pause', 'Hold'), { call: STOP('', '') }),
-      { k: 'land', pad: P.H, hdg: 0, lab: nm('착륙장 안 착륙지점으로 강하 → 착륙 (중심축 기준)', 'Descend to the touchdown point → land (centre axis)'), call: C('정상 접근 착륙 실시!', 'Normal approach, landing!', ['착륙', '접근']) },
-      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('착륙 Done! 시동 OFF!', 'Landed! Motors off!', ['착륙', '시동', '오프', 'off']) }] },
+      { k: 'land', pad: P.H, hdg: 0, lab: nm('착륙장 안 착륙지점으로 강하 → 착륙 (중심축 기준)', 'Descend to the touchdown point → land (centre axis)'), call: C('착륙', 'Landing', ['착륙']) },
+      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('정상접근 및 착륙 완료', 'Normal approach and landing complete', ['정상', '완료']) }] },
     { id: 'xw', name: nm('측풍접근 및 착륙', 'Crosswind approach & landing'), ann: ['GPS 모드로 전환 후 측풍접근 및 착륙을 실시하십시오.', 'Switch back to GPS mode and carry out the crosswind approach and landing.'], steps: [
-      { k: 'mode', gps: true, lab: nm('GPS 모드로 전환 (Y) · 평가 제외', 'Back to GPS mode (Y) · not scored'), call: C('GPS 모드 변경 확인!', 'GPS mode confirmed!', ['모드', '변경', 'gps', '지피에스']) },
+      { k: 'mode', gps: true, lab: nm('GPS 모드로 전환 · GPS 스위치 켜기 (평가 제외)', 'Back to GPS mode · GPS switch on (not scored)'), call: C('GPS 모드로 전환', 'Switching to GPS mode', ['모드', '전환', 'gps', '지피에스']) },
       { k: 'arm', csc: true, lab: nm('시동 · 스틱 or Enter (평가 제외)', 'Start · sticks or Enter (not scored)'), call: C('시동', 'Start', ['시동']) },
-      { k: 'xfer', to: SB, lab: nm(`Takeoff 후 기수 전방으로 ${nB} 지점 move (평가 제외)`, `Take off and move nose-forward to ${nB} (not scored)`), call: C('Takeoff', 'Takeoff', ['Takeoff']) },
+      { k: 'xfer', to: SB, lab: nm(`Takeoff 후 기수 전방으로 ${nB} 지점 move (평가 제외)`, `Take off and move nose-forward to ${nB} (not scored)`), call: C('Takeoff, 측풍 접근 위치로', 'Takeoff. To the crosswind start point', ['Takeoff', '측풍', '위치']) },
       H0(SB, 0, 0, nm(`${nB} 에서 기준고도·기수 전방 Pause`, `Hold at ${nB}, nose forward`), { call: STOP('', '') }),
-      H0(SB, 90 * s, 0, nm(`바람 쪽(${sideKo})으로 90° yaw → Pause`, `Turn 90° into the wind (${sideEn}) → hold`), { posWatch: true, rot: true, call: STOP('', '') }),
-      { k: 'move', from: SB, to: P.H, hdg: 90 * s, lab: nm('측면 상태로 H 상공까지 직선 move', 'Straight sideways to over H') },
+      H0(SB, 90 * s, 0, nm(`바람 쪽(${sideKo})으로 90° yaw → Pause`, `Turn 90° into the wind (${sideEn}) → hold`), { posWatch: true, rot: true, call: STOP('측풍 대응', 'Crosswind correction') }),
+      { k: 'move', from: SB, to: P.H, hdg: 90 * s, lab: nm('측면 상태로 H 상공까지 직선 move', 'Straight sideways to over H'), call: C('측풍 접근', 'Crosswind approach', ['측풍', '접근']) },
       H0(P.H, 90 * s, 0, nm('Pause', 'Hold'), { call: STOP('', '') }),
-      { k: 'land', pad: P.H, hdg: 90 * s, lab: nm('강하 → 착륙 (중심축 기준)', 'Descend → land (centre axis)'), call: C('측풍 접근 착륙 실시!', 'Crosswind approach, landing!', ['착륙', '측풍']) },
-      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('착륙 Done! 시동 OFF!', 'Landed! Motors off!', ['착륙', '시동', '오프', 'off']) }] },
-    { id: 'post', name: nm('FLIGHT 후 점검 · FLIGHT기록', 'Post-flight · logbook'), unrated: true, ann: ['FLIGHT 후 점검과 FLIGHT기록 작성을 실시하십시오.', 'Carry out the post-flight inspection and write the flight log.'], steps: [
-      { k: 'prep', lab: nm('기체 전원 차단: 메인 배터리 분리 · 외관 점검 · Enter', 'Aircraft power off: battery out, exterior check · Enter'), call: C('메인 배터리 분리! 기체 외관 이상무!', 'Main battery out! Exterior OK!', ['배터리', '외관']) },
-      { k: 'prep', lab: nm('조종기 전원 차단 · Enter', 'Transmitter off · Enter'), call: C('조종기 전원 OFF! FLIGHT 후 점검 Done!', 'Transmitter off! Post-flight check complete!', ['조종기', '점검']) },
-      { k: 'prep', lab: nm('평가관에게 보고 · FLIGHT기록 작성 · Enter (기록 내보내기는 결과 화면)', 'Report to the examiner · write the log · Enter (export on the result screen)'), call: C('FLIGHT 종료했습니다!', 'Flight complete!', ['종료']) }] },
+      { k: 'land', pad: P.H, hdg: 90 * s, lab: nm('강하 → 착륙 (중심축 기준)', 'Descend → land (centre axis)'), call: C('착륙', 'Landing', ['착륙']) },
+      { k: 'disarm', lab: nm('시동 종료 · Enter', 'Shut down · Enter'), call: C('측풍접근 및 착륙 완료, FLIGHT 완료', 'Crosswind approach and landing complete. Flight complete', ['측풍', '완료']) }] },
+    { id: 'post', name: nm('FLIGHT 후 기체점검', 'Post-flight check'), unrated: true, ann: ['FLIGHT 후 기체점검을 실시하십시오.', 'Carry out the post-flight check.'], steps: [
+      { k: 'prep', lab: nm('아워미터 확인 · 기체배터리·조종기 끄기 · Enter', 'Hour meter · flight battery and transmitter off · Enter'), call: C('아워메타 확인, 기체배터리 OFF, 조종기 OFF', 'Hour meter checked. Flight battery off. Transmitter off', ['아워', '오프', 'off']) },
+      { k: 'prep', lab: nm('기체 외관 점검 · Enter', 'Airframe check · Enter'), call: C('프로펠러, 모터, 모터베이스, 변속기 이상무, 암대, 메인프레임, 랜딩스키드 이상무', 'Propellers, motors, motor mounts, ESCs OK. Arms, main frame, landing skids OK', ['프로펠러', '이상무']) },
+      { k: 'prep', lab: nm('배터리 분리·점검 · 기체 원위치 · FLIGHT기록 · Enter (기록 내보내기는 결과 화면)', 'Battery out and checked · aircraft back · log · Enter (export on the result screen)'), call: C('배터리 분리, 배터리 케이블, 배부름 이상무, 기체 원위치, FLIGHT 후 기체점검 완료', 'Battery out. Cables and swelling OK. Aircraft back in place. Post-flight check complete', ['배터리', '완료']) }] },
     { id: 'oral', name: nm('구술시험 (5문항)', 'Oral exam (5 questions)'), ann: ['구술시험을 시작하겠습니다.', 'The oral exam begins.'], steps: [
       { k: 'oral', lab: nm('구술: 항목별 1문항씩 5문항 (앱 작성 예시 문항)', 'Oral: one question per area, 5 in total (app-written examples)') }] }
   ].map(m => { if (m.ann) m.steps.unshift(A(m.ann[0], m.ann[1])); return m; });
@@ -6669,7 +6669,7 @@ function c1Menu(k) {
   const on = isC1(k);
   if (on) c1Site();
   if (C1G) C1G.visible = on;
-  if (!on) C1.on = false;
+  if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; }
   C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
   if (ui.map) ui.map.style.display = on ? 'none' : '';
@@ -6941,6 +6941,22 @@ function c1SkidOnPad(t, pad) {
   return false;
 }
 
+// ---- 시험 시각 → 해 위치 (그림자로 Zoom감) · Lat 36.8° · 오늘 날짜 · 한국 표준시 기준 태양 정오 약 12:32 ----
+function c1Sun() {
+  try {
+    if (!isC1() || ENV.night || ENV.dusk) return;
+    const h = SET.c1hour || 11, d = new Date(), N = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5), phi = 36.8 * DEG;
+    const dec = -23.44 * DEG * Math.cos(2 * Math.PI / 365 * (N + 10)), H = 15 * DEG * (h - 12.53);
+    const el = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
+    const az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi)) + Math.PI;   // 북쪽 기준 시계 방향
+    let nx = 0, nz = -1, ex = 1, ez = 0;   // 월드에서 북·동 방향 (Site CRS에서 구함)
+    if (typeof SITE_X !== 'undefined' && SITE_X.toEN) { const a = SITE_X.toEN(0, 0), bd = SITE_X.toEN(1, 0), bs = SITE_X.toEN(0, 1);
+      const dEd = bd[0] - a[0], dNd = bd[1] - a[1], dEs = bs[0] - a[0], dNs = bs[1] - a[1], det = dEd * dNs - dEs * dNd;
+      const nd = -dEs / det, ns = dEd / det, ed = dNs / det, es = -dNd / det; nx = ns; nz = -nd; ex = es; ez = -ed; const ln = Math.hypot(nx, nz), le = Math.hypot(ex, ez); nx /= ln; nz /= ln; ex /= le; ez /= le; }
+    const ce = Math.cos(Math.max(el, 3 * DEG)), se = Math.sin(Math.max(el, 3 * DEG)), sE = Math.sin(az) * ce, sN = Math.cos(az) * ce;
+    SUN_DIR.set(ex * sE + nx * sN, se, ez * sE + nz * sN).normalize(); C1.sun = { h, el: +(el / DEG).toFixed(1), az: +(az / DEG).toFixed(0) };
+  } catch (e) { }
+}
 // ---- 진행 ----
 function c1Start(a) {
   c1Site(); C1G.visible = true; C1ON = !C1S.real;
@@ -6950,11 +6966,17 @@ function c1Start(a) {
   C1.M = c1Build(C1.side);
   C1.M.forEach(m => { m.done = false; m.miss = false; m.fail = false; m.why = []; m.label = m.name; m.steps.forEach(s => { s.T = s.T || c1R('hoverT'); }); });
   S.cam = 1; ui.map.style.display = 'none'; document.body.classList.add('c1on');
-  c1Panel(true); c1ALoad();
+  c1Panel(true); c1ALoad(); c1Sun();
   c1Ev('start', { exam: C1.exam, side: C1.side < 0 ? 'left-first' : 'right-first', profile: C1P.ver, rules: C1RULES.ver, wind: WIND.lv });
   return C1.M;
 }
 function c1StartPose() { return { p: c1W(C1PT.H[0], C1PT.H[1], c1p('skidDrop')), h: C1S.h }; }
+// 단계 충족 표시: 안내창에 ✓ 와 짧은 알림음 (모의평가에서도)
+function c1OkFlash(st) {
+  if (!st || ['ann', 'oral', 'inspect'].includes(st.k)) return;
+  const bad = st.fails && st.fails.length; C1.ok = { text: (bad ? '✗ ' : '✓ ') + st.lab.split(' · ')[0].split(' (')[0], bad: !!bad, t: 2.2 };
+  try { if (AU.ctx && !TEST) { const o = AU.ctx.createOscillator(), g = AU.ctx.createGain(); o.frequency.value = bad ? 330 : 880; g.gain.setValueAtTime(0.0001, AU.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.12, AU.ctx.currentTime + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, AU.ctx.currentTime + 0.18); o.connect(g); g.connect(AU.master || AU.ctx.destination); o.start(); o.stop(AU.ctx.currentTime + 0.2); } } catch (e) { }
+}
 function c1Count(x) {
   if (!x || !x.call || !x.call.count || x.callSaid !== 'btn' || x.arrT == null) return;
   if (!x.stopSaid) { x.stopSaid = true; c1Say(L2('Pause.', 'Hold.'), 'me'); return; }
@@ -6991,12 +7013,13 @@ function c1Step(prev, cur, dt) {
   // 버튼으로 Pause 구호를 했으면 Pause 지점 도착 때 "Pause", 그 뒤 1초마다 "하나…다섯" (단계가 먼저 끝나도 다섯까지, 움직이면 멈춤)
   if (st.call && st.call.count && st.armedEval) { if (st.arrT == null || C1.t - st.arrT > st.t + 0.6) { st.arrT = C1.t - st.t; st.cnt = Math.floor(st.t); } }
   c1Count(st); if (C1V.cst && C1V.cst !== st) { if (M.hs > 0.6 || (C1V.cst.cnt || 0) >= 5 || C1.t - C1V.cst.arrT > 6.5) C1V.cst = null; else c1Count(C1V.cst); }
-  if (done) { if (st.call && st.call.count && st.arrT != null && (st.cnt || 0) < 5) C1V.cst = st; c1Next(); }
+  if (done) { if (st.call && st.call.count && st.arrT != null && (st.cnt || 0) < 5) C1V.cst = st; if (st.call && st.call.after && st.callSaid === 'btn') c1Say(L2(st.call.after[0], st.call.after[1]), 'me'); c1OkFlash(st); c1Next(); }
 }
 function c1Key(k, fromVoice) {
   if (!isC1() || S.state !== 'run') return false;
   const st = c1Cur();
   if (k === 'KeyY') { c1Mode(); return true; }
+  if (k === 'KeyH' || k === 'KeyG') { c1GpsToggle(); return true; }   // GPS 스위치 (assist 버튼·H 키)
   if (st && st.k === 'inspect' && st.open && !st.done && (XR_ON || window.C1_VRTEST) && (k === 'Enter' || k === 'KeyE' || k === 'Space')) {   // VR: 항목마다 A 정상 / X 불량
     const it = C1INS.find(x => !st.ans[x.id]); if (it) { st.ans[it.id] = k === 'KeyE' ? 'bad' : 'ok'; sfx('good'); } if (C1INS.every(x => st.ans[x.id])) c1InspectDone(st); return true; }
   if (st && st.k === 'oral' && st.qs && !st.done && (XR_ON || window.C1_VRTEST) && k === 'Enter') { c1OralAns(st, st.qs[st.qi].ord[C1XR.sel]); C1XR.sel = 0; return true; }
@@ -7014,6 +7037,10 @@ function c1Confirm() {
   if (st.k === 'prep') { if (st.call) c1CallDo('btn'); c1Ev('confirm'); c1Next(); }
   else if (st.k === 'arm') { if (DR.landed) { c1Arm('btn'); c1Next(); } }
   else if (st.k === 'disarm') { if (DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3) { C1.armed = false; if (st.call) c1CallDo('btn'); c1Ev('disarm'); c1Next(); } else showMsg(L2('착지 후 시동 종료', 'Land first, then shut down'), '#ffc828', 1); }
+}
+function c1GpsToggle() {
+  C1.mode = C1.mode === 'gps' ? 'atti' : 'gps'; C1.hold = null; C1.altT = null; C1.ei.set(0, 0, 0);
+  c1Ev('mode', { mode: C1.mode, by: 'gpsSwitch' }); showMsg(c1ModeName(), C1.mode === 'gps' ? '#5dff9a' : '#ffb030', 1.4); sfx('good');
 }
 function c1Mode() {
   const L = ['gps', 'atti', 'manual']; C1.mode = L[(L.indexOf(C1.mode) + 1) % 3]; C1.hold = null; C1.altT = null; C1.ei.set(0, 0, 0);
@@ -7048,8 +7075,9 @@ function c1Panel(show) {
 #c1p .bt{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#c1p .bt button{flex:1 1 auto;min-width:56px;padding:6px 4px;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3;font-size:12px}
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
-#c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
-#c1cap{position:fixed;left:50%;top:58px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
+#c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
 #c1m .box{background:#11161c;border:1px solid #c9a2ff;border-radius:12px;padding:14px 16px;max-width:min(640px,94vw);max-height:90vh;overflow:auto;color:#e8eef3;font:14px/1.45 system-ui,sans-serif}
@@ -7060,6 +7088,7 @@ body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.
 body.touch #c1p .s,body.touch #c1p .cl,body.touch #c1p .m,body.touch #c1p .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.touch #c1p{left:150px;right:280px;top:36px;width:auto;max-height:calc(38vh - 40px);overflow:hidden;padding:4px 8px;font-size:11px;line-height:1.25}
 body.touch #c1p .r,body.touch #c1p canvas,body.touch #c1p .note{display:none}body.touch #c1p .m{font-size:12px;margin:0}body.touch #c1p .s{margin:1px 0}
+body.touch #c1An,body.touch #c1Mic,body.touch #c1Md,body.touch #c1Vw{display:none}
 body.touch #c1p .bt{flex-wrap:nowrap;margin-top:3px;gap:3px}body.touch #c1p .bt button{min-width:0;padding:5px 3px;font-size:11px}
 body.touch #c1p.chk .t,body.touch #c1p.chk .cl{display:none}body.touch #c1p.chk .r{display:flex;flex-wrap:wrap;gap:0 6px;font-size:10px}body.touch #c1p.chk .r span{margin-right:6px}body.touch #c1p.mini{max-height:34px}
 body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
@@ -7068,11 +7097,12 @@ body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
 <div class="cl" id="c1Cl"></div>
-<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
+<div class="bt"><button id="c1Ok">✓ Enter</button><button id="c1Cb">${L2('📣 구호 Q', '📣 CALL Q')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1Gp">GPS</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
-    tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
+    tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Gp', 'KeyH');
+    $('c1Hr').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const L = [9, 11, 13, 15, 17]; SET.c1hour = L[(L.indexOf(SET.c1hour | 0) + 1) % L.length] || 11; saveSet(); c1Sun(); showMsg(L2('시험 시각 ', 'Test time ') + SET.c1hour + L2('시 · 해 위치·그림자 반영', ':00 · sun and shadows updated'), '#ffc828', 1.6); }; tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
     $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 Off (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 On', 'Examiner announcements on'), '#ffc828', 1.6); };
     $('c1Vo').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); if (SET.c1voice === false) { SET.c1voice = true; saveSet(); } c1VoiceUnlock(); c1VoiceTest(); };
     $('c1Vo').oncontextmenu = e => { e.preventDefault(); SET.c1voice = SET.c1voice === false; saveSet(); showMsg(SET.c1voice === false ? L2('시험장 음성 Off', 'Test-field voice off') : L2('시험장 음성 On', 'Test-field voice on'), '#ffc828', 1.4); };
@@ -7086,7 +7116,8 @@ let _c1ui = 0;
 function c1Tick(dt) {
   if (!isC1() || !C1G) return;
   if (C1.pilotFig) C1.pilotFig.visible = C1.view !== 'pilot' || !!C1.introCam || S.state === 'menu';
-  if (C1V.heardT > 0) C1V.heardT -= dt;
+  if (C1V.heardT > 0) C1V.heardT -= dt; if (C1.ok && C1.ok.t > 0) C1.ok.t -= dt;
+  if (ui.modeTag && (S.state === 'run' || S.state === 'pause')) ui.modeTag.textContent = 'C1 · ' + (C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF (ATTI)' : 'MANUAL') + (C1.armed ? ' · ARMED' : '');
   if (C1.ribbons) { const t = S.simT, w = c1Wind(c1W(0, 20, 1)), ws = Math.hypot(w.x, w.z), wa = Math.atan2(w.x, w.z);
     for (const rb of C1.ribbons) { const c = c1W(rb.uv[0], rb.uv[1], 0.5), d = Math.hypot(DR.p.x - c.x, DR.p.z - c.z), hh = DR.p.y - c.y;
       const wash = (S.state === 'run' && hh > 0 && hh < 9 && d < 1.8) ? (1 - d / 1.8) * clamp(1 - hh / 9, 0, 1) * Math.min(1, DR.thrust * 1.6) : 0;
@@ -7134,6 +7165,9 @@ function c1Tick(dt) {
   if (st && st.k === 'rc') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r = `<b>${L2('스로틀', 'Throttle')}</b><span>↑${ck('thr+')} ↓${ck('thr-')}</span><b>${L2('러더', 'Rudder')}</b><span>←${ck('yaw-')} →${ck('yaw+')}</span><b>${L2('엘리베이터', 'Elevator')}</b><span>↑${ck('pitch+')} ↓${ck('pitch-')}</span><b>${L2('에일러론', 'Aileron')}</b><span>←${ck('roll-')} →${ck('roll+')}</span><b>${L2('모드 스위치', 'Mode switch')}</b><span class="${C1.mode === 'gps' ? 'ok' : 'bad'}">${C1.mode.toUpperCase()}</span>`; }
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (KEYBOARD S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
+  { const gp = $('c1Gp'); if (gp) { gp.textContent = C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF' : 'MANUAL'; gp.className = C1.mode === 'gps' ? 'on' : 'off'; } const hb = $('c1Hr'); if (hb) hb.textContent = '🕐 ' + (SET.c1hour || 11) + L2('시', ':00'); }
+  if (st && st.k === 'hold' && st.armedEval) { const pc = Math.min(1, st.t / st.T); r += `<b>${L2('Pause', 'Hold')}</b><span><i class="pb"><i style="width:${(pc * 100).toFixed(0)}%"></i></i> ${st.t.toFixed(1)} / ${st.T} s${pc >= 1 ? ' ✓' : ''}</span>`; }
+  if (C1.ok && C1.ok.t > 0) r = `<span class="okf ${C1.ok.bad ? 'bad' : 'ok'}" style="grid-column:1/3">${C1.ok.text}</span>` + r;
   $('c1R').innerHTML = r; el.classList.toggle('chk', !!st && (st.k === 'rc' || st.k === 'ctl' || (st.k === 'arm' && st.csc)));
   $('c1Note').textContent = L2('1종 실기시험 기준 참고 연습용 · 공식 시험·교육시간 인정 여부 미확인', 'Reference practice for the class-1 practical test · not an official test or training hours') + (C1.exam ? '' : L2(' · 숫자 1~9 = 기동 바로가기 · N = next lesson', ' · keys 1–9 jump to a manoeuvre · N = next step'));
   const cv = $('c1Map'); if (cv && !C1.exam) c1DrawMap(cv, st, M); else if (cv) cv.style.display = 'none';
@@ -7418,7 +7452,7 @@ Object.assign(C1EV, {
   rc(st) {
     const sn = st.seen || (st.seen = {}), a = { thr: IN.thr, yaw: IN.yaw, pitch: IN.pitch, roll: IN.roll };
     for (const k in a) { if (a[k] > 0.85) sn[k + '+'] = 1; if (a[k] < -0.85) sn[k + '-'] = 1; }
-    st.err = null; return Object.keys(sn).length >= 8 && C1.mode === 'gps' && Math.abs(IN.thr) < 0.3 && Math.abs(IN.pitch) < 0.3;
+    st.err = null; return (Object.keys(sn).length >= 8 || st.callSaid) && C1.mode === 'gps' && Math.abs(IN.thr) < 0.3 && Math.abs(IN.pitch) < 0.3;   // 이상무 구호를 하면 다음으로
   },
   arm(st, M, dt) {
     if (C1.armed) return true;
@@ -7429,9 +7463,9 @@ Object.assign(C1EV, {
     const lat = Math.hypot(M.u - st.at[0], M.v - st.at[1]); st.err = { lat, alt: M.alt - (C1.ref || 4), hdg: c1Wrap(M.hdg) };
     c1Dev(st, 'pos', lat > c1R('posTol'), { lat: +lat.toFixed(2) }, dt); c1Dev(st, 'alt', Math.abs(st.err.alt) > c1R('altTol'), { alt: +M.alt.toFixed(2) }, dt);
     const sn = st.seen || (st.seen = {}); for (const [k, v] of [['p', IN.pitch], ['r', IN.roll], ['y', IN.yaw]]) { if (v > 0.12) sn[k + '+'] = 1; if (v < -0.12) sn[k + '-'] = 1; }
-    st.okT = Object.keys(sn).length >= 6 && c1Still(M) ? (st.okT || 0) + dt : 0;
-    if (C1.t - (st.t0 || 0) > 40 && !st.late) { st.late = true; c1Fail(st, 'ctl', { seen: Object.keys(sn) }); }
-    return st.okT > 0.8 || (st.late && c1Still(M));
+    st.okT = (Object.keys(sn).length >= 6 || st.callSaid) && c1Still(M) ? (st.okT || 0) + dt : 0;   // 이상무 구호를 하면 다음으로 (조작 확인은 기록만)
+    if (st.okT > 0.8) { c1Ev('ctlChk', { seen: Object.keys(sn), byCall: !!st.callSaid }); return true; }
+    return false;
   },
   oral(st) { if (!st.open) { st.open = true; c1OralUI(st); } return !!st.done; }
 });
