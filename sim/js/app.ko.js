@@ -6393,7 +6393,7 @@ MS_CAT.class1 = MS_CAT.class1x = 'exam'; CAT_C.exam = '#c9a2ff';
 const C1DISC = () => L2('※ 기체 제원과 비행 특성은 실제 기체 정보가 아닌 연습용 설정입니다.', '※ Aircraft specs and handling are practice settings, not real aircraft data.');
 BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multicopter class 1 · learn'),
   L2('평탄 시험장에서 이륙·호버링·전후진·삼각·원주·비상·정상접근·측풍접근 순서로 연습합니다. 경로·허용구역·타이머를 보여 줍니다.', 'Practise takeoff, hover, forward/back, triangle, circle, emergency, normal and crosswind approach on a flat test field, with path, tolerance box and timers shown.'),
-  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · Q 구호(기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · Enter 확인 · Y 비행모드 · E "비상" · C 시점 · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · Q call-out (device voice) · 🎤 say it yourself (speech recognition) · Enter confirm · Y flight mode · E "emergency" · C view · Not an official test or training hours.') + ' ' + C1DISC()];
+  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · 🗣 내 구호(Q · 기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · 다음 ▶(Enter) · GPS 스위치(H) · 🚨 비상(E) · 시점(C) · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · 🗣 MY CALL (Q · device voice) · 🎤 say it yourself (speech recognition) · NEXT ▶ (Enter) · GPS switch (H) · 🚨 EMER (E) · VIEW (C) · Not an official test or training hours.') + ' ' + C1DISC()];
 BRIEF.class1x = [L2('무인멀티콥터 1종 · 모의평가', 'Unmanned multicopter class 1 · mock check'),
   L2('호명·비행 전 점검·조종기 점검·시동부터 전체 기동, 구술 5문항까지 실제 시험 순서로 진행하고 항목별 S/U 모의판정을 받습니다. 공중경계·판단력은 미평가로 남습니다.', 'Run the real order — call-up, pre-flight and transmitter checks, start, all manoeuvres and a 5-question oral — and get a per-item S/U mock verdict. Lookout and judgement stay unrated.'),
   L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.') + ' ' + C1DISC()];
@@ -6654,14 +6654,14 @@ function c1Props(G0) {
   for (const [u, v] of [[-12, -6], [-6, -6], [-12, -11], [-6, -11]]) mk(UCYL, leg, u, v, 1.25, 0.04, 2.5, 0.04);
   mk(UBOX, tw, -9, -8.5, 2.55, 6.4, 0.12, 5.4); const roof = mk(new THREE.ConeGeometry(4.3, 1.1, 4), tb, -9, -8.5, 3.15, 1, 1, 1, Math.PI / 4); roof.scale.set(1.05, 1, 0.88);
   mk(UBOX, tw, -9, -7.2, 0.75, 2.4, 0.05, 0.8); for (const u of [-10, -8]) mk(UCYL, leg, u, -7.2, 0.37, 0.03, 0.74, 0.03);
-  // 시험위원 (조종자 뒤 · 기록판)
+  // 조종자 인형 (3인칭 시점에서만 보임)
   const person = (u, v, vest, sit) => { const g = new THREE.Group(); g.position.copy(W2(u, v, 0)); g.rotation.y = -C1S.h; G0.add(g);
     const body = new THREE.Mesh(UCYL, mat(0x2d3640)); body.scale.set(0.2, 0.75, 0.15); body.position.y = 0.38 + 0.45; g.add(body);
     const top = new THREE.Mesh(UBOX, mat(vest)); top.scale.set(0.42, 0.6, 0.26); top.position.y = 1.2; g.add(top);
     const head = new THREE.Mesh(USPH || UCYL, mat(0xe2b897)); head.scale.setScalar(0.12); head.position.y = 1.62; g.add(head);
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf5f5f5)); cap.position.y = 1.64; g.add(cap);
     g.traverse(o => { o.castShadow = true; }); return g; };
-  person(2.6, -2.2, 0xd8f02a); C1.pilotFig = person(0, -0.15, 0xff8a1e);
+  C1.pilotFig = person(0, -0.15, 0xff8a1e);
 }
 // 메뉴·출격 시 시험장 보이기/감추기
 function c1Menu(k) {
@@ -7076,7 +7076,7 @@ function c1Panel(show) {
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
 #c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
-#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{50%{box-shadow:0 0 0 3px rgba(127,208,255,.55)}}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{50%{box-shadow:0 0 0 3px rgba(127,208,255,.55)}}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
 #c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
@@ -7097,7 +7097,7 @@ body.touch #c1cap{top:calc(38% + 4px);font-size:13px;max-width:60vw}
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="s" id="c1St"></div>
 <div class="cl" id="c1Cl"></div>
-<div class="bt"><button id="c1Ok" title="${L2('완료하고 다음 단계로 (키보드 Enter)', 'Done, go to next step (Enter key)')}">${L2('다음 ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목소리로 대신 말함 · 마이크로 직접 말해도 됨 (키보드 Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1Gp">GPS</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Em">${L2('비상 E', 'EMER E')}</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button></div><div class="r" id="c1R"></div>
+<div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 다음 단계로 (키보드 Enter)', 'Done, go to next step (Enter key)')}">${L2('다음 ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목소리로 대신 말함 · 마이크로 직접 말해도 됨 (키보드 Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1Em" title="${L2('비상 선언 (키보드 E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button></div><div class="bt sub"><button id="c1Gp">GPS</button><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button></div></div><div class="r" id="c1R"></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
