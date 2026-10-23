@@ -6552,7 +6552,7 @@ function c1GlowMat(col) {
   if (_c1glow[col]) return _c1glow[col];
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = (col >> 16) & 255, gg = (col >> 8) & 255, b = col & 255;
   const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.22, `rgba(${r},${gg},${b},1)`); gr.addColorStop(0.5, `rgba(${r},${gg},${b},0.55)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  gr.addColorStop(0, `rgba(${(r + 255) >> 1},${(gg + 255) >> 1},${(b + 255) >> 1},0.95)`); gr.addColorStop(0.3, `rgba(${r},${gg},${b},0.85)`); gr.addColorStop(0.6, `rgba(${r},${gg},${b},0.25)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
   g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
   return (_c1glow[col] = new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
@@ -6593,8 +6593,8 @@ function c1NavTick() {
   const H = (renderer.domElement.clientHeight || 720), px = 2 * d * Math.tan((cam.fov || 50) * DEG / 2) / H;   // 1 px 의 실제 크기 (m)
   const on = typeof lightOn === 'function' && lightOn(), t = S.simT || 0, live = S.state !== 'menu';
   for (const n of m) {
-    let sz = Math.max(n.strobe ? 0.5 : 0.3, px * (on ? 17 : 12)), vis = live;
-    if (n.strobe) { const ph = t % 1.2; vis = live && on && (ph < 0.06 || (ph > 0.16 && ph < 0.22)); sz = Math.max(0.6, px * 22); }
+    let sz = Math.max(n.strobe ? 0.22 : 0.12, px * (on ? 8 : 5.5)), vis = live;
+    if (n.strobe) { const ph = t % 1.2; vis = live && on && (ph < 0.06 || (ph > 0.16 && ph < 0.22)); sz = Math.max(0.3, px * 11); }
     n.sp.visible = vis; n.sp.scale.set(sz, sz, 1);
   }
 }
