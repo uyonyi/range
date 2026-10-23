@@ -7385,7 +7385,8 @@ function c1Tick(dt) {
   $('c1St').textContent = st ? st.lab : '';
   { const cl = $('c1Cl'); let h = '';
     const ctx = st && st.call ? (st.call.count ? (L2(st.call.ko, st.call.en) ? L2(st.call.ko, st.call.en) + ' → ' : '') + L2('(도착 후) 정지. 하나, 둘, 셋, 넷, 다섯', '(on arrival) hold, one … five') : L2(st.call.ko, st.call.en)) : '';
-    if (st && st.call) h = st.callSaid ? `✓ ${L2('구호', 'Call')}: ${ctx} <i>(${st.callSaid === 'voice' ? L2('음성', 'voice') : L2('버튼', 'button')})</i>` : (C1.exam ? `${L2('지금 내 구호 차례 ▶ 🗣 내 구호 버튼 또는 직접 말하기', 'Your call now ▶ 🗣 MY CALL button or say it')}` : `${L2('내 구호', 'My call')}: “${ctx}” <i>(${L2('🗣 내 구호 버튼 · 🎤 말하기', '🗣 MY CALL · 🎤 say it')})</i>`);
+    if (st && st.k === 'inspect' && st.call && !st.callSaid) h = L2('점검 항목을 모두 판정하면 보고 구호가 자동으로 나갑니다', 'When every item is judged, the report call is made for you');
+    else if (st && st.call) h = st.callSaid ? `✓ ${L2('구호', 'Call')}: ${ctx} <i>(${st.callSaid === 'voice' ? L2('음성', 'voice') : st.callSaid === 'auto' ? L2('자동', 'auto') : L2('버튼', 'button')})</i>` : (C1.exam ? `${L2('지금 내 구호 차례 ▶ 🗣 내 구호 버튼 또는 직접 말하기', 'Your call now ▶ 🗣 MY CALL button or say it')}` : `${L2('내 구호', 'My call')}: “${ctx}” <i>(${L2('🗣 내 구호 버튼 · 🎤 말하기', '🗣 MY CALL · 🎤 say it')})</i>`);
     if (C1V.heardT > 0) h += `<br><i>🎤 ${C1V.heard}</i>`;
     const vs = c1VoiceStatus(); if (vs) h += `<br><i style="color:#ffb070">${vs}</i>`;
     cl.innerHTML = h; }
@@ -7402,8 +7403,8 @@ function c1Tick(dt) {
   if (st && st.k === 'rc') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r = `<b>${L2('스로틀', 'Throttle')}</b><span>↑${ck('thr+')} ↓${ck('thr-')}</span><b>${L2('러더', 'Rudder')}</b><span>←${ck('yaw-')} →${ck('yaw+')}</span><b>${L2('엘리베이터', 'Elevator')}</b><span>↑${ck('pitch+')} ↓${ck('pitch-')}</span><b>${L2('에일러론', 'Aileron')}</b><span>←${ck('roll-')} →${ck('roll+')}</span><b>${L2('모드 스위치', 'Mode switch')}</b><span class="${C1.mode === 'gps' ? 'ok' : 'bad'}">${C1.mode.toUpperCase()}</span>`; }
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (키보드 S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
-  { const needCall = !!(st && st.call && !st.callSaid), needOk = !C1.demo && !!(st && (st.k === 'prep' || (st.k === 'arm' && DR.landed) || (st.k === 'disarm' && DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3)));
-    const ob = $('c1Ok'), cb = $('c1Cb'); if (ob) ob.classList.toggle('need', needOk); if (cb) cb.classList.toggle('need', needCall && !C1.demo); el.classList.toggle('demo', !!C1.demo); c1DemoBanner(m); }
+  { const needCall = !!(st && st.call && !st.callSaid && st.k !== 'inspect'), needOk = !C1.demo && !!(st && (st.k === 'prep' || (st.k === 'arm' && DR.landed) || (st.k === 'disarm' && DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3)));
+    const ob = $('c1Ok'), cb = $('c1Cb'); if (ob) ob.classList.toggle('need', needOk && !needCall); if (cb) cb.classList.toggle('need', needCall && !C1.demo); el.classList.toggle('demo', !!C1.demo); c1DemoBanner(m); }
   { const gp = $('c1Gp'); if (gp) { gp.textContent = C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF' : 'MANUAL'; gp.className = C1.mode === 'gps' ? 'on' : 'off'; } const hb = $('c1Hr'); if (hb) hb.textContent = '🕐 ' + (SET.c1hour || 11) + L2('시', ':00'); }
   if (st && st.k === 'hold' && st.armedEval) { const pc = Math.min(1, st.t / st.T); r += `<b>${L2('정지', 'Hold')}</b><span><i class="pb"><i style="width:${(pc * 100).toFixed(0)}%"></i></i> ${st.t.toFixed(1)} / ${st.T} s${pc >= 1 ? ' ✓' : ''}</span>`; }
   if (C1.ok && C1.ok.t > 0) r = `<span class="okf ${C1.ok.bad ? 'bad' : 'ok'}" style="grid-column:1/3">${C1.ok.text}</span>` + r;
@@ -7651,6 +7652,7 @@ function c1InspectDone(st) {
   c1Ev('inspect', { fault: st.fault, answers: st.ans, wrong });
   if (wrong.length) c1Fail(st, 'inspect', { wrong, fault: st.fault });
   if (st.fault && st.ans[st.fault] === 'bad') c1Say(L2('이상 확인. 조치 후 진행하십시오.', 'Fault confirmed. Fix it, then continue.'), 'ex');
+  if (st.call && !st.callSaid) c1CallDo('auto');   // 점검을 마치면 보고 구호가 자동으로 나감 (버튼 없이)
 }
 function c1InspectAuto(correct) { const st = c1Cur(); if (!st || st.k !== 'inspect' || st.done) return; st.ans = {}; C1INS.forEach(it => st.ans[it.id] = correct ? (st.fault === it.id ? 'bad' : 'ok') : 'ok'); if (!correct && !st.fault) st.ans[C1INS[0].id] = 'bad'; c1InspectDone(st); }
 
