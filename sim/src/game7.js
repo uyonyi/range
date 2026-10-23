@@ -72,7 +72,7 @@ MS_CAT.class1 = MS_CAT.class1x = 'exam'; CAT_C.exam = '#c9a2ff';
 const C1DISC = () => L2('※ 기체 제원과 비행 특성은 실제 기체 정보가 아닌 연습용 설정입니다.', '※ Aircraft specs and handling are practice settings, not real aircraft data.');
 BRIEF.class1 = [L2('무인멀티콥터 1종 실기 · 학습', 'Unmanned multicopter class 1 · learn'),
   L2('평탄 시험장에서 이륙·호버링·전후진·삼각·원주·비상·정상접근·측풍접근 순서로 연습합니다. 경로·허용구역·타이머를 보여 줍니다.', 'Practise takeoff, hover, forward/back, triangle, circle, emergency, normal and crosswind approach on a flat test field, with path, tolerance box and timers shown.'),
-  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · 🗣 내 구호(Q · 기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · 다음 ▶(Enter) · GPS 스위치(H) · 🚨 비상(E) · 시점(C) · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · 🗣 MY CALL (Q · device voice) · 🎤 say it yourself (speech recognition) · NEXT ▶ (Enter) · GPS switch (H) · 🚨 EMER (E) · VIEW (C) · Not an official test or training hours.') + ' ' + C1DISC()];
+  L2('영인산 야전 착륙장 옆 시험장 · 시험위원 방송(기기 음성) · 🗣 내 구호(Q · 기기 음성이 대신 외침) · 🎤 직접 말하면 음성인식 · 다음 ▶(Enter) · GPS 스위치(H) · 🚨 비상(E) · 시점(C) · 시야 넓게/좁게(Z) · 기체 등: 앞 초록 · 뒤 빨강, 조명(L) 켜면 흰 섬광 · 공식 시험·교육시간 인정 여부는 확인되지 않았습니다.', 'Test field beside the Yeonginsan airstrip · examiner announcements (device voice) · 🗣 MY CALL (Q · device voice) · 🎤 say it yourself (speech recognition) · NEXT ▶ (Enter) · GPS switch (H) · 🚨 EMER (E) · VIEW (C) · view width (Z) · nav lights: green front · red rear, light (L) adds a white strobe · Not an official test or training hours.') + ' ' + C1DISC()];
 BRIEF.class1x = [L2('무인멀티콥터 1종 · 모의평가', 'Unmanned multicopter class 1 · mock check'),
   L2('호명·비행 전 점검·조종기 점검·시동부터 전체 기동, 구술 5문항까지 실제 시험 순서로 진행하고 항목별 S/U 모의판정을 받습니다. 공중경계·판단력은 미평가로 남습니다.', 'Run the real order — call-up, pre-flight and transmitter checks, start, all manoeuvres and a 5-question oral — and get a per-item S/U mock verdict. Lookout and judgement stay unrated.'),
   L2('모의판정은 앱 기준이며 합격·자격 판정이 아닙니다.', 'Mock verdicts follow app rules; they are not a pass or a certificate.') + ' ' + C1DISC()];
@@ -127,7 +127,8 @@ function c1Place() {
       const k = o <= 0 ? 1 : 1 - smooth01(0, 1, o / mg); const i = iy * n + ix; H[i] = H[i] * (1 - k) + y0 * k; changed++;
     }
     applyTerrain(H);
-    if (STREES.hideRect) { const c = [px + fx * 37.6, pz + fz * 37.6]; STREES.hideRect(c[0], c[1], fx, fz, (v1 - v0) + 2 * mg, 2 * hu + 2 * mg); }
+    if (STREES.hideRect) { const c = [px + fx * 37.6, pz + fz * 37.6]; STREES.hideRect(c[0], c[1], fx, fz, (v1 - v0) + 2 * mg, 2 * hu + 2 * mg);
+      const c2 = [px + fx * 135, pz + fz * 135]; STREES.hideRect(c2[0], c2[1], fx, fz, 90, 110); }   // 기체 뒤 배경 나무를 더 멀리 (조종자 시야에서 기체가 나무에 묻히지 않게)
     Object.assign(C1S, { x: px, z: pz, y: y0, h, real: true, range: +best.range.toFixed(1), cells: changed });
     return true;
   } catch (e) { console.warn('class1 site', e); return false; }
@@ -225,9 +226,60 @@ function c1WindInfo() {
   return { sp, dirKo: ['북', '북동', '동', '남동', '남', '남서', '서', '북서'][i] + '풍', dirEn: ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][i] };
 }
 // ---- 기체 형상: X2D 형상과 별도로 굵은 팔·스키드·큰 프롭 ----
+const _c1glow = {};
+function c1GlowMat(col) {
+  if (_c1glow[col]) return _c1glow[col];
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = (col >> 16) & 255, gg = (col >> 8) & 255, b = col & 255;
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.22, `rgba(${r},${gg},${b},1)`); gr.addColorStop(0.5, `rgba(${r},${gg},${b},0.55)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding;
+  return (_c1glow[col] = new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+}
+// 수술 흐름: 바람 + 기체 하강풍. 하강풍은 기체 아래로 내려와 땅에서 옆으로 퍼짐 (움직이면 뒤로 밀려 꼬리처럼 남음)
+const _c1fl = new V3();
+function c1Flow(p) {
+  const w = c1Wind(p), f = _c1fl.set(w.x || 0, 0, w.z || 0); let down = 0;
+  if ((S.state === 'run' || S.state === 'pause') && C1.armed && DR.thrust > 0) {
+    const hh = DR.p.y - p.y;
+    if (hh > -0.5 && hh < 14) {
+      const tdown = Math.max(0, hh) / 7, cx = DR.p.x - DR.v.x * tdown + (w.x || 0) * tdown, cz = DR.p.z - DR.v.z * tdown + (w.z || 0) * tdown;   // 하강풍이 내려오는 동안 기체는 지나가고 바람에 밀림
+      const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz), r = 1.0 + 0.22 * Math.max(0, hh);
+      const S0 = 11 * clamp(DR.thrust * 2, 0, 1.6) / (1 + Math.pow(Math.max(0, hh) / 4.5, 2));   // 하강풍 세기 (m/s)
+      const out = d < r ? S0 * (d / r) * 0.6 : S0 * (r / d) * Math.exp(-(d - r) / 4);   // 기둥 안: 아래로 · 밖: 옆으로 퍼짐
+      if (d > 0.01) { f.x += dx / d * out; f.z += dz / d * out; }
+      down = d < r ? S0 * (1 - d / r) : 0;
+    }
+  }
+  f.y = down; return f;
+}
+function c1RibbonTick() {
+  const t = S.simT;
+  for (const rb of C1.ribbons) {
+    const f = c1Flow(rb.top), sp = Math.hypot(f.x, f.z), yaw = Math.atan2(-f.x, -f.z);
+    rb.sp = (rb.sp == null ? sp : rb.sp + (sp - rb.sp) * 0.25); rb.yaw = rb.yaw == null ? yaw : rb.yaw + Math.atan2(Math.sin(yaw - rb.yaw), Math.cos(yaw - rb.yaw)) * 0.3;
+    const lift = (Math.PI / 2) * (1 - Math.exp(-rb.sp / 3.2)) * (1 - Math.min(0.6, f.y / 10)), tur = 0.05 + 0.3 * Math.min(1, rb.sp / 6) + Math.min(0.6, f.y / 8);
+    for (const st of rb.strips) {
+      st.pv.rotation.set(0, rb.yaw + st.off * (0.25 + 0.6 * Math.exp(-rb.sp / 2)) + Math.sin(t * st.f * 0.6 + st.ph) * tur * 0.6, 0);
+      st.m.rotation.x = lift + Math.sin(t * st.f + st.ph) * tur * 0.5;
+    }
+  }
+}
+// 항법등 크기: 화면에서 최소 몇 픽셀로 보이게 (멀리 있어도 점으로 보임)
+function c1NavTick() {
+  const m = typeof droneM !== 'undefined' && droneM && droneM.nav; if (!m || !m.length) return;
+  const cam = (typeof c1VRon === 'function' && c1VRon()) ? C1XR.cam : camera, d = Math.max(0.5, cam.position.distanceTo(DR.p));
+  const H = (renderer.domElement.clientHeight || 720), px = 2 * d * Math.tan((cam.fov || 50) * DEG / 2) / H;   // 1 px 의 실제 크기 (m)
+  const on = typeof lightOn === 'function' && lightOn(), t = S.simT || 0, live = S.state !== 'menu';
+  for (const n of m) {
+    let sz = Math.max(n.strobe ? 0.5 : 0.3, px * (on ? 17 : 12)), vis = live;
+    if (n.strobe) { const ph = t % 1.2; vis = live && on && (ph < 0.06 || (ph > 0.16 && ph < 0.22)); sz = Math.max(0.6, px * 22); }
+    n.sp.visible = vis; n.sp.scale.set(sz, sz, 1);
+  }
+}
 function makeC1(ghost) {
   const K = partsKit(ghost);
-  const body = K.m(mat(0x30343a, { roughness: 0.55 })), arm = K.m(mat(0x1d1f22, { roughness: 0.5 })), mot = K.m(mat(0x808890, { roughness: 0.35, metalness: 0.6 })), skid = K.m(mat(0x2a2c30, { roughness: 0.6 }));
+  const body = K.m(mat(0x8a9098, { roughness: 0.55 })), arm = K.m(mat(0xd9dde1, { roughness: 0.5 })), mot = K.m(mat(0x808890, { roughness: 0.35, metalness: 0.6 })), skid = K.m(mat(0x2a2c30, { roughness: 0.6 }));
   K.add(UBOX, body, 0, 0.02, 0, 0.42, 0.16, 0.42); K.add(UBOX, K.m(mat(0xd8dde2, { roughness: 0.5 })), 0, 0.12, 0, 0.3, 0.05, 0.3);
   K.add(UBOX, K.m(mat(0xd04040)), 0, 0.06, -0.22, 0.12, 0.05, 0.04);   // 기수 표시 (빨강)
   const props = [];
@@ -242,7 +294,14 @@ function makeC1(ghost) {
     for (const z of [-0.25, 0.25]) { const l = K.add(UBOX, skid, x * 0.7, -0.14, z, 0.03, 0.3, 0.03); l.rotation.z = x > 0 ? 0.45 : -0.45; }
   }
   const leds = [K.add(UBOX, K.LM(0xff2a2a), -0.1, -0.06, -0.21, 0.03, 0.02, 0.02), K.add(UBOX, K.LM(0x2aff4a), 0.1, -0.06, -0.21, 0.03, 0.02, 0.02)];
-  return { g: K.g, props, leds, cans: [] };
+  // 항법등: 앞 두 팔 끝 초록 · 뒤 두 팔 끝 빨강 (계속 켜짐) · 조명 켜면 위 흰색 섬광 — 멀리서도 기수 방향 파악
+  const nav = [];
+  if (!ghost) {
+    for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2, x = Math.sin(a) * 0.8, z = -Math.cos(a) * 0.8, front = z < 0;
+      const sp = new THREE.Sprite(c1GlowMat(front ? 0x30ff60 : 0xff3030)); sp.position.set(x, 0.0, z); K.g.add(sp); nav.push({ sp, front }); }
+    const sb = new THREE.Sprite(c1GlowMat(0xffffff)); sb.position.set(0, 0.2, 0.05); K.g.add(sb); nav.push({ sp: sb, strobe: true });
+  }
+  return { g: K.g, props, leds, cans: [], nav };
 }
 
 // ---- 시험장 (평탄 · 지형과 떨어진 곳) ----
@@ -317,9 +376,15 @@ function c1Site() {
 function c1Cone(G0, uv, cm) {
   const c = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 14), cm); c.position.copy(c1W(uv[0], uv[1], 0.25)); c.castShadow = true; G0.add(c);
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.1, 14), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })); band.position.copy(c1W(uv[0], uv[1], 0.3)); G0.add(band);
-  const rb = new THREE.Group(); rb.position.copy(c1W(uv[0], uv[1], 0.5)); G0.add(rb);
-  const strips = [0xff3b3b, 0xffe14a, 0x3bb0ff].map((col, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.55), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.7 })); m.geometry.translate(0, 0.275, 0); m.rotation.y = i * 2.1; rb.add(m); return m; });
-  (C1.ribbons = C1.ribbons || []).push({ g: rb, strips, uv, ph: Math.random() * 6 });
+  // 수술(리본 다발): 고깔 위 짧은 막대 끝에 매달림 → 바람 · 기체 하강풍(다운워시)에 날림
+  const pole = new THREE.Mesh(UCYL, new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 })); pole.scale.set(0.012, 0.75, 0.012); pole.position.copy(c1W(uv[0], uv[1], 0.5 + 0.375)); G0.add(pole);
+  const top = c1W(uv[0], uv[1], 1.24), strips = [];
+  const cols = [0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff, 0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff];
+  cols.forEach((col, k) => { const pv = new THREE.Group(); pv.position.copy(top); G0.add(pv);
+    const g = new THREE.PlaneGeometry(0.07, 0.7); g.translate(0, -0.35, 0);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.7 })); m.castShadow = true; pv.add(m);
+    strips.push({ pv, m, off: (k / cols.length - 0.5) * 0.9, ph: Math.random() * 6, f: 6 + Math.random() * 5 }); });
+  (C1.ribbons = C1.ribbons || []).push({ strips, uv, top, ph: Math.random() * 6 });
 }
 // 시험장 소품: 천막·책상·시험위원·응시자·안전펜스 (위치는 앱 설정)
 function c1Props(G0) {
@@ -704,6 +769,7 @@ function c1Key(k, fromVoice) {
   if (st && st.k === 'oral' && st.qs && !st.done && (XR_ON || window.C1_VRTEST) && k === 'Enter') { c1OralAns(st, st.qs[st.qi].ord[C1XR.sel]); C1XR.sel = 0; return true; }
   if (k === 'KeyQ') { if (!c1CallDo('btn') && st && st.call && !C1.exam) showMsg(L2('이 단계 구호는 이미 했습니다', 'Call already made for this step'), '#9aa6ad', 1); return true; }
   if (k === 'KeyE') { if (st && st.k === 'callout' && !st.wait2) { st.wait2 = true; c1CallDo(fromVoice ? 'voice' : 'btn'); c1Ev('callout'); showMsg(L2('"비상!"', '"EMERGENCY!"'), '#ff5050', 1.2); sfx('bad'); c1Next(); const n = c1Cur(); if (n) n.t0 = C1.t; } return true; }
+  if (k === 'KeyZ') { const L = [1, 1.3, 0.8], i = (L.indexOf(SET.c1zoom || 1) + 1) % 3; SET.c1zoom = L[i]; saveSet(); showMsg(L2('조종자 시야 ', 'Pilot view ') + [L2('기본', 'normal'), L2('넓게', 'wide'), L2('좁게 (확대)', 'narrow (zoom in)')][i], '#fff', 0.9); return true; }
   if (k === 'KeyC' || k === 'PadRB') { if (!C1.exam) { C1.view = C1.view === 'pilot' ? 'chase' : 'pilot'; showMsg(C1.view === 'pilot' ? L2('조종자 시점', 'Pilot view') : L2('추적 시점 (학습용)', 'Chase view (learning)'), '#4fe3ff', 1); } else showMsg(L2('모의평가는 조종자 시점만', 'Mock check uses the pilot view only'), '#ffc828', 1); return true; }
   if (k === 'Enter' || k === 'Space' || k === 'PadA') { c1Confirm(); return true; }
   if (k === 'KeyR' || k === 'PadY') { if (!C1.exam) { c1Jump(C1.mi, true); showMsg(L2('이 기동 다시', 'Restart this manoeuvre'), '#c9a2ff', 1); } return true; }
@@ -795,12 +861,10 @@ let _c1ui = 0;
 function c1Tick(dt) {
   if (!isC1() || !C1G) return;
   if (C1.pilotFig) C1.pilotFig.visible = C1.view !== 'pilot' || !!C1.introCam || S.state === 'menu';
+  c1NavTick();
   if (C1V.heardT > 0) C1V.heardT -= dt; if (C1.ok && C1.ok.t > 0) C1.ok.t -= dt;
   if (ui.modeTag && (S.state === 'run' || S.state === 'pause')) ui.modeTag.textContent = 'C1 · ' + (C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF (ATTI)' : 'MANUAL') + (C1.armed ? ' · ARMED' : '');
-  if (C1.ribbons) { const t = S.simT, w = c1Wind(c1W(0, 20, 1)), ws = Math.hypot(w.x, w.z), wa = Math.atan2(w.x, w.z);
-    for (const rb of C1.ribbons) { const c = c1W(rb.uv[0], rb.uv[1], 0.5), d = Math.hypot(DR.p.x - c.x, DR.p.z - c.z), hh = DR.p.y - c.y;
-      const wash = (S.state === 'run' && hh > 0 && hh < 9 && d < 1.8) ? (1 - d / 1.8) * clamp(1 - hh / 9, 0, 1) * Math.min(1, DR.thrust * 1.6) : 0;
-      rb.g.rotation.y = wa; rb.strips.forEach((m, i) => { const fl = Math.sin(t * (7 + i) + rb.ph + i) * (0.12 + 0.25 * Math.min(1, ws / 5) + wash * 0.5); m.rotation.x = Math.min(2.9, 0.15 + Math.min(1, ws / 6) * 0.9 + wash * 2.6) + fl; }); } }
+  if (C1.ribbons) c1RibbonTick();
   if (C1.sock) { const w = c1Wind(c1W(-16, 10, 4)); const sp = Math.hypot(w.x, w.z); C1.sock.rotation.set(0, 0, 0); C1.sock.lookAt(C1.sock.position.clone().add(new V3(w.x || 0.001, -Math.max(0, 3 - sp) * 0.6, w.z))); C1.sock.rotateX(Math.PI / 2); }
   const run = S.state === 'run' || S.state === 'pause';
   const st = run ? c1Cur() : null, aids = !C1.exam && run && st;
@@ -867,6 +931,7 @@ function c1DrawMap(cv, st, M) {
   const x = XX(M.u), y = YY(M.v), h = M.hdg * DEG; g.fillStyle = '#ffc828'; g.beginPath(); g.moveTo(x + Math.sin(h) * 7, y - Math.cos(h) * 7); g.lineTo(x + Math.sin(h + 2.5) * 5, y - Math.cos(h + 2.5) * 5); g.lineTo(x + Math.sin(h - 2.5) * 5, y - Math.cos(h - 2.5) * 5); g.fill();
 }
 // 조종자 시점: P 에서 눈높이 · 기체를 따라 시선만 돌림 (육안 시점의 근사)
+const _c1cg = new V3(), _c1ct = new V3(), _c1cv = new V3(), _c1cw = new V3();
 function c1Camera(dt, subj) {
   if (!C1 || !isC1() || S.state === 'menu') return false;
   if (C1.view === 'chase' && !C1.exam) {
@@ -877,9 +942,12 @@ function c1Camera(dt, subj) {
     camera.position.copy(c1W(-9, -7.5, 1.7)); camLook.copy(c1W(0, 24, 2)); camera.up.set(0, 1, 0); camera.lookAt(camLook); camera.fov = 55; camera.near = 0.1; return true;
   }
   camera.position.copy(c1W(0, 0, c1p('eye')));
-  camLook.lerp(subj.p, 1 - Math.exp(-dt * 7)); if (camLook.distanceTo(subj.p) > 30) camLook.copy(subj.p);
+  // 기체와 그 아래 바닥(지점·고깔·그림자)이 함께 보이도록: 둘 사이를 바라보고 화각을 넓힘
+  const gy = C1S.y, gp = _c1cg.set(subj.p.x, Math.min(subj.p.y, gy), subj.p.z), tgt = _c1ct.copy(subj.p).lerp(gp, 0.4);
+  camLook.lerp(tgt, 1 - Math.exp(-dt * 7)); if (camLook.distanceTo(tgt) > 30) camLook.copy(tgt);
   camera.up.set(0, 1, 0); camera.lookAt(camLook);
-  const d = camera.position.distanceTo(subj.p), want = clamp(2 * Math.atan(6 / Math.max(d, 1)) / DEG, 24, 62);
+  const d = camera.position.distanceTo(subj.p), a = _c1cv.copy(subj.p).sub(camera.position).angleTo(_c1cw.copy(gp).sub(camera.position)) / DEG;
+  const want = clamp(Math.max(2 * Math.atan(7.5 / Math.max(d, 1)) / DEG, a * 1.7 + 6) * (SET.c1zoom || 1), 30, 75);
   camera.fov += (want - camera.fov) * (1 - Math.exp(-dt * 3)); camera.near = 0.1;
   return true;
 }
@@ -1209,4 +1277,4 @@ function c1BoardDraw() {
 }
 
 c1Place();
-if (window.__sim) Object.assign(window.__sim, { WIND, C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, C1XR, c1XRUpdate, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, AF, AF_IDS, MS_OK, TOUCH, isC1 });
+if (window.__sim) Object.assign(window.__sim, { WIND, C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, C1XR, c1XRUpdate, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, c1Flow, getDroneM: () => droneM, AF, AF_IDS, MS_OK, TOUCH, isC1 });

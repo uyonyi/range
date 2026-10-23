@@ -14,7 +14,7 @@ const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', gho
 try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour })); } catch (e) { } }
+function saveSet() { try { localStorage.setItem('hroc_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour, c1zoom: SET.c1zoom })); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -884,7 +884,7 @@ function frame(now, noRender) {
   const inB = S.state !== 'menu' && insideBunker(subjPos);
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;
   hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : envHemi(), 1 - Math.exp(-dt * 5));
-  spot.intensity = lerp(spot.intensity, (lightOn() || inB || nearB) && S.state !== 'menu' ? 4.5 : 0, 1 - Math.exp(-dt * 8));
+  spot.intensity = lerp(spot.intensity, (lightOn() || inB || nearB) && S.state !== 'menu' && !(typeof isC1 === 'function' && isC1() && !ENV.night) ? 4.5 : 0, 1 - Math.exp(-dt * 8));
   { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
