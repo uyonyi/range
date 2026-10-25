@@ -260,7 +260,11 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 #wzVR{background:#1d2a33;border:1px solid #4fe3ff;color:#4fe3ff}#wzVR.hidden{display:none}
 .s2 .hangar .afcards{grid-template-columns:repeat(4,minmax(0,1fr))}.s2 .afStageW{aspect-ratio:auto;height:min(30vh,250px)}
 .wz .wzbtns{position:sticky;bottom:-16px;background:linear-gradient(transparent,rgba(14,18,22,.97) 30%);padding:14px 0 12px;z-index:3}
-.s3 .msStageW{max-height:34vh}
+.s3 .msStageW{max-height:30vh}#msGoF{min-width:160px}#msGoF.hidden{display:none}.msinfo .go{margin-top:8px}
+.introG .cont{grid-column:1/-1}.introC.cont i{font-style:normal}.msgrid.tm .ord{position:absolute;left:10px;top:7px;font-size:10px;color:var(--cc);opacity:.85;letter-spacing:.04em}.msgrid.tm .rec~.ord{display:none}.msgrid.tm .best{position:absolute;left:auto;right:40px;top:7px;font-size:10px;color:var(--amber);background:rgba(0,0,0,.35);padding:1px 6px;border-radius:999px}
+#pause{z-index:40}#radio{z-index:5}
+#navArrow{position:fixed;left:0;top:0;z-index:7;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:1px;color:#ffc828;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.7);font:700 13px "SF Mono",Menlo,Consolas,monospace}#navArrow i{font-style:normal;font-size:16px;line-height:1;display:block;transition:transform .12s}#navArrow.edge i{font-size:30px;color:#ffc828;filter:drop-shadow(0 0 6px rgba(255,200,40,.8))}#navArrow.edge{animation:navp 1s ease-in-out infinite}@keyframes navp{50%{opacity:.55}}#navArrow.hidden{display:none}body.calm #navArrow{color:#8ec5ff}#keys{transition:opacity .6s}#keys.fade{opacity:0;pointer-events:none}
+body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body.calm #bottom span{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:0}body.calm #objNext{border-left-color:#8ec5ff}
 .padinfo h3{margin:14px 0 6px}
 .mmain{display:grid;grid-template-columns:minmax(280px,350px) minmax(0,1fr);gap:18px;align-items:start}
 .hangar,.ops{min-width:0}
@@ -276,7 +280,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .afstats .note2{grid-column:1/-1;font-size:11px;opacity:.7;margin-top:2px}
 .hangar .afcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .hangar .afc{padding:6px 4px;align-items:center;text-align:center;flex:none}.hangar .afc svg{width:38px;height:28px;margin:0}.hangar .afc small,.hangar .afc .spec,.hangar .afc .nt,.hangar .afc .cat{display:none}.hangar .afc b{font-size:11px;line-height:1.2;font-weight:600}
-.mstabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:0 0 8px}.mstabs button{margin:0;padding:8px 10px;border-radius:8px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-weight:700;font-size:15px;opacity:.6;border:1px solid var(--line);background:rgba(255,255,255,.03)}.mstabs button small{font-weight:400;font-size:11px;opacity:.75}.mstabs button.on{opacity:1;border-color:#4fe3ff;background:linear-gradient(135deg,rgba(79,227,255,.22),rgba(79,227,255,.04));box-shadow:inset 0 -3px 0 #4fe3ff}
+.mstabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 8px}.mstabs button{margin:0;padding:8px 10px;border-radius:8px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-weight:700;font-size:15px;opacity:.6;border:1px solid var(--line);background:rgba(255,255,255,.03)}.mstabs button small{font-weight:400;font-size:11px;opacity:.75}.mstabs button.on{opacity:1;border-color:#4fe3ff;background:linear-gradient(135deg,rgba(79,227,255,.22),rgba(79,227,255,.04));box-shadow:inset 0 -3px 0 #4fe3ff}
 .msgrid.tm{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));grid-auto-rows:84px;gap:6px}.msgrid.tm button.hid{display:none}.msgrid.tm .rec{position:absolute;left:10px;top:7px;font-style:normal;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:#ffc828;color:#111;z-index:1}
 .msgrid.tm button{position:relative;overflow:hidden;border-radius:8px;justify-content:flex-end;padding:7px 10px;min-width:0;margin:0}
 .msgrid.tm button::after{content:attr(data-ic);position:absolute;right:8px;top:2px;font-size:30px;line-height:1;color:var(--cc);opacity:.22;pointer-events:none}
@@ -362,13 +366,13 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
   <div class="card" style="position:relative" id="menuCard" data-step="0">
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>FPV TERRAIN TRAINER</h1>
-    <h2>실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)</h2>
+    <h2>실제 지형 드론 훈련 · 임무 · 1종 실기 연습 · 웹 시뮬레이터 (시제품 v0.6)</h2>
     <div class="wzbar"><span class="wzmode" id="wzMode"></span><span data-s="1">1 · 조종사</span><span data-s="2">2 · 기체</span><span data-s="3">3 · 코스</span></div>
     <section class="wz s0">
       <div class="pickLbl">어떻게 비행할까요?</div>
       <div class="introG">
         <button id="introPC" class="introC"><i>🖥</i><b>컴퓨터로 비행</b><small>키보드 · 게임패드 · RC 조종기 · 휴대폰 터치</small></button>
-        <button id="introVR" class="introC vr"><i>🥽</i><b>VR로 비행</b><small>Meta Quest 헤드셋 · FPV 고글 화면</small></button>
+        <button id="introVR" class="introC vr"><i>🥽</i><b>VR로 비행</b><small>Meta Quest 헤드셋 · FPV 고글 화면</small></button><button id="introCont" class="introC cont hidden"><i>↻</i><b>이어서 비행</b><small id="introContS"></small></button>
       </div>
       <p id="introNote" class="wzhint"></p>
     </section>
@@ -395,7 +399,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       <div class="mmain one">
       <section class="ops">
         <div class="pickLbl">임무 <small>종류를 고르고 → 임무를 눌러 미리 보기 → 출격 (두 번 누르면 바로 출격)</small></div>
-        <div id="msTabs" class="mstabs"><button data-g="basic">처음 시작<small>튜토리얼 · 기본 코스</small></button><button data-g="skill">비행 기술<small>숲길 · 레이스 · 능선 · 착륙장</small></button><button data-g="mission">실전 임무<small>정찰 · 구조 · 타격</small></button><!--C1TAB--><button data-g="exam">자격 시험 연습<small>무인멀티콥터 1종 실기</small></button><!--/C1TAB--></div>
+        <div id="msTabs" class="mstabs"><button data-g="basic">처음 시작<small>튜토리얼 · 기본 코스</small></button><!--C1TAB--><button data-g="exam">자격 시험 연습<small>무인멀티콥터 1종 실기</small></button><!--/C1TAB--><button data-g="skill">비행 기술<small>숲길 · 레이스 · 능선 · 착륙장</small></button><button data-g="mission">전술 임무<small>정찰 · 구조 · 타격</small></button></div>
         <div id="msGrid" class="msgrid tm">
           <button data-cat="train" data-g="basic" id="bTut" data-ms="tutorial" data-ic="?"><em class="rec">처음이라면 여기부터</em><b>튜토리얼</b><small>단계별 연습 (정찰 쿼드)</small></button>
           <button data-cat="train" data-g="basic" data-ms="course" data-ic="◎"><b>장애물 코스</b><small>게이트 · 슬라롬 · 투하 · 착륙</small></button>
@@ -420,7 +424,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
       </section>
       </div>
       <div id="vrNote" class="vrnote hidden"><span id="vrNoteT"></span><button id="vrResume" class="primary hidden">VR로 돌아가기</button></div>
-      <div class="wzbtns"><button id="wz3Back">◀ 기체</button><span class="wzmid"><button id="bOpt">⚙ 옵션</button><button id="bCtl">🎮 조작 안내</button></span><span id="wzWho" class="wzwho"></span></div>
+      <div class="wzbtns"><button id="wz3Back">◀ 기체</button><span class="wzmid"><button id="bOpt">⚙ 옵션</button><button id="bCtl">🎮 조작 안내</button></span><span id="wzWho" class="wzwho"></span><button id="msGoF" class="primary">출격 ▶</button></div>
     </div>
   </div>
 </div>
@@ -656,7 +660,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=a1499eae"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.ko.js?v=a1499eae"></script>
+<script src="../sites/yeongin.js?v=e12c8cfa"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.ko.js?v=e12c8cfa"></script>
 </body>
 </html>

@@ -41,6 +41,7 @@ function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0);
 function startRun(kind) {
   enterFull();
   if (typeof c1Menu === 'function') c1Menu(kind);
+  S.keysT = 0; S.keysShow = false; document.body.classList.toggle('calm', kind === 'tutorial' || (typeof isC1 === 'function' && isC1(kind)));   // 훈련·시험 모드는 차분한 톤
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
   S.objState = OBJS.map(() => 0); S.objNear = -1; S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
@@ -694,6 +695,7 @@ function updateTargeting(subj) {
   const pr = running ? predictImpact(DR.p, DR.v) : null;
   if (running && (S.kind === 'free' || (S.kind === 'tutorial' && !tgtKey))) { const n = nearestTarget(pr.p, S.simT + pr.t); if (n && n.d < 18) tgtKey = n.key; }
   $('keys').classList.toggle('hidden', !!(tgtKey && pr));
+  { const kEl = $('keys'); if (kEl) kEl.classList.toggle('fade', S.t > 45 && !S.keysShow && S.state === 'run'); }   // 조작 안내: 비행 45초 뒤 서서히 숨김 (? 또는 F1 로 다시)
   if (!tgtKey || !pr) { ui.scope.classList.add('hidden'); impactRing.visible = false; return; }
   const ev = targetEval(tgtKey, pr.p, null, S.simT + pr.t);
   ui.scope.classList.remove('hidden');
@@ -741,17 +743,7 @@ function updateHUD(dt, subj) {
   else ui.objNext.style.display = 'none';
   const podE = isMission() && S.kind !== 'sar' && S.state === 'run', kitM = S.kind === 'sar' && S.state === 'run', n = podE ? 0 : kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
   const ak = actionKind(); ui.payload.innerHTML = ak === 'report' ? '📷 REPORT' : podE ? 'POD —' : (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
-  if (o && o.mk && S.state === 'run' && DR.alive && !sIn) {
-    const s = toScreen(o.mk);
-    let x = s.x / innerWidth * 2 - 1, y = 1 - s.y / innerHeight * 2; if (s.behind) { x = -x; y = -y; }
-    const off = s.behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.88;
-    if (off) {
-      const ang = Math.atan2(y, x), m = Math.max(Math.abs(x) / 0.88, Math.abs(y) / 0.8, 1e-3); x /= m; y /= m;
-      ui.arrow.classList.remove('hidden');
-      ui.arrow.style.left = ((x + 1) / 2 * innerWidth - 13) + 'px'; ui.arrow.style.top = ((1 - y) / 2 * innerHeight - 13) + 'px';
-      ui.arrow.style.transform = `rotate(${Math.PI / 2 - ang}rad)`;
-    } else ui.arrow.classList.add('hidden');
-  } else ui.arrow.classList.add('hidden');
+  ui.arrow.classList.add('hidden');   // 예전 가장자리 삼각형은 navArrow(game3d, 방향+거리) 로 대체
   drawSticks();
   updateTargeting(subj);
 }
@@ -807,6 +799,7 @@ function handleKeys() {
     else if (k === 'PadLB') { S.cam = (S.cam + 2) % 3; updateTags(); }
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
+    else if (k === 'Slash' || k === 'F1') { S.keysShow = !S.keysShow; if (S.keysShow) S.keysT = 0; }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }

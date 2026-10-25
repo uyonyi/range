@@ -2,7 +2,7 @@
 // =====================================================================
 //  가이드: 다음 과제까지 따라갈 사각 틀(3D) + 조작 안내 문구 + 아래 카메라
 // =====================================================================
-const GUIDE = { n: 12, sp: 2.6, meshes: [], next: null, detour: false };
+const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
 (function makeFrames() {
   // 비행 경로에 수직으로 서는 사각 틀 ('하늘의 길' 방식) - FPV·추적 시점 모두에서 잘 보임
   const o = 0.55, n = 0.49, arr = [];
@@ -73,7 +73,25 @@ function guidePoints(o, p) {
   return before < -3 ? (before < -ld - 2 ? [p.clone(), lead, C, exit] : [p.clone(), C.clone().addScaledVector(A, Math.min(-2, before * 0.5)), C, exit]) : [p.clone(), C, exit];
 }
 const _gt = new V3(), _gq = new V3();
-function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); $('guide').classList.add('hidden'); }
+function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+// 다음 목표 방향 표시: 화면 안이면 목표 아래에 거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 (VR·1종 제외)
+const _nv = new V3();
+function navArrow(tgt, subj) {
+  let el = $('navArrow'); if (!el) { el = document.createElement('div'); el.id = 'navArrow'; el.innerHTML = '<i>➤</i><b></b>'; document.body.appendChild(el); }
+  if (!tgt || XR_ON || S.state !== 'run') { el.classList.add('hidden'); return; }
+  const dist = tgt.distanceTo(subj.p); if (dist < 4) { el.classList.add('hidden'); return; }
+  _nv.copy(tgt).project(camera); const behind = _nv.z > 1;
+  let x = _nv.x, y = _nv.y; if (behind) { x = -x; y = -y; }
+  const W = innerWidth, H = innerHeight, mx = 0.80, my = 0.74;   // 가장자리 여백 (계기·목록 피함)
+  const inside = !behind && Math.abs(x) < mx && Math.abs(y) < my;
+  let sx, sy, rot;
+  if (inside) { sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H + 34; rot = 90; }   // 목표 아래쪽에 ▼ + 거리
+  else { const k = Math.max(Math.hypot(x / mx, y / my), 1e-6); x /= k; y /= k; /* 타원 가장자리: 모서리의 계기·목록을 피함 */ sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = Math.atan2(-(y), x) / Math.PI * 180; }
+  el.classList.remove('hidden'); el.classList.toggle('edge', !inside);
+  el.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%,-50%)`;
+  el.firstChild.style.transform = `rotate(${rot.toFixed(0)}deg)`;
+  const txt = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist.toFixed(0) + ' m'; if (el.lastChild.textContent !== txt) el.lastChild.textContent = txt;
+}
 function updateGuide(subj) {
   const active = S.state === 'run' && DR.alive && !(S.tut && S.tut.st !== 'fly');
   const o = active ? curObj() : null;
@@ -86,6 +104,7 @@ function updateGuide(subj) {
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
+  navArrow(o.mk || pts[pts.length - 1], subj);
   if (!SET.guide) { hideGuide(); return; }
   // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
   { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
@@ -103,7 +122,7 @@ function updateGuide(subj) {
     x.g.visible = true; x.g.position.copy(_gt); x.g.lookAt(_gq);
     const s = 0.9 + Math.min(d, 20) * 0.02; x.g.scale.set(s, s, s);
     x.m.color.set(GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff);
-    x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
+    x.m.opacity = 0.8 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2) * (1 - 0.6 * i / GUIDE.n);   // 가까운 것은 또렷, 멀수록 옅게
   });
   // ---- 조작 안내 문구 ----
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
