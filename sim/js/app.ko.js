@@ -468,9 +468,25 @@ groundMat.onBeforeCompile = sh => {
 };
 const TER = { n: 241, step: GSZ / 240, h: SITE_L.dec ? SITE_L.dec.inner : null };   // 코스 주변 고해상도 지형 (5 m)
 if (TER.h) { scene.fog.near = 180; scene.fog.far = 6500; camera.far = 9000; camera.updateProjectionMatrix(); }
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(GSZ, GSZ, 240, 240), groundMat);
-ground.rotation.x = -Math.PI / 2; ground.position.set((GS0 + GS1) / 2, 0, -(GD0 + GD1) / 2);
-ground.receiveShadow = true; scene.add(ground);
+// 지형 조각 나누기: 큰 지형 메시 하나를 격자 조각(인덱스만 따로, 꼭짓점 버퍼는 공유)으로 나눠 시야 밖 조각은 그리지 않음
+//   돌려주는 Group 은 .geometry(전체 지오메트리)·.userData.chunks·.userData.refresh()(높이 바뀐 뒤 경계구 다시 계산) 를 가짐
+function chunkify(mesh, nx, nz) {
+  const geo = mesh.geometry, pos = geo.attributes.position, idx = geo.index ? geo.index.array : null; if (!idx) return mesh;
+  const bb = new THREE.Box3().setFromBufferAttribute(pos), ext = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
+  const ax = [0, 1, 2].sort((a, b) => ext[b] - ext[a]).slice(0, 2).sort(), A = ax[0], B = ax[1], mn = [bb.min.x, bb.min.y, bb.min.z];
+  const buckets = []; for (let i = 0; i < nx * nz; i++) buckets.push([]);
+  const P = pos.array, g = i => [P[i * 3 + A], P[i * 3 + B]];
+  for (let k = 0; k < idx.length; k += 3) { const a = g(idx[k]), b = g(idx[k + 1]), c = g(idx[k + 2]); const u = (a[0] + b[0] + c[0]) / 3 - mn[A], v = (a[1] + b[1] + c[1]) / 3 - mn[B];
+    const bx = Math.min(nx - 1, Math.max(0, Math.floor(u / ext[A] * nx))), bz = Math.min(nz - 1, Math.max(0, Math.floor(v / ext[B] * nz))); buckets[bz * nx + bx].push(idx[k], idx[k + 1], idx[k + 2]); }
+  const grp = new THREE.Group(); grp.position.copy(mesh.position); grp.rotation.copy(mesh.rotation); grp.scale.copy(mesh.scale); grp.geometry = geo; grp.material = mesh.material; grp.userData.chunks = [];
+  for (const b of buckets) { if (!b.length) continue; const cg = new THREE.BufferGeometry(); for (const nm in geo.attributes) cg.setAttribute(nm, geo.attributes[nm]); cg.setIndex(b);
+    const m = new THREE.Mesh(cg, mesh.material); m.castShadow = mesh.castShadow; m.receiveShadow = mesh.receiveShadow; m.userData.irBase = mesh.userData.irBase; grp.add(m); grp.userData.chunks.push(m); }
+  grp.userData.refresh = () => { const v = new V3(); for (const m of grp.userData.chunks) { const ii = m.geometry.index.array, box = new THREE.Box3(); for (let k = 0; k < ii.length; k++) box.expandByPoint(v.fromBufferAttribute(pos, ii[k])); m.geometry.boundingBox = box; m.geometry.boundingSphere = box.getBoundingSphere(new THREE.Sphere()); } };
+  grp.userData.refresh(); if (mesh.parent) { mesh.parent.add(grp); mesh.parent.remove(mesh); }
+  return grp;
+}
+const ground = (() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(GSZ, GSZ, 240, 240), groundMat);
+  m.rotation.x = -Math.PI / 2; m.position.set((GS0 + GS1) / 2, 0, -(GD0 + GD1) / 2); m.receiveShadow = true; scene.add(m); return chunkify(m, 6, 6); })();
 let MIDH = null;   // 고해상도 구역 밖 높이 (중간 지형이 만들어지면 채워짐)
 function terrainAt(x, z) {
   if (!TER.h) return MIDH && (x < GS0 || x > GS1 || -z < GD0 || -z > GD1) ? MIDH(x, z) : 0;
@@ -482,7 +498,7 @@ function terrainAt(x, z) {
 function applyTerrain(h) {
   TER.h = h; const pos = ground.geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, h ? h[i] : 0);
-  pos.needsUpdate = true; ground.geometry.computeVertexNormals(); ground.geometry.computeBoundingSphere();
+  pos.needsUpdate = true; ground.geometry.computeVertexNormals(); ground.geometry.computeBoundingSphere(); if (ground.userData.refresh) ground.userData.refresh();
   // 산지 숲 색: 경사가 있는 곳은 짙은 녹색으로 (코스 통로·경지는 그대로)
   if (h) {
     const nr = ground.geometry.attributes.normal, n = TER.n, col = new Float32Array(pos.count * 3);
@@ -494,7 +510,7 @@ function applyTerrain(h) {
       f *= 0.75 + 0.25 * Math.sin(side * 0.05 + Math.cos(down * 0.043) * 2);
       col[i * 3] = 1 - f * 0.62; col[i * 3 + 1] = 1 - f * 0.42; col[i * 3 + 2] = 1 - f * 0.6;
     }
-    ground.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3)); groundMat.vertexColors = true; groundMat.needsUpdate = true;
+    const ca = new THREE.BufferAttribute(col, 3); ground.geometry.setAttribute('color', ca); if (ground.userData.chunks) ground.userData.chunks.forEach(c => c.geometry.setAttribute('color', ca)); groundMat.vertexColors = true; groundMat.needsUpdate = true;
   }
 }
 if (TER.h) applyTerrain(TER.h);
@@ -521,7 +537,7 @@ const FAR = (function farTerrain() {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
-  m.receiveShadow = false; scene.add(m); return m;
+  m.receiveShadow = false; scene.add(m); return chunkify(m, 4, 4);
 })();
 // ---- 중간 지형: 비행 구역(반경 약 1 km)을 덮는 10 m 격자 · 원경 격자를 부드럽게 보간 + 잔기복 · 고해상도 구역 경계는 이어 붙임 ----
 const MID = (function midTerrain() {
@@ -561,11 +577,12 @@ const MID = (function midTerrain() {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
   const cv = document.createElement('canvas'); cv.width = cv.height = 2048; const cg = cv.getContext('2d'); cg.fillStyle = '#5f6b3e'; cg.fillRect(0, 0, 2048, 2048);
   const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh.receiveShadow = true; scene.add(mesh);
-  // 원경 그물: 중간 지형 상자 안은 비움
-  if (FAR) { const fi = FAR.geometry.index.array, keep = []; const n = FN;
-    for (let k = 0; k < fi.length; k += 6) { const a = fi[k], ix = a % n, iy = (a / n) | 0, s = G.fs0 + (ix + 0.5) * fs, d = G.fd1 - (iy + 0.5) * fs; if (s > s0 && s < s1 && d > d0 && d < d1) continue; for (let j = 0; j < 6; j++) keep.push(fi[k + j]); }
-    FAR.geometry.setIndex(keep); }
+  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
+  // 원경 그물: 중간 지형 상자 안은 비움 (조각별 인덱스에서 걸러냄)
+  if (FAR) { const n = FN; for (const ch of (FAR.userData.chunks || [FAR])) { const fi = ch.geometry.index.array, keep = [];
+    const FP = FAR.geometry.attributes.position.array;
+    for (let k = 0; k < fi.length; k += 3) { const s = (FP[fi[k] * 3] + FP[fi[k + 1] * 3] + FP[fi[k + 2] * 3]) / 3, d = -(FP[fi[k] * 3 + 2] + FP[fi[k + 1] * 3 + 2] + FP[fi[k + 2] * 3 + 2]) / 3; if (s > s0 && s < s1 && d > d0 && d < d1) continue; for (let j = 0; j < 3; j++) keep.push(fi[k + j]); }
+    ch.geometry.setIndex(keep); } if (FAR.userData.refresh) FAR.userData.refresh(); }
   MIDH = at;
   return { s0, s1, d0, d1, st, nx, ny, H, at, cv, cg, tex, mesh, uvOf: (x, z) => [(x - s0) / (s1 - s0) * 2048, (d1 + z) / (d1 - d0) * 2048] };
 })();
@@ -1835,10 +1852,16 @@ const MODES = {
 };
 const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.4, h: 0.8, fov: 56 }];   // 추적 카메라 거리 (멀리·보통·가까이)
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
-try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); Object.assign(SET, s); } catch (e) { }
+// 저장 구조: 일반 설정은 평탄, 종목별 설정은 하위 묶음 (c1: 1종 실기). 구버전(평탄 c1xxx 키)도 읽음
+const SET_GROUPS = ['c1'];
+try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-function saveSet() { try { localStorage.setItem('fpvsim_fpv_settings', JSON.stringify({ belly: SET.belly, guide: SET.guide, keymap: SET.keymap, zoom: SET.zoom, diff: SET.diff, ghost: SET.ghost, ghostSrc: SET.ghostSrc, tilt: SET.tilt, assist: SET.assist, autoFull: SET.autoFull, af: SET.af, acro: SET.acro, night: SET.night, wind: SET.wind, voice: SET.voice, vrMode: SET.vrMode, vrScreen: SET.vrScreen, vrCam: SET.vrCam, vrPip: SET.vrPip, vrMap: SET.vrMap, vrScr2: SET.vrScr2, vrModeW: SET.vrModeW, hud: SET.hud, expo: SET.expo, tod: SET.tod, wx: SET.wx, wxFx: SET.wxFx, c1ann: SET.c1ann, c1side: SET.c1side, c1voice: SET.c1voice, c1hour: SET.c1hour, c1zoom: SET.c1zoom, c1posT: SET.c1posT, c1posP: SET.c1posP, c1mini: SET.c1mini })); } catch (e) { } }
+const SET_KEYS = ['belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
+function saveSet() {
+  try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
+    for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
+    localStorage.setItem('fpvsim_fpv_settings', JSON.stringify(o)); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -7460,7 +7483,7 @@ body.c1on #objNext,body.c1on #list,body.c1on #bottom,body.c1on #c1demo{display:n
 #c1p .bt.main{flex-wrap:nowrap}#c1p .bt.main button{font-size:12.5px;white-space:nowrap;min-width:0;padding:7px 3px}#c1p .bt.main button small{display:none}#c1p canvas{display:none}#c1p.map canvas{display:block}#c1p .note{display:none}#c1p.map .note{display:block}
 #c1cap{top:10px;font-size:14px;padding:6px 12px}
 #c1g{position:fixed;right:12px;bottom:14px;z-index:6;width:236px;height:168px;pointer-events:none;border-radius:10px;background:rgba(10,14,20,.6);border:1px solid rgba(127,208,255,.35)}#c1g.hidden{display:none}
-body.touch #c1g{right:auto;left:6px;top:104px;bottom:auto;width:150px;height:107px}
+body.touch #c1g{right:auto;left:50%;transform:translateX(-50%);top:auto;bottom:44px;width:min(132px,15.5vw);height:calc(min(132px,15.5vw)*0.72)}
 body.touch #c1p .tip,body.touch #c1p .cl{display:none}
 body.touch #c1p .bts{flex-wrap:wrap}body.touch #c1p .bts .bt.main{flex:1 1 100%}body.touch #c1p .bts .bt.sub{flex:1 1 100%;margin-top:2px}body.touch #c1p:not(.more) .bts .bt.sub{display:none}
 body.touch #c1p #c1More{flex:0 0 26px}

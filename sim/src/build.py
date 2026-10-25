@@ -1,11 +1,13 @@
 """시뮬레이터 빌드
   python3 build.py            -> 내부용 단일 HTML (KO/EN, 기본 코스 포함)
   python3 build.py public DIR -> 공개용 여러 파일 (GitHub Pages, 영인산 현장만)
+  python3 build.py check DIR  -> 공개 빌드 후 배포 전 점검 (node tests/check.js)
 """
 import json, base64, re, sys, os, shutil
 from en import EN
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game4.js', 'game5.js', 'game6.js']
+C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
 TITLES = {
     'civil': {'TITLE': 'FPV Terrain Trainer · Civil', 'H1': 'FPV TERRAIN TRAINER',
               'H2': {'ko': '민간 비행 연습 · 무인멀티콥터 1종 실기 기준 참고 연습 (시제품, 공식 시험 아님)', 'en': 'Civil flight practice · class-1 multicopter practical reference (prototype, not an official test)'}},
@@ -20,7 +22,7 @@ def sources(lang, mode, c1=None):
     t = open('template.html', encoding='utf-8').read()
     game = ''.join(open(f, encoding='utf-8').read() for f in FILES)
     if c1:   # 1종 연습 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
-        i = game.rstrip().rfind('})();'); game = game[:i] + open('game7.js', encoding='utf-8').read() + '\n' + game[i:]
+        i = game.rstrip().rfind('})();'); game = game[:i] + ''.join(open(f, encoding='utf-8').read() for f in C1_FILES) + '\n' + game[i:]
     if not c1:
         t = re.sub(r'<!--C1TAB-->.*?<!--/C1TAB-->', '', t, flags=re.S); t = re.sub(r'\n[^\n]*data-g="exam"[^\n]*', '', t)
     if mode == 'civil':   # 민간판: 타격·차량 추적 메뉴 없음, 투하 문구 정리
@@ -171,6 +173,10 @@ if __name__ == '__main__':
         build_dual(False, 'fpv_civil_class1_test.html', civil=True)
     elif len(sys.argv) > 1 and sys.argv[1] == 'public':
         build_public(sys.argv[2])
+    elif len(sys.argv) > 1 and sys.argv[1] == 'check':   # 공개 빌드 + 배포 전 점검 (tests/check.js: 자동비행·VR 경로·모바일·씬 예산)
+        build_public(sys.argv[2])
+        import subprocess; r = subprocess.run(['node', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests', 'check.js'), sys.argv[2]])
+        sys.exit(r.returncode)
     else:
         build('ko', False, 'hroc_fpv_simulator_KO.html')
         build('en', False, 'hroc_fpv_simulator_EN.html')
