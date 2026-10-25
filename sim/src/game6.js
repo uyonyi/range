@@ -142,7 +142,7 @@ const OUTER = (function outerWorld() {
     mk(conGeo, cs2, leafM, t => Sv.set(t[4], t[3] * 0.92, t[4])); mk(trunkGeo, cs2, trunkM, t => Sv.set(1, t[3] * 0.25, 1));
     const [kx, kz] = key.split(',').map(Number); CK.push({ grp, c: new V3((kx + 0.5) * CH, 0, (kz + 0.5) * CH) }); }
   // 멀리 있는 숲 조각은 그리지 않음 (VR 은 더 가까이서 끔)
-  setInterval(() => { const cp = camera.position, lim = (XR_ON ? 650 : 1100) + CH * 0.7; for (const k of CK) k.grp.visible = Math.hypot(cp.x - k.c.x, cp.z - k.c.z) < lim; }, 400);
+  setInterval(() => { const cp = camera.position, c1v = typeof c1VRon === 'function' && c1VRon(), lim = (c1v ? 380 : XR_ON ? 650 : 1100) + CH * 0.7; for (const k of CK) k.grp.visible = Math.hypot(cp.x - k.c.x, cp.z - k.c.z) < lim; }, 400);   // 1종 VR: 조종자 제자리 → 바깥 숲은 가까운 조각만
   // ---- 충돌: 나무(줄기+수관) · 건물(회전 상자) ----
   const GC = 40, GR = new Map(); const put = (x, z, v) => { const k = Math.floor(x / GC) + ',' + Math.floor(z / GC); if (!GR.has(k)) GR.set(k, []); GR.get(k).push(v); };
   T.forEach((t, i) => put(t[0], t[2], i)); B.forEach((b, i) => { const R = Math.hypot(b.w, b.l) / 2; for (let ox = -R; ox <= R; ox += GC) for (let oz = -R; oz <= R; oz += GC) put(b.x + ox, b.z + oz, -1 - i); put(b.x + R, b.z + R, -1 - i); });

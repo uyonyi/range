@@ -238,7 +238,7 @@ function W(down, side, alt) { const v = new V3(side, alt || 0, -down); v.y += te
 function agl(p) { return p.y - groundAt(p.x, p.z); }
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const R = rng(320);
-const LOWQ = !!window.SIM_MOBILE || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // 모바일: 가벼운 화질
+const LOWQ = !!window.SIM_MOBILE || !!window.SIM_VR || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // VR(Quest) 도 가벼운 화질   // 모바일: 가벼운 화질
 
 THREE.ColorManagement.legacyMode = false;
 
@@ -1293,8 +1293,9 @@ const STREES = (function siteTrees() {
   }
   // 카메라 거리로 세밀도 바꿈 (0.3 초마다)
   function lod(cam) {
+    const far = (typeof c1VRon === 'function' && c1VRon()) ? 420 : 1e9;   // 1종 VR: 조종자가 제자리 → 먼 숲은 생략
     for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < (LOWQ ? 50 : 90) ? 0 : d < (LOWQ ? 170 : 300) ? 1 : 2;
-      if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
+      k.im.visible = d < far; if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);
   // 산불: 불난 자리 나무를 그을린 앙상한 줄기로 (숲에 구멍이 나서 위에서 불길이 보이게) · 임무가 바뀌면 되돌림
@@ -2601,7 +2602,7 @@ function handleKeys() {
     const k = pressed.shift();
     if (RCUI.open) continue;
     if (!S.brief && typeof c1Key === 'function' && c1Key(k)) continue;
-    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA')) { if (BRIEF_GO) BRIEF_GO(); continue; }
+    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA' || (k === 'KeyQ' && typeof isC1 === 'function' && isC1()))) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
@@ -2724,7 +2725,7 @@ function frame(now, noRender) {
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
-  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon()) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
 }
 
 // =====================================================================
@@ -6023,7 +6024,7 @@ function xrTick(dt) {
     if (hv !== XR.hover || (XR.mT -= dt) <= 0) { XR.hover = hv; XR.mT = 0.3; vrMenuDraw(); }
   }
   XR.ctl.forEach(c => c.userData.ln.visible = !!c.userData.hand && (XR.menu || S.state === 'result'));
-  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 (고글 화면 없음)
+  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 · 그림자 2프레임에 한 번   // 1종: 조종자 자리에서 맨눈 (고글 화면 없음)
   VR_SCR.visible = true;
   // 지형 장면을 드론 카메라(게임 카메라)로 화면 텍스처에 그림
   renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true;   // 그림자는 2프레임에 한 번
@@ -6295,7 +6296,7 @@ const OUTER = (function outerWorld() {
     mk(conGeo, cs2, leafM, t => Sv.set(t[4], t[3] * 0.92, t[4])); mk(trunkGeo, cs2, trunkM, t => Sv.set(1, t[3] * 0.25, 1));
     const [kx, kz] = key.split(',').map(Number); CK.push({ grp, c: new V3((kx + 0.5) * CH, 0, (kz + 0.5) * CH) }); }
   // 멀리 있는 숲 조각은 그리지 않음 (VR 은 더 가까이서 끔)
-  setInterval(() => { const cp = camera.position, lim = (XR_ON ? 650 : 1100) + CH * 0.7; for (const k of CK) k.grp.visible = Math.hypot(cp.x - k.c.x, cp.z - k.c.z) < lim; }, 400);
+  setInterval(() => { const cp = camera.position, c1v = typeof c1VRon === 'function' && c1VRon(), lim = (c1v ? 380 : XR_ON ? 650 : 1100) + CH * 0.7; for (const k of CK) k.grp.visible = Math.hypot(cp.x - k.c.x, cp.z - k.c.z) < lim; }, 400);   // 1종 VR: 조종자 제자리 → 바깥 숲은 가까운 조각만
   // ---- 충돌: 나무(줄기+수관) · 건물(회전 상자) ----
   const GC = 40, GR = new Map(); const put = (x, z, v) => { const k = Math.floor(x / GC) + ',' + Math.floor(z / GC); if (!GR.has(k)) GR.set(k, []); GR.get(k).push(v); };
   T.forEach((t, i) => put(t[0], t[2], i)); B.forEach((b, i) => { const R = Math.hypot(b.w, b.l) / 2; for (let ox = -R; ox <= R; ox += GC) for (let oz = -R; oz <= R; oz += GC) put(b.x + ox, b.z + oz, -1 - i); put(b.x + R, b.z + R, -1 - i); });
@@ -6550,6 +6551,22 @@ function c1WindInfo() {
   return { sp, dirKo: ['북', '북동', '동', '남동', '남', '남서', '서', '북서'][i] + '풍', dirEn: ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][i] };
 }
 // ---- 기체 형상: X2D 형상과 별도로 굵은 팔·스키드·큰 프롭 ----
+// 정적 메시 묶기: 같은 그룹의 단색 메시들을 꼭짓점 색이 든 한 메시로 (드로우콜 ↓ · Quest 성능)
+function c1Bake(G0, list, opt) {
+  opt = opt || {}; const P = [], N = [], C = [], col = new THREE.Color(), m4 = new THREE.Matrix4(), nm = new THREE.Matrix3(), v = new V3(), n = new V3();
+  G0.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(G0.matrixWorld).invert(); let cast = false, recv = false;
+  for (const o of list) {
+    let g = o.geometry; if (g.index) g = g.toNonIndexed();
+    o.updateMatrixWorld(true); m4.multiplyMatrices(inv, o.matrixWorld); nm.getNormalMatrix(m4);
+    const pa = g.attributes.position, na = g.attributes.normal; if (opt.white || !o.material.color) col.set(0xffffff); else col.copy(o.material.color);
+    for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(m4); P.push(v.x, v.y, v.z); if (na) { n.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); N.push(n.x, n.y, n.z); } else N.push(0, 1, 0); C.push(col.r, col.g, col.b); }
+    cast = cast || !!o.castShadow; recv = recv || !!o.receiveShadow; if (o.parent) o.parent.remove(o);
+  }
+  if (!P.length) return null;
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+  const mt = opt.basic ? new THREE.MeshBasicMaterial(Object.assign({ vertexColors: true }, opt.mat || {})) : new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.75, metalness: 0 }, opt.mat || {}));
+  const m = new THREE.Mesh(g, mt); m.castShadow = cast && opt.shadow !== false; m.receiveShadow = recv; m.name = opt.name || 'baked'; G0.add(m); return m;
+}
 const _c1glow = {};
 function c1GlowMat(col) {
   if (_c1glow[col]) return _c1glow[col];
@@ -6578,21 +6595,42 @@ function c1Flow(p) {
   f.y = down; return f;
 }
 function c1RibbonTick() {
-  const t = S.simT;
-  for (const rb of C1.ribbons) {
+  const t = S.simT, all = C1.ribbons; if (!all || !all.length || !C1G) return;
+  if (!C1.ribMesh) {   // 모든 수술을 한 메시로 (스트립 1장 = 꼭짓점 4개)
+    let n = 0; all.forEach(r => n += r.strips.length);
+    const g = new THREE.BufferGeometry(), C = new Float32Array(n * 12); let ci = 0;
+    all.forEach(r => r.strips.forEach(st => { for (let k = 0; k < 4; k++) { C[ci++] = st.col.r; C[ci++] = st.col.g; C[ci++] = st.col.b; } }));
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 12), 3)); g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * 12), 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const idx = []; for (let q = 0; q < n; q++) { const b = q * 4; idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3); } g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7 })); m.castShadow = true; m.frustumCulled = false; m.name = 'c1ribbons'; C1G.add(m); C1.ribMesh = m;
+  }
+  const pa = C1.ribMesh.geometry.attributes.position, na = C1.ribMesh.geometry.attributes.normal, PA = pa.array, NA = na.array; let q = 0;
+  const w = 0.035, L = 0.7;
+  for (const rb of all) {
     const f = c1Flow(rb.top), sp = Math.hypot(f.x, f.z), yaw = Math.atan2(-f.x, -f.z);
     rb.sp = (rb.sp == null ? sp : rb.sp + (sp - rb.sp) * 0.25); rb.yaw = rb.yaw == null ? yaw : rb.yaw + Math.atan2(Math.sin(yaw - rb.yaw), Math.cos(yaw - rb.yaw)) * 0.3;
     const lift = (Math.PI / 2) * (1 - Math.exp(-rb.sp / 3.2)) * (1 - Math.min(0.6, f.y / 10)), tur = 0.05 + 0.3 * Math.min(1, rb.sp / 6) + Math.min(0.6, f.y / 8);
     for (const st of rb.strips) {
-      st.pv.rotation.set(0, rb.yaw + st.off * (0.25 + 0.6 * Math.exp(-rb.sp / 2)) + Math.sin(t * st.f * 0.6 + st.ph) * tur * 0.6, 0);
-      st.m.rotation.x = lift + Math.sin(t * st.f + st.ph) * tur * 0.5;
+      const y = rb.yaw + st.off * (0.25 + 0.6 * Math.exp(-rb.sp / 2)) + Math.sin(t * st.f * 0.6 + st.ph) * tur * 0.6, a = lift + Math.sin(t * st.f + st.ph) * tur * 0.5;
+      const cy = Math.cos(y), sy = Math.sin(y), ca = Math.cos(a), sa = Math.sin(a);
+      // 아래 끝: X 회전(a) → Y 회전(y) → 꼭대기 위치
+      const by = -L * ca, bz = -L * sa, bx0 = bz * sy, bz0 = bz * cy;   // (0, -L cos a, -L sin a) 를 yaw 회전
+      const wx = w * cy, wz = -w * sy;   // 폭 방향 (w, 0, 0) 을 yaw 회전
+      const o = q * 12, T = rb.top;
+      PA[o] = T.x - wx; PA[o + 1] = T.y; PA[o + 2] = T.z - wz;  PA[o + 3] = T.x + wx; PA[o + 4] = T.y; PA[o + 5] = T.z + wz;
+      PA[o + 6] = T.x - wx + bx0; PA[o + 7] = T.y + by; PA[o + 8] = T.z - wz + bz0;  PA[o + 9] = T.x + wx + bx0; PA[o + 10] = T.y + by; PA[o + 11] = T.z + wz + bz0;
+      const nx = ca * sy, ny = -sa, nz = ca * cy;   // (0, -sin a, cos a) 를 yaw 회전
+      for (let k = 0; k < 4; k++) { NA[o + k * 3] = nx; NA[o + k * 3 + 1] = ny; NA[o + k * 3 + 2] = nz; }
+      q++;
     }
   }
+  pa.needsUpdate = true; na.needsUpdate = true;
 }
 // 항법등 크기: 화면에서 최소 몇 픽셀로 보이게 (멀리 있어도 점으로 보임)
+const _c1cp = new V3();
 function c1NavTick() {
   const m = typeof droneM !== 'undefined' && droneM && droneM.nav; if (!m || !m.length) return;
-  const cam = (typeof c1VRon === 'function' && c1VRon()) ? C1XR.cam : camera, d = Math.max(0.5, cam.position.distanceTo(DR.p));
+  const cam = (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? C1XR.cam : camera, cp = cam === camera ? camera.position : _c1cp.setFromMatrixPosition(cam.matrixWorld), d = Math.max(0.5, cp.distanceTo(DR.p));
   const H = (renderer.domElement.clientHeight || 720), px = 2 * d * Math.tan((cam.fov || 50) * DEG / 2) / H;   // 1 px 의 실제 크기 (m)
   const on = typeof lightOn === 'function' && lightOn(), t = S.simT || 0, live = S.state !== 'menu';
   for (const n of m) {
@@ -6617,6 +6655,7 @@ function makeC1(ghost) {
     K.add(UBOX, skid, x, -0.29, 0, 0.035, 0.03, 1.1);
     for (const z of [-0.25, 0.25]) { const l = K.add(UBOX, skid, x * 0.7, -0.14, z, 0.03, 0.3, 0.03); l.rotation.z = x > 0 ? 0.45 : -0.45; }
   }
+  { const stat = K.g.children.filter(o => o.isMesh); c1Bake(K.g, stat, ghost ? { basic: true, white: true, mat: { color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }, shadow: false, name: 'c1body' } : { mat: { roughness: 0.5, metalness: 0.15 }, name: 'c1body' }); }
   const leds = [K.add(UBOX, K.LM(0xff2a2a), -0.1, -0.06, -0.21, 0.03, 0.02, 0.02), K.add(UBOX, K.LM(0x2aff4a), 0.1, -0.06, -0.21, 0.03, 0.02, 0.02)];
   // 항법등: 앞 두 팔 끝 초록 · 뒤 두 팔 끝 빨강 (계속 켜짐) · 조명 켜면 위 흰색 섬광 — 멀리서도 기수 방향 파악
   const nav = [];
@@ -6651,7 +6690,9 @@ function c1Site() {
   // 시험 구역 (짧게 깎은 잔디)
   const fld = new THREE.Mesh(new THREE.PlaneGeometry(C1FIELD.u1 - C1FIELD.u0, C1FIELD.v1 - C1FIELD.v0), new THREE.MeshStandardMaterial({ color: 0x7f9b56, roughness: 1 }));
   fld.rotation.set(-Math.PI / 2, 0, -C1S.h); fld.material.polygonOffset = true; fld.material.polygonOffsetFactor = -1; fld.position.copy(c1W((C1FIELD.u0 + C1FIELD.u1) / 2, (C1FIELD.v0 + C1FIELD.v1) / 2, 0.003)); fld.receiveShadow = true; G0.add(fld);
-  const line = (pts, col, op) => { const g = new THREE.BufferGeometry().setFromPoints(pts); const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: col, transparent: op < 1, opacity: op || 1 })); G0.add(l); return l; };
+  // 바닥 선은 전부 한 LineSegments 로 (투명도는 잔디색과 섞어 표현)
+  const LP = [], LC = [], GRASS = new THREE.Color(0x7f9b56), _lc = new THREE.Color();
+  const line = (pts, col, op) => { _lc.set(col).lerp(GRASS, 1 - (op || 1)); for (let i = 0; i < pts.length - 1; i++) { LP.push(pts[i].x, pts[i].y, pts[i].z, pts[i + 1].x, pts[i + 1].y, pts[i + 1].z); LC.push(_lc.r, _lc.g, _lc.b, _lc.r, _lc.g, _lc.b); } };
   const F = C1FIELD; line([c1W(F.u0, F.v0, 0.02), c1W(F.u1, F.v0, 0.02), c1W(F.u1, F.v1, 0.02), c1W(F.u0, F.v1, 0.02), c1W(F.u0, F.v0, 0.02)], 0xffffff, 0.8);
   // 안전라인 (조종자 어깨와 평행) · 권고 안전거리 원 14 m
   line([c1W(F.u0, 0.6, 0.02), c1W(F.u1, 0.6, 0.02)], 0xffd040, 0.9);
@@ -6689,6 +6730,11 @@ function c1Site() {
   }
   }
   c1Props(G0);
+  { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3)); lg.setAttribute('color', new THREE.Float32BufferAttribute(LC, 3)); const ls = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ vertexColors: true })); ls.name = 'c1lines'; G0.add(ls); }
+  // 정적 소품 묶기: 입체물(고깔·펜스·천막·나무) 한 메시 · 바닥 표지(패드·원판) 한 메시
+  { const keep = new Set([fld, C1.sock]); const flat = [], solid = [];
+    for (const o of G0.children.slice()) { if (!o.isMesh || keep.has(o) || !o.material || o.material.map || o.material.transparent || !o.material.isMeshStandardMaterial) continue; (o.material.polygonOffset ? flat : solid).push(o); }
+    c1Bake(G0, solid, { name: 'c1solid' }); c1Bake(G0, flat, { mat: { roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 }, shadow: false, name: 'c1flat' }); }
   // 학습용 보조 표시: 목표 허용 상자 · 경로 선
   C1.aidBox = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
   G0.add(C1.aidBox);
@@ -6700,14 +6746,10 @@ function c1Site() {
 function c1Cone(G0, uv, cm) {
   const c = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 14), cm); c.position.copy(c1W(uv[0], uv[1], 0.25)); c.castShadow = true; G0.add(c);
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.1, 14), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })); band.position.copy(c1W(uv[0], uv[1], 0.3)); G0.add(band);
-  // 수술(리본 다발): 고깔 위 짧은 막대 끝에 매달림 → 바람 · 기체 하강풍(다운워시)에 날림
+  // 수술(리본 다발): 고깔 위 짧은 막대 끝에 매달림 → 바람 · 기체 하강풍(다운워시)에 날림 (전체 수술은 c1RibbonTick 에서 한 메시로 그림)
   const pole = new THREE.Mesh(UCYL, new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 })); pole.scale.set(0.012, 0.75, 0.012); pole.position.copy(c1W(uv[0], uv[1], 0.5 + 0.375)); G0.add(pole);
-  const top = c1W(uv[0], uv[1], 1.24), strips = [];
-  const cols = [0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff, 0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff];
-  cols.forEach((col, k) => { const pv = new THREE.Group(); pv.position.copy(top); G0.add(pv);
-    const g = new THREE.PlaneGeometry(0.07, 0.7); g.translate(0, -0.35, 0);
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.7 })); m.castShadow = true; pv.add(m);
-    strips.push({ pv, m, off: (k / cols.length - 0.5) * 0.9, ph: Math.random() * 6, f: 6 + Math.random() * 5 }); });
+  const top = c1W(uv[0], uv[1], 1.24), cols = [0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff, 0xff3b3b, 0xffe14a, 0x3bb0ff, 0xffffff];
+  const strips = cols.map((col, k) => ({ col: new THREE.Color(col), off: (k / cols.length - 0.5) * 0.9, ph: Math.random() * 6, f: 6 + Math.random() * 5 }));
   (C1.ribbons = C1.ribbons || []).push({ strips, uv, top, ph: Math.random() * 6 });
 }
 // 시험장 소품: 천막·책상·시험위원·응시자·안전펜스 (위치는 앱 설정)
@@ -6737,6 +6779,10 @@ function c1Menu(k) {
   const on = isC1(k);
   if (on) c1Site();
   if (C1G) C1G.visible = on;
+  // 시험장에서 안 쓰는 코스 시설물(게이트·벙커·숲길 등)은 감춤 → 드로우콜 ↓ (메뉴로 나가면 복구)
+  if (on && !C1.hidObj) { C1.hidObj = []; const c = c1W(0, 30, 0); for (const id in OBJ) { const g = OBJ[id] && OBJ[id].g; if (g && g.visible && g.position.distanceTo(c) > 60) { g.visible = false; C1.hidObj.push(g); } }
+    if (typeof FLANE !== 'undefined' && FLANE && FLANE.G && FLANE.G.visible) { FLANE.G.visible = false; C1.hidObj.push(FLANE.G); } }
+  if (!on && C1.hidObj) { C1.hidObj.forEach(g => { g.visible = true; }); C1.hidObj = null; }
   if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; }
   C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
@@ -7030,14 +7076,14 @@ function c1Sun() {
 }
 // ---- 진행 ----
 function c1Start(a) {
-  c1Site(); C1G.visible = true; C1ON = !C1S.real;
+  c1Site(); C1G.visible = true; C1ON = !C1S.real; if (C1.hidObj) C1.hidObj.forEach(g => { g.visible = false; });   // msStart 가 다시 켠 코스 시설물 재숨김
   Object.assign(C1, { on: true, exam: S.kind === 'class1x', demo: S.kind === 'class1d', dm: null, sayUntil: 0, mode: 'gps', view: 'pilot', armed: false, ref: null, refDesc: null, mi: 0, si: 0, ev: [], t: 0, az: 0, yr: 0, hold: null, touch: null, crash: null, over: false, tArm: null, altT: null, modeLog: [] });
   C1.ei.set(0, 0, 0);
   C1.side = SET.c1side === 1 ? 1 : -1;
   C1.M = c1Build(C1.side);
   C1.M.forEach(m => { m.done = false; m.miss = false; m.fail = false; m.why = []; m.label = m.name; m.steps.forEach(s => { s.T = s.T || c1R('hoverT'); }); });
   S.cam = 1; ui.map.style.display = 'none'; document.body.classList.add('c1on');
-  c1Panel(true); c1ALoad(); c1Sun();
+  c1Panel(true); c1ALoad(); c1Sun(); if ((typeof XR_ON !== 'undefined' && XR_ON) || window.C1_VRTEST) c1XRInit();
   c1Ev('start', { exam: C1.exam, side: C1.side < 0 ? 'left-first' : 'right-first', profile: C1P.ver, rules: C1RULES.ver, wind: WIND.lv });
   return C1.M;
 }
@@ -7130,20 +7176,22 @@ function c1Aid3D(st) {
   const G0 = C1G; if (!G0) return;
   if (!C1.ghost) {
     const gm = makeC1(true); C1.ghost = gm.g; C1.ghost.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.opacity = 0.32; o.material.color && o.material.color.set(0x7fe0ff); } o.castShadow = false; }); G0.add(C1.ghost);
-    C1.drop = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.75 })); C1.drop.frustumCulled = false; G0.add(C1.drop);
+    C1.dropV = new Float32Array(6); C1.poleV = new Float32Array(6);
+    C1.drop = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(C1.dropV, 3)), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18, transparent: true, opacity: 0.75 })); C1.drop.frustumCulled = false; G0.add(C1.drop);
     C1.dropRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide })); C1.dropRing.rotation.x = -Math.PI / 2; G0.add(C1.dropRing);
     C1.tgtRing = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 40), new THREE.MeshBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide })); C1.tgtRing.rotation.x = -Math.PI / 2; G0.add(C1.tgtRing);
-    C1.tgtPole = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(), new V3()]), new THREE.LineBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.8 })); C1.tgtPole.frustumCulled = false; G0.add(C1.tgtPole);
+    C1.tgtPole = new THREE.Line(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(C1.poleV, 3)), new THREE.LineBasicMaterial({ color: 0x5dff9a, transparent: true, opacity: 0.8 })); C1.tgtPole.frustumCulled = false; G0.add(C1.tgtPole);
   }
   const air = st && !DR.landed && C1.armed, sd = c1p('skidDrop');
   C1.drop.visible = C1.dropRing.visible = !!air;
-  if (air) { const gy = c1Gnd() + 0.03; C1.drop.geometry.setFromPoints([DR.p.clone(), new V3(DR.p.x, gy, DR.p.z)]); C1.drop.computeLineDistances(); C1.dropRing.position.set(DR.p.x, gy, DR.p.z); }
+  if (air) { const gy = c1Gnd() + 0.03, D = C1.dropV; D[0] = DR.p.x; D[1] = DR.p.y; D[2] = DR.p.z; D[3] = DR.p.x; D[4] = gy; D[5] = DR.p.z; C1.drop.geometry.attributes.position.needsUpdate = true;
+    const ld = C1.drop.geometry.attributes.lineDistance || (C1.drop.geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array(2), 1)), C1.drop.geometry.attributes.lineDistance); ld.array[1] = DR.p.y - gy; ld.needsUpdate = true; C1.dropRing.position.set(DR.p.x, gy, DR.p.z); }
   const T = st && c1Tgt(st);
   C1.ghost.visible = C1.tgtRing.visible = C1.tgtPole.visible = !!T;
   if (!T) return;
   const p = c1W(T.u, T.v, T.alt + sd); C1.ghost.position.copy(p); C1.ghost.rotation.set(0, -(C1S.h + (T.hdg || 0) * DEG), 0);
   const gp = c1W(T.u, T.v, 0.04); C1.tgtRing.position.copy(gp); const r = st.alongTol ? 1 : c1R('posTol'); C1.tgtRing.scale.set(r, r, 1);
-  C1.tgtPole.geometry.setFromPoints([gp.clone(), p.clone()]);
+  { const V = C1.poleV; V[0] = gp.x; V[1] = gp.y; V[2] = gp.z; V[3] = p.x; V[4] = p.y; V[5] = p.z; C1.tgtPole.geometry.attributes.position.needsUpdate = true; }
 }
 // 지금 단계의 목표 (u, v, 고도, 기수) — 없으면 null
 function c1Tgt(st) {
@@ -7158,7 +7206,7 @@ function c1Tgt(st) {
 }
 function c1Gauge(st, M) {
   let cv = $('c1g'); if (!cv) { cv = document.createElement('canvas'); cv.id = 'c1g'; document.body.appendChild(cv); }
-  const show = !!st && !C1.exam && S.state !== 'menu' && ['climb', 'hold', 'move', 'arc', 'emg', 'land', 'xfer'].includes(st.k) && !C1.over;
+  const show = !!st && !C1.exam && !(typeof XR_ON !== 'undefined' && XR_ON) && S.state !== 'menu' && ['climb', 'hold', 'move', 'arc', 'emg', 'land', 'xfer'].includes(st.k) && !C1.over;
   cv.classList.toggle('hidden', !show); if (!show) return;
   const dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
   if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -7853,6 +7901,7 @@ function c1XRUpdate(dt) {
   R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
   if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
   C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';
+  if (S.brief && !window.C1_VRTEST) { C1XR.briefT = C1XR.briefT == null ? 8 : C1XR.briefT - dt; if (C1XR.briefT <= 0 && typeof BRIEF_GO === 'function' && BRIEF_GO) { BRIEF_GO(); C1XR.briefT = null; } } else C1XR.briefT = null;
   // 점검·구술 고르기: 오른쪽 스틱 위아래
   const st = c1Cur(); C1XR.selT -= dt;
   if (st && st.k === 'oral' && st.qs && C1XR.selT <= 0) { if (IN.pitch > 0.6) { C1XR.sel = (C1XR.sel + 3) % 4; C1XR.selT = 0.3; } else if (IN.pitch < -0.6) { C1XR.sel = (C1XR.sel + 1) % 4; C1XR.selT = 0.3; } }
@@ -7863,6 +7912,8 @@ function c1BoardDraw() {
   g.clearRect(0, 0, W2, H2); g.fillStyle = 'rgba(10,14,20,.9)'; vrRR(g, 0, 0, W2, H2, 26); g.fill(); g.strokeStyle = '#c9a2ff'; g.lineWidth = 4; vrRR(g, 2, 2, W2 - 4, H2 - 4, 24); g.stroke();
   let y = 22; const line = (t, col, sz, wt) => { g.fillStyle = col || '#e8eef3'; g.font = `${wt || 600} ${sz || 30}px system-ui, sans-serif`; const ws = String(t).split(' '); let ln = ''; for (const w of ws) { const tl = ln ? ln + ' ' + w : w; if (g.measureText(tl).width > W2 - 56 && ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; ln = w; } else ln = tl; } if (ln) { g.fillText(ln, 28, y); y += (sz || 30) * 1.25; } };
   g.textBaseline = 'top';
+  if (S.brief) {   // 브리핑: 고글 화면이 없으니 안내판에 (A·트리거로 시작 · 8초 뒤 자동 시작)
+    const b = BRIEF[S.kind] || []; line('BRIEFING', '#4fe3ff', 26, 700); line(b[0] || '', '#fff', 32, 800); line(b[1] || '', '#e8eef3', 24); line(L2('A 버튼 또는 트리거 = 시작', 'A button or trigger = start') + (C1XR.briefT != null ? ` (${Math.max(0, Math.ceil(C1XR.briefT))})` : ''), '#5dff9a', 26, 700); return; }
   line((C1.exam ? L2('1종 모의평가', 'CLASS 1 · MOCK') : C1.demo ? L2('1종 시범비행', 'CLASS 1 · DEMO') : L2('1종 학습', 'CLASS 1 · LEARN')) + ' · ' + C1.mode.toUpperCase() + (C1.armed ? ' · ARMED' : ' · SAFE') + (C1.ref ? ' · ' + L2('기준', 'REF') + ' ' + C1.ref.toFixed(1) + ' m' : ''), '#c9a2ff', 24, 700);
   if (m) line(`${C1.mi + 1}. ${m.name}`, '#fff', 34, 800);
   if (st) line(st.lab, '#ffc828', 27);
@@ -7888,6 +7939,6 @@ function c1BoardDraw() {
 }
 
 c1Place();
-if (window.__sim) Object.assign(window.__sim, { WIND, C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, C1XR, c1XRUpdate, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, c1Flow, getDroneM: () => droneM, AF, AF_IDS, MS_OK, TOUCH, isC1 });
+if (window.__sim) Object.assign(window.__sim, { WIND, C1, C1P, C1RULES, C1PT, C1EV, C1S, c1Key, c1M, c1W, C1V, C1XR, c1XRUpdate, c1InspectAuto, c1OralAuto, c1CallDo, c1Heard, C1INS, C1Q, c1UV, c1Jump, c1Cur, c1SkidOnPad, c1CenterOnPad, c1Wrap, c1Log, c1Build, c1Flow, getDroneM: () => droneM, getFLANE: () => (typeof FLANE !== 'undefined' ? FLANE : null), AF, AF_IDS, MS_OK, TOUCH, isC1 });
 
 })();
