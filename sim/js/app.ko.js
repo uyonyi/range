@@ -1949,6 +1949,7 @@ function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0);
 function startRun(kind) {
   enterFull();
   if (typeof c1Menu === 'function') c1Menu(kind);
+  S.keysT = 0; S.keysShow = false; document.body.classList.toggle('calm', kind === 'tutorial' || (typeof isC1 === 'function' && isC1(kind)));   // 훈련·시험 모드는 차분한 톤
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
   S.objState = OBJS.map(() => 0); S.objNear = -1; S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
@@ -2602,6 +2603,7 @@ function updateTargeting(subj) {
   const pr = running ? predictImpact(DR.p, DR.v) : null;
   if (running && (S.kind === 'free' || (S.kind === 'tutorial' && !tgtKey))) { const n = nearestTarget(pr.p, S.simT + pr.t); if (n && n.d < 18) tgtKey = n.key; }
   $('keys').classList.toggle('hidden', !!(tgtKey && pr));
+  { const kEl = $('keys'); if (kEl) kEl.classList.toggle('fade', S.t > 45 && !S.keysShow && S.state === 'run'); }   // 조작 안내: 비행 45초 뒤 서서히 숨김 (? 또는 F1 로 다시)
   if (!tgtKey || !pr) { ui.scope.classList.add('hidden'); impactRing.visible = false; return; }
   const ev = targetEval(tgtKey, pr.p, null, S.simT + pr.t);
   ui.scope.classList.remove('hidden');
@@ -2649,17 +2651,7 @@ function updateHUD(dt, subj) {
   else ui.objNext.style.display = 'none';
   const podE = isMission() && S.kind !== 'sar' && S.state === 'run', kitM = S.kind === 'sar' && S.state === 'run', n = podE ? 0 : kitM ? S.kits | 0 : S.kind === 'course' && S.state === 'run' ? S.payloads : droneM.cans.filter(c => c.visible).length;
   const ak = actionKind(); ui.payload.innerHTML = ak === 'report' ? '📷 REPORT' : podE ? 'POD —' : (kitM ? 'KIT ' : 'M84 ') + [0, 1, 2].slice(0, kitM ? 2 : 3).map(i => `<i class="${i < n ? '' : 'used'}"></i>`).join('');
-  if (o && o.mk && S.state === 'run' && DR.alive && !sIn) {
-    const s = toScreen(o.mk);
-    let x = s.x / innerWidth * 2 - 1, y = 1 - s.y / innerHeight * 2; if (s.behind) { x = -x; y = -y; }
-    const off = s.behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.88;
-    if (off) {
-      const ang = Math.atan2(y, x), m = Math.max(Math.abs(x) / 0.88, Math.abs(y) / 0.8, 1e-3); x /= m; y /= m;
-      ui.arrow.classList.remove('hidden');
-      ui.arrow.style.left = ((x + 1) / 2 * innerWidth - 13) + 'px'; ui.arrow.style.top = ((1 - y) / 2 * innerHeight - 13) + 'px';
-      ui.arrow.style.transform = `rotate(${Math.PI / 2 - ang}rad)`;
-    } else ui.arrow.classList.add('hidden');
-  } else ui.arrow.classList.add('hidden');
+  ui.arrow.classList.add('hidden');   // 예전 가장자리 삼각형은 navArrow(game3d, 방향+거리) 로 대체
   drawSticks();
   updateTargeting(subj);
 }
@@ -2715,6 +2707,7 @@ function handleKeys() {
     else if (k === 'PadLB') { S.cam = (S.cam + 2) % 3; updateTags(); }
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
+    else if (k === 'Slash' || k === 'F1') { S.keysShow = !S.keysShow; if (S.keysShow) S.keysT = 0; }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }
@@ -3131,7 +3124,7 @@ $('bFull').onclick = toggleFull;
 // =====================================================================
 //  가이드: 다음 과제까지 따라갈 사각 틀(3D) + 조작 안내 문구 + 아래 카메라
 // =====================================================================
-const GUIDE = { n: 12, sp: 2.6, meshes: [], next: null, detour: false };
+const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
 (function makeFrames() {
   // 비행 경로에 수직으로 서는 사각 틀 ('하늘의 길' 방식) - FPV·추적 시점 모두에서 잘 보임
   const o = 0.55, n = 0.49, arr = [];
@@ -3202,7 +3195,25 @@ function guidePoints(o, p) {
   return before < -3 ? (before < -ld - 2 ? [p.clone(), lead, C, exit] : [p.clone(), C.clone().addScaledVector(A, Math.min(-2, before * 0.5)), C, exit]) : [p.clone(), C, exit];
 }
 const _gt = new V3(), _gq = new V3();
-function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); $('guide').classList.add('hidden'); }
+function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+// 다음 목표 방향 표시: 화면 안이면 목표 아래에 거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 (VR·1종 제외)
+const _nv = new V3();
+function navArrow(tgt, subj) {
+  let el = $('navArrow'); if (!el) { el = document.createElement('div'); el.id = 'navArrow'; el.innerHTML = '<i>➤</i><b></b>'; document.body.appendChild(el); }
+  if (!tgt || XR_ON || S.state !== 'run') { el.classList.add('hidden'); return; }
+  const dist = tgt.distanceTo(subj.p); if (dist < 4) { el.classList.add('hidden'); return; }
+  _nv.copy(tgt).project(camera); const behind = _nv.z > 1;
+  let x = _nv.x, y = _nv.y; if (behind) { x = -x; y = -y; }
+  const W = innerWidth, H = innerHeight, mx = 0.80, my = 0.74;   // 가장자리 여백 (계기·목록 피함)
+  const inside = !behind && Math.abs(x) < mx && Math.abs(y) < my;
+  let sx, sy, rot;
+  if (inside) { sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H + 34; rot = 90; }   // 목표 아래쪽에 ▼ + 거리
+  else { const k = Math.max(Math.hypot(x / mx, y / my), 1e-6); x /= k; y /= k; /* 타원 가장자리: 모서리의 계기·목록을 피함 */ sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = Math.atan2(-(y), x) / Math.PI * 180; }
+  el.classList.remove('hidden'); el.classList.toggle('edge', !inside);
+  el.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%,-50%)`;
+  el.firstChild.style.transform = `rotate(${rot.toFixed(0)}deg)`;
+  const txt = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist.toFixed(0) + ' m'; if (el.lastChild.textContent !== txt) el.lastChild.textContent = txt;
+}
 function updateGuide(subj) {
   const active = S.state === 'run' && DR.alive && !(S.tut && S.tut.st !== 'fly');
   const o = active ? curObj() : null;
@@ -3215,6 +3226,7 @@ function updateGuide(subj) {
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
+  navArrow(o.mk || pts[pts.length - 1], subj);
   if (!SET.guide) { hideGuide(); return; }
   // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
   { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
@@ -3232,7 +3244,7 @@ function updateGuide(subj) {
     x.g.visible = true; x.g.position.copy(_gt); x.g.lookAt(_gq);
     const s = 0.9 + Math.min(d, 20) * 0.02; x.g.scale.set(s, s, s);
     x.m.color.set(GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff);
-    x.m.opacity = 0.75 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2);
+    x.m.opacity = 0.8 * Math.min(1, (d - 1.2) / 1.5) * Math.min(1, (L - d) / 2) * (1 - 0.6 * i / GUIDE.n);   // 가까운 것은 또렷, 멀수록 옅게
   });
   // ---- 조작 안내 문구 ----
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
@@ -4278,6 +4290,15 @@ function debriefShow(ok, n, par) {
   if (S.photos && S.photos.length) h += ln(L2('사진 (인정 / 전체)', 'Photos (valid / taken)'), `${S.photos.filter(p => p.ok).length} / ${S.photos.length}`);
   h += `<h4>${L2('벌점 내역', 'PENALTIES')} · +${S.pen.toFixed(0)} s</h4>` + (DBF.pens.length ? DBF.pens.map(p => ln(`${fmt(p.t)} ${p.why || L2('벌점', 'penalty')}`, '+' + p.d.toFixed(0) + ' s', 'bad')).join('') : `<div class="dim">${L2('없음', 'None')}</div>`);
   if (DBF.objs.length) { let pt = 0; h += `<h4>${L2('과제별 기록', 'TASKS')} · ${ok}/${n}</h4>` + DBF.objs.map((o, i) => { const s = ln(`${i + 1}. ${o.ok ? '✓' : '✗'} ${o.label}`, `${fmt(o.t)} <span class="dim">(+${(o.t - pt).toFixed(1)})</span>`, o.ok ? 'ok' : 'bad'); pt = o.t; return s; }).join(''); }
+  // 다음에는: 기록에서 고칠 점 최대 3가지
+  { const tips = []; const miss = DBF.objs.filter(o => !o.ok).length;
+    if (miss) tips.push(L2(`놓친 과제 ${miss}개 — 다음 목표가 뜨면 속도를 줄이고 가이드 선을 따라가기`, `${miss} missed task(s) — slow down when the next target appears and follow the guide`));
+    if ((S.impacts || 0) >= 2) tips.push(L2(`충돌 ${S.impacts}회 — 장애물 앞에서 먼저 고도를 맞추고 통과`, `${S.impacts} impacts — set height before the obstacle, then pass`));
+    if (par && S.t > par * 1.3) tips.push(L2('기준 시간보다 30% 이상 느림 — 목표 사이 직선 구간에서 속도 올리기', 'Over 30% slower than par — speed up on the straight legs between targets'));
+    if (DBF.pens.length >= 3) tips.push(L2(`벌점 ${DBF.pens.length}건 — 벌점 내역에서 반복되는 원인 하나부터 없애기`, `${DBF.pens.length} penalties — fix the most repeated cause first`));
+    if (S.photos && S.photos.length && S.photos.filter(p => !p.ok).length > S.photos.filter(p => p.ok).length) tips.push(L2('무효 사진이 많음 — 대상을 화면 가운데에 두고 1.5초 멈춘 뒤 촬영', 'Many invalid photos — centre the target and hold 1.5 s before shooting'));
+    if (!tips.length) tips.push(R.g === 'S' ? L2('깔끔한 비행 — 다음 난이도나 바람 설정으로 올려보기', 'Clean flight — try the next difficulty or add wind') : L2('큰 실수 없음 — 같은 임무를 한 번 더 하며 기준 시간을 당겨보기', 'No major errors — fly it again and chase the par time'));
+    h = `<h4>${L2('다음에는', 'NEXT TIME')}</h4>` + tips.slice(0, 3).map(x => `<div class="ln"><span>• ${x}</span></div>`).join('') + h; }
   const d = $('resDebrief'); if (d) d.innerHTML = h;
 }
 // ---- 항공(UAS)식 계기: 피치 사다리 · 속도/고도 테이프 · HSI(방위 원판 + 목표 방위 바늘 + 바람) ----
@@ -4877,7 +4898,8 @@ function scenStart(kind, a) {
   if (kind === 'sar' && SAR) {
     MSG.sar.visible = true; SAR.kit = null; sarRandom();
     S.kits = 2; SAR.pkFound = false;
-    const L = [{ kind: 'ms', t: 'sarfind', label: L2('실종자 수색 · 구역 반경 120 m', 'Find the hiker · area radius 120 m'), tp: SAR.tp, mk: SAR.area, search: { r: 120 }, need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
+    const sr = sarR();
+    const L = [{ kind: 'ms', t: 'sarfind', label: L2(`실종자 수색 · 구역 반경 ${sr} m`, `Find the hiker · area radius ${sr} m`), tp: SAR.tp, mk: SAR.area, search: { r: sr }, need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
     if (a.drop) L.push({ kind: 'ms', t: 'sarkit', label: '구조 키트 투하 (5 m 이내)', mk: SAR.c.clone().add(new V3(0, 8, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } });
     L.push(rtbObj(a));
     return L;
@@ -5017,7 +5039,8 @@ const shuffle = a => { const b = a.slice(); for (let i = b.length - 1; i > 0; i-
 function nearOrder(L, p) { const out = [], rest = L.slice(); let c = p; while (rest.length) { let k = 0, bd = 1e9; rest.forEach((o, i) => { const d = Math.hypot(o.tp.x - c.x, o.tp.z - c.z); if (d < bd) { bd = d; k = i; } }); c = rest[k].tp; out.push(rest.splice(k, 1)[0]); } return out; }
 function reconPick() {
   const ok = RECON.filter(r => flyL(r.tp) <= FLY_R_SAFE), pool = ok.length >= 4 ? ok : RECON.slice().sort((a, b) => flyL(a.tp) - flyL(b.tp));
-  const L = nearOrder(shuffle(pool).slice(0, Math.min(4, pool.length)), startPos());
+  const nR = SET.diff === 'train' ? 3 : SET.diff === 'sport' ? 5 : 4;   // 난이도별 대상 수
+  const L = nearOrder(shuffle(pool).slice(0, Math.min(nR, pool.length)), startPos());
   L.forEach((o, i) => { o.label = `정찰 ${i + 1} · 건물 (${o.wl})`; o.done = false; }); return L;
 }
 // 산불: 후보 8곳 중 5곳, 3곳은 처음부터 · 2곳은 나중에 신고
@@ -5106,6 +5129,7 @@ function briefShow(kind, L) {
   const go = () => { el.classList.add('hidden'); S.brief = false; commStart(kind); };
   $('briefGo').onclick = go; el.onpointerdown = e => { if (e.target === el) go(); };
   BRIEF_GO = go;
+  clearInterval(briefShow.tm); if (MENU.fromPreview && !TEST && !XR_ON) { let n = 4; const b = $('briefGo'), base = b.textContent; b.textContent = `${base} (${n})`; briefShow.tm = setInterval(() => { if (!S.brief || !el || el.classList.contains('hidden')) { clearInterval(briefShow.tm); return; } n--; if (n <= 0) { clearInterval(briefShow.tm); go(); } else b.textContent = `${base} (${n})`; }, 1000); } MENU.fromPreview = false;
 }
 let BRIEF_GO = null;
 // 시간에 따른 사건 (불씨 추가·번짐, 실종자 구역 좁힘, 차량 정차·속도 변화)
@@ -5138,10 +5162,12 @@ const SAR_POOL = (function () {
   for (const a of VEC.trail) for (let i = 0; i < a.length; i += 6) { const d = a[i], s = a[i + 1], dist = Math.hypot(d - st.down, s - st.side); if (dist > 220 && dist < 520 && INB(d, s) && flyL(W(d, s, 0)) <= 470 && !P.some(p => Math.hypot(p[0] - d, p[1] - s) < 90)) P.push([d, s]); }
   return P.length ? P : [[SAR.d, SAR.s]];
 })();
+function sarR() { return SET.diff === 'train' ? 90 : SET.diff === 'sport' ? 150 : 120; }   // 난이도별 수색 구역 반경
 function sarRandom() {
   const q = SAR_POOL[Math.floor(Math.random() * SAR_POOL.length)], d = q[0] + (Math.random() - 0.5) * 12, s = q[1] + (Math.random() - 0.5) * 12, c = W(d, s, 0);
   SAR.d = d; SAR.s = s; SAR.c.copy(c); SAR.tp.copy(c).add(new V3(0, 0.3, 0)); SAR.g.position.copy(c); SAR.g.rotation.y = Math.random() * 6.28;
-  for (let t = 0; t < 24; t++) { const ang = Math.random() * 6.283, ad = 55 + Math.random() * 40; SAR.area.copy(W(d + Math.cos(ang) * ad, s + Math.sin(ang) * ad, 30)); if (flyL(SAR.area) <= FLY_R - 130) break; } MS.h1 = MS.h2 = false;   // 수색 구역이 비행 구역 안에 들어오게
+  const sk = sarR() / 120;   // 수색 반경에 비례해 구역 중심을 실종자에게서 띄움 (반경 안에 들어오게)
+  for (let t = 0; t < 24; t++) { const ang = Math.random() * 6.283, ad = (55 + Math.random() * 40) * sk; SAR.area.copy(W(d + Math.cos(ang) * ad, s + Math.sin(ang) * ad, 30)); if (flyL(SAR.area) <= FLY_R - 130) break; } MS.h1 = MS.h2 = false;   // 수색 구역이 비행 구역 안에 들어오게
   for (let t = 0; t < 24; t++) { const pa = Math.random() * 6.283, pd = 45 + Math.random() * 25; SAR.pkP.copy(W(d + Math.cos(pa) * pd, s + Math.sin(pa) * pd, 0)); if (flyL(SAR.pkP) <= FLY_R_SAFE) break; } SAR.pk.position.copy(SAR.pkP); SAR.pk.rotation.y = Math.random() * 6.28; SAR.pk.visible = true; SAR.pkFound = false;
   SAR.sig.position.copy(c).add(new V3(0, 0.9, 0)); SAR.sigT = Math.random() * 3;
 }
@@ -5570,15 +5596,22 @@ function menuDetail() {
   $('mdMeta').innerHTML = meta.join(' · ');
   $('msGo').disabled = !av.ok; $('msGo').textContent = MENU.mode === 'vr' ? (k === 'demo' ? L2('VR로 재생 ▶ (헤드셋 착용)', 'Play in VR ▶') : L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)')) : k === 'tutorial' ? L2('단계 고르기 ▶', 'Choose a step ▶') : k === 'demo' ? L2('재생 ▶', 'Play ▶') : L2('출격 ▶', 'Launch ▶');
   $('mdWhy').textContent = av.why || MENU.afNote || '';
+  { const f = $('msGoF'); if (f) { f.disabled = !av.ok; f.textContent = $('msGo').textContent; } } msGoFSync();
   if (typeof vrBtnUpdate === 'function' && VR_OK) vrBtnUpdate();
   const no = $('msStageNo'); if (no) { no.classList.toggle('on', !av.site); no.textContent = av.site ? '' : L2('이 훈련장에는 없는 임무입니다', 'This mission is not available at this site'); }
   menuShow(k);
 }
 // 임무 종류 탭: 고른 종류의 임무만 보여 줌 (이 훈련장에 없는 임무는 숨김)
-const MS_GRP = ['basic', 'skill', 'mission'].concat(document.querySelector('#msTabs [data-g="exam"]') ? ['exam'] : []);
+const MS_GRP = ['basic'].concat(document.querySelector('#msTabs [data-g="exam"]') ? ['exam'] : []).concat(['skill', 'mission']);
 function msTile(k) { return document.querySelector(`#msGrid [data-ms="${k}"]`); }
+// 바닥 고정 출격 버튼: 미리보기의 출격 버튼이 화면 밖(아래)에 있을 때만
+function msGoFSync() { const f = $('msGoF'), g = $('msGo'); if (!f || !g) return; const r = g.getBoundingClientRect(); f.classList.toggle('hidden', !(MENU.step === 3) || (r.bottom > 0 && r.bottom <= innerHeight - 56)); }
+addEventListener('resize', msGoFSync); { const pn = $('menu'); if (pn) pn.addEventListener('scroll', msGoFSync, { passive: true }); }
 function msVis() {
   const g = MENU.g || 'basic';
+  // 타일에 내 최고 기록 · 추천 순서 번호
+  document.querySelectorAll(`#msGrid [data-g]`).forEach(b => { const k = b.dataset.ms, best = (k === 'course' || isMission(k)) ? menuBest(k) : null; let e = b.querySelector('.best'); if (best) { if (!e) { e = document.createElement('span'); e.className = 'best'; b.appendChild(e); } e.textContent = '★ ' + fmt(best); } else if (e) e.remove(); });
+  ['basic', 'exam', 'skill', 'mission'].forEach(gg => { let i = 0; document.querySelectorAll(`#msGrid [data-g="${gg}"]`).forEach(b => { if (b.dataset.site === '0' || b.dataset.ms === 'free' || b.dataset.ms === 'demo' || b.querySelector('.rec')) return; i++; let e = b.querySelector('.ord'); if (!e) { e = document.createElement('span'); e.className = 'ord'; b.appendChild(e); } e.textContent = L2('추천 ', 'step ') + i; }); });
   document.querySelectorAll('#msTabs [data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === g));
   document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0'));
 }
@@ -5599,7 +5632,7 @@ function menuSel(k, go) {
 }
 document.querySelectorAll('#msTabs [data-g]').forEach(b => b.addEventListener('click', () => menuTab(b.dataset.g)));
 function menuGo() {
-  const k = MENU.ms; if (!msAvail(k).ok) return;
+  const k = MENU.ms; if (!msAvail(k).ok) return; MENU.fromPreview = true;   // 미리보기에서 읽고 왔으니 브리핑은 짧게
   if (MENU.mode === 'vr') { if (k === 'tutorial') { const w = $('mdWhy'); if (w) w.textContent = L2('튜토리얼은 컴퓨터 판에서만 · VR에서는 장애물 코스부터', 'Tutorial is on the computer version only'); return; } if (!VR_OK.ok) { const w = $('mdWhy'); if (w) w.textContent = L2('이 기기는 VR을 지원하지 않습니다', 'This device does not support VR'); return; } XR.pending = k; vrStart(); return; }
   if (k === 'tutorial') openTutMenu(); else startRun(k);
 }
@@ -5617,7 +5650,7 @@ function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
 function wizGo(n) {
   n = Math.max(HAS_INTRO ? 0 : 1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
   if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
-  MENU.step = n; c.dataset.step = n; closePanels();
+  MENU.step = n; c.dataset.step = n; closePanels(); setTimeout(msGoFSync, 0);
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
   if (n === 3 && typeof isC1 === 'function') { if (SET.af === 'c1' && !isC1(MENU.ms)) MENU.ms = 'class1'; else if (SET.af !== 'c1' && isC1(MENU.ms)) MENU.ms = 'course'; }   // 1종 연습기 → 1종 코스로
@@ -5685,6 +5718,10 @@ function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex
 // 처음 화면: 컴퓨터 / VR 갈림길 (PC 판과 VR 판은 서로 다른 주소)
 function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
 if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
+// 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
+{ const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
+  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
+    c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; } }
 if ($('introVR')) $('introVR').onclick = () => {
   const n = $('introNote');
   if (window.SIM_VR) { if (VR_OK.ok) wizGo(1); else if (n) n.textContent = L2('이 기기·브라우저는 VR을 지원하지 않습니다. Meta Quest 헤드셋의 브라우저에서 이 주소를 열어 주세요.', 'This device or browser does not support VR. Open this address in the Meta Quest browser.'); return; }

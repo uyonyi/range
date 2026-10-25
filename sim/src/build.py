@@ -10,9 +10,9 @@ FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.j
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
 TITLES = {
     'civil': {'TITLE': 'FPV Terrain Trainer · Civil', 'H1': 'FPV TERRAIN TRAINER',
-              'H2': {'ko': '민간 비행 연습 · 무인멀티콥터 1종 실기 기준 참고 연습 (시제품, 공식 시험 아님)', 'en': 'Civil flight practice · class-1 multicopter practical reference (prototype, not an official test)'}},
+              'H2': {'ko': '민간 비행 연습 · 무인멀티콥터 1종 실기 기준 참고 연습 (시제품 v0.6, 공식 시험 아님)', 'en': 'Civil flight practice · class-1 multicopter practical reference (prototype v0.6, not an official test)'}},
     'public': {'TITLE': 'FPV Terrain Trainer', 'H1': 'FPV TERRAIN TRAINER',
-               'H2': {'ko': '실제 지형 드론 장애물 코스 · 웹 시뮬레이터 (시제품 v0.5)', 'en': 'Real-terrain drone obstacle course · web simulator (prototype v0.5)'}},
+               'H2': {'ko': '실제 지형 드론 훈련 · 임무 · 1종 실기 연습 · 웹 시뮬레이터 (시제품 v0.6)', 'en': 'Real-terrain drone training · missions · class-1 practice · web simulator (prototype v0.6)'}},
 }
 LIBS = {'THREE': 'node_modules/three/build/three.min.js', 'GEOTIFF': 'node_modules/geotiff/dist-browser/geotiff.js', 'PROJ4': 'node_modules/proj4/dist/proj4.js'}
 
@@ -28,7 +28,7 @@ def sources(lang, mode, c1=None):
     if mode == 'civil':   # 민간판: 타격·차량 추적 메뉴 없음, 투하 문구 정리
         t = re.sub(r'\n[^\n]*data-ms="(strike|track)"[^\n]*', '', t)
         game = game.replace("${n(KB.drop)} ${'투하'}", "${n(KB.drop)} ${'확인·사진'}").replace("drop: '투하', boost", "drop: 'OK', boost").replace("one('drop', '탑재물 투하')", "one('drop', '확인 · 사진 보고')")
-        t = t.replace('<small>정찰 · 구조 · 타격</small>', '<small>정찰 · 산불 · 수색</small>').replace('숲 속 실종자 찾고 구조 키트 투하 · 복귀', '숲 속 실종자 찾아 위치 보고 · 복귀').replace('게이트 · 슬라롬 · 투하 · 착륙', '게이트 · 슬라롬 · 선회 · 착륙')
+        t = t.replace('전술 임무<small>정찰 · 구조 · 타격</small>', '응용 임무<small>정찰 · 산불 · 수색</small>').replace('<small>정찰 · 구조 · 타격</small>', '<small>정찰 · 산불 · 수색</small>').replace('숲 속 실종자 찾고 구조 키트 투하 · 복귀', '숲 속 실종자 찾아 위치 보고 · 복귀').replace('게이트 · 슬라롬 · 투하 · 착륙', '게이트 · 슬라롬 · 선회 · 착륙')
     game = game.replace("'use strict';\n", "'use strict';\n" + open('game0t.js', encoding='utf-8').read(), 1)
     if lang == 'en':
         segs = json.load(open('ko_segs.json', encoding='utf-8'))

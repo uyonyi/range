@@ -552,7 +552,7 @@ EN.update({
 '<button data-g="basic">처음 시작<small>튜토리얼 · 기본 코스</small></button>': '<button data-g="basic">Getting started<small>Tutorial · core course</small></button>',
 '<button data-g="skill">비행 기술<small>숲길 · 레이스 · 능선 · 착륙장</small></button>': '<button data-g="skill">Flying skills<small>Forest · race · ridge · airstrip</small></button>',
 '<b>야전 착륙장</b><small>활주로·유도로·H 패드 이착륙 연습</small>': '<b>Field airstrip</b><small>Runway, taxiway and H pads · takeoff and landing practice</small>',
-'<button data-g="mission">실전 임무<small>정찰 · 구조 · 타격</small></button>': '<button data-g="mission">Missions<small>Recon · rescue · strike</small></button>',
+'<button data-g="mission">실전 임무<small>정찰 · 구조 · 타격</small></button>': '<button data-g="mission">Missions<small>Recon · rescue · strike</small></button>', '<button data-g="mission">전술 임무<small>정찰 · 구조 · 타격</small></button>': '<button data-g="mission">Tactical missions<small>Recon · rescue · strike</small></button>', '<button data-g="mission">응용 임무<small>정찰 · 산불 · 수색</small></button>': '<button data-g="mission">Applied missions<small>Recon · wildfire · search</small></button>', '<b>이어서 비행</b>': '<b>Continue flying</b>', '출격 ▶</button></div>': 'Launch ▶</button></div>',
 '<em class="rec">처음이라면 여기부터</em>': '<em class="rec">New? Start here</em>',
 })
 EN.update({
