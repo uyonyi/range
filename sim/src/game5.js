@@ -2403,7 +2403,7 @@ function xrTick(dt) {
     if (hv !== XR.hover || (XR.mT -= dt) <= 0) { XR.hover = hv; XR.mT = 0.3; vrMenuDraw(); }
   }
   XR.ctl.forEach(c => c.userData.ln.visible = !!c.userData.hand && (XR.menu || S.state === 'result'));
-  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 (고글 화면 없음)
+  if (typeof c1VRon === 'function' && c1VRon()) { VR_SCR.visible = false; renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true; c1XRUpdate(dt); return; }   // 1종: 조종자 자리에서 맨눈 · 그림자 2프레임에 한 번   // 1종: 조종자 자리에서 맨눈 (고글 화면 없음)
   VR_SCR.visible = true;
   // 지형 장면을 드론 카메라(게임 카메라)로 화면 텍스처에 그림
   renderer.shadowMap.autoUpdate = false; if (XR.frames % 2 === 0) renderer.shadowMap.needsUpdate = true;   // 그림자는 2프레임에 한 번

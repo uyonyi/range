@@ -16,7 +16,7 @@ function W(down, side, alt) { const v = new V3(side, alt || 0, -down); v.y += te
 function agl(p) { return p.y - groundAt(p.x, p.z); }
 function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const R = rng(320);
-const LOWQ = !!window.SIM_MOBILE || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // 모바일: 가벼운 화질
+const LOWQ = !!window.SIM_MOBILE || !!window.SIM_VR || !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // VR(Quest) 도 가벼운 화질   // 모바일: 가벼운 화질
 
 THREE.ColorManagement.legacyMode = false;
 
@@ -1071,8 +1071,9 @@ const STREES = (function siteTrees() {
   }
   // 카메라 거리로 세밀도 바꿈 (0.3 초마다)
   function lod(cam) {
+    const far = (typeof c1VRon === 'function' && c1VRon()) ? 420 : 1e9;   // 1종 VR: 조종자가 제자리 → 먼 숲은 생략
     for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < (LOWQ ? 50 : 90) ? 0 : d < (LOWQ ? 170 : 300) ? 1 : 2;
-      if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
+      k.im.visible = d < far; if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);
   // 산불: 불난 자리 나무를 그을린 앙상한 줄기로 (숲에 구멍이 나서 위에서 불길이 보이게) · 임무가 바뀌면 되돌림

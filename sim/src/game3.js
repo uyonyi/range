@@ -778,7 +778,7 @@ function handleKeys() {
     const k = pressed.shift();
     if (RCUI.open) continue;
     if (!S.brief && typeof c1Key === 'function' && c1Key(k)) continue;
-    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA')) { if (BRIEF_GO) BRIEF_GO(); continue; }
+    if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA' || (k === 'KeyQ' && typeof isC1 === 'function' && isC1()))) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }
     if (k === 'KeyT') { irSet(!ENV.ir); continue; }
@@ -901,5 +901,5 @@ function frame(now, noRender) {
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
-  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon()) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
 }
