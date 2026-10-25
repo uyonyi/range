@@ -246,9 +246,25 @@ groundMat.onBeforeCompile = sh => {
 };
 const TER = { n: 241, step: GSZ / 240, h: SITE_L.dec ? SITE_L.dec.inner : null };   // 코스 주변 고해상도 지형 (5 m)
 if (TER.h) { scene.fog.near = 180; scene.fog.far = 6500; camera.far = 9000; camera.updateProjectionMatrix(); }
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(GSZ, GSZ, 240, 240), groundMat);
-ground.rotation.x = -Math.PI / 2; ground.position.set((GS0 + GS1) / 2, 0, -(GD0 + GD1) / 2);
-ground.receiveShadow = true; scene.add(ground);
+// 지형 조각 나누기: 큰 지형 메시 하나를 격자 조각(인덱스만 따로, 꼭짓점 버퍼는 공유)으로 나눠 시야 밖 조각은 그리지 않음
+//   돌려주는 Group 은 .geometry(전체 지오메트리)·.userData.chunks·.userData.refresh()(높이 바뀐 뒤 경계구 다시 계산) 를 가짐
+function chunkify(mesh, nx, nz) {
+  const geo = mesh.geometry, pos = geo.attributes.position, idx = geo.index ? geo.index.array : null; if (!idx) return mesh;
+  const bb = new THREE.Box3().setFromBufferAttribute(pos), ext = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
+  const ax = [0, 1, 2].sort((a, b) => ext[b] - ext[a]).slice(0, 2).sort(), A = ax[0], B = ax[1], mn = [bb.min.x, bb.min.y, bb.min.z];
+  const buckets = []; for (let i = 0; i < nx * nz; i++) buckets.push([]);
+  const P = pos.array, g = i => [P[i * 3 + A], P[i * 3 + B]];
+  for (let k = 0; k < idx.length; k += 3) { const a = g(idx[k]), b = g(idx[k + 1]), c = g(idx[k + 2]); const u = (a[0] + b[0] + c[0]) / 3 - mn[A], v = (a[1] + b[1] + c[1]) / 3 - mn[B];
+    const bx = Math.min(nx - 1, Math.max(0, Math.floor(u / ext[A] * nx))), bz = Math.min(nz - 1, Math.max(0, Math.floor(v / ext[B] * nz))); buckets[bz * nx + bx].push(idx[k], idx[k + 1], idx[k + 2]); }
+  const grp = new THREE.Group(); grp.position.copy(mesh.position); grp.rotation.copy(mesh.rotation); grp.scale.copy(mesh.scale); grp.geometry = geo; grp.material = mesh.material; grp.userData.chunks = [];
+  for (const b of buckets) { if (!b.length) continue; const cg = new THREE.BufferGeometry(); for (const nm in geo.attributes) cg.setAttribute(nm, geo.attributes[nm]); cg.setIndex(b);
+    const m = new THREE.Mesh(cg, mesh.material); m.castShadow = mesh.castShadow; m.receiveShadow = mesh.receiveShadow; m.userData.irBase = mesh.userData.irBase; grp.add(m); grp.userData.chunks.push(m); }
+  grp.userData.refresh = () => { const v = new V3(); for (const m of grp.userData.chunks) { const ii = m.geometry.index.array, box = new THREE.Box3(); for (let k = 0; k < ii.length; k++) box.expandByPoint(v.fromBufferAttribute(pos, ii[k])); m.geometry.boundingBox = box; m.geometry.boundingSphere = box.getBoundingSphere(new THREE.Sphere()); } };
+  grp.userData.refresh(); if (mesh.parent) { mesh.parent.add(grp); mesh.parent.remove(mesh); }
+  return grp;
+}
+const ground = (() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(GSZ, GSZ, 240, 240), groundMat);
+  m.rotation.x = -Math.PI / 2; m.position.set((GS0 + GS1) / 2, 0, -(GD0 + GD1) / 2); m.receiveShadow = true; scene.add(m); return chunkify(m, 6, 6); })();
 let MIDH = null;   // 고해상도 구역 밖 높이 (중간 지형이 만들어지면 채워짐)
 function terrainAt(x, z) {
   if (!TER.h) return MIDH && (x < GS0 || x > GS1 || -z < GD0 || -z > GD1) ? MIDH(x, z) : 0;
@@ -260,7 +276,7 @@ function terrainAt(x, z) {
 function applyTerrain(h) {
   TER.h = h; const pos = ground.geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, h ? h[i] : 0);
-  pos.needsUpdate = true; ground.geometry.computeVertexNormals(); ground.geometry.computeBoundingSphere();
+  pos.needsUpdate = true; ground.geometry.computeVertexNormals(); ground.geometry.computeBoundingSphere(); if (ground.userData.refresh) ground.userData.refresh();
   // 산지 숲 색: 경사가 있는 곳은 짙은 녹색으로 (코스 통로·경지는 그대로)
   if (h) {
     const nr = ground.geometry.attributes.normal, n = TER.n, col = new Float32Array(pos.count * 3);
@@ -272,7 +288,7 @@ function applyTerrain(h) {
       f *= 0.75 + 0.25 * Math.sin(side * 0.05 + Math.cos(down * 0.043) * 2);
       col[i * 3] = 1 - f * 0.62; col[i * 3 + 1] = 1 - f * 0.42; col[i * 3 + 2] = 1 - f * 0.6;
     }
-    ground.geometry.setAttribute('color', new THREE.BufferAttribute(col, 3)); groundMat.vertexColors = true; groundMat.needsUpdate = true;
+    const ca = new THREE.BufferAttribute(col, 3); ground.geometry.setAttribute('color', ca); if (ground.userData.chunks) ground.userData.chunks.forEach(c => c.geometry.setAttribute('color', ca)); groundMat.vertexColors = true; groundMat.needsUpdate = true;
   }
 }
 if (TER.h) applyTerrain(TER.h);
@@ -299,7 +315,7 @@ const FAR = (function farTerrain() {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
-  m.receiveShadow = false; scene.add(m); return m;
+  m.receiveShadow = false; scene.add(m); return chunkify(m, 4, 4);
 })();
 // ---- 중간 지형: 비행 구역(반경 약 1 km)을 덮는 10 m 격자 · 원경 격자를 부드럽게 보간 + 잔기복 · 고해상도 구역 경계는 이어 붙임 ----
 const MID = (function midTerrain() {
@@ -339,11 +355,12 @@ const MID = (function midTerrain() {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
   const cv = document.createElement('canvas'); cv.width = cv.height = 2048; const cg = cv.getContext('2d'); cg.fillStyle = '#5f6b3e'; cg.fillRect(0, 0, 2048, 2048);
   const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh.receiveShadow = true; scene.add(mesh);
-  // 원경 그물: 중간 지형 상자 안은 비움
-  if (FAR) { const fi = FAR.geometry.index.array, keep = []; const n = FN;
-    for (let k = 0; k < fi.length; k += 6) { const a = fi[k], ix = a % n, iy = (a / n) | 0, s = G.fs0 + (ix + 0.5) * fs, d = G.fd1 - (iy + 0.5) * fs; if (s > s0 && s < s1 && d > d0 && d < d1) continue; for (let j = 0; j < 6; j++) keep.push(fi[k + j]); }
-    FAR.geometry.setIndex(keep); }
+  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
+  // 원경 그물: 중간 지형 상자 안은 비움 (조각별 인덱스에서 걸러냄)
+  if (FAR) { const n = FN; for (const ch of (FAR.userData.chunks || [FAR])) { const fi = ch.geometry.index.array, keep = [];
+    const FP = FAR.geometry.attributes.position.array;
+    for (let k = 0; k < fi.length; k += 3) { const s = (FP[fi[k] * 3] + FP[fi[k + 1] * 3] + FP[fi[k + 2] * 3]) / 3, d = -(FP[fi[k] * 3 + 2] + FP[fi[k + 1] * 3 + 2] + FP[fi[k + 2] * 3 + 2]) / 3; if (s > s0 && s < s1 && d > d0 && d < d1) continue; for (let j = 0; j < 3; j++) keep.push(fi[k + j]); }
+    ch.geometry.setIndex(keep); } if (FAR.userData.refresh) FAR.userData.refresh(); }
   MIDH = at;
   return { s0, s1, d0, d1, st, nx, ny, H, at, cv, cg, tex, mesh, uvOf: (x, z) => [(x - s0) / (s1 - s0) * 2048, (d1 + z) / (d1 - d0) * 2048] };
 })();
