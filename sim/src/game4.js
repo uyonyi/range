@@ -382,4 +382,21 @@ let fakeNow = 0;
 function advance(sec, step, skipRender) { step = step || 1 / 60; const n = Math.max(1, Math.round(sec / step)); if (!fakeNow) fakeNow = last; for (let i = 0; i < n; i++) { fakeNow += step * 1000; frame(fakeNow, skipRender || i < n - 1); } }
 
 // 시험용 핸들
-window.__sim = { STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
+// 테스트용: 배경음악을 오프라인으로 그려 WAV(16비트) 로 돌려줌 (스타일 확인용 · ?test 에서만 씀)
+async function renderMusic(style, dur, state, kind) {
+  const sr = 44100, off = new OfflineAudioContext(2, Math.ceil(sr * dur), sr); let fakeT = 0; Object.defineProperty(off, 'currentTime', { get: () => fakeT });
+  const keep = { ctx: AU.ctx, master: AU.master, noise: AU.noise, bus: MUS.bus, duck: MUS.duck, dly: MUS.dly, timer: MUS.timer, next: MUS.next, step: MUS.step, state: S.state, kind: S.kind, on: MUS.on, vol: MUS.vol };
+  const nb = off.createBuffer(1, sr * 2, sr); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  AU.ctx = off; AU.master = off.createGain(); AU.master.gain.value = 0.9; AU.master.connect(off.destination); AU.noise = nb; MUS.bus = null; MUS.timer = null; MUS.on = true; MUS.vol = 0.8;
+  S.state = state || 'run'; S.kind = kind || 'ridge'; SONG.style = style; SONG.want = style; SONG.prog = null; SONG.sec = 0; SONG.bar = 0; SONG.rnd = (() => { let x = 12345; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
+  musicStart(); clearInterval(MUS.timer);
+  for (fakeT = 0; fakeT < dur; fakeT += 0.1) musicSchedule();
+  const buf = await off.startRendering();
+  Object.assign(AU, { ctx: keep.ctx, master: keep.master, noise: keep.noise }); Object.assign(MUS, { bus: keep.bus, duck: keep.duck, dly: keep.dly, timer: keep.timer, next: keep.next, step: keep.step, on: keep.on, vol: keep.vol }); S.state = keep.state; S.kind = keep.kind;
+  const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)); const w = (o, s2) => { for (let i = 0; i < s2.length; i++) out.setUint8(o + i, s2.charCodeAt(i)); };
+  w(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); w(8, 'WAVEfmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, sr, true); out.setUint32(28, sr * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); w(36, 'data'); out.setUint32(40, n * 4, true);
+  const L = buf.getChannelData(0), Rr = buf.getChannelData(1); let peak = 0; for (let i = 0; i < n; i++) { const a = Math.max(-1, Math.min(1, L[i])), b = Math.max(-1, Math.min(1, Rr[i])); peak = Math.max(peak, Math.abs(L[i]), Math.abs(Rr[i])); out.setInt16(44 + i * 4, a * 32767, true); out.setInt16(46 + i * 4, b * 32767, true); }
+  let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
+  return { wav: btoa(bin), peak };
+}
+window.__sim = { renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
