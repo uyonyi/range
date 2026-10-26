@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <title>FPV Terrain Trainer</title>
 <script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="en")location.replace("index.html")}catch(e){}</script>
+<link rel="manifest" href="manifest.en.webmanifest"><link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="theme-color" content="#0e1216"><meta name="apple-mobile-web-app-title" content="FPV Trainer">
 <script>/* 주소 끝에 ?reset 을 붙이면 저장된 SETTINGS을 지움 */try{if(/[?&]reset/.test(location.search)){Object.keys(localStorage).forEach(function(k){if(/_fpv_settings$|_fpv_keys2$|_fpv_rc$|_menu_ms$/.test(k))localStorage.removeItem(k)});}}catch(e){}</script>
 <script>/* 실행 오류를 화면에 표시 (기기에서 원인 확인용) */(function(){var shown=0;function show(m){if(shown++>2)return;try{var d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#3a0d0d;color:#ffd0d0;border:1px solid #ff6060;border-radius:8px;padding:8px 10px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:30vh;overflow:auto';(document.body||document.documentElement).appendChild(d);}d.textContent+=(d.textContent?'\n':'')+'⚠ '+m;var v=document.getElementById('vrBackD');if(v)v.textContent='오류: '+m;}catch(e){}}
 window.addEventListener('error',function(e){show((e.message||'error')+(e.filename?' @ '+String(e.filename).split('/').pop()+':'+e.lineno:''));});window.addEventListener('unhandledrejection',function(e){var r=e.reason;if(r&&/radio_voice|fetch/i.test(String(r)))return;show('promise: '+(r&&r.message||r));});})();</script>
@@ -174,6 +175,7 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
 .afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
 #irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
+.instbtn{position:absolute;top:14px;right:150px;padding:6px 10px;font-size:12px;border-radius:8px;border:1px solid var(--amber);color:var(--amber);background:rgba(255,200,40,.08)}.instbtn.hidden{display:none}@media (max-width:640px){.instbtn{top:48px;right:14px}}
 .langtog{position:absolute;top:14px;right:14px;display:flex;border:1px solid rgba(255,255,255,.18);border-radius:8px;overflow:hidden}.langtog button{border:0;border-radius:0;padding:6px 10px;font-size:12px;background:transparent;color:#9aa6ad}.langtog button.on{background:#ffc828;color:#111}
 .sitepick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sitepick.hidden{display:none}.stc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}.stc b{font-size:15px}.stc small{font-size:11px;opacity:.75}.stc.on{border-color:#4fe3ff;background:rgba(79,227,255,.1)}
 #attrib{position:fixed;left:calc(8px + env(safe-area-inset-left));bottom:4px;font-size:10px;color:rgba(255,255,255,.55);pointer-events:none;z-index:5;text-shadow:0 0 3px #000;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -376,6 +378,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 </div>
 <div id="menu" class="panel">
   <div class="card" style="position:relative" id="menuCard" data-step="0">
+    <button id="bInstall" class="instbtn hidden" title="Install as an app on your home screen or desktop (works offline)">⬇ Install app</button>
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>FPV TERRAIN TRAINER</h1>
     <h2>Real-terrain drone training · missions · class-1 practice · web simulator (prototype v0.6)</h2>
@@ -683,7 +686,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script>window.SIM_GEOTIFF_URL='lib/geotiff.js';</script>
 <script src="lib/proj4.js"></script>
 <script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=7f7bd7a3"></script>
+<script src="js/app.en.js?v=173f0916"></script>
 <script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

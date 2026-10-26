@@ -105,6 +105,15 @@ def build_public(outdir, site_ids=('yeongin',)):
         js = '// 현장 데이터 (자동 생성: tools/)\nwindow.SIM_NOFLAT=true;\nwindow.SIM_SITES=(window.SIM_SITES||[]).concat([' + json.dumps(s, ensure_ascii=False) + ']);\n'
         js += 'window.SIM_DATA=window.SIM_DATA||' + json.dumps(data, ensure_ascii=False) + ';\n'
         open(f'{outdir}/sites/{sid}.js', 'w', encoding='utf-8').write(js)
+    os.makedirs(outdir + '/icons', exist_ok=True)   # 앱 아이콘 (tools/mk_icons.py) · 설치용 manifest
+    for f in os.listdir('icons'): shutil.copy('icons/' + f, outdir + '/icons/' + f)
+    for lang, page, name, short, desc in (('ko', 'index.html', 'FPV 지형 훈련 시뮬레이터', 'FPV 훈련', '실제 지형 드론 훈련 · 임무 · 1종 실기 연습'), ('en', 'en.html', 'FPV Terrain Trainer', 'FPV Trainer', 'Real-terrain drone training, missions and class-1 practice')):
+        man = {'name': name, 'short_name': short, 'description': desc, 'lang': lang, 'start_url': page, 'scope': './', 'id': page,
+               'display': 'fullscreen', 'display_override': ['fullscreen', 'standalone'], 'orientation': 'landscape', 'background_color': '#0e1216', 'theme_color': '#0e1216',
+               'icons': [{'src': 'icons/icon-192.png', 'sizes': '192x192', 'type': 'image/png'}, {'src': 'icons/icon-512.png', 'sizes': '512x512', 'type': 'image/png'},
+                         {'src': 'icons/icon-maskable-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'}],
+               'categories': ['education', 'games']}
+        json.dump(man, open(f"{outdir}/manifest{'' if lang == 'ko' else '.en'}.webmanifest", 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     pre = build_pages(outdir, site_ids, vr=False)
     os.makedirs(outdir + '/vr/js', exist_ok=True)
     pre += build_pages(outdir + '/vr', site_ids, vr=True)
@@ -116,7 +125,7 @@ def build_public(outdir, site_ids=('yeongin',)):
 def write_sw(outdir, pre):
     """서비스 워커: 핵심 파일은 설치 때 받아 두고(오프라인 실행), 음성·해석기 같은 큰 파일은 처음 쓸 때 받아 캐시. 버전(VER)이 바뀌면 옛 캐시는 지움"""
     import hashlib, glob
-    core = ['lib/three.min.js', 'lib/proj4.js'] + pre
+    core = ['lib/three.min.js', 'lib/proj4.js', 'manifest.webmanifest', 'manifest.en.webmanifest', 'icons/icon-192.png', 'icons/favicon-32.png'] + pre
     for s in glob.glob(outdir + '/sites/*.js'):   # 현장 데이터 안의 ?v= 포함 바닥 사진 주소
         txt = open(s, encoding='utf-8').read()
         core += re.findall(r'"(sites/[^"]+\.webp\?v=[0-9a-f]+)"', txt)
@@ -167,6 +176,7 @@ def build_pages(outdir, site_ids, vr):
         sv = {sid: hashlib.md5(open(f"{outdir if not vr else outdir[:-3]}/sites/{sid}.js", 'rb').read()).hexdigest()[:8] for sid in site_ids}   # 현장 데이터는 그 파일 내용으로 버전
         sites = ''.join(f'<script src="{up}sites/{sid}.js?v={sv[sid]}"></script>' for sid in site_ids)
         other = 'index.html' if lang == 'en' else 'en.html'
+        t = t.replace('</title>', f'</title>\n<link rel="manifest" href="{up}manifest{"" if lang == "ko" else ".en"}.webmanifest"><link rel="icon" type="image/png" sizes="32x32" href="{up}icons/favicon-32.png"><link rel="apple-touch-icon" href="{up}icons/apple-touch-icon.png"><meta name="theme-color" content="#0e1216"><meta name="apple-mobile-web-app-title" content="FPV Trainer">', 1)
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
         flags = "window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';"
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')

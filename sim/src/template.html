@@ -173,6 +173,7 @@ button.mini{padding:3px 9px;font-size:12px;margin-left:8px}
 .afc svg{width:56px;height:42px;color:#cfd6dc;margin-bottom:4px}.afc b{font-size:14px}.afc small{font-size:11px;opacity:.75}.afc .spec{font-size:12px;color:#ffc828;margin-top:4px}.afc .nt{font-size:11px;opacity:.7;line-height:1.35}
 .afc.on{border-color:#ffc828;background:rgba(255,200,40,.12)}.afc.on svg{color:#ffc828}
 #irTag{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);font:600 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border:1px solid #fff;border-radius:4px;pointer-events:none}
+.instbtn{position:absolute;top:14px;right:150px;padding:6px 10px;font-size:12px;border-radius:8px;border:1px solid var(--amber);color:var(--amber);background:rgba(255,200,40,.08)}.instbtn.hidden{display:none}@media (max-width:640px){.instbtn{top:48px;right:14px}}
 .langtog{position:absolute;top:14px;right:14px;display:flex;border:1px solid rgba(255,255,255,.18);border-radius:8px;overflow:hidden}.langtog button{border:0;border-radius:0;padding:6px 10px;font-size:12px;background:transparent;color:#9aa6ad}.langtog button.on{background:#ffc828;color:#111}
 .sitepick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sitepick.hidden{display:none}.stc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}.stc b{font-size:15px}.stc small{font-size:11px;opacity:.75}.stc.on{border-color:#4fe3ff;background:rgba(79,227,255,.1)}
 #attrib{position:fixed;left:calc(8px + env(safe-area-inset-left));bottom:4px;font-size:10px;color:rgba(255,255,255,.55);pointer-events:none;z-index:5;text-shadow:0 0 3px #000;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -375,6 +376,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 </div>
 <div id="menu" class="panel">
   <div class="card" style="position:relative" id="menuCard" data-step="0">
+    <button id="bInstall" class="instbtn hidden" title="홈 화면·바탕화면에 앱으로 설치 (오프라인 실행)">⬇ 앱으로 설치</button>
     <div id="langTog" class="langtog"><button data-l="ko">한국어</button><button data-l="en">English</button></div>
     <h1>{{H1}}</h1>
     <h2>{{H2}}</h2>
