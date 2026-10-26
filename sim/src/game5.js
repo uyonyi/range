@@ -478,7 +478,7 @@ function passCross(o, prev, cur) {
 const RACE_PEN = 8;   // 레이스: 놓친 링 하나당 +8 s
 // 구간 기록: 통과점마다 지금 시간을 적고, 같은 임무·기체·모드의 최고 기록 구간과 비교해 녹/적 델타 표시 (Liftoff 랩 타이머식)
 const SPLIT = { t: 0 };
-function splitKey() { return 'hroc_ms_split_' + S.kind + '_' + AFc().id + '_' + SET.diff + SITE_KEY; }
+function splitKey() { return 'fpvsim_ms_split_' + S.kind + '_' + AFc().id + '_' + SET.diff + SITE_KEY; }
 function splitMark() {
   if (!(S.kind === 'race' || S.kind === 'ridge' || S.kind === 'forest')) return;
   const now = S.t + S.pen; MS.splits = MS.splits || []; while (MS.splits.length <= MS.idx) MS.splits.push(now);   // 건너뛴 링도 같은 시각으로 채워 인덱스를 맞춤
@@ -559,12 +559,12 @@ const DBF = { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0 
 function dbfStart() { Object.assign(DBF, { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0, flyT: 0 }); }
 function dbfObj(label, ok) { if (S.state === 'run') DBF.objs.push({ label: String(label || ''), ok, t: S.t }); }
 // 누적 비행 시간 (모든 모드 · 로컬 저장)
-const TOT = (() => { let t = 0; try { t = +localStorage.getItem('hroc_fpv_flyT') || 0; } catch (e) { } return { t, save: 0 }; })();
+const TOT = (() => { let t = 0; try { t = +localStorage.getItem('fpvsim_fpv_flyT') || 0; } catch (e) { } return { t, save: 0 }; })();
 function totFlyText() { const h = Math.floor(TOT.t / 3600), m = Math.floor(TOT.t % 3600 / 60); return L2('누적 비행 ', 'Flight time ') + (h ? h + 'h ' : '') + m + 'm'; }
 function totFlyUI() { const e = $('totFly'); if (e) e.textContent = totFlyText(); }
 function dbfTick(dt) {
   splitTick(dt);
-  if (S.state === 'run' && DR.alive && !DR.landed) { TOT.t += dt; TOT.save += dt; if (TOT.save > 15) { TOT.save = 0; try { localStorage.setItem('hroc_fpv_flyT', String(Math.round(TOT.t))); } catch (e) { } } }
+  if (S.state === 'run' && DR.alive && !DR.landed) { TOT.t += dt; TOT.save += dt; if (TOT.save > 15) { TOT.save = 0; try { localStorage.setItem('fpvsim_fpv_flyT', String(Math.round(TOT.t))); } catch (e) { } } }
   if (S.state !== 'run' || !S.running) return;
   if (DR.alive && !DR.landed) { const v = DR.v.length(); DBF.dist += v * dt; DBF.vmax = Math.max(DBF.vmax, v); DBF.flyT += dt; DBF.altMax = Math.max(DBF.altMax, DR.p.y - groundAt(DR.p.x, DR.p.z)); }
   if (S.pen > DBF.pen0 + 0.01) { DBF.pens.push({ t: S.t, d: S.pen - DBF.pen0, why: S.lastMsg && S.t - (S.lastMsgT || 0) < 2 && /\+\s?\d+\s?(s|초)|MISS|IMPACT|SKIP|번짐|spread/i.test(S.lastMsg) ? S.lastMsg : (S.kind === 'fire' ? L2('불씨 번짐', 'fire spread') : '') }); DBF.pen0 = S.pen; }
@@ -770,7 +770,7 @@ function msFinish() {
     debriefShow(MS.list.filter(x => x.done && !x.miss).length, MS.list.length, MS.par || 0);
     const ph = (S.photos || []).filter(p => p.ok), rp = $('resPhotos');
     if (rp) { rp.style.display = ph.length ? 'flex' : 'none'; rp.innerHTML = ph.map((p, i) => `<figure><a href="${p.url}" download="report_${S.kind}_${i + 1}.jpg"><img src="${p.url}" alt=""></a>${L2('보고 ', 'Report ')}${i + 1}${p.xy ? ' · ' + p.xy[0].toFixed(0) + ', ' + p.xy[1].toFixed(0) : ''}</figure>`).join(''); }
-    const key = 'hroc_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY; let best = null;
+    const key = 'fpvsim_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY; let best = null;
     try { best = parseFloat(localStorage.getItem(key)); } catch (e) { }
     if (!best || total < best) { try { localStorage.setItem(key, String(total)); if (MS.splits) localStorage.setItem(splitKey(), JSON.stringify(MS.splits)); } catch (e) { } ui.resBest.textContent = '★ 최고 기록 갱신'; }
     else ui.resBest.textContent = '최고 기록 ' + fmt(best);
@@ -1721,7 +1721,7 @@ const LY_ITEMS = [
   ['radio', '무전', 'Radio'], ['guide', '안내 문구', 'Guide'], ['bottom', '상태 표시', 'Status'], ['scope', '투하 조준', 'Drop scope'],
   ['tbBoost', 'BST', 'BST'], ['tbDrop', 'DROP', 'DROP'], ['tbCam', 'CAM', 'CAM'], ['tbReset', '⟲', '⟲'], ['tbBelly', '↓CAM', '↓CAM'], ['tbIR', 'IR', 'IR'], ['tbLight', '💡', '💡'], ['tbAssist', 'AST', 'AST'], ['tbZoom', 'ZM', 'ZM'], ['tbGuide', 'GD', 'GD'], ['tbFull', '⛶', '⛶'], ['tbPause', '❚❚', '❚❚']
 ];
-const LY = { key: 'hroc_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
+const LY = { key: 'fpvsim_layout_' + (IS_TOUCH ? 'touch' : 'desk'), d: {}, edit: false, sel: null };
 try { LY.d = JSON.parse(localStorage.getItem(LY.key) || '{}'); } catch (e) { }
 // 버튼 기본 배치가 바뀌었으니 예전에 저장한 버튼 위치는 한 번 지움 (다른 창 위치는 유지)
 if (!LY.d.__v3) { for (const k of Object.keys(LY.d)) if (/^tb/.test(k)) delete LY.d[k]; LY.d.__v3 = 1; try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
@@ -1822,7 +1822,7 @@ document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle(
 //  시작 화면: 격납고(기체 회전 미리 보기) · 임무 트리맵 · 임무 현장 미리 보기
 // =====================================================================
 const MENU = { ms: 'course', cf: null, cR: 60, cH: 20, a: 0, ri: 0, tt: 0, models: {}, dbl: 0 };
-try { const v = localStorage.getItem('hroc_menu_ms'); if (v) MENU.ms = v; } catch (e) { }
+try { const v = localStorage.getItem('fpvsim_menu_ms'); if (v) MENU.ms = v; } catch (e) { }
 const MS_CAT = { course: 'train', forest: 'train', race: 'train', ridge: 'train', field: 'train', tutorial: 'train', free: 'train', demo: 'train', recon: 'recon', track: 'recon', fire: 'rescue', sar: 'rescue', strike: 'strike' };
 const CAT_C = { train: '#4fe3ff', recon: '#5dff9a', rescue: '#ffaa4d', strike: '#ff5d5d' };
 const AF_C = { quad: '#5aa9ff', fpv: '#b48cff', wing: '#4fe3c0', kam: '#ff6a5d' };
@@ -1871,7 +1871,7 @@ function menuAfPanel() {
   const st = $('afStats'); if (st) { st.style.setProperty('--cc', col); st.innerHTML = afStats(a).map(r => `<span class="k">${r[0]}</span><span class="sbar"><i style="width:${Math.round(clamp(r[1], 0.04, 1) * 100)}%"></i></span><span class="v">${r[2]}</span>`).join('') + `<span class="note2">${a.note}</span>`; }
 }
 function menuBest(k) {
-  let key = k === 'course' ? 'hroc_fpv_best_' + SET.diff + SITE_KEY : isMission(k) ? 'hroc_ms_best_' + k + '_' + SET.af + '_' + SET.diff + SITE_KEY : null, b = null;
+  let key = k === 'course' ? 'fpvsim_fpv_best_' + SET.diff + SITE_KEY : isMission(k) ? 'fpvsim_ms_best_' + k + '_' + SET.af + '_' + SET.diff + SITE_KEY : null, b = null;
   if (key) try { b = parseFloat(localStorage.getItem(key)); } catch (e) { }
   return b > 0 ? b : null;
 }
@@ -1922,7 +1922,7 @@ function menuSel(k, go) {
     const g0 = t ? t.dataset.g : 'basic', L = msInGrp(g0).length ? msInGrp(g0) : MS_GRP.flatMap(msInGrp); k = L[0] || 'free'; t = msTile(k);
   }
   MENU.ms = k; MENU.g = msTile(k).dataset.g; (MENU.lastIn = MENU.lastIn || {})[MENU.g] = k;
-  try { localStorage.setItem('hroc_menu_ms', k); } catch (e) { }
+  try { localStorage.setItem('fpvsim_menu_ms', k); } catch (e) { }
   MENU.afNote = '';
   MENU.prevMs = k; msVis(); menuDetail(); if (go) menuGo();
 }
@@ -1941,11 +1941,11 @@ if ($('bPauseCtl')) $('bPauseCtl').onclick = () => { openPanel('ctlPanel'); try 
 setInterval(() => { const w = $('pauseWho'); if (w && S.state === 'pause') { const lk = S.lastKind || S.kind; w.textContent = L2('현재 임무: ', 'Mission: ') + (MS_NAME[lk] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('자유 비행', 'Free flight'), tutorial: L2('튜토리얼', 'Tutorial'), demo: L2('기준 비행', 'Reference flight') })[lk] || lk) + ' · ' + AFc().name + ' · ' + pilotName(); } }, 400);
 // ---- 첫 화면 3단계: 1 조종사 이름 → 2 기체 → 3 코스 (각 단계 뒤로 가기) ----
 MENU.step = 0; const HAS_INTRO = !!(window.SIM_VR || window.SIM_VR_URL); MENU.mode = window.SIM_VR ? 'vr' : 'pc';
-try { SET.pilot = localStorage.getItem('hroc_pilot') || ''; } catch (e) { SET.pilot = ''; }
+try { SET.pilot = localStorage.getItem('fpvsim_pilot') || ''; } catch (e) { SET.pilot = ''; }
 function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
 function wizGo(n) {
   n = Math.max(HAS_INTRO ? 0 : 1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
-  if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('hroc_pilot', v); } catch (e) { } }
+  if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
   MENU.step = n; c.dataset.step = n; closePanels(); setTimeout(msGoFSync, 0);
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
@@ -1990,7 +1990,7 @@ function sha256hex(str) {
 }
 function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex('fpv~' + i + '~' + x); return x; }
 (function pinGate() {
-  const SALT = 'k7Qx2#range', MID = 5000, N = 12000, FIN = '667c6eac4841dacac28af88ce9febae877dcf0556f15edc5211601d0f51bb8eb', KEY = 'hroc_pin_ok', el = $('pinGate'); if (!el) return;
+  const SALT = 'k7Qx2#range', MID = 5000, N = 12000, FIN = '667c6eac4841dacac28af88ce9febae877dcf0556f15edc5211601d0f51bb8eb', KEY = 'fpvsim_pin_ok', el = $('pinGate'); if (!el) return;
   const okMid = m => typeof m === 'string' && /^[0-9a-f]{64}$/.test(m) && pinStretch(m, MID, N) === FIN;
   let ok = false; try { ok = okMid(localStorage.getItem(KEY)); } catch (e) { }
   if (ok || window.SIM_UNLOCKED || /[?&]test/.test(location.search)) return;   // 암호로 잠근 파일은 이미 문구 암호를 거쳤으므로 다시 묻지 않음
@@ -2015,7 +2015,7 @@ function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex
 function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
 if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
 // 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
-{ const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('hroc_menu_ms'); } catch (e) { }
+{ const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
   if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
     c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; } }
 if ($('introVR')) $('introVR').onclick = () => {

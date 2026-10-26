@@ -82,7 +82,7 @@ const LESSONS = [
     start: () => startFacing(17, 14) }
 ];
 let TUT_DONE = {};
-try { TUT_DONE = JSON.parse(localStorage.getItem('hroc_fpv_tut') || '{}'); } catch (e) { }
+try { TUT_DONE = JSON.parse(localStorage.getItem('fpvsim_fpv_tut') || '{}'); } catch (e) { }
 function tutStart(i) {
   enterFull();
   startRun('tutorial');
@@ -118,7 +118,7 @@ function tutCustomCheck(p, dt) {
 }
 function tutComplete() {
   S.tut.st = 'done';
-  TUT_DONE[S.tut.i] = 1; try { localStorage.setItem('hroc_fpv_tut', JSON.stringify(TUT_DONE)); } catch (e) { }
+  TUT_DONE[S.tut.i] = 1; try { localStorage.setItem('fpvsim_fpv_tut', JSON.stringify(TUT_DONE)); } catch (e) { }
   sfx('chime'); showMsg('LESSON COMPLETE', '#5dff9a', 2.5);
   tutRender(); renderTutMenu();
 }
@@ -172,12 +172,12 @@ function recFinish() {
   REC.total = S.t + S.pen; REC.course = S.t; LAST_REC = REC; const r = REC; REC = null; return r;
 }
 function loadBest() {
-  for (const d of Object.keys(MODES)) { try { const s = localStorage.getItem('hroc_fpv_bestrec_' + d + SITE_KEY); if (s) BEST[d] = JSON.parse(s); } catch (e) { } }
+  for (const d of Object.keys(MODES)) { try { const s = localStorage.getItem('fpvsim_fpv_bestrec_' + d + SITE_KEY); if (s) BEST[d] = JSON.parse(s); } catch (e) { } }
 }
 function saveBest(r) {
   if (!r || r.kind !== 'course') return;
   const o = { s: r.s, ev: r.ev, t0: r.t0, total: r.total, diff: r.diff, kind: r.kind };
-  BEST[r.diff] = o; try { localStorage.setItem('hroc_fpv_bestrec_' + r.diff + SITE_KEY, JSON.stringify(o)); } catch (e) { }
+  BEST[r.diff] = o; try { localStorage.setItem('fpvsim_fpv_bestrec_' + r.diff + SITE_KEY, JSON.stringify(o)); } catch (e) { }
 }
 function recPose(rec, t, out) {
   const s = rec.s; if (!s.length) return out;

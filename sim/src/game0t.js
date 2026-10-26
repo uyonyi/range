@@ -194,11 +194,11 @@ function demPreview(R, maxPx) {
 const SITE_FLAT = Object.assign({ id: 'flat', name: '평지 · 기본 코스', crs: 'EPSG:32652', e0: 300000, n0: 4000000, brg: 0, dc: 170, sc: -15, base: 0, flat: true }, window.SIM_FLAT_SITE || {});
 function sitesAll() {
   const L = (window.SIM_NOFLAT ? [] : [SITE_FLAT]).concat(window.SIM_SITES || []);
-  try { const s = localStorage.getItem('hroc_site_custom'); if (s) L.push(JSON.parse(s)); } catch (e) { }
+  try { const s = localStorage.getItem('fpvsim_site_custom'); if (s) L.push(JSON.parse(s)); } catch (e) { }
   return L;
 }
-function siteCurrentId() { try { return localStorage.getItem('hroc_site') || window.SIM_DEFAULT_SITE || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
-function siteSelect(id) { try { localStorage.setItem('hroc_site', id); } catch (e) { } }
+function siteCurrentId() { try { return localStorage.getItem('fpvsim_site') || window.SIM_DEFAULT_SITE || (window.SIM_SITES && window.SIM_SITES[0] ? window.SIM_SITES[0].id : 'flat'); } catch (e) { return 'flat'; } }
+function siteSelect(id) { try { localStorage.setItem('fpvsim_site', id); } catch (e) { } }
 function siteLoad() {
   const id = siteCurrentId(), L = sitesAll();
   const s = L.find(x => x.id === id) || L[0] || SITE_FLAT;

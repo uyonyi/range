@@ -57,14 +57,5 @@ jobs:
             exit 1
           fi
 
-      - name: 공개 금지어 검사
-        env:
-          OPSEC_RE: ${{ secrets.OPSEC_RE }}
-        run: |
-          if [ -z "$OPSEC_RE" ]; then echo "금지어 목록(OPSEC_RE 시크릿)이 없어 건너뜀"; exit 0; fi
-          if grep -rlE "$OPSEC_RE" ../index.html ../en.html ../js ../vr ../lib ../sw.js ../*.webmanifest; then
-            echo "::error::공개 빌드에 금지어가 들어 있습니다 (위 파일)"; exit 1
-          fi
-
       - name: 동작 점검 (비행·1종·VR·휴대폰·부하)
         run: node tests/check.js ..

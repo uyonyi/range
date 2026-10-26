@@ -7,7 +7,7 @@ const SITE_X = siteXform(SITE);
 function course2utm(down, side) { return SITE_X.toEN(down, side); }
 const ORTHO_N = 4096;
 const IDB = {
-  open() { return new Promise((res, rej) => { try { const r = indexedDB.open('hroc_fpv', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
+  open() { return new Promise((res, rej) => { try { const r = indexedDB.open('fpvsim_fpv', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
   async put(k, v) { try { const db = await this.open(); await new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); } catch (e) { } },
   async get(k) { try { const db = await this.open(); return await new Promise((res) => { const tx = db.transaction('kv', 'readonly'); const r = tx.objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); }); } catch (e) { return null; } },
   async del(k) { try { const db = await this.open(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = res; }); } catch (e) { } }
@@ -200,7 +200,7 @@ $('demApply').onclick = async () => {
   if (!DEMUI.R) return; $('demMsg').textContent = '지형 만드는 중…'; await new Promise(r => setTimeout(r, 30));
   try {
     const pkg = buildTerrainPkg(DEMUI.R, { lat: +$('demLat').value, lon: +$('demLon').value, brg: +$('demBrg').value, name: ($('demName').value || 'DEM') + ' (내 DEM)', id: 'custom' });
-    localStorage.setItem('hroc_site_custom', JSON.stringify(pkg)); siteSelect('custom');
+    localStorage.setItem('fpvsim_site_custom', JSON.stringify(pkg)); siteSelect('custom');
     $('demMsg').textContent = '완료 — 다시 불러옵니다'; setTimeout(() => location.reload(), 300);
   } catch (err) { $('demMsg').textContent = '실패: ' + (err && err.message ? err.message : err); }
 };
@@ -329,7 +329,7 @@ $('setClose').onclick = $('recClose').onclick = $('helpClose').onclick = () => c
 $('bKB3').onclick = () => { closePanels(); kbOpen(); };
 function renderRecords() {
   const rows = Object.keys(MODES).map(d => {
-    let b = null; try { b = parseFloat(localStorage.getItem('hroc_fpv_best_' + d + SITE_KEY)); } catch (e) { }
+    let b = null; try { b = parseFloat(localStorage.getItem('fpvsim_fpv_best_' + d + SITE_KEY)); } catch (e) { }
     return `<tr><td>${MODES[d].name}</td><td class="mono">${b ? fmt(b) : '—'}</td><td>${BEST[d] ? `<button data-rp="${d}">리플레이</button>` : ''}</td></tr>`;
   }).join('');
   $('recTable').innerHTML = `<tr><td style="color:var(--mute)">난이도</td><td style="color:var(--mute)">최고 기록 (벌점 포함)</td><td></td></tr>` + rows + `<tr><td>기준 비행</td><td class="mono">${fmt(GH.total)}</td><td style="color:var(--mute);font-size:12px">영상 경로</td></tr>`;
@@ -415,7 +415,7 @@ $('demFile').addEventListener('change', e => { const f = e.target.files[0]; if (
 $('bOrthoReset').onclick = () => { resetGround(); IDB.del('ortho' + SITE_KEY0); setOrthoStatus('기본 바닥 사용 중', ''); };
 function refreshBest() {
   $('bLastRp').disabled = !LAST_REC;
-  let b = null; try { b = parseFloat(localStorage.getItem('hroc_fpv_best_' + SET.diff)); } catch (e) { }
+  let b = null; try { b = parseFloat(localStorage.getItem('fpvsim_fpv_best_' + SET.diff)); } catch (e) { }
   ui.best.textContent = b ? `최고 기록 (${MODES[SET.diff].name}): ${fmt(b)} · 기준 비행 ${fmt(GH.total)}` : `기준 비행 (영상 경로): ${fmt(GH.total)}`;
 }
 // 앱으로 설치 (PWA): 브라우저가 설치를 허락하면(beforeinstallprompt) 첫 화면에 버튼 표시 · 이미 설치된 창에서는 숨김
