@@ -452,7 +452,7 @@ function msStart(kind) {
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
-  o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
+  o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3); rumble(0.15, 0.5, 90);
   splitMark();
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; commAck(o, S.kind);
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
@@ -483,7 +483,7 @@ function splitMark() {
 function splitTick(dt) { if (SPLIT.t > 0) { SPLIT.t -= dt; if (SPLIT.t <= 0) { const el = $('split'); if (el) el.classList.remove('on'); } } }
 function msSkip() {
   const o = msObj(); if (!o) return;
-  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3); splitMark();
+  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); rumble(0.6, 0.2, 160); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3); splitMark();
   comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
@@ -2549,6 +2549,7 @@ Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWx
     segFull: { 1: ['출격할 때 전체 화면으로 바꿉니다', 'Switches to full screen at launch'], 0: ['창 크기 그대로 비행합니다', 'Stays in the window'] },
     segVoice: { 1: ['CONTROL(남)·EAGLE ONE(여) 영어 무전을 소리로 들려줍니다', 'Plays CONTROL (male) and EAGLE ONE (female) radio'], 0: ['무전은 글자로만 보입니다', 'Radio shown as text only'] },
     segMusic: { 1: ['배경음악 켬 · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['배경음악 끔', 'Music off'] },
+    segRumble: { 0: ['진동 없음', 'No rumble'], 1: ['충돌·링 통과·착지·실속 때 짧게 (Xbox 등 게임패드 · VR 컨트롤러 · 휴대폰)', 'Short pulses on hits, gates, landing, stall (gamepads, VR controllers, phones)'], 2: ['여기에 높은 스로틀·부스트·고속 바람의 약한 상시 진동 추가', 'Plus a light constant buzz at high throttle, boost and speed'] },
     segKeys: { A: ['W/S 상승·하강 · A/D 회전 · 방향키 이동', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·회전, WASD로 이동', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 직접 지정합니다', 'Assign every key yourself'] },
   };
   const HW = { segMode: {   // 고정익일 때 설명

@@ -295,7 +295,21 @@ function readInput(dt) {
   if (XR_ON) xrInput(dt);   // VR 컨트롤러 스틱
 }
 const RCUI = { open: false };
+// 진동 피드백: 게임패드(Xbox 등 dual-rumble) · VR 컨트롤러 · 휴대폰. 세기 설정 SET.rumble 0 끔 · 1 보통(이벤트만) · 2 강(모터·바람 상시 진동 포함)
+const RUM = { t: 0, lvl: 0 };
+function rumbleK() { const v = SET.rumble; return v == null ? 1 : +v; }
 function rumble(strong, weak, ms) {
+  const k = rumbleK(); if (!k) return; const sc = k >= 2 ? 1 : 0.8; strong = Math.min(1, strong * sc); weak = Math.min(1, weak * sc);
   try { if (TOUCH.on && navigator.vibrate) navigator.vibrate(Math.round((ms || 180) * Math.max(strong, weak) * 0.6)); } catch (e) { }
   try { const gp = getPad(); const va = gp && gp.vibrationActuator; if (va && va.playEffect) va.playEffect('dual-rumble', { duration: ms || 180, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { }
+  try { if (typeof XR !== 'undefined' && XR.sess) for (const src of XR.sess.inputSources) { const h = src.gamepad && src.gamepad.hapticActuators && src.gamepad.hapticActuators[0]; if (h && h.pulse) h.pulse(Math.max(strong, weak), ms || 180); } } catch (e) { }
+}
+// 상시 진동 (강 설정): 높은 스로틀·부스트·고속 바람 → 약한 모터 진동 (100 ms 마다 갱신)
+function rumbleTick(dt) {
+  if (rumbleK() < 2 || S.state !== 'run' || !DR.alive) return;
+  RUM.t -= dt; if (RUM.t > 0) return; RUM.t = 0.1;
+  const sp = Math.hypot(DR.v.x, DR.v.z), thr = DR.thrust || 0, boost = S.boosting ? 0.35 : 0;
+  const weak = Math.min(0.6, Math.max(0, thr - 0.6) * 0.8 + sp / 60 * 0.3 + boost), strong = Math.min(0.4, boost * 0.6 + Math.max(0, sp - 25) / 40);
+  if (weak < 0.04 && strong < 0.04) return;
+  try { const gp = getPad(); const va = gp && gp.vibrationActuator; if (va && va.playEffect) va.playEffect('dual-rumble', { duration: 130, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { }
 }

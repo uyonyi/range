@@ -27,7 +27,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
+const SET_KEYS = ['rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -303,7 +303,7 @@ function droneGround(dt) {
     const hs = Math.hypot(DR.v.x, DR.v.z), vy = DR.v.y;
     DR.p.y = gh;
     if (vy < -4.5 || hs > 7 || (DR.q && DR.upY < 0.6)) { impact(new V3(0, 1, 0), Math.min(vy, -2)); DR.v.y = Math.abs(vy) * 0.3; if (DR.q) { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(0, _ve.y, 0); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); } }
-    else { DR.v.y = Math.max(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); DR.landed = true; }
+    else { DR.v.y = Math.max(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); if (!DR.landed && vy < -0.8) rumble(0.25 + Math.min(0.4, -vy * 0.1), 0.2, 110); DR.landed = true; }
   } else if (DR.p.y > gh + 0.03) DR.landed = false;
   if (DR.p.y > gh + 120) { DR.p.y = gh + 120; DR.v.y = Math.min(DR.v.y, 0); }   // 지면 위 120 m 제한
   // 장애물
@@ -312,7 +312,7 @@ function droneGround(dt) {
     const vn = DR.v.dot(hit.n);
     DR.p.addScaledVector(hit.n, hit.pen + 0.003);
     if (vn < -2.5) impact(hit.n, vn);
-    else { if (vn < 0) DR.v.addScaledVector(hit.n, -vn * 1.2); DR.v.multiplyScalar(0.85); if (S.bumpT <= 0) { sfx('bad'); S.bumpT = 0.4; } }
+    else { if (vn < 0) DR.v.addScaledVector(hit.n, -vn * 1.2); DR.v.multiplyScalar(0.85); if (S.bumpT <= 0) { sfx('bad'); rumble(0.45, 0.35, 120); S.bumpT = 0.4; } }
   }
   // 비행 구역 경계: 밀어냄
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
@@ -881,7 +881,8 @@ let XR_ON = false;   // VR(WebXR) 중: 화면 갱신은 XR 세션이 돌림
 function frame(now, noRender) {
   if (!TEST && !XR_ON) requestAnimationFrame(frame);
   let dt = Math.max(0, Math.min((now - last) / 1000, 0.1)); last = now;
-  readInput(dt); handleKeys();
+  readInput(dt);
+  rumbleTick(dt); handleKeys();
   if (RCUI.open) rcPanelUpdate();
   const playing = S.state === 'run' || S.state === 'demo';
   if (S.state === 'pause') dt = 0;

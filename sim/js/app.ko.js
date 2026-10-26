@@ -1902,9 +1902,23 @@ function readInput(dt) {
   if (XR_ON) xrInput(dt);   // VR 컨트롤러 스틱
 }
 const RCUI = { open: false };
+// 진동 피드백: 게임패드(Xbox 등 dual-rumble) · VR 컨트롤러 · 휴대폰. 세기 설정 SET.rumble 0 끔 · 1 보통(이벤트만) · 2 강(모터·바람 상시 진동 포함)
+const RUM = { t: 0, lvl: 0 };
+function rumbleK() { const v = SET.rumble; return v == null ? 1 : +v; }
 function rumble(strong, weak, ms) {
+  const k = rumbleK(); if (!k) return; const sc = k >= 2 ? 1 : 0.8; strong = Math.min(1, strong * sc); weak = Math.min(1, weak * sc);
   try { if (TOUCH.on && navigator.vibrate) navigator.vibrate(Math.round((ms || 180) * Math.max(strong, weak) * 0.6)); } catch (e) { }
   try { const gp = getPad(); const va = gp && gp.vibrationActuator; if (va && va.playEffect) va.playEffect('dual-rumble', { duration: ms || 180, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { }
+  try { if (typeof XR !== 'undefined' && XR.sess) for (const src of XR.sess.inputSources) { const h = src.gamepad && src.gamepad.hapticActuators && src.gamepad.hapticActuators[0]; if (h && h.pulse) h.pulse(Math.max(strong, weak), ms || 180); } } catch (e) { }
+}
+// 상시 진동 (강 설정): 높은 스로틀·부스트·고속 바람 → 약한 모터 진동 (100 ms 마다 갱신)
+function rumbleTick(dt) {
+  if (rumbleK() < 2 || S.state !== 'run' || !DR.alive) return;
+  RUM.t -= dt; if (RUM.t > 0) return; RUM.t = 0.1;
+  const sp = Math.hypot(DR.v.x, DR.v.z), thr = DR.thrust || 0, boost = S.boosting ? 0.35 : 0;
+  const weak = Math.min(0.6, Math.max(0, thr - 0.6) * 0.8 + sp / 60 * 0.3 + boost), strong = Math.min(0.4, boost * 0.6 + Math.max(0, sp - 25) / 40);
+  if (weak < 0.04 && strong < 0.04) return;
+  try { const gp = getPad(); const va = gp && gp.vibrationActuator; if (va && va.playEffect) va.playEffect('dual-rumble', { duration: 130, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { }
 }
 
 // =====================================================================
@@ -1935,7 +1949,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
+const SET_KEYS = ['rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -2211,7 +2225,7 @@ function droneGround(dt) {
     const hs = Math.hypot(DR.v.x, DR.v.z), vy = DR.v.y;
     DR.p.y = gh;
     if (vy < -4.5 || hs > 7 || (DR.q && DR.upY < 0.6)) { impact(new V3(0, 1, 0), Math.min(vy, -2)); DR.v.y = Math.abs(vy) * 0.3; if (DR.q) { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(0, _ve.y, 0); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); } }
-    else { DR.v.y = Math.max(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); DR.landed = true; }
+    else { DR.v.y = Math.max(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); if (!DR.landed && vy < -0.8) rumble(0.25 + Math.min(0.4, -vy * 0.1), 0.2, 110); DR.landed = true; }
   } else if (DR.p.y > gh + 0.03) DR.landed = false;
   if (DR.p.y > gh + 120) { DR.p.y = gh + 120; DR.v.y = Math.min(DR.v.y, 0); }   // 지면 위 120 m 제한
   // 장애물
@@ -2220,7 +2234,7 @@ function droneGround(dt) {
     const vn = DR.v.dot(hit.n);
     DR.p.addScaledVector(hit.n, hit.pen + 0.003);
     if (vn < -2.5) impact(hit.n, vn);
-    else { if (vn < 0) DR.v.addScaledVector(hit.n, -vn * 1.2); DR.v.multiplyScalar(0.85); if (S.bumpT <= 0) { sfx('bad'); S.bumpT = 0.4; } }
+    else { if (vn < 0) DR.v.addScaledVector(hit.n, -vn * 1.2); DR.v.multiplyScalar(0.85); if (S.bumpT <= 0) { sfx('bad'); rumble(0.45, 0.35, 120); S.bumpT = 0.4; } }
   }
   // 비행 구역 경계: 밀어냄
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
@@ -2789,7 +2803,8 @@ let XR_ON = false;   // VR(WebXR) 중: 화면 갱신은 XR 세션이 돌림
 function frame(now, noRender) {
   if (!TEST && !XR_ON) requestAnimationFrame(frame);
   let dt = Math.max(0, Math.min((now - last) / 1000, 0.1)); last = now;
-  readInput(dt); handleKeys();
+  readInput(dt);
+  rumbleTick(dt); handleKeys();
   if (RCUI.open) rcPanelUpdate();
   const playing = S.state === 'run' || S.state === 'demo';
   if (S.state === 'pause') dt = 0;
@@ -3681,7 +3696,9 @@ function syncSeg() {
   document.querySelectorAll('#segAssistLv button').forEach(b => b.classList.toggle('on', +b.dataset.v === SET.assistLv));
   document.querySelectorAll('#segFeel button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.feel));
   document.querySelectorAll('#segThrHover button').forEach(b => b.classList.toggle('on', b.dataset.v === (SET.thrHover || 'auto')));
-  document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
+  document.querySelectorAll('#segRumble button').forEach(b => b.classList.toggle('on', +b.dataset.v === (SET.rumble == null ? 1 : +SET.rumble)));
+  document.querySelectorAll('#segRumble button').forEach(b => b.addEventListener('click', () => { SET.rumble = +b.dataset.v; saveSet(); syncSeg(); rumble(0.6, 0.6, 200); }));
+document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
   { const r = feelRates('p'), y = feelRates('y'); ['rc0', 'rc1', 'rc2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = r[i]; }); ['ry0', 'ry1', 'ry2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = y[i]; });
     const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
     if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
@@ -4291,7 +4308,7 @@ function msStart(kind) {
 }
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
-  o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
+  o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3); rumble(0.15, 0.5, 90);
   splitMark();
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; commAck(o, S.kind);
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
@@ -4322,7 +4339,7 @@ function splitMark() {
 function splitTick(dt) { if (SPLIT.t > 0) { SPLIT.t -= dt; if (SPLIT.t <= 0) { const el = $('split'); if (el) el.classList.remove('on'); } } }
 function msSkip() {
   const o = msObj(); if (!o) return;
-  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3); splitMark();
+  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); rumble(0.6, 0.2, 160); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3); splitMark();
   comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
@@ -6388,6 +6405,7 @@ Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWx
     segFull: { 1: ['출격할 때 전체 화면으로 바꿉니다', 'Switches to full screen at launch'], 0: ['창 크기 그대로 비행합니다', 'Stays in the window'] },
     segVoice: { 1: ['CONTROL(남)·EAGLE ONE(여) 영어 무전을 소리로 들려줍니다', 'Plays CONTROL (male) and EAGLE ONE (female) radio'], 0: ['무전은 글자로만 보입니다', 'Radio shown as text only'] },
     segMusic: { 1: ['배경음악 켬 · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['배경음악 끔', 'Music off'] },
+    segRumble: { 0: ['진동 없음', 'No rumble'], 1: ['충돌·링 통과·착지·실속 때 짧게 (Xbox 등 게임패드 · VR 컨트롤러 · 휴대폰)', 'Short pulses on hits, gates, landing, stall (gamepads, VR controllers, phones)'], 2: ['여기에 높은 스로틀·부스트·고속 바람의 약한 상시 진동 추가', 'Plus a light constant buzz at high throttle, boost and speed'] },
     segKeys: { A: ['W/S 상승·하강 · A/D 회전 · 방향키 이동', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·회전, WASD로 이동', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 직접 지정합니다', 'Assign every key yourself'] },
   };
   const HW = { segMode: {   // 고정익일 때 설명
