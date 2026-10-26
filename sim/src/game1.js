@@ -1112,7 +1112,16 @@ const STREES = (function siteTrees() {
         const ch = CHUNKS[REF[i * 2]], k = REF[i * 2 + 1]; ch.im.getMatrixAt(k, _m); _m.decompose(_p, _q, _s); _s.set(0.0001, 0.0001, 0.0001); _m.compose(_p, _q, _s); ch.im.setMatrixAt(k, _m); ch.im.instanceMatrix.needsUpdate = true; dim[i * 2] = 0; dim[i * 2 + 1] = 0; n0++; } }
     return n0;
   }
-  return { n, col: col1, lod, scorch, unscorch, hideRect };
+  // 반지름 R 안 나무 꼭대기의 최고 높이 (월드 y) · 없으면 -Infinity
+  function topAt(x, z, R) {
+    const gx = Math.floor(x / GC), gz = Math.floor(z / GC), rg = Math.ceil(R / GC) + 1; let top = -Infinity;
+    for (let ix = gx - rg; ix <= gx + rg; ix++) for (let iz = gz - rg; iz <= gz + rg; iz++) {
+      const L = GRID.get(ix + ',' + iz); if (!L) continue;
+      for (const v of L) { const i = v & 0xffffff, px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], h = dim[i * 2], r = dim[i * 2 + 1]; if (Math.hypot(px - x, pz - z) <= R + r) top = Math.max(top, py + h); }
+    }
+    return top;
+  }
+  return { n, col: col1, lod, scorch, unscorch, hideRect, topAt };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }

@@ -1334,7 +1334,16 @@ const STREES = (function siteTrees() {
         const ch = CHUNKS[REF[i * 2]], k = REF[i * 2 + 1]; ch.im.getMatrixAt(k, _m); _m.decompose(_p, _q, _s); _s.set(0.0001, 0.0001, 0.0001); _m.compose(_p, _q, _s); ch.im.setMatrixAt(k, _m); ch.im.instanceMatrix.needsUpdate = true; dim[i * 2] = 0; dim[i * 2 + 1] = 0; n0++; } }
     return n0;
   }
-  return { n, col: col1, lod, scorch, unscorch, hideRect };
+  // 반지름 R 안 나무 꼭대기의 최고 높이 (월드 y) · 없으면 -Infinity
+  function topAt(x, z, R) {
+    const gx = Math.floor(x / GC), gz = Math.floor(z / GC), rg = Math.ceil(R / GC) + 1; let top = -Infinity;
+    for (let ix = gx - rg; ix <= gx + rg; ix++) for (let iz = gz - rg; iz <= gz + rg; iz++) {
+      const L = GRID.get(ix + ',' + iz); if (!L) continue;
+      for (const v of L) { const i = v & 0xffffff, px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], h = dim[i * 2], r = dim[i * 2 + 1]; if (Math.hypot(px - x, pz - z) <= R + r) top = Math.max(top, py + h); }
+    }
+    return top;
+  }
+  return { n, col: col1, lod, scorch, unscorch, hideRect, topAt };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }
@@ -2630,6 +2639,7 @@ function drawSticks() {
   const g = ui.stk.getContext('2d'); g.clearRect(0, 0, 150, 70);
   const box = (x, sx, sy) => {
     g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(x, 4, 62, 62); g.beginPath(); g.moveTo(x + 31, 4); g.lineTo(x + 31, 66); g.moveTo(x, 35); g.lineTo(x + 62, 35); g.strokeStyle = 'rgba(255,255,255,.12)'; g.stroke();
+    g.lineWidth = 2.2; g.strokeStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.moveTo(x + 31 - 7, 35); g.lineTo(x + 31 + 7, 35); g.moveTo(x + 31, 35 - 7); g.lineTo(x + 31, 35 + 7); g.stroke(); g.lineWidth = 1;   // 가운데(중립) 십자
     g.fillStyle = '#ffc828'; g.beginPath(); g.arc(x + 31 + sx * 27, 35 - sy * 27, 5, 0, 7); g.fill();
   };
   box(4, IN.yaw, IN.thr); box(82, IN.roll, IN.pitch);
@@ -2752,6 +2762,7 @@ function handleKeys() {
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
+    if (k === 'Digit0' || k === 'Numpad0') { document.body.classList.toggle('nohud'); if (S.state !== 'menu') showMsg(document.body.classList.contains('nohud') ? 'UI OFF (0)' : 'UI ON', '#fff', 0.8); continue; }
     if (!S.brief && typeof c1Key === 'function' && c1Key(k)) continue;
     if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA' || (k === 'KeyQ' && typeof isC1 === 'function' && isC1()))) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
@@ -2789,7 +2800,6 @@ function handleKeys() {
     if (S.tut && S.tut.st !== 'fly') continue;
     if (k === 'Space' && DR.alive) { if (actionKind() === 'report') missionPhoto(); else dropPayload(DR.p, DR.v, false); }   // 투하 버튼 = 임무에 따라 투하 / 사진 보고
     else if (k === 'KeyR') respawn();
-    else if (k === 'Digit0') { document.body.classList.toggle('nohud'); showMsg(document.body.classList.contains('nohud') ? 'UI OFF (0)' : 'UI ON', '#fff', 0.8); }
     else if (k === 'KeyN' && isMission() && S.running && msObj()) { S.pen += 20; msNext('SKIPPED +20s', '#ff9a40'); }
     else if (k === 'KeyN' && S.kind === 'course' && S.running && curObj() && curObj().kind !== 'land') { S.pen += 20; completeObj(2, 'SKIPPED +20s', '#ff9a40'); }
   }
@@ -3267,26 +3277,36 @@ function guidePoints(o, p) {
 }
 const _gt = new V3(), _gq = new V3(), _gs = new V3(), _gv = new V3();
 // 기체에서 목표까지 이어지는 띠: 틀만 있으면 추적 시점에서 기체와 떨어져 떠 보이므로, 기체 바로 앞에서 시작해 목표까지 한 줄로 이어 줌
-const GPATH = (function () {
-  const N = 48, g = new THREE.BufferGeometry();
+function makeStrip(N) {
+  const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 8), 4));
   const idx = []; for (let i = 0; i < N - 1; i++) { const b = i * 2; idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); } g.setIndex(idx);
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false }));
   m.renderOrder = 7; m.frustumCulled = false; m.visible = false; scene.add(m); return { m, N, col: new THREE.Color() };
-})();
-function guidePath(curve, L, col) {
-  const { m, N } = GPATH, P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, cp = camera.position, c = GPATH.col.set(col);
+}
+const GPATH = makeStrip(48), GAXIS = makeStrip(40);   // GPATH: 기체→목표 경로 띠 · GAXIS: 게이트 진입축 점선 (가운데를 어느 각도로 지나야 하는지)
+// 카메라를 향하는 띠를 곡선 위에 깔기. alphaFn(d, L, dist) 로 구간별 투명도
+function stripAlong(S0, curve, L, col, alphaFn, wk) {
+  const { m, N } = S0, P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, cp = camera.position, c = S0.col.set(col);
   for (let i = 0; i < N; i++) {
     const u = i / (N - 1); curve.getPointAt(u, _gt); curve.getPointAt(Math.min(1, u + 0.01), _gq); _gq.sub(_gt);
     _gv.subVectors(_gt, cp); const dist = _gv.length(); _gs.crossVectors(_gq, _gv);
-    if (_gs.lengthSq() < 1e-8) _gs.set(1, 0, 0); _gs.normalize().multiplyScalar(Math.max(0.05, dist * 0.0055));   // 화면에서 거의 일정한 굵기
+    if (_gs.lengthSq() < 1e-8) _gs.set(1, 0, 0); _gs.normalize().multiplyScalar(Math.max(0.05, dist * (wk || 0.0055)));   // 화면에서 거의 일정한 굵기
     P[i * 6] = _gt.x - _gs.x; P[i * 6 + 1] = _gt.y - _gs.y; P[i * 6 + 2] = _gt.z - _gs.z; P[i * 6 + 3] = _gt.x + _gs.x; P[i * 6 + 4] = _gt.y + _gs.y; P[i * 6 + 5] = _gt.z + _gs.z;
-    const d = u * L, a = clamp((d - 2) / 4, 0, 1) * clamp((dist - 1.5) / 2, 0, 1) * Math.min(1, (L - d) / 1.5) * 0.65;   // 기체·카메라 바로 옆은 투명
+    const a = alphaFn(u * L, L, dist);
     for (let k = 0; k < 2; k++) { const o = i * 8 + k * 4; C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b; C[o + 3] = a; }
   }
   m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
 }
-function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+function guidePath(curve, L, col) { stripAlong(GPATH, curve, L, col, (d, L, dist) => clamp((d - 2) / 4, 0, 1) * clamp((dist - 1.5) / 2, 0, 1) * Math.min(1, (L - d) / 1.5) * 0.65); }   // 기체·카메라 바로 옆은 투명
+const _axA = new V3(), _axB = new V3();
+// 진입축: 게이트 중심 C 를 지나 방향 A 로 before~after 만큼 점선 (멀리서 접근 각을 맞추기 위한 기준선)
+function guideAxis(C, A, before, after, col) {
+  _axA.copy(C).addScaledVector(A, -before); _axB.copy(C).addScaledVector(A, after);
+  const L = before + after, cur = new THREE.LineCurve3(_axA.clone(), _axB.clone());
+  stripAlong(GAXIS, cur, L, col, (d, L, dist) => (Math.floor(d / 1.5) % 2 ? 0.08 : 0.55) * Math.min(1, d / 2) * clamp((dist - 1.5) / 2, 0, 1), 0.0035);
+}
+function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
 // 다음 목표 방향 표시: 화면 안이면 목표 아래에 거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 (VR·1종 제외)
 const _nv = new V3();
 function navArrow(tgt, subj) {
@@ -3314,6 +3334,22 @@ function updateGuide(subj) {
     hideGuide(); if (!SET.guide) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
   }
+  // 수색 구역(산불·실종자) 안: 경로 띠는 끄되 안내는 끊지 않음 — 구역 중심 화살표 + 할 일·고도 안내
+  if (o.kind === 'ms' && searchIn(o, subj.p)) {
+    GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;
+    navArrow(o.mk, subj);
+    if (!SET.guide) { $('guide').classList.add('hidden'); return; }
+    const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
+    const en = window.SIM_LANG === 'en';
+    if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press Enter/📷' : '불씨 포착 · 화면 가운데에 두고 Enter/📷') : (en ? 'Hiker in view · centre and Enter/📷' : '실종자 포착 · 가운데에 두고 Enter/📷'), 'ok']);
+    else {
+      lines.push([fire ? (en ? 'Inside search area · sweep slowly with thermal (T), look for smoke/glow' : '수색 구역 안 · 열화상(T)으로 천천히 훑기 · 연기·불빛 찾기') : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
+      if (agl > band[1]) lines.push([(en ? 'Descend to ' : '고도 내리기 → ') + band[0] + '–' + band[1] + ' m' + (en ? ' AGL' : ''), 'warn']);
+      else if (agl < band[0]) lines.push([(en ? 'Climb to ' : '고도 올리기 → ') + band[0] + '–' + band[1] + ' m', 'warn']);
+      const dc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z); if (dc > o.search.r * 0.8) lines.push([en ? 'Near the edge · turn back toward the centre' : '구역 가장자리 · 중심 쪽으로 되돌아가기', 'warn']);
+    }
+    const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join(''); return;
+  }
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
@@ -3328,9 +3364,14 @@ function updateGuide(subj) {
     if ((wing || sp > 6) && ang > 15 * DEG && dist > turnR * 1.2) { const k = Math.min(turnR * (0.4 + ang / Math.PI), dist * 0.45); const a = pts[0].clone().addScaledVector(hd, k); a.y = pts[0].y + (pts[1].y - pts[0].y) * 0.15; pts = [pts[0], a].concat(pts.slice(1)); } }
   const curve = pts.length > 2 ? new THREE.CatmullRomCurve3(pts, false, 'centripetal') : new THREE.LineCurve3(pts[0], pts[1]);
   const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
-  const L = curve.getLength(), phase = (S.simT * 3.2) % GSP;
+  const L = curve.getLength(), phase = 0;   // 틀은 경로 위에 고정 (흘러가는 애니메이션은 어지러워서 뺌 · 기체가 나아가면 자연히 지나감)
   const gcol = GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff;
   if (L > 1.5 && !XR_ON) guidePath(curve, L, gcol); else GPATH.m.visible = false;
+  // 진입축 점선: 통과점(링·게이트)이 있는 과제에서 가운데를 지나는 접근 방향 기준선
+  { let C = null, A = null, R = 3;
+    if (o.kind === 'ms' && o.t === 'pass' && o.c && o.n) { C = o.ring ? o.c : o.mk; A = o.n; R = o.ring || 3; }
+    else if (o.kind !== 'ms' && o.kind !== 'takeoff' && o.kind !== 'land' && o.kind !== 'drop' && o.kind !== 'orbit' && o.kind !== 'custom') { const op = openingOf(o); if (op && !GUIDE.detour) { C = op.b.world(op.lx, op.ly, op.lz); A = (op.side ? op.b.world(-1, 0, 0) : op.b.world(0, 1, 0)).sub(op.b.world(0, 0, 0)).normalize(); R = 2; } }
+    if (C && A && !XR_ON) guideAxis(C, A, Math.max(12, R * 4), Math.max(4, R * 1.5), gcol); else GAXIS.m.visible = false; }
   GUIDE.meshes.forEach((x, i) => {
     const d = 4.5 + phase + i * GSP;   // 기체 바로 앞 틀은 추적 시점에서 화면을 가리므로 4.5 m부터
     if (d > L - 0.2 || L < 1.2) { x.g.visible = false; return; }
@@ -3442,7 +3483,7 @@ function gpnContainer() {
   if (S.state === 'pause') return ui.pause; if (S.state === 'result') return ui.result; if (S.brief) return $('brief'); return ui.menu;
 }
 function gpnVisible(e) { if (e.disabled || e.offsetParent === null) return false; const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }
-function gpnItems() { const c = gpnContainer(); if (!c) return []; return [...c.querySelectorAll('button, input[type=range], input[type=number], select')].filter(gpnVisible); }
+function gpnItems() { const c = gpnContainer(); if (!c) return []; return [...c.querySelectorAll('button, input[type=range], input[type=number], select, [role=button], a[href], .stc, .introC, #introCont, label.chk')].filter(gpnVisible); }
 function gpnSet(e) { if (GPN.el && GPN.el !== e) GPN.el.classList.remove('gpf'); GPN.el = e || null; if (e) { e.classList.add('gpf'); try { e.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (x) { } } }
 function gpnRefresh() { const items = gpnItems(); if (!GPN.el || !items.includes(GPN.el) || !gpnVisible(GPN.el)) gpnSet(items.find(e => e.classList.contains('on') || e.classList.contains('primary')) || items[0] || null); }
 function gpnMove(dx, dy) {
@@ -4284,6 +4325,13 @@ function passCP(label, q, hw, y0, y1, ring) {
   return { kind: 'ms', t: 'pass', label, c, n, r, hw, y0, y1, ring, mk: mid.clone(),
     pts(p) { const ld = guideLead(), cc = this.ring ? this.c : mid, bf = p.clone().sub(cc).dot(n); return bf < -ld - 2 ? [p.clone(), cc.clone().addScaledVector(n, -ld), cc.clone(), cc.clone().addScaledVector(n, 3)] : [p.clone(), cc.clone(), cc.clone().addScaledVector(n, 3)]; } };
 }
+// 링 높이 보정: 링 아래쪽이 주변 지형·나무 꼭대기(반지름 R+1 m 안)보다 여유를 두고 뜨도록 (낮게 생성돼 구조물과 겹치지 않게)
+function clearAlt(d, s, alt, R) {
+  const c = W(d, s, 0), g0 = c.y; let top = g0;
+  for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; top = Math.max(top, terrainAt(c.x + Math.cos(a) * (R + 1), c.z + Math.sin(a) * (R + 1))); }
+  if (STREES && STREES.topAt) top = Math.max(top, STREES.topAt(c.x, c.z, R + 1));
+  return Math.max(alt, top - g0 + R + 2.5);
+}
 // 레이스 링
 const RACE = (function () {
   if (!PATHL) return [];
@@ -4292,7 +4340,7 @@ const RACE = (function () {
   for (let i = 0; i < alts.length; i++) {
     const s = 30 + i * (PATHL.total - 50) / (alts.length - 1), q0 = PATHL.at(s), la = lats[i];
     const q = Object.assign({}, q0, { d: q0.d - q0.ts * la, s: q0.s + q0.td * la }), cp = passCP('RING ' + (i + 1), q, 0, alts[i], alts[i], 3.2);
-    cp.q = q; cp.alt = alts[i]; cp.mk = W(q.d, q.s, alts[i]); cp.c = cp.mk.clone(); const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), mat(i === alts.length - 1 ? 0x5dff9a : 0xffc828, { emissive: 0x332200, roughness: 0.4 }));
+    cp.q = q; cp.alt = clearAlt(q.d, q.s, alts[i], 3.2); cp.mk = W(q.d, q.s, cp.alt); cp.c = cp.mk.clone(); const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), mat(i === alts.length - 1 ? 0x5dff9a : 0xffc828, { emissive: 0x332200, roughness: 0.4 }));
     tor.position.copy(cp.c); tor.lookAt(cp.c.clone().add(cp.n)); MSG.race.add(tor); cp.mesh = tor; ringDecor(cp); L.push(cp);
   }
   return L;
@@ -4350,7 +4398,7 @@ function msStart(kind) {
   MS.idx = 0; S.photos = []; PH.lastSim = undefined; S.lost = 0; droneM.cans.forEach(c => c.visible = kind === 'sar'); S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
   const a = AFc(); let L = [];
   if (kind === 'forest' && FLANE) L = FLANE.cps.map(c => passCP(c.label, c.q, c.hw, c.y0, c.y1));
-  if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
+  if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt, r.ring); r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
   if (kind === 'recon') L = reconPick();
   if (kind === 'fire') L = firePick();
   if (kind === 'strike') L = strikePick();
@@ -5139,7 +5187,7 @@ function scenStart(kind, a) {
   }
   if (kind === 'ridge' && RIDGE) {
     MSG.ridge.visible = true; const k = a.cls === 'wing' ? 2.2 : 1;
-    RIDGE.list.forEach(r => { r.ring = 6 * k; const al = a.cls === 'wing' ? 38 : 18; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(6 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
+    RIDGE.list.forEach(r => { r.ring = 6 * k; const al = clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18, r.ring); r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(6 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
     return RIDGE.list;
   }
   return null;
@@ -5795,8 +5843,8 @@ function menuDetail() {
   document.querySelector('.msStageW').style.setProperty('--cc', col);
   $('mdCat').textContent = CAT_N()[cat]; $('mdTitle').textContent = inf.t; $('mdDesc').textContent = inf.d; $('mdTip').textContent = inf.tip;
   const ok = MS_OK[k] || [];
-  $('mdAf').innerHTML = (ok.length === AF_IDS.length ? '' : ok.map(id => `<button data-af="${id}" class="${id === SET.af ? 'on' : ''}">${AF[id].name}</button>`).join(''));
-  $('mdAf').querySelectorAll('button').forEach(b => b.onclick = () => { MENU.afNote = ''; setAirframe(b.dataset.af); afUI(); });
+  $('mdAf').innerHTML = `<button class="on" data-af="${SET.af}">${AFc().name}</button><button class="mini" id="mdAfChg">${L2('기체 바꾸기 ◀', 'Change airframe ◀')}</button>`;
+  { const c = $('mdAfChg'); if (c) c.onclick = () => wizGo(2); }
   const best = menuBest(k), meta = [];
   if (isMission(k)) meta.push(L2('기준 ', 'Par ') + fmt(msPar(k, [1, 2, 3, 4])));
   if (best) meta.push(L2('내 최고 ', 'Best ') + `<b>${fmt(best)}</b>`);
@@ -5820,22 +5868,23 @@ function msVis() {
   // 타일에 내 최고 기록 · 추천 순서 번호
   document.querySelectorAll(`#msGrid [data-g]`).forEach(b => { const k = b.dataset.ms, best = (k === 'course' || isMission(k)) ? menuBest(k) : null; let e = b.querySelector('.best'); if (best) { if (!e) { e = document.createElement('span'); e.className = 'best'; b.appendChild(e); } e.textContent = '★ ' + fmt(best); } else if (e) e.remove(); });
   ['basic', 'exam', 'skill', 'mission'].forEach(gg => { let i = 0; document.querySelectorAll(`#msGrid [data-g="${gg}"]`).forEach(b => { if (b.dataset.site === '0' || b.dataset.ms === 'free' || b.dataset.ms === 'demo' || b.querySelector('.rec')) return; i++; let e = b.querySelector('.ord'); if (!e) { e = document.createElement('span'); e.className = 'ord'; b.appendChild(e); } e.textContent = L2('추천 ', 'step ') + i; }); });
-  document.querySelectorAll('#msTabs [data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === g));
-  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0'));
+  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0' || !msAfOk(b.dataset.ms)));
+  document.querySelectorAll('#msTabs [data-g]').forEach(b => { b.classList.toggle('on', b.dataset.g === g); b.classList.toggle('hid', !msInGrp(b.dataset.g).length); });   // 고른 기체로 할 수 있는 임무가 없는 종류는 탭도 숨김
 }
-function msInGrp(g) { return [...document.querySelectorAll(`#msGrid [data-g="${g}"]`)].filter(b => b.dataset.site !== '0').map(b => b.dataset.ms); }
+// 기체는 2단계에서 고르고, 3단계는 그 기체로 할 수 있는 임무만 보여 줌 (임무에 맞춰 기체를 바꾸지 않음)
+function msAfOk(k) { const ok = MS_OK[k]; return !ok || !ok.length || ok.includes(SET.af); }
+function msInGrp(g) { return [...document.querySelectorAll(`#msGrid [data-g="${g}"]`)].filter(b => b.dataset.site !== '0' && msAfOk(b.dataset.ms)).map(b => b.dataset.ms); }
 function menuTab(g) {
   const L = msInGrp(g); if (!L.length) return;
   const last = (MENU.lastIn || {})[g]; menuSel(L.includes(last) ? last : L[0]);
 }
 function menuSel(k, go) {
-  const t = msTile(k); if (!t || t.dataset.site === '0') k = 'course';
+  let t = msTile(k); if (!t || t.dataset.site === '0' || !msAfOk(k)) {   // 이 기체로 못 하는 임무면 같은 종류 → 전체에서 할 수 있는 첫 임무로
+    const g0 = t ? t.dataset.g : 'basic', L = msInGrp(g0).length ? msInGrp(g0) : MS_GRP.flatMap(msInGrp); k = L[0] || 'free'; t = msTile(k);
+  }
   MENU.ms = k; MENU.g = msTile(k).dataset.g; (MENU.lastIn = MENU.lastIn || {})[MENU.g] = k;
   try { localStorage.setItem('fpvsim_menu_ms', k); } catch (e) { }
-  // 고른 기체로 못 하는 임무면 알맞은 기체로 바꿔 줌
-  const ok = MS_OK[k] || [];
-  if (ok.length && !ok.includes(SET.af)) { const prev = AFc().name; MENU.afNote = L2(`${prev} 로는 할 수 없어 ${AF[ok[0]].name} 로 바꿨습니다`, `Switched from ${prev} to ${AF[ok[0]].name} for this mission`); setAirframe(ok[0]); afUI(); }
-  else if (k !== MENU.prevMs) MENU.afNote = '';
+  MENU.afNote = '';
   MENU.prevMs = k; msVis(); menuDetail(); if (go) menuGo();
 }
 document.querySelectorAll('#msTabs [data-g]').forEach(b => b.addEventListener('click', () => menuTab(b.dataset.g)));
@@ -5928,7 +5977,7 @@ function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.S
 if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
 // 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
 { const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
-  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
+  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
     c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; } }
 if ($('introVR')) $('introVR').onclick = () => {
   const n = $('introNote');
@@ -5943,8 +5992,8 @@ function menuShow(k) {
   if (typeof c1Menu === 'function') c1Menu(k);
   Object.values(MSG).forEach(g => g.visible = false);
   const a = AFc(), kw = a.cls === 'wing' ? 2.2 : 1;
-  if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt)); }); }
-  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18); r.mesh.position.copy(c); r.mesh.scale.setScalar(6 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
+  if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt, 3.2 * kw))); }); }
+  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18, 6 * kw)); r.mesh.position.copy(c); r.mesh.scale.setScalar(6 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
   if (k === 'fire' && FIRE.length) { MSG.fire.visible = true; FIRE.forEach((f, i) => { f.on = f.active = i < 3; f.g.visible = i < 3; f.g.scale.setScalar(1); }); }
   if (k === 'sar' && SAR) MSG.sar.visible = true;
   if (k === 'track' && TRACK) { MSG.track.visible = true; if (!(TRACK.s > 0)) TRACK.s = TRACK.total * 0.2; }

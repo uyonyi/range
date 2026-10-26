@@ -10,7 +10,7 @@ function gpnContainer() {
   if (S.state === 'pause') return ui.pause; if (S.state === 'result') return ui.result; if (S.brief) return $('brief'); return ui.menu;
 }
 function gpnVisible(e) { if (e.disabled || e.offsetParent === null) return false; const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }
-function gpnItems() { const c = gpnContainer(); if (!c) return []; return [...c.querySelectorAll('button, input[type=range], input[type=number], select')].filter(gpnVisible); }
+function gpnItems() { const c = gpnContainer(); if (!c) return []; return [...c.querySelectorAll('button, input[type=range], input[type=number], select, [role=button], a[href], .stc, .introC, #introCont, label.chk')].filter(gpnVisible); }
 function gpnSet(e) { if (GPN.el && GPN.el !== e) GPN.el.classList.remove('gpf'); GPN.el = e || null; if (e) { e.classList.add('gpf'); try { e.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (x) { } } }
 function gpnRefresh() { const items = gpnItems(); if (!GPN.el || !items.includes(GPN.el) || !gpnVisible(GPN.el)) gpnSet(items.find(e => e.classList.contains('on') || e.classList.contains('primary')) || items[0] || null); }
 function gpnMove(dx, dy) {

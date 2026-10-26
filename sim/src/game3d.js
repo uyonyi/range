@@ -74,26 +74,36 @@ function guidePoints(o, p) {
 }
 const _gt = new V3(), _gq = new V3(), _gs = new V3(), _gv = new V3();
 // 기체에서 목표까지 이어지는 띠: 틀만 있으면 추적 시점에서 기체와 떨어져 떠 보이므로, 기체 바로 앞에서 시작해 목표까지 한 줄로 이어 줌
-const GPATH = (function () {
-  const N = 48, g = new THREE.BufferGeometry();
+function makeStrip(N) {
+  const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 8), 4));
   const idx = []; for (let i = 0; i < N - 1; i++) { const b = i * 2; idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); } g.setIndex(idx);
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false }));
   m.renderOrder = 7; m.frustumCulled = false; m.visible = false; scene.add(m); return { m, N, col: new THREE.Color() };
-})();
-function guidePath(curve, L, col) {
-  const { m, N } = GPATH, P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, cp = camera.position, c = GPATH.col.set(col);
+}
+const GPATH = makeStrip(48), GAXIS = makeStrip(40);   // GPATH: 기체→목표 경로 띠 · GAXIS: 게이트 진입축 점선 (가운데를 어느 각도로 지나야 하는지)
+// 카메라를 향하는 띠를 곡선 위에 깔기. alphaFn(d, L, dist) 로 구간별 투명도
+function stripAlong(S0, curve, L, col, alphaFn, wk) {
+  const { m, N } = S0, P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, cp = camera.position, c = S0.col.set(col);
   for (let i = 0; i < N; i++) {
     const u = i / (N - 1); curve.getPointAt(u, _gt); curve.getPointAt(Math.min(1, u + 0.01), _gq); _gq.sub(_gt);
     _gv.subVectors(_gt, cp); const dist = _gv.length(); _gs.crossVectors(_gq, _gv);
-    if (_gs.lengthSq() < 1e-8) _gs.set(1, 0, 0); _gs.normalize().multiplyScalar(Math.max(0.05, dist * 0.0055));   // 화면에서 거의 일정한 굵기
+    if (_gs.lengthSq() < 1e-8) _gs.set(1, 0, 0); _gs.normalize().multiplyScalar(Math.max(0.05, dist * (wk || 0.0055)));   // 화면에서 거의 일정한 굵기
     P[i * 6] = _gt.x - _gs.x; P[i * 6 + 1] = _gt.y - _gs.y; P[i * 6 + 2] = _gt.z - _gs.z; P[i * 6 + 3] = _gt.x + _gs.x; P[i * 6 + 4] = _gt.y + _gs.y; P[i * 6 + 5] = _gt.z + _gs.z;
-    const d = u * L, a = clamp((d - 2) / 4, 0, 1) * clamp((dist - 1.5) / 2, 0, 1) * Math.min(1, (L - d) / 1.5) * 0.65;   // 기체·카메라 바로 옆은 투명
+    const a = alphaFn(u * L, L, dist);
     for (let k = 0; k < 2; k++) { const o = i * 8 + k * 4; C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b; C[o + 3] = a; }
   }
   m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
 }
-function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+function guidePath(curve, L, col) { stripAlong(GPATH, curve, L, col, (d, L, dist) => clamp((d - 2) / 4, 0, 1) * clamp((dist - 1.5) / 2, 0, 1) * Math.min(1, (L - d) / 1.5) * 0.65); }   // 기체·카메라 바로 옆은 투명
+const _axA = new V3(), _axB = new V3();
+// 진입축: 게이트 중심 C 를 지나 방향 A 로 before~after 만큼 점선 (멀리서 접근 각을 맞추기 위한 기준선)
+function guideAxis(C, A, before, after, col) {
+  _axA.copy(C).addScaledVector(A, -before); _axB.copy(C).addScaledVector(A, after);
+  const L = before + after, cur = new THREE.LineCurve3(_axA.clone(), _axB.clone());
+  stripAlong(GAXIS, cur, L, col, (d, L, dist) => (Math.floor(d / 1.5) % 2 ? 0.08 : 0.55) * Math.min(1, d / 2) * clamp((dist - 1.5) / 2, 0, 1), 0.0035);
+}
+function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
 // 다음 목표 방향 표시: 화면 안이면 목표 아래에 거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 (VR·1종 제외)
 const _nv = new V3();
 function navArrow(tgt, subj) {
@@ -121,6 +131,22 @@ function updateGuide(subj) {
     hideGuide(); if (!SET.guide) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
   }
+  // 수색 구역(산불·실종자) 안: 경로 띠는 끄되 안내는 끊지 않음 — 구역 중심 화살표 + 할 일·고도 안내
+  if (o.kind === 'ms' && searchIn(o, subj.p)) {
+    GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;
+    navArrow(o.mk, subj);
+    if (!SET.guide) { $('guide').classList.add('hidden'); return; }
+    const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
+    const en = window.SIM_LANG === 'en';
+    if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press Enter/📷' : '불씨 포착 · 화면 가운데에 두고 Enter/📷') : (en ? 'Hiker in view · centre and Enter/📷' : '실종자 포착 · 가운데에 두고 Enter/📷'), 'ok']);
+    else {
+      lines.push([fire ? (en ? 'Inside search area · sweep slowly with thermal (T), look for smoke/glow' : '수색 구역 안 · 열화상(T)으로 천천히 훑기 · 연기·불빛 찾기') : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
+      if (agl > band[1]) lines.push([(en ? 'Descend to ' : '고도 내리기 → ') + band[0] + '–' + band[1] + ' m' + (en ? ' AGL' : ''), 'warn']);
+      else if (agl < band[0]) lines.push([(en ? 'Climb to ' : '고도 올리기 → ') + band[0] + '–' + band[1] + ' m', 'warn']);
+      const dc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z); if (dc > o.search.r * 0.8) lines.push([en ? 'Near the edge · turn back toward the centre' : '구역 가장자리 · 중심 쪽으로 되돌아가기', 'warn']);
+    }
+    const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join(''); return;
+  }
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
@@ -135,9 +161,14 @@ function updateGuide(subj) {
     if ((wing || sp > 6) && ang > 15 * DEG && dist > turnR * 1.2) { const k = Math.min(turnR * (0.4 + ang / Math.PI), dist * 0.45); const a = pts[0].clone().addScaledVector(hd, k); a.y = pts[0].y + (pts[1].y - pts[0].y) * 0.15; pts = [pts[0], a].concat(pts.slice(1)); } }
   const curve = pts.length > 2 ? new THREE.CatmullRomCurve3(pts, false, 'centripetal') : new THREE.LineCurve3(pts[0], pts[1]);
   const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
-  const L = curve.getLength(), phase = (S.simT * 3.2) % GSP;
+  const L = curve.getLength(), phase = 0;   // 틀은 경로 위에 고정 (흘러가는 애니메이션은 어지러워서 뺌 · 기체가 나아가면 자연히 지나감)
   const gcol = GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff;
   if (L > 1.5 && !XR_ON) guidePath(curve, L, gcol); else GPATH.m.visible = false;
+  // 진입축 점선: 통과점(링·게이트)이 있는 과제에서 가운데를 지나는 접근 방향 기준선
+  { let C = null, A = null, R = 3;
+    if (o.kind === 'ms' && o.t === 'pass' && o.c && o.n) { C = o.ring ? o.c : o.mk; A = o.n; R = o.ring || 3; }
+    else if (o.kind !== 'ms' && o.kind !== 'takeoff' && o.kind !== 'land' && o.kind !== 'drop' && o.kind !== 'orbit' && o.kind !== 'custom') { const op = openingOf(o); if (op && !GUIDE.detour) { C = op.b.world(op.lx, op.ly, op.lz); A = (op.side ? op.b.world(-1, 0, 0) : op.b.world(0, 1, 0)).sub(op.b.world(0, 0, 0)).normalize(); R = 2; } }
+    if (C && A && !XR_ON) guideAxis(C, A, Math.max(12, R * 4), Math.max(4, R * 1.5), gcol); else GAXIS.m.visible = false; }
   GUIDE.meshes.forEach((x, i) => {
     const d = 4.5 + phase + i * GSP;   // 기체 바로 앞 틀은 추적 시점에서 화면을 가리므로 4.5 m부터
     if (d > L - 0.2 || L < 1.2) { x.g.visible = false; return; }

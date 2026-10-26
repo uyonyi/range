@@ -708,6 +708,7 @@ function drawSticks() {
   const g = ui.stk.getContext('2d'); g.clearRect(0, 0, 150, 70);
   const box = (x, sx, sy) => {
     g.strokeStyle = 'rgba(255,255,255,.35)'; g.strokeRect(x, 4, 62, 62); g.beginPath(); g.moveTo(x + 31, 4); g.lineTo(x + 31, 66); g.moveTo(x, 35); g.lineTo(x + 62, 35); g.strokeStyle = 'rgba(255,255,255,.12)'; g.stroke();
+    g.lineWidth = 2.2; g.strokeStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.moveTo(x + 31 - 7, 35); g.lineTo(x + 31 + 7, 35); g.moveTo(x + 31, 35 - 7); g.lineTo(x + 31, 35 + 7); g.stroke(); g.lineWidth = 1;   // 가운데(중립) 십자
     g.fillStyle = '#ffc828'; g.beginPath(); g.arc(x + 31 + sx * 27, 35 - sy * 27, 5, 0, 7); g.fill();
   };
   box(4, IN.yaw, IN.thr); box(82, IN.roll, IN.pitch);
@@ -830,6 +831,7 @@ function handleKeys() {
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
+    if (k === 'Digit0' || k === 'Numpad0') { document.body.classList.toggle('nohud'); if (S.state !== 'menu') showMsg(document.body.classList.contains('nohud') ? 'UI OFF (0)' : 'UI ON', '#fff', 0.8); continue; }
     if (!S.brief && typeof c1Key === 'function' && c1Key(k)) continue;
     if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA' || (k === 'KeyQ' && typeof isC1 === 'function' && isC1()))) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
@@ -867,7 +869,6 @@ function handleKeys() {
     if (S.tut && S.tut.st !== 'fly') continue;
     if (k === 'Space' && DR.alive) { if (actionKind() === 'report') missionPhoto(); else dropPayload(DR.p, DR.v, false); }   // 투하 버튼 = 임무에 따라 투하 / 사진 보고
     else if (k === 'KeyR') respawn();
-    else if (k === 'Digit0') { document.body.classList.toggle('nohud'); showMsg(document.body.classList.contains('nohud') ? 'UI OFF (0)' : 'UI ON', '#fff', 0.8); }
     else if (k === 'KeyN' && isMission() && S.running && msObj()) { S.pen += 20; msNext('SKIPPED +20s', '#ff9a40'); }
     else if (k === 'KeyN' && S.kind === 'course' && S.running && curObj() && curObj().kind !== 'land') { S.pen += 20; completeObj(2, 'SKIPPED +20s', '#ff9a40'); }
   }
