@@ -15,7 +15,7 @@ function zoomCfg() { const d = clamp(+SET.camDist || (ZOOMS[SET.zoom] || ZOOMS[1
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 1, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
 // 저장 구조: 일반 설정은 평탄, 종목별 설정은 하위 묶음 (c1: 1종 실기). 구버전(평탄 c1xxx 키)도 읽음
 const SET_GROUPS = ['c1'];
-try { const s = JSON.parse(localStorage.getItem('hroc_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
 // 비행 방식은 세 축으로 나눠 저장: 비행 모드(mode: gps·atti·man·acro) · 보조 단계(assistLv 2·1·0) · 비행감(feel: train·std·real). SET.diff/acro/assist 는 여기서 파생 (기존 코드 호환)
@@ -33,7 +33,7 @@ const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'rat
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
-    localStorage.setItem('hroc_fpv_settings', JSON.stringify(o)); } catch (e) { } }
+    localStorage.setItem('fpvsim_fpv_settings', JSON.stringify(o)); } catch (e) { } }
 
 const DR = { p: new V3(), v: new V3(), h: 0, pitch: 0, roll: 0, landed: true, thrust: 0, R: 0.24, alive: true };
 const S = {
@@ -108,7 +108,7 @@ function finishRun() {
       ['투하 명중', S.hits + ' / 3'], ['기준 비행 (영상)', fmt(GH.total)]];
     ui.resTable.innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="mono">${r[1]}</td></tr>`).join('');
     debriefShow(done, OBJS.length, GH.total * 1.25);
-    const key = 'hroc_fpv_best_' + SET.diff + SITE_KEY; let best = null;
+    const key = 'fpvsim_fpv_best_' + SET.diff + SITE_KEY; let best = null;
     try { best = parseFloat(localStorage.getItem(key)); } catch (e) { }
     if (!best || total < best) { try { localStorage.setItem(key, String(total)); } catch (e) { } saveBest(rec); ui.resBest.textContent = '★ 최고 기록 갱신 (리플레이·고스트로 저장됨)'; }
     else ui.resBest.textContent = '최고 기록 ' + fmt(best);

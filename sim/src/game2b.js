@@ -3,8 +3,8 @@
 //  background music (절차 생성: 장면별 스타일 5가지, 구간마다 화음·멜로디 새로 만듦)
 // =====================================================================
 const MUS = { on: true, vol: 0.5, timer: null, next: 0, step: 0, bus: null };
-try { const m = JSON.parse(localStorage.getItem('hroc_fpv_music') || '{}'); if (m.on !== undefined) MUS.on = m.on; if (m.vol !== undefined) MUS.vol = m.vol; } catch (e) { }
-function saveMusic() { try { localStorage.setItem('hroc_fpv_music', JSON.stringify({ on: MUS.on, vol: MUS.vol })); } catch (e) { } }
+try { const m = JSON.parse(localStorage.getItem('fpvsim_fpv_music') || '{}'); if (m.on !== undefined) MUS.on = m.on; if (m.vol !== undefined) MUS.vol = m.vol; } catch (e) { }
+function saveMusic() { try { localStorage.setItem('fpvsim_fpv_music', JSON.stringify({ on: MUS.on, vol: MUS.vol })); } catch (e) { } }
 const mf = n => 440 * Math.pow(2, (n - 69) / 12);
 const BPM = 126;
 const CHORDS = [[45, [57, 60, 64]], [41, [57, 60, 65]], [48, [55, 60, 64]], [43, [55, 59, 62]]];   // Am F C G
@@ -207,8 +207,8 @@ const RC_DEFAULT = {
   thrType: 'center', cal: {}, pad: -1
 };
 let RC = JSON.parse(JSON.stringify(RC_DEFAULT));
-try { const r = JSON.parse(localStorage.getItem('hroc_fpv_rc') || 'null'); if (r && r.axes) RC = Object.assign(RC, r); } catch (e) { }
-function saveRC() { try { localStorage.setItem('hroc_fpv_rc', JSON.stringify(RC)); } catch (e) { } }
+try { const r = JSON.parse(localStorage.getItem('fpvsim_fpv_rc') || 'null'); if (r && r.axes) RC = Object.assign(RC, r); } catch (e) { }
+function saveRC() { try { localStorage.setItem('fpvsim_fpv_rc', JSON.stringify(RC)); } catch (e) { } }
 // ---- 키보드 지정 (사용자가 바꿀 수 있음) ----
 const KB_PRESET = {
   A: { up: 'KeyW', down: 'KeyS', yawL: 'KeyA', yawR: 'KeyD', fwd: 'ArrowUp', back: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', drop: 'Space', cam: 'KeyC', zoom: 'KeyZ', reset: 'KeyR', assist: 'KeyH', boost: 'ShiftLeft' },
@@ -217,8 +217,8 @@ const KB_PRESET = {
 const KB_CANON = { drop: 'Space', cam: 'KeyC', zoom: 'KeyZ', reset: 'KeyR', assist: 'KeyH' };
 const KB_RESERVED = ['Digit0', 'KeyT', 'Escape', 'Enter', 'Tab', 'KeyF', 'KeyB', 'KeyM', 'KeyG', 'KeyP', 'KeyL', 'KeyN', 'KeyV', 'KeyX', 'MetaLeft', 'MetaRight', 'Digit1', 'Digit2', 'Digit3', 'Digit4'];
 let KB = Object.assign({}, KB_PRESET.A);
-try { const k = JSON.parse(localStorage.getItem('hroc_fpv_keys2') || 'null'); if (k && k.up) KB = Object.assign({}, KB_PRESET.A, k); } catch (e) { }
-function saveKB() { try { localStorage.setItem('hroc_fpv_keys2', JSON.stringify(KB)); } catch (e) { } }
+try { const k = JSON.parse(localStorage.getItem('fpvsim_fpv_keys2') || 'null'); if (k && k.up) KB = Object.assign({}, KB_PRESET.A, k); } catch (e) { }
+function saveKB() { try { localStorage.setItem('fpvsim_fpv_keys2', JSON.stringify(KB)); } catch (e) { } }
 function kbWhich() { for (const p of ['A', 'B']) if (Object.keys(KB_PRESET[p]).every(k => KB_PRESET[p][k] === KB[k])) return p; return 'C'; }
 function keyName(c) {
   if (!c) return '—';

@@ -6,6 +6,7 @@
 """
 import json, base64, re, sys, os, shutil
 from en import EN
+SIM_ROOT = os.environ.get('SIM_ROOT') or ('/home/claude/range/sim' if os.path.isdir('/home/claude/range/sim') else os.path.abspath('..'))   # 공개 사이트 폴더 (바닥 사진·정사영상 원본이 있는 곳) · CI 에서는 저장소의 sim/
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game3e.js', 'game4.js', 'game5.js', 'game6.js']
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
@@ -19,7 +20,7 @@ LIBS = {'THREE': 'node_modules/three/build/three.min.js', 'GEOTIFF': 'node_modul
 
 
 def sources(lang, mode, c1=None):
-    if c1 is None: c1 = mode in ('hroc', 'civil', 'public')   # 1종 연습: 내부판·민간판·공개 PC판 (VR판 제외)
+    if c1 is None: c1 = mode in ('private', 'civil', 'public')   # 1종 연습: 내부판·민간판·공개 PC판 (VR판 제외)
     t = open('template.html', encoding='utf-8').read()
     game = ''.join(open(f, encoding='utf-8').read() for f in FILES)
     if c1:   # 1종 연습 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
@@ -41,14 +42,13 @@ def sources(lang, mode, c1=None):
         g2 = re.sub(r'(?<![:\\])//[^\n]*', '', game); t2 = re.sub(r'<!--.*?-->', '', t, flags=re.S)
         left = set(re.findall(r'[가-힣]+', g2 + t2))
         if left: print('LEFTOVER', list(left)[:30])
-    T = PRIV['titles'] if mode == 'hroc' else TITLES[mode]
-    if mode == 'civil': game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리 (내부판 기록과 섞이지 않게)
+    T = PRIV['titles'] if mode == 'private' else TITLES[mode]
     t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang])
     return t, game
 
 
-def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
-    t, game = sources(lang, 'hroc')
+def build(lang='ko', mobile=False, out='fpv_simulator_private.html', vr=False):
+    t, game = sources(lang, 'private')
     lib = {k: open(v, encoding='utf-8').read().replace('</script>', '<\\/script>') for k, v in LIBS.items()}
     data = json.load(open('data.json', encoding='utf-8'))
     data['logo'] = 'data:image/jpeg;base64,' + base64.b64encode(open('logo.jpg', 'rb').read()).decode()
@@ -62,7 +62,7 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
     sites = [s for s in sites if s['id'] == 'yeongin']
     for s in sites:   # 내부판: 정사영상을 파일 안에 넣어 오프라인에서도 입힘
         s = s; s['name'] = '산악 훈련장 · 영인산'; s['name_en'] = 'Mountain site · Yeonginsan'
-        op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+        op = SIM_ROOT + '/sites/yeongin_ortho.tif'
         if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
     pre += "window.SIM_DEFAULT_SITE='flat';"
     pre += 'window.SIM_SITES=' + json.dumps(sites, ensure_ascii=False) + ';'
@@ -71,11 +71,11 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
 
 
 def build_civil(lang='ko', out='civil.html'):
-    """민간 일반 비행판 한 파일: 공개 현장(영인산)만 · 사격장 코스·좌표 없음 · 1종 연습 포함"""
+    """민간 일반 비행판 한 파일: 공개 현장(영인산)만 · 비공개 코스·좌표 없음 · 1종 연습 포함"""
     t, game = sources(lang, 'civil')
     lib = {k: open(v, encoding='utf-8').read().replace('</script>', '<\\/script>') for k, v in LIBS.items()}
     s = [x for x in json.load(open('sites.json', encoding='utf-8')) if x['id'] == 'yeongin'][0]
-    op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+    op = SIM_ROOT + '/sites/yeongin_ortho.tif'
     if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
     data = {'objs': s['course']['objs'], 'wp': s['course']['wp']}
     pre = 'window.SIM_CIVIL=true;window.SIM_UNLOCKED=true;window.SIM_NOFLAT=true;window.SIM_LANG=' + json.dumps(lang) + ';window.SIM_SITES=' + json.dumps([s], ensure_ascii=False) + ';window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';'
@@ -96,7 +96,7 @@ def build_public(outdir, site_ids=('yeongin',)):
         for key in ('ortho', 'ground', 'groundLo'):   # 정사영상(tif, 올린 파일 대비용)·바닥 사진(webp): 같은 폴더로 복사 + 바뀌면 새로 받게 ?v=
             if not s.get(key) or s[key].startswith('data:'): continue
             import hashlib
-            src = '/home/claude/range/sim/' + s[key].split('?')[0]
+            src = SIM_ROOT + '/' + s[key].split('?')[0]
             if os.path.exists(src):
                 dst = f"{outdir}/{s[key].split('?')[0]}"
                 if os.path.abspath(src) != os.path.abspath(dst): shutil.copy(src, dst)
@@ -166,7 +166,6 @@ def build_pages(outdir, site_ids, vr):
     pre = []   # 서비스 워커가 미리 받아 둘 파일
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
         t, game = sources(lang, 'public', c1=True)
-        game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(minify_js(game, f'{outdir}/js/app.{lang}.js'))
         tags = {'THREE': up + 'lib/three.min.js', 'PROJ4': up + 'lib/proj4.js'}
         for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
@@ -188,7 +187,7 @@ def build_pages(outdir, site_ids, vr):
     return pre
 
 
-def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False, civil=False):
+def build_dual(mobile=False, out='fpv_simulator_private.html', vr=False, civil=False):
     """내부용 한 파일에 한국어·영어 둘 다 (첫 화면 오른쪽 위에서 바꿈, 브라우저에 기억)"""
     pages = {}
     for lang in ('ko', 'en'):
@@ -234,6 +233,6 @@ if __name__ == '__main__':
         import subprocess; r = subprocess.run(['node', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests', 'check.js'), sys.argv[2]])
         sys.exit(r.returncode)
     else:
-        build('ko', False, 'hroc_fpv_simulator_KO.html')
-        build('en', False, 'hroc_fpv_simulator_EN.html')
-        build_dual(False, 'hroc_fpv_simulator.html')
+        build('ko', False, 'fpv_simulator_private_KO.html')
+        build('en', False, 'fpv_simulator_private_EN.html')
+        build_dual(False, 'fpv_simulator_private.html')

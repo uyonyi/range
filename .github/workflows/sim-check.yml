@@ -1,0 +1,61 @@
+name: 시뮬레이터 점검
+
+# sim/ 을 바꾸는 PR·main 푸시마다: 소스로 공개판을 다시 빌드해 커밋된 결과와 같은지 확인하고,
+# 헤드리스 Chromium 으로 실제 비행·1종 자동 채점·VR·휴대폰 배치·장면 부하를 점검한다 (sim/src/tests/check.js)
+on:
+  pull_request:
+    paths: ["sim/**", ".github/workflows/sim-check.yml"]
+  push:
+    branches: [main]
+    paths: ["sim/**", ".github/workflows/sim-check.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sim-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sim/src
+    env:
+      SIM_ROOT: ${{ github.workspace }}/sim
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sim/src/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 빌드 도구 설치
+        run: npm ci
+
+      - name: Chromium 설치
+        run: npx playwright install --with-deps chromium
+
+      - name: 공개판 다시 빌드
+        run: python3 build.py public ..
+
+      - name: 커밋된 빌드가 소스와 같은지
+        run: |
+          if [ -n "$(git status --porcelain -- ..)" ]; then
+            echo "::error::sim/ 의 빌드 결과가 sim/src 소스와 다릅니다. 로컬에서 'python3 build.py public ..' 후 함께 커밋하세요."
+            git status --short -- ..
+            git diff --stat -- .. | tail -20
+            exit 1
+          fi
+
+      - name: 동작 점검 (비행·1종·VR·휴대폰·부하)
+        run: node tests/check.js ..
