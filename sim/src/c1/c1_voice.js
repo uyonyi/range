@@ -36,6 +36,7 @@ function c1Say(text, who) {
   const ak = C1A.st === 'ready' ? c1AKey(text, who) : null;
   const dur = ak ? C1A.idx[ak][2] + 0.35 : Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
   c1Caption(text, who, dur); C1.sayUntil = Math.max(C1.sayUntil || 0, C1.t || 0) + dur;
+  if (who === 'me') { C1.meUntil = C1.sayUntil; C1.lastMe = text; } else { C1.exUntil = C1.sayUntil; C1.lastEx = text; }   // 구호가 끝날 때까지 단계 완료를 기다리기 위한 시각
   (C1V.log = C1V.log || []).push((ak ? '' : '[NOKEY] ') + (who === 'me' ? 'ME: ' : 'EX: ') + text); if (C1V.log.length > 300) C1V.log.shift();
   try {
     if (ak && SET.c1voice !== false) { if (!TEST) c1APlay(ak); C1V.nRec = (C1V.nRec || 0) + 1; }

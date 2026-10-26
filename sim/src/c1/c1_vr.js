@@ -7,14 +7,14 @@ function c1VRon() { return ((typeof XR_ON !== 'undefined' && XR_ON && !XR.menu) 
 function c1XRInit() {
   if (C1XR.rig) return;
   const rig = new THREE.Group(); scene.add(rig); const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 9000); rig.add(cam);
-  const b = vrPlane(0.62, 0.42, 1024, 694, { depthTest: false }); b.m.position.set(-0.32, 1.02, -0.5); b.m.rotation.set(-0.62, 0.42, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);
+  const b = vrPlane(0.56, 0.38, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.62); b.m.rotation.set(-0.5, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 눈을 향해 살짝 기울임 (기체 시야를 가리지 않게 아래쪽)
   Object.assign(C1XR, { rig, cam, board: b });
 }
 function c1XRUpdate(dt) {
   c1XRInit(); const R = C1XR.rig;
-  const at = C1.introCam ? c1W(-9, -7.5, 0) : c1W(0, 0, 0);
+  const at = C1.introCam ? c1W(-9, -3.6, 0) : c1W(0, 0, 0);
   const raise = XR.local ? c1p('eye') : 0;   // 바닥 기준 공간이 없으면 눈높이만큼 올림 (안내판은 그만큼 내림)
-  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.02 - raise;
+  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.08 - raise;
   R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
   if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
   C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';
