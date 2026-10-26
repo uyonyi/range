@@ -954,7 +954,7 @@ function frame(now, noRender) {
   const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt);
+  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt); try { TREES3.tick(now / 1000); } catch (e) { }
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림

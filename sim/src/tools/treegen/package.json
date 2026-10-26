@@ -1,0 +1,13 @@
+{
+  "name": "treegen",
+  "private": true,
+  "description": "나무 모형·잎 아틀라스 생성기 (ez-tree MIT) → ../../trees.json · trees_rgb.webp · trees_a.webp",
+  "type": "commonjs",
+  "scripts": {
+    "export": "node export.js ../.."
+  },
+  "dependencies": {
+    "@dgreenheck/ez-tree": "1.1.0",
+    "three": "0.170.0"
+  }
+}

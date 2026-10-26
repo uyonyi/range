@@ -140,7 +140,7 @@ const OUTER = (function outerWorld() {
       m.castShadow = !LOWQ; m.receiveShadow = false; m.userData.irBase = 0.13; grp.add(m); };
     mk(leafGeo, ls, leafM, t => { Sv.set(t[4], t[3] * 0.42, t[4]); t.__l = 1; }); mk(trunkGeo, ls, trunkM, t => Sv.set(1, t[3] * 0.55, 1));
     mk(conGeo, cs2, leafM, t => Sv.set(t[4], t[3] * 0.92, t[4])); mk(trunkGeo, cs2, trunkM, t => Sv.set(1, t[3] * 0.25, 1));
-    const [kx, kz] = key.split(',').map(Number); CK.push({ grp, c: new V3((kx + 0.5) * CH, 0, (kz + 0.5) * CH) }); }
+    const [kx, kz] = key.split(',').map(Number); CK.push({ grp, c: new V3((kx + 0.5) * CH, 0, (kz + 0.5) * CH), ls, cs: cs2 }); }
   // 멀리 있는 숲 조각은 그리지 않음 (VR 은 더 가까이서 끔)
   setInterval(() => { const cp = camera.position, c1v = typeof c1VRon === 'function' && c1VRon(), lim = (c1v ? 380 : XR_ON ? 650 : 1100) + CH * 0.7; for (const k of CK) k.grp.visible = Math.hypot(cp.x - k.c.x, cp.z - k.c.z) < lim; }, 400);   // 1종 VR: 조종자 제자리 → 바깥 숲은 가까운 조각만
   // ---- 충돌: 나무(줄기+수관) · 건물(회전 상자) ----
@@ -164,6 +164,6 @@ const OUTER = (function outerWorld() {
   window.__OUTER = { cand: cand.slice(0, 40).map(c => [Math.round(c.x), Math.round(c.z), +c.sc.toFixed(2)]), trees: T.length, roads: roads.map(rd => ({ w: rd.w, p: rd.p })), blds: B.map(b => [b.x, b.z, b.kind]), vil: vil.map(v => [v.x, v.z]) };
   // 코스 지도(미리 그려 둔 것)에 바깥 지역을 다시 그려 넣음
   if (typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const kb = mapBg, kv = MAPV; mapBg = MAP_CACHE.course; MAPV = MAP_CACHE.course.V || MAPV; drawMapBg(); mapBg = kb; MAPV = kv; } catch (e) { } }
-  return { lu, B, T, roads, vil, col };
+  return { lu, B, T, roads, vil, col, CK, CH };
 })();
 })();
