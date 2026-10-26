@@ -1931,7 +1931,9 @@ const MODES = {
   atti: { name: 'ATTI', maxTilt: 30 * DEG, vmax: 12, yawRate: 110 * DEG, althold: true, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 3, atti: true },
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
-const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.4, h: 0.8, fov: 56 }];   // 추적 Camera distance (멀리·보통·가까이)
+const ZOOMS = [{ d: 4.5, h: 1.5, fov: 62 }, { d: 2.6, h: 0.9, fov: 58 }, { d: 1.8, h: 0.6, fov: 56 }];   // 추적 Camera distance 프리셋 (멀리·보통·가까이) · Z 키
+// 추적 Camera: Zoom는 슬라이더(SET.camDist, 1.5~8 m)로 이어서 조절, 프리셋(Z)은 슬라이더 값을 바꿔 줌
+function zoomCfg() { const d = clamp(+SET.camDist || (ZOOMS[SET.zoom] || ZOOMS[1]).d, 1.5, 8); return { d, h: d * 0.34, fov: 56 + clamp((d - 2) / 4, 0, 1) * 7 }; }
 const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 1, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
 // 저장 구조: 일반 SETTINGS은 평탄, 종목별 SETTINGS은 하위 묶음 (c1: 1종 실기). 구버전(평탄 c1xxx 키)도 읽음
 const SET_GROUPS = ['c1'];
@@ -1949,7 +1951,7 @@ function setDiff(v) {   // 옛 Difficulty 값 → 세 축 (VR Menu 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
+const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 SETTINGS은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 None)
@@ -2459,13 +2461,13 @@ function updateCamera(dt, subj) {
       want = b.world(clamp(lw.lx, -n.x + 0.18, n.x - 0.18), clamp(lw.ly, n.y0 + 0.18, n.y1 - 0.18), clamp(lw.lz, 0.4, n.z - 0.2));
       camPos.lerp(want, 1 - Math.exp(-dt * 12));
     } else {
-      const Z = ZOOMS[SET.zoom] || ZOOMS[1]; want = subj.p.clone().addScaledVector(fwd, -Z.d * camK()).add(new V3(0, Z.h * camK(), 0));
+      const Z = zoomCfg(); want = subj.p.clone().addScaledVector(fwd, -Z.d * camK()).add(new V3(0, Z.h * camK(), 0));
       want.y = Math.max(want.y, groundAt(want.x, want.z) + 0.35);
-      camPos.lerp(want, 1 - Math.exp(-dt * 5.5));
+      camPos.lerp(want, 1 - Math.exp(-dt * 9));   // 가속할 때 Camera가 처져서 멀어 보이지 않게
     }
     camera.position.copy(camPos);
     camLook.lerp(subj.p.clone().addScaledVector(fwd, 1.5).add(new V3(0, 0.2, 0)), 1 - Math.exp(-dt * 9));
-    camera.lookAt(camLook); camera.fov = (ZOOMS[SET.zoom] || ZOOMS[1]).fov + (innerHeight > innerWidth ? 10 : 0) + (S.boosting && SET.boostFov !== 0 ? 9 : 0); camera.near = 0.05;
+    camera.lookAt(camLook); camera.fov = zoomCfg().fov + (innerHeight > innerWidth ? 10 : 0) + (S.boosting && SET.boostFov !== 0 ? 9 : 0); camera.near = 0.05;
   } else {
     // TOP: 드론 뒤쪽 위에서 비스듬히 내려다봄 (방향은 천천히 따라감)
     topH += wrapA(subj.h - topH) * (1 - Math.exp(-dt * 1.8));
@@ -2775,7 +2777,7 @@ function handleKeys() {
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
     else if (k === 'Slash' || k === 'F1') { S.keysShow = !S.keysShow; if (S.keysShow) S.keysT = 0; }
-    else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; saveSet(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom], '#fff', 0.7); }
+    else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; SET.camDist = ZOOMS[SET.zoom].d; saveSet(); if (typeof syncSeg === 'function') syncSeg(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom] + ' · ' + SET.camDist.toFixed(1) + ' m', '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }
     else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('Light On', 'LIGHT ON') : L2x('Light Off', 'LIGHT OFF'), '#ffe9a0', 0.9); }
@@ -2804,7 +2806,7 @@ function frame(now, noRender) {
   if (!TEST && !XR_ON) requestAnimationFrame(frame);
   let dt = Math.max(0, Math.min((now - last) / 1000, 0.1)); last = now;
   readInput(dt);
-  rumbleTick(dt); handleKeys();
+  rumbleTick(dt); gpnTick(dt); handleKeys();
   if (RCUI.open) rcPanelUpdate();
   const playing = S.state === 'run' || S.state === 'demo';
   if (S.state === 'pause') dt = 0;
@@ -3430,6 +3432,65 @@ function renderBelly() {
 }
 
 // =====================================================================
+//  게임패드 Menu 탐색: Menu·브리핑·Pause·결과·옵션 패널에서
+//  D패드/스틱 = 초점 move · A = 선택 · B = 뒤로 · LB/RB = 탭 전환 · 슬라이더는 좌우로 값 조절
+// =====================================================================
+const GPN = { el: null, t: 0, rep: 0, pA: false, pB: false, pL: false, pR: false, seen: false };
+function gpnActive() { return !XR_ON && !RCUI.open && (S.state === 'menu' || S.state === 'pause' || S.state === 'result' || (S.state === 'run' && S.brief)); }
+function gpnContainer() {
+  for (const id of ['kbPanel', 'rcPanel', 'optPanel', 'setPanel', 'recPanel', 'helpPanel', 'ctlPanel', 'tutMenu']) { const e = $(id); if (e && !e.classList.contains('hidden')) return e; }
+  if (S.state === 'pause') return ui.pause; if (S.state === 'result') return ui.result; if (S.brief) return $('brief'); return ui.menu;
+}
+function gpnVisible(e) { if (e.disabled || e.offsetParent === null) return false; const r = e.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; }
+function gpnItems() { const c = gpnContainer(); if (!c) return []; return [...c.querySelectorAll('button, input[type=range], input[type=number], select')].filter(gpnVisible); }
+function gpnSet(e) { if (GPN.el && GPN.el !== e) GPN.el.classList.remove('gpf'); GPN.el = e || null; if (e) { e.classList.add('gpf'); try { e.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (x) { } } }
+function gpnRefresh() { const items = gpnItems(); if (!GPN.el || !items.includes(GPN.el) || !gpnVisible(GPN.el)) gpnSet(items.find(e => e.classList.contains('on') || e.classList.contains('primary')) || items[0] || null); }
+function gpnMove(dx, dy) {
+  const items = gpnItems(); if (!items.length) return;
+  const cur = GPN.el; if (!cur || !items.includes(cur)) { gpnRefresh(); return; }
+  const r0 = cur.getBoundingClientRect(), cx = (r0.left + r0.right) / 2, cy = (r0.top + r0.bottom) / 2; let best = null, bs = 1e9;
+  for (const e of items) {
+    if (e === cur) continue; const r = e.getBoundingClientRect();
+    // 가장자리 기준 Zoom (큰 타일·긴 버튼도 자연스럽게)
+    const vx = dx > 0 ? r.left - r0.right : dx < 0 ? r0.left - r.right : 0, vy = dy > 0 ? r.top - r0.bottom : dy < 0 ? r0.top - r.bottom : 0;
+    const along = dx ? vx : vy; if (along < -Math.max(r0.height, r0.width) * 0.3) continue;
+    const ex = (r.left + r.right) / 2, ey = (r.top + r.bottom) / 2, perp = dx ? Math.abs(ey - cy) : Math.abs(ex - cx);
+    const score = Math.max(0, along) + perp * (dx ? 1.6 : 2.2); if (score < bs) { bs = score; best = e; }
+  }
+  if (best) gpnSet(best);
+}
+function gpnAdjust(d) {
+  const e = GPN.el; if (!e || e.tagName !== 'INPUT') return false;
+  if (e.type === 'range') { const st = +e.step || 1; e.value = clamp(+e.value + d * st * (st < 1 ? 2 : 1), +e.min, +e.max); e.dispatchEvent(new Event('input', { bubbles: true })); return true; }
+  if (e.type === 'number') { const st = +e.step || 1; e.value = clamp(+e.value + d * st, +e.min, +e.max); e.dispatchEvent(new Event('change', { bubbles: true })); return true; }
+  return false;
+}
+function gpnPress() { const e = GPN.el; if (!e) return; if (e.tagName === 'INPUT') return; sfx('good'); e.click(); setTimeout(gpnRefresh, 60); }
+function gpnTab(d) {
+  const c = gpnContainer(), tabs = c === ui.menu ? [...document.querySelectorAll('#msTabs button')].filter(gpnVisible) : [...c.querySelectorAll('#optTabs button')];
+  if (!tabs.length) return; const on = tabs.findIndex(t => t.classList.contains('on')); tabs[((on < 0 ? 0 : on) + d + tabs.length) % tabs.length].click(); setTimeout(gpnRefresh, 60);
+}
+// readInput 뒤에서 매 프레임: Menu 상태면 패드의 Menu용 키 입력(PadA·D패드·LB/RB)은 여기서 소비
+function gpnTick(dt) {
+  const gp = getPad();
+  if (!gp || !gpnActive()) { if (GPN.el) gpnSet(null); GPN.pA = GPN.pB = GPN.pL = GPN.pR = false; return; }
+  const b = i => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
+  { const c = gpnContainer(); if (c !== GPN.c) { GPN.c = c; if (GPN.seen) gpnRefresh(); else gpnSet(null); } }   // 패널이 바뀌면 초점도 그 안으로
+  for (let i = pressed.length - 1; i >= 0; i--) if (/^Pad(A|Up|Down|Left|Right|LB|RB)$/.test(pressed[i])) pressed.splice(i, 1);
+  const ax = Math.abs(gp.axes[0] || 0) > Math.abs(gp.axes[2] || 0) ? gp.axes[0] || 0 : gp.axes[2] || 0, ay = Math.abs(gp.axes[1] || 0) > Math.abs(gp.axes[3] || 0) ? gp.axes[1] || 0 : gp.axes[3] || 0;
+  let dx = (b(15) ? 1 : 0) - (b(14) ? 1 : 0), dy = (b(13) ? 1 : 0) - (b(12) ? 1 : 0);
+  if (!dx && !dy) { if (Math.abs(ax) > 0.6 && Math.abs(ax) >= Math.abs(ay)) dx = Math.sign(ax); else if (Math.abs(ay) > 0.6) dy = Math.sign(ay); }
+  if (dx || dy) { GPN.t -= dt; if (GPN.t <= 0) { GPN.t = GPN.rep ? 0.16 : 0.4; GPN.rep++; if (!GPN.el) gpnRefresh(); else if (dx && gpnAdjust(dx)) { } else gpnMove(dx, dy); GPN.seen = true; } }
+  else { GPN.t = 0; GPN.rep = 0; }
+  const A = b(0), B = b(1), LB = b(4), RB = b(5);
+  if (A && !GPN.pA) { if (!GPN.el) gpnRefresh(); gpnPress(); }
+  if (B && !GPN.pB) pressed.push('Escape');
+  if (LB && !GPN.pL) gpnTab(-1); if (RB && !GPN.pR) gpnTab(1);
+  GPN.pA = A; GPN.pB = B; GPN.pL = LB; GPN.pR = RB;
+  if (GPN.seen && !GPN.el) gpnRefresh();
+}
+
+// =====================================================================
 //  위성사진 (ortho.tif, EPSG:32652) 불러오기 -> 코스 좌표에 맞춰 바닥에 입힘
 // =====================================================================
 // 코스 좌표 -> 현재 Site의 투영 좌표 (SITE.crs)
@@ -3703,6 +3764,7 @@ document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle
     const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
     if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
     const a = afOk ? AFc() : {}; if ($('hovV')) $('hovV').textContent = a.twr ? `Pause FLIGHT ≈ ${Math.round(hoverThr(a.twr, 0.05) * 100)}% (추력비 ${a.twr})` : ''; document.body.classList.toggle('acroOk', !!a.acro); }
+  if ($('camDist')) { const d = zoomCfg().d; $('camDist').value = d; $('camDistV').textContent = d.toFixed(1) + ' m'; document.querySelectorAll('#zoomPre button').forEach(b => b.classList.toggle('on', Math.abs(ZOOMS[+b.dataset.v].d - d) < 0.05)); }
   if ($('fov')) { $('fov').value = SET.fov || 82; $('fovV').textContent = (SET.fov || 82) + '°'; }
   document.querySelectorAll('#segGhost button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.ghost));
   document.querySelectorAll('#segAssist button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.assist));
@@ -3724,6 +3786,8 @@ const rateIn = (ids, key) => ids.forEach((id, i) => { const e = $(id); if (!e) r
 rateIn(['rc0', 'rc1', 'rc2'], 'rates'); rateIn(['ry0', 'ry1', 'ry2'], 'ratesY');
 document.querySelectorAll('#segThrHover button').forEach(b => b.addEventListener('click', () => { SET.thrHover = b.dataset.v; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segBoostFov button').forEach(b => b.addEventListener('click', () => { SET.boostFov = +b.dataset.v; saveSet(); syncSeg(); }));
+if ($('camDist')) $('camDist').addEventListener('input', () => { SET.camDist = +$('camDist').value; saveSet(); syncSeg(); });
+document.querySelectorAll('#zoomPre button').forEach(b => b.addEventListener('click', () => { SET.zoom = +b.dataset.v; SET.camDist = ZOOMS[SET.zoom].d; saveSet(); syncSeg(); }));
 if ($('fov')) $('fov').addEventListener('input', () => { SET.fov = +$('fov').value; saveSet(); syncSeg(); });
 document.querySelectorAll('#camPre button').forEach(b => b.addEventListener('click', () => { const P = { novice: [12, 90], std: [15, 82], racer: [25, 110] }[b.dataset.v]; SET.tilt = P[0]; SET.fov = P[1]; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segGhost button').forEach(b => b.addEventListener('click', () => { SET.ghost = b.dataset.v === '1'; saveSet(); syncSeg(); }));
@@ -6221,8 +6285,8 @@ function vrMenuClick(hand) {
   if (id.startsWith('diff:')) { setDiff(id.slice(5)); saveSet(); return; }
   if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
-  if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
-  if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); SET.camDist = ZOOMS[SET.zoom].d; } saveSet(); vrApplyCam(); return; }
+  if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); SET.camDist = ZOOMS[SET.zoom].d; saveSet(); return; }
   if (id.startsWith('expo:')) { SET.expo = id.slice(5); saveSet(); syncExpo(); return; }
   if (id.startsWith('hud:')) { SET.hud = id.slice(4); saveSet(); syncHud(); return; }
   if (id.startsWith('pip:')) { SET.vrPip = +id.slice(4); saveSet(); return; }

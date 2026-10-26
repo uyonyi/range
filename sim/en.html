@@ -194,6 +194,7 @@ body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bot
 #feelAdv .frow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0}
 #feelAdv label{display:inline-flex;gap:4px;align-items:center}#feelAdv input[type=number]{width:62px;background:#1a2129;color:var(--fg);border:1px solid #33404b;border-radius:5px;padding:3px 5px;font:inherit}
 .seg.small button{padding:4px 8px;font-size:11.5px}
+.gpf{outline:3px solid var(--amber)!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(255,200,40,.18)!important;position:relative;z-index:2}input.gpf{outline-offset:4px}
 body:not(.acroOk) #feelAdv{opacity:.45}
 .oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
 .qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
@@ -467,6 +468,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div>Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span></div>
       <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>FPV camera tilt <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>Chase camera distance (Z cycles presets) <span class="seg"><input id="camDist" type="range" min="1.5" max="8" step="0.1" value="2.6" style="vertical-align:middle"> <span id="camDistV" class="mono">3.2 m</span> <span class="seg small" id="zoomPre"><button data-v="2">Near 1.8</button><button data-v="1">Mid 2.6</button><button data-v="0">Far 4.5</button></span></span></div>
       <div>FPV field of view <span class="seg"><input id="fov" type="range" min="70" max="120" value="82" style="vertical-align:middle"> <span id="fovV" class="mono">82°</span> <span class="seg small" id="camPre"><button data-v="novice">Novice (12° · 90°)</button><button data-v="std">Default (15° · 82°)</button><button data-v="racer">Racer (25° · 110°)</button></span></span></div>
       <div>Widen FOV on boost <span class="seg" id="segBoostFov"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
@@ -513,7 +515,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div class="thumbs"><div><b>Left stick</b>↕ climb·descend · ↔ yaw (Mode 2)</div><div><b>Right stick</b>↕ forward·back · ↔ sideways</div></div>
       <div class="note">A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause · R-stick click light</div>
       <h3>RC transmitter (USB joystick mode)</h3>
-      <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
+      <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. In menus: D-pad/stick to move, A select, B back, LB/RB switch tabs. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
     </div>
     <div class="touchOnly">
       <h3>TOUCH CONTROLS</h3>
@@ -679,7 +681,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script src="lib/three.min.js"></script>
 <script src="lib/geotiff.js"></script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=adf8fa7d"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
-<script src="js/app.en.js?v=adf8fa7d"></script>
+<script src="sites/yeongin.js?v=241f5852"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';</script>
+<script src="js/app.en.js?v=241f5852"></script>
 </body>
 </html>

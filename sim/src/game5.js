@@ -2365,8 +2365,8 @@ function vrMenuClick(hand) {
   if (id.startsWith('diff:')) { setDiff(id.slice(5)); saveSet(); return; }
   if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
-  if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
-  if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); saveSet(); return; }
+  if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); SET.camDist = ZOOMS[SET.zoom].d; } saveSet(); vrApplyCam(); return; }
+  if (id.startsWith('zoom:')) { SET.zoom = +id.slice(5); SET.camDist = ZOOMS[SET.zoom].d; saveSet(); return; }
   if (id.startsWith('expo:')) { SET.expo = id.slice(5); saveSet(); syncExpo(); return; }
   if (id.startsWith('hud:')) { SET.hud = id.slice(4); saveSet(); syncHud(); return; }
   if (id.startsWith('pip:')) { SET.vrPip = +id.slice(4); saveSet(); return; }

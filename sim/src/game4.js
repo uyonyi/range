@@ -273,6 +273,7 @@ document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle
     const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
     if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
     const a = afOk ? AFc() : {}; if ($('hovV')) $('hovV').textContent = a.twr ? `정지 비행 ≈ ${Math.round(hoverThr(a.twr, 0.05) * 100)}% (추력비 ${a.twr})` : ''; document.body.classList.toggle('acroOk', !!a.acro); }
+  if ($('camDist')) { const d = zoomCfg().d; $('camDist').value = d; $('camDistV').textContent = d.toFixed(1) + ' m'; document.querySelectorAll('#zoomPre button').forEach(b => b.classList.toggle('on', Math.abs(ZOOMS[+b.dataset.v].d - d) < 0.05)); }
   if ($('fov')) { $('fov').value = SET.fov || 82; $('fovV').textContent = (SET.fov || 82) + '°'; }
   document.querySelectorAll('#segGhost button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.ghost));
   document.querySelectorAll('#segAssist button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.assist));
@@ -294,6 +295,8 @@ const rateIn = (ids, key) => ids.forEach((id, i) => { const e = $(id); if (!e) r
 rateIn(['rc0', 'rc1', 'rc2'], 'rates'); rateIn(['ry0', 'ry1', 'ry2'], 'ratesY');
 document.querySelectorAll('#segThrHover button').forEach(b => b.addEventListener('click', () => { SET.thrHover = b.dataset.v; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segBoostFov button').forEach(b => b.addEventListener('click', () => { SET.boostFov = +b.dataset.v; saveSet(); syncSeg(); }));
+if ($('camDist')) $('camDist').addEventListener('input', () => { SET.camDist = +$('camDist').value; saveSet(); syncSeg(); });
+document.querySelectorAll('#zoomPre button').forEach(b => b.addEventListener('click', () => { SET.zoom = +b.dataset.v; SET.camDist = ZOOMS[SET.zoom].d; saveSet(); syncSeg(); }));
 if ($('fov')) $('fov').addEventListener('input', () => { SET.fov = +$('fov').value; saveSet(); syncSeg(); });
 document.querySelectorAll('#camPre button').forEach(b => b.addEventListener('click', () => { const P = { novice: [12, 90], std: [15, 82], racer: [25, 110] }[b.dataset.v]; SET.tilt = P[0]; SET.fov = P[1]; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segGhost button').forEach(b => b.addEventListener('click', () => { SET.ghost = b.dataset.v === '1'; saveSet(); syncSeg(); }));

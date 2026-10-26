@@ -194,6 +194,7 @@ body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bot
 #feelAdv .frow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0}
 #feelAdv label{display:inline-flex;gap:4px;align-items:center}#feelAdv input[type=number]{width:62px;background:#1a2129;color:var(--fg);border:1px solid #33404b;border-radius:5px;padding:3px 5px;font:inherit}
 .seg.small button{padding:4px 8px;font-size:11.5px}
+.gpf{outline:3px solid var(--amber)!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(255,200,40,.18)!important;position:relative;z-index:2}input.gpf{outline-offset:4px}
 body:not(.acroOk) #feelAdv{opacity:.45}
 .oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
 .qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
@@ -467,6 +468,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div>계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>FPV 카메라 기울기 <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>추적 카메라 거리 (Z 키로 프리셋 순환) <span class="seg"><input id="camDist" type="range" min="1.5" max="8" step="0.1" value="2.6" style="vertical-align:middle"> <span id="camDistV" class="mono">3.2 m</span> <span class="seg small" id="zoomPre"><button data-v="2">가까이 1.8</button><button data-v="1">보통 2.6</button><button data-v="0">멀리 4.5</button></span></span></div>
       <div>FPV 시야각 (FOV) <span class="seg"><input id="fov" type="range" min="70" max="120" value="82" style="vertical-align:middle"> <span id="fovV" class="mono">82°</span> <span class="seg small" id="camPre"><button data-v="novice">초보 (12° · 90°)</button><button data-v="std">기본 (15° · 82°)</button><button data-v="racer">레이서 (25° · 110°)</button></span></span></div>
       <div>부스트 때 시야각 확대 <span class="seg" id="segBoostFov"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
@@ -513,7 +515,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div class="thumbs"><div><b>왼쪽 스틱</b>↕ 상승·하강 · ↔ 회전 (모드 2)</div><div><b>오른쪽 스틱</b>↕ 전진·후진 · ↔ 좌우 이동</div></div>
       <div class="note">A 투하 · 사진 보고(산불·수색) · B 카메라 전환 · Y 다시 시작 · RT 투하 · LT 부스트(ATTI 모드는 없음) · LB/RB 카메라 · X 보조 켜기/끄기 · 십자키 ↑↓ 카메라 각도 · ← 아래 카메라 · START 일시정지 · 오른쪽 스틱 누르기 조명</div>
       <h3>RC 조종기 (USB 조이스틱 모드)</h3>
-      <div class="note">조종기를 USB로 연결하고 조종기 설정에서 축(스로틀·요·피치·롤)과 버튼을 지정합니다. 스틱 반응은 옵션에서 실기체(선형)로 바꿀 수 있습니다. <button id="bRC2" class="mini">조종기 설정 열기</button> <span id="padStatus2"></span></div>
+      <div class="note">조종기를 USB로 연결하고 조종기 설정에서 축(스로틀·요·피치·롤)과 버튼을 지정합니다. 스틱 반응은 옵션에서 실기체(선형)로 바꿀 수 있습니다. 메뉴에서는 D패드·스틱으로 이동, A 선택, B 뒤로, LB/RB 탭 전환. <button id="bRC2" class="mini">조종기 설정 열기</button> <span id="padStatus2"></span></div>
     </div>
     <div class="touchOnly">
       <h3>터치 조작</h3>
@@ -679,7 +681,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=0d2be501"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.ko.js?v=0d2be501"></script>
+<script src="../sites/yeongin.js?v=670a17d2"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.ko.js?v=670a17d2"></script>
 </body>
 </html>
