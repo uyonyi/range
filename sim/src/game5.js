@@ -1587,7 +1587,7 @@ function rvLoad() {
   Promise.all([fetch(base + '.json').then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)), fetch(base + '.bin').then(r => r.ok ? r.arrayBuffer() : Promise.reject('bin ' + r.status))])
     .then(([i, b]) => { RV.idx = i; RV.buf = b; RV.st = 'ready'; }).catch(e => { RV.st = 'fail'; COMM.rvErr = String(e); });
 }
-setTimeout(rvLoad, window.SIM_VR ? 300 : 1500);
+setTimeout(rvLoad, window.SIM_VR ? 300 : 12000);   // 메뉴에서는 첫 화면이 다 뜬 뒤에 · 출격하면 바로 (startRun)
 const RV_U = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' '), RV_T = 'twenty thirty forty fifty sixty seventy eighty ninety'.split(' ');
 function rvNumW(n) { return n < 20 ? RV_U[n] : n < 100 ? RV_T[Math.floor(n / 10) - 2] + (n % 10 ? ' ' + RV_U[n % 10] : '') : String(n); }
 function rvNorm(t) { return String(t).toLowerCase().replace(/\d+/g, m => ' ' + rvNumW(+m) + ' ').match(/[a-z']+/g) || []; }

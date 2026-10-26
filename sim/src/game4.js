@@ -20,8 +20,25 @@ function applyGroundCanvas(cv) {
   groundMat.map = t; groundMat.needsUpdate = true; detailK.value = 0.45;
 }
 function resetGround() { if (groundMat.map !== groundMacro) groundMat.map.dispose(); groundMat.map = groundMacro; groundMat.needsUpdate = true; detailK.value = 1; }
+// GeoTIFF 해석기는 사진·DEM 파일을 직접 올릴 때만 필요 → 그때 불러옴 (공개판: lib/geotiff.js)
+const _scriptP = {};
+function loadScriptOnce(url) { return _scriptP[url] || (_scriptP[url] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = url; s.onload = () => res(); s.onerror = () => { delete _scriptP[url]; rej(new Error('load ' + url)); }; document.head.appendChild(s); })); }
+async function ensureGeoTIFF() { if (window.GeoTIFF) return true; if (!window.SIM_GEOTIFF_URL) return false; try { await loadScriptOnce(window.SIM_GEOTIFF_URL); } catch (e) { } return !!window.GeoTIFF; }
+window.ensureGeoTIFF = ensureGeoTIFF;
+// 미리 만들어 둔 바닥 사진 (sites/*_ground.webp · tools/mk_ground.js): 저해상을 먼저 입히고 고해상으로 바꿈 — GeoTIFF 해석·재투영 없이 바로
+function loadImg(url) { return new Promise((res, rej) => { const im = new Image(); im.decoding = 'async'; im.onload = () => res(im); im.onerror = () => rej(new Error('img ' + url)); im.src = url; }); }
+async function autoGroundImg() {
+  if (!SITE.ground) return false;
+  const base = (/^(https?:|\/)/.test(SITE.ground) ? '' : (window.SIM_BASE || ''));
+  const put = im => { const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext('2d').drawImage(im, 0, 0); applyGroundCanvas(cv); };
+  try {
+    if (SITE.groundLo) { try { put(await loadImg(base + SITE.groundLo)); setOrthoStatus('정사영상 (저해상) · 고해상 받는 중…', '#ffc828'); } catch (e) { } }
+    put(await loadImg(base + SITE.ground));
+    setOrthoStatus('위성사진 적용됨 · ' + ((window.SIM_LANG === 'en' && SITE.orthoSrc_en) || SITE.orthoSrc || ''), '#5dff9a'); return true;
+  } catch (e) { return false; }
+}
 async function loadOrthoFile(file, opt) {
-  if (!window.GeoTIFF) throw new Error('GeoTIFF 해석기가 없습니다');
+  if (!window.GeoTIFF && !(await ensureGeoTIFF())) throw new Error('GeoTIFF 해석기가 없습니다');
   setOrthoStatus('읽는 중… (' + (file.size / 1048576).toFixed(0) + ' MB)', '#ffc828');
   const tiff = await GeoTIFF.fromBlob(file);
   const img0 = await tiff.getImage(0);
@@ -93,6 +110,7 @@ async function loadOrthoFile(file, opt) {
 }
 // 현장 기본 정사영상 (sites/*.tif, 현장 데이터의 ortho 항목) — 사용자가 올린 사진이 없을 때 자동으로 입힘
 async function autoOrtho() {
+  if (await autoGroundImg()) return true;
   if (!SITE.ortho) return false;
   try {
     setOrthoStatus('현장 정사영상 불러오는 중…', '#ffc828');
@@ -426,4 +444,4 @@ async function renderMusic(style, dur, state, kind) {
   let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
   return { wav: btoa(bin), peak };
 }
-window.__sim = { modeSync, setDiff, actualRate, hoverThr, renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
+window.__sim = { groundCanvas: () => (groundMat.map && groundMat.map.image && groundMat.map.image.getContext ? groundMat.map.image : null), modeSync, setDiff, actualRate, hoverThr, renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };

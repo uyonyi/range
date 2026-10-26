@@ -52,7 +52,7 @@ function resetDrone(pos, heading) {
 function startHead() { return -num(BY.pad_start.yaw, 0) * DEG; }
 function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0); p.y = groundAt(p.x, p.z) + 0.06; return p; }
 function startRun(kind) {
-  enterFull();
+  enterFull(); if (typeof rvLoad === 'function') rvLoad();
   if (typeof c1Menu === 'function') c1Menu(kind);
   S.keysT = 0; S.keysShow = false; document.body.classList.toggle('calm', kind === 'tutorial' || (typeof isC1 === 'function' && isC1(kind)));   // 훈련·시험 모드는 차분한 톤
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
