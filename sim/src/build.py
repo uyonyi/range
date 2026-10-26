@@ -6,6 +6,7 @@
 """
 import json, base64, re, sys, os, shutil
 from en import EN
+SIM_ROOT = os.environ.get('SIM_ROOT') or ('/home/claude/range/sim' if os.path.isdir('/home/claude/range/sim') else os.path.abspath('..'))   # 공개 사이트 폴더 (바닥 사진·정사영상 원본이 있는 곳) · CI 에서는 저장소의 sim/
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game3e.js', 'game4.js', 'game5.js', 'game6.js']
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
@@ -62,7 +63,7 @@ def build(lang='ko', mobile=False, out='hroc_fpv_simulator.html', vr=False):
     sites = [s for s in sites if s['id'] == 'yeongin']
     for s in sites:   # 내부판: 정사영상을 파일 안에 넣어 오프라인에서도 입힘
         s = s; s['name'] = '산악 훈련장 · 영인산'; s['name_en'] = 'Mountain site · Yeonginsan'
-        op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+        op = SIM_ROOT + '/sites/yeongin_ortho.tif'
         if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
     pre += "window.SIM_DEFAULT_SITE='flat';"
     pre += 'window.SIM_SITES=' + json.dumps(sites, ensure_ascii=False) + ';'
@@ -75,7 +76,7 @@ def build_civil(lang='ko', out='civil.html'):
     t, game = sources(lang, 'civil')
     lib = {k: open(v, encoding='utf-8').read().replace('</script>', '<\\/script>') for k, v in LIBS.items()}
     s = [x for x in json.load(open('sites.json', encoding='utf-8')) if x['id'] == 'yeongin'][0]
-    op = '/home/claude/range/sim/sites/yeongin_ortho.tif'
+    op = SIM_ROOT + '/sites/yeongin_ortho.tif'
     if os.path.exists(op): s['ortho'] = 'data:image/tiff;base64,' + base64.b64encode(open(op, 'rb').read()).decode()
     data = {'objs': s['course']['objs'], 'wp': s['course']['wp']}
     pre = 'window.SIM_CIVIL=true;window.SIM_UNLOCKED=true;window.SIM_NOFLAT=true;window.SIM_LANG=' + json.dumps(lang) + ';window.SIM_SITES=' + json.dumps([s], ensure_ascii=False) + ';window.SIM_DATA=' + json.dumps(data, ensure_ascii=False) + ';'
@@ -96,7 +97,7 @@ def build_public(outdir, site_ids=('yeongin',)):
         for key in ('ortho', 'ground', 'groundLo'):   # 정사영상(tif, 올린 파일 대비용)·바닥 사진(webp): 같은 폴더로 복사 + 바뀌면 새로 받게 ?v=
             if not s.get(key) or s[key].startswith('data:'): continue
             import hashlib
-            src = '/home/claude/range/sim/' + s[key].split('?')[0]
+            src = SIM_ROOT + '/' + s[key].split('?')[0]
             if os.path.exists(src):
                 dst = f"{outdir}/{s[key].split('?')[0]}"
                 if os.path.abspath(src) != os.path.abspath(dst): shutil.copy(src, dst)
