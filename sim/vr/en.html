@@ -17,6 +17,9 @@ canvas#c{display:block;width:100vw;height:100vh}
 .mono{font-family:"SF Mono",Menlo,Consolas,monospace}
 .hidden{display:none!important}
 #hud{position:fixed;inset:0;pointer-events:none}
+#split{position:absolute;left:16px;top:118px;font:700 20px/1 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 8px rgba(0,0,0,.7);opacity:0;transition:opacity .4s;pointer-events:none}#split.on{opacity:1}#split.good{color:#5dff9a}#split.bad{color:#ff6a5a}#split small{font-size:11px;font-weight:600;opacity:.8;margin-left:6px}
+body.touch #split{top:92px;font-size:16px}
+body.nohud #osd,body.nohud #obj,body.nohud #list,body.nohud #map,body.nohud #sticks,body.nohud #keys,body.nohud #bottom,body.nohud #guide,body.nohud #navArrow,body.nohud #radio,body.nohud #belly,body.nohud #split,body.nohud #c1g,body.nohud #c1p,body.nohud .c1w{visibility:hidden!important}
 #osd{position:absolute;left:16px;top:14px;font:600 15px/1.45 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.6);letter-spacing:.02em}
 #osd b{color:var(--amber);font-weight:600;display:inline-block;width:52px}
 #osd .big{font-size:26px;line-height:1.2}
@@ -186,6 +189,12 @@ body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bot
 .otab{display:none;min-height:150px}.otab.on{display:block}
 .optCard .opt.col>div{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;align-items:center;width:100%}
 .optCard .opt.col>div>.seg,.optCard .opt.col>div>input,.optCard .opt.col>div>.oh{grid-column:2}
+.optCard .opt.col>#feelAdv{display:block;grid-column:1/-1;border:1px solid #2c3540;border-radius:8px;padding:8px 10px;margin-top:4px;font-size:12.5px;color:var(--mute)}
+#feelAdv .fh{display:flex;justify-content:space-between;align-items:center;color:var(--fg);margin-bottom:6px}
+#feelAdv .frow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0}
+#feelAdv label{display:inline-flex;gap:4px;align-items:center}#feelAdv input[type=number]{width:62px;background:#1a2129;color:var(--fg);border:1px solid #33404b;border-radius:5px;padding:3px 5px;font:inherit}
+.seg.small button{padding:4px 8px;font-size:11.5px}
+body:not(.acroOk) #feelAdv{opacity:.45}
 .oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
 .qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
 .qsbar+.go{margin-top:4px}
@@ -327,6 +336,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
   <div id="irTag" class="hidden">IR · WHITE-HOT</div>
   <div id="vig" class="hidden"></div>
   <div id="osd"></div>
+  <div id="split"></div>
   <div id="obj"><div id="objNext"></div><div id="objMsg"></div></div>
   <div id="list"></div>
   <canvas id="map" width="180" height="300"></canvas>
@@ -424,7 +434,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       </section>
       </div>
       <div id="vrNote" class="vrnote hidden"><span id="vrNoteT"></span><button id="vrResume" class="primary hidden">Back to VR</button></div>
-      <div class="wzbtns"><button id="wz3Back">◀ Drone</button><span class="wzmid"><button id="bOpt">⚙ Options</button><button id="bCtl">🎮 Controls</button></span><span id="wzWho" class="wzwho"></span><button id="msGoF" class="primary">Launch ▶</button></div>
+      <div class="wzbtns"><button id="wz3Back">◀ Drone</button><span class="wzmid"><button id="bOpt">⚙ Options</button><button id="bCtl">🎮 Controls</button></span><span id="wzWho" class="wzwho"></span><span id="totFly" class="wzwho mono" title="Flight time 시간"></span><button id="msGoF" class="primary">Launch ▶</button></div>
     </div>
   </div>
 </div>
@@ -434,13 +444,19 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
     <h1>OPTIONS</h1><h2>Options · flight mode, display and environment</h2>
     <div class="otabs" id="optTabs"><button data-t="fly" class="on">✈️ Flight</button><button data-t="env">🌤 Weather·time</button><button data-t="view">🖥 Display</button><button data-t="snd">🔊 Sound</button><button data-t="dev">🎮 Controllers</button><button data-t="gis">🗺 Terrain</button></div>
     <div class="otab" data-t="fly"><div class="opt col">
-      <div>Difficulty <span class="seg" id="segDiff"><button data-v="train" class="on">Training</button><button data-v="easy">Easy</button><button data-v="atti">ATTI</button><button data-v="sport">Sport</button></span></div>
+      <div>Flight mode <span class="seg" id="segMode"><button data-v="gps" class="on">GPS · position hold</button><button data-v="atti">ATTI · attitude only</button><button data-v="man">Manual · stabilised</button><button data-v="acro">ACRO · full manual</button></span></div>
+      <div>Assistance <span class="seg" id="segAssistLv"><button data-v="2" class="on">Full</button><button data-v="1">Light</button><button data-v="0">Off</button></span></div>
+      <div>Feel <span class="seg" id="segFeel"><button data-v="train">Beginner</button><button data-v="std" class="on">Standard</button><button data-v="real">Real aircraft</button></span></div>
       <div>Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span></div>
-      <div>Flight assist <span class="seg" id="segAssist"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Guide <span class="seg" id="segGuide"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>FPV / kamikaze FPV manual control (Acro, in Sport) <span class="seg" id="segAcro"><button data-v="0" class="on">Off · self-level</button><button data-v="1">On · manual</button></span></div>
+      <div id="feelAdv" class="feeladv">
+        <div class="fh">ACRO details (FPV · kamikaze FPV) <span class="seg small" id="segRatePre"><button data-v="train">Beginner</button><button data-v="std">Betaflight default</button><button data-v="racer">Racer</button></span></div>
+        <div class="frow">Rates roll·pitch <label>Center <input id="rc0" type="number" min="10" max="400" step="5"></label><label>Max <input id="rc1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="rc2" type="number" min="0" max="1" step="0.05"></label> <span class="mono" id="rcV"></span></div>
+        <div class="frow">Rates yaw <label>Center <input id="ry0" type="number" min="10" max="400" step="5"></label><label>Max <input id="ry1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="ry2" type="number" min="0" max="1" step="0.05"></label></div>
+        <div class="frow">Throttle centre = hover <span class="seg small" id="segThrHover"><button data-v="auto" class="on">Auto (gamepad: bottom = idle)</button><button data-v="1">Always</button><button data-v="0">Off · bottom = idle</button></span> <span class="mono" id="hovV"></span></div>
+      </div>
     </div>
-    <div class="note">Difficulty — <b>Training</b>: slow, stops when you release the sticks, turns toward the next task automatically and nudges you to the center of each gate · <b>Easy</b>: altitude hold + light assist · <b>Sport</b>: no assist. Hitting an obstacle bounces you off with a time penalty (Training 2 s · Easy 3 s · Sport 5 s) and the flight continues.</div></div>
+    <div class="note"><b>Flight mode</b> — GPS: stops when you let go · ATTI: attitude only, drifts with momentum and wind · Manual: stabilised within the tilt limit · ACRO: no tilt limit (flips, inverted), thrust ∝ rpm², bottom stick = idle. <b>Assistance</b> — Full: auto heading, gate guidance, terrain follow · Light: gate guidance only. <b>Feel</b> — Beginner: speed and tilt limited · Standard · Real aircraft: full specs. Collisions bounce and cost penalty time.</div></div>
     <div class="otab" data-t="env"><div class="opt col">
       <div>Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="2">Dusk</button><button data-v="1">Night</button></span></div>
       <div>Weather <span class="seg" id="segWx"><button data-v="clear" class="on">Clear</button><button data-v="rain">Rain</button><button data-v="snow">Snow</button></span></div>
@@ -451,6 +467,8 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div>Instruments <span class="seg" id="segHud"><button data-v="auto" class="on">Auto</button><button data-v="fpv">Simple (FPV)</button><button data-v="uas">Aviation (UAS)</button></span></div>
       <div>Belly camera (automatic for drops and orbit; X toggles it any time) <span class="seg" id="segBelly"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>FPV camera tilt <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>FPV field of view <span class="seg"><input id="fov" type="range" min="70" max="120" value="82" style="vertical-align:middle"> <span id="fovV" class="mono">82°</span> <span class="seg small" id="camPre"><button data-v="novice">Novice (12° · 90°)</button><button data-v="std">Default (15° · 82°)</button><button data-v="racer">Racer (25° · 110°)</button></span></span></div>
+      <div>Widen FOV on boost <span class="seg" id="segBoostFov"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
       <div>Start in full screen <span class="seg" id="segFull"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
     </div></div>
     <div class="otab" data-t="snd"><div class="opt col">
@@ -660,7 +678,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script src="../lib/three.min.js"></script>
 <script src="../lib/geotiff.js"></script>
 <script src="../lib/proj4.js"></script>
-<script src="../sites/yeongin.js?v=272c3ca8"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
-<script src="js/app.en.js?v=272c3ca8"></script>
+<script src="../sites/yeongin.js?v=5268f074"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';</script>
+<script src="js/app.en.js?v=5268f074"></script>
 </body>
 </html>

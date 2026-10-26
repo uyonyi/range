@@ -1822,7 +1822,7 @@ const KB_PRESET = {
   B: { up: 'ArrowUp', down: 'ArrowDown', yawL: 'ArrowLeft', yawR: 'ArrowRight', fwd: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', drop: 'Space', cam: 'KeyC', zoom: 'KeyZ', reset: 'KeyR', assist: 'KeyH', boost: 'ShiftLeft' }
 };
 const KB_CANON = { drop: 'Space', cam: 'KeyC', zoom: 'KeyZ', reset: 'KeyR', assist: 'KeyH' };
-const KB_RESERVED = ['KeyT', 'Escape', 'Enter', 'Tab', 'KeyF', 'KeyB', 'KeyM', 'KeyG', 'KeyP', 'KeyL', 'KeyN', 'KeyV', 'KeyX', 'MetaLeft', 'MetaRight', 'Digit1', 'Digit2', 'Digit3', 'Digit4'];
+const KB_RESERVED = ['Digit0', 'KeyT', 'Escape', 'Enter', 'Tab', 'KeyF', 'KeyB', 'KeyM', 'KeyG', 'KeyP', 'KeyL', 'KeyN', 'KeyV', 'KeyX', 'MetaLeft', 'MetaRight', 'Digit1', 'Digit2', 'Digit3', 'Digit4'];
 let KB = Object.assign({}, KB_PRESET.A);
 try { const k = JSON.parse(localStorage.getItem('fpvsim_fpv_keys2') || 'null'); if (k && k.up) KB = Object.assign({}, KB_PRESET.A, k); } catch (e) { }
 function saveKB() { try { localStorage.setItem('fpvsim_fpv_keys2', JSON.stringify(KB)); } catch (e) { } }
@@ -1924,7 +1924,18 @@ const SET_GROUPS = ['c1'];
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
 if (!MODES[SET.diff]) SET.diff = 'train';
-const SET_KEYS = ['belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
+// FLIGHT 방식은 세 축으로 나눠 저장: FLIGHT 모드(mode: gps·atti·man·acro) · assist 단계(assistLv 2·1·0) · FLIGHT감(feel: train·std·real). SET.diff/acro/assist 는 여기서 파생 (기존 코드 호환)
+function modeSync() {
+  if (!SET.mode) { SET.mode = SET.diff === 'atti' ? 'atti' : SET.diff === 'sport' ? (SET.acro ? 'acro' : 'man') : 'gps'; SET.assistLv = SET.diff === 'train' ? 2 : SET.diff === 'easy' ? 1 : 0; SET.feel = SET.diff === 'train' ? 'train' : SET.diff === 'easy' ? 'std' : 'real'; }
+  if (!['train', 'std', 'real'].includes(SET.feel)) SET.feel = 'std'; if (SET.assistLv == null) SET.assistLv = 2;
+  SET.diff = SET.mode === 'atti' ? 'atti' : SET.mode === 'gps' ? (SET.assistLv >= 2 ? 'train' : 'easy') : 'sport';
+  SET.acro = SET.mode === 'acro'; SET.assist = SET.assistLv > 0;
+}
+function setDiff(v) {   // 옛 Difficulty 값 → 세 축 (VR Menu 등)
+  SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
+}
+modeSync();
+const SET_KEYS = ['mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 SETTINGS은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 None)
@@ -1940,7 +1951,7 @@ const PAY = [];
 const CAMS = ['FPV', 'CHASE', 'TOP'];
 
 function resetDrone(pos, heading) {
-  DR.p.copy(pos); DR.v.set(0, 0, 0); DR.h = heading; DR.pitch = 0; DR.roll = 0; DR.alive = true;
+  DR.p.copy(pos); DR.v.set(0, 0, 0); DR.h = heading; DR.pitch = 0; DR.roll = 0; DR.alive = true; DR.q = null; DR.w = null; DR.om = 0;
   DR.landed = pos.y <= groundAt(pos.x, pos.z) + 0.07; DR.thrust = 0; S.stun = 0;
   for (const k in ks) ks[k] = 0;
 }
@@ -2077,6 +2088,8 @@ function stepDrone(dt) {
   if (AFc().cls === 'wing') { stepWing(dt); return; }
   if (typeof isC1 === 'function' && isC1() && AFc().c1) { c1Phys(dt); return; }
   const md = effMode(), afc = AFc();
+  if (md.acro) { stepAcro(dt); droneGround(dt); return; }
+  DR.q = null;
   const grounded = DR.landed && IN.thr <= 0.05;
   const boost = !!IN.boost && !grounded && boostZone() && !md.atti; S.boosting = boost;
   const vmaxB = boost ? Math.max(md.vmax, afc.top) : md.vmax, tiltB = md.maxTilt + (boost ? 15 * DEG : 0);
@@ -2151,13 +2164,53 @@ function stepDrone(dt) {
     DR.v.y += ay * dt; DR.thrust = grounded ? 0.08 : clamp(0.5 + IN.thr * 0.45, 0.05, 1);
     if (grounded) DR.v.y = Math.min(DR.v.y, 0);
   }
+  droneGround(dt);
+}
+// ---- 수동(Acro) FPV 물리: 쿼터니언 자세 · Actual Rates · 추력 ∝ yaw수² · 모터 지연 · 2차 항력 (힘 기반, 플립·배면 가능) ----
+const _qd = new THREE.Quaternion(), _bu = new V3(), _ar = new V3(), _ve = new THREE.Euler(0, 0, 0, 'YXZ');
+function actualRate(x, c, m, e) { const a = Math.abs(x); return x * c + Math.max(0, m - c) * a * (Math.pow(x, 5) * e + x * (1 - e)); }   // Betaflight rc.c applyActualRates
+const RATE_PRESET = { train: [55, 320, 0.4], std: [70, 670, 0.54], real: [70, 670, 0.54], racer: [200, 620, 0] };
+function feelRates(ax) { const r = ax === 'y' ? (SET.ratesY || SET.rates) : SET.rates; return (r && r.length === 3) ? r : RATE_PRESET.std; }
+function hoverThr(twr, idle) { return (Math.sqrt(1 / twr) - idle) / (1 - idle); }   // Pause FLIGHT 스틱 위치 (0..1)
+function thrHoverCenter() { const v = SET.thrHover || 'auto'; return v === 'auto' ? IN.src !== 'PAD' : v === '1'; }   // KEYBOARD·터치는 중앙 = Pause FLIGHT
+function stepAcro(dt) {
+  const afc = AFc(), m = afc.mass || 0.65, twr = afc.twr || 4.5, idle = 0.05, tauM = afc.tauM || 0.1, tauR = 0.04;
+  if (!DR.q) { DR.q = new THREE.Quaternion(); eul.set(-DR.pitch, -DR.h, -DR.roll); DR.q.setFromEuler(eul); DR.w = new V3(); DR.om = DR.landed ? 0 : Math.sqrt(1 / twr); }
+  const stun = S.stun > 0 ? 0.25 : 1; if (S.stun > 0) S.stun -= dt;
+  // 스로틀 0..1: 조종기는 하단 = 아이들, KEYBOARD·터치는 중앙 = Pause FLIGHT (Throttle Mid 와 같은 역할)
+  let t01; const hs = hoverThr(twr, idle);
+  if (!thrHoverCenter()) t01 = (IN.thr + 1) / 2; else t01 = IN.thr >= 0 ? hs + IN.thr * (1 - hs) : hs * (1 + IN.thr);
+  const grounded = DR.landed && t01 < hs * 0.6;
+  const u = grounded ? 0 : idle + (1 - idle) * clamp(t01, 0, 1);
+  DR.om += (u - DR.om) * (1 - Math.exp(-dt / tauM));
+  const T = twr * m * G * DR.om * DR.om;
+  const [rc, rm, re] = feelRates('p'), [yc, ym, ye] = feelRates('y');
+  const wp = actualRate(IN.pitch * stun, rc, rm, re) * DEG, wr = actualRate(IN.roll * stun, rc, rm, re) * DEG, wy = actualRate(IN.yaw * stun, yc, ym, ye) * DEG;
+  const kr = 1 - Math.exp(-dt / tauR);
+  DR.w.x += (wp - DR.w.x) * kr; DR.w.y += (wy - DR.w.y) * kr; DR.w.z += (wr - DR.w.z) * kr;
+  if (!grounded) {   // 기체 축 yaw: 앞으로 밀면 기수 내림(-X) · 오른쪽 요(-Y) · 오른쪽 롤(-Z)  (모델 CRS: 앞 -Z · 오른쪽 +X · 위 +Y)
+    _ar.set(-DR.w.x, -DR.w.y, -DR.w.z); const ang = _ar.length() * dt;
+    if (ang > 1e-7) { _ar.normalize(); _qd.setFromAxisAngle(_ar, ang); DR.q.multiply(_qd).normalize(); }
+  } else { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(0, _ve.y, 0); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); }
+  _ve.setFromQuaternion(DR.q, 'YXZ'); DR.pitch = -_ve.x; DR.h = -_ve.y; DR.roll = -_ve.z;
+  _bu.set(0, 1, 0).applyQuaternion(DR.q); DR.upY = _bu.y;
+  const wv = windAt(DR.p), rvx = DR.v.x - wv.x, rvy = DR.v.y - wv.y, rvz = DR.v.z - wv.z, sp = Math.hypot(rvx, rvy, rvz);
+  const cda = afc.cda || (2 * m * G * Math.tan(60 * DEG) / (1.225 * afc.top * afc.top)), kq = 0.5 * 1.225 * cda / m, kl = 0.08;   // 최고 속도 = 60° 기울기에서 추력·항력 균형
+  const aT = grounded ? 0 : T / m;
+  DR.v.x += (_bu.x * aT - (kq * sp + kl) * rvx) * dt; DR.v.y += (_bu.y * aT - G - (kq * sp + kl) * rvy) * dt; DR.v.z += (_bu.z * aT - (kq * sp + kl) * rvz) * dt;
+  if (grounded) { DR.v.y = Math.min(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); }
+  DR.thrust = Math.max(0.05, DR.om); S.boosting = false;
+  FWD.set(Math.sin(DR.h), 0, -Math.cos(DR.h)); RGT.set(Math.cos(DR.h), 0, Math.sin(DR.h));
+}
+// ---- 공통: move · 지면 · 장애물 · 구역 경계 ----
+function droneGround(dt) {
   DR.p.addScaledVector(DR.v, dt);
   // 지면
   const gh = groundAt(DR.p.x, DR.p.z) + 0.06;
   if (DR.p.y < gh) {
     const hs = Math.hypot(DR.v.x, DR.v.z), vy = DR.v.y;
     DR.p.y = gh;
-    if (vy < -4.5 || hs > 7) { impact(new V3(0, 1, 0), Math.min(vy, -2)); DR.v.y = Math.abs(vy) * 0.3; }
+    if (vy < -4.5 || hs > 7 || (DR.q && DR.upY < 0.6)) { impact(new V3(0, 1, 0), Math.min(vy, -2)); DR.v.y = Math.abs(vy) * 0.3; if (DR.q) { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(0, _ve.y, 0); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); } }
     else { DR.v.y = Math.max(DR.v.y, 0); DR.v.x *= Math.exp(-9 * dt); DR.v.z *= Math.exp(-9 * dt); DR.landed = true; }
   } else if (DR.p.y > gh + 0.03) DR.landed = false;
   if (DR.p.y > gh + 120) { DR.p.y = gh + 120; DR.v.y = Math.min(DR.v.y, 0); }   // 지면 위 120 m 제한
@@ -2376,14 +2429,14 @@ let shake = 0, topH = 0;
 function updateCamera(dt, subj) {
   if (typeof c1Camera === 'function' && c1Camera(dt, subj)) { if (shake > 0) { camera.position.add(new V3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0)); shake *= Math.exp(-dt * 8); } camera.updateProjectionMatrix(); return; }
   const mode = CAMS[S.cam];
-  eul.set(-visPitch(subj), -subj.h, -subj.roll); qBody.setFromEuler(eul);
+  if (subj.q) qBody.copy(subj.q); else { eul.set(-visPitch(subj), -subj.h, -subj.roll); qBody.setFromEuler(eul); }
   const fwd = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h));
   camera.up.set(0, 1, 0);
   if (mode === 'FPV') {
     qTilt.setFromAxisAngle(new V3(1, 0, 0), (AFc().cls === 'wing' ? 0 : SET.tilt) * DEG);
     camera.quaternion.copy(qBody).multiply(qTilt);
     camera.position.copy(subj.p).add(new V3(0, 0.02, -0.12).applyQuaternion(qBody));
-    camera.fov = 82 + (S.boosting ? 8 : 0); camera.near = 0.03;
+    camera.fov = (SET.fov || 82) + (S.boosting && SET.boostFov !== 0 ? 8 : 0); camera.near = 0.03;
   } else if (mode === 'CHASE') {
     let want;
     if (insideBunker(subj.p)) {
@@ -2398,7 +2451,7 @@ function updateCamera(dt, subj) {
     }
     camera.position.copy(camPos);
     camLook.lerp(subj.p.clone().addScaledVector(fwd, 1.5).add(new V3(0, 0.2, 0)), 1 - Math.exp(-dt * 9));
-    camera.lookAt(camLook); camera.fov = (ZOOMS[SET.zoom] || ZOOMS[1]).fov + (innerHeight > innerWidth ? 10 : 0) + (S.boosting ? 9 : 0); camera.near = 0.05;
+    camera.lookAt(camLook); camera.fov = (ZOOMS[SET.zoom] || ZOOMS[1]).fov + (innerHeight > innerWidth ? 10 : 0) + (S.boosting && SET.boostFov !== 0 ? 9 : 0); camera.near = 0.05;
   } else {
     // TOP: 드론 뒤쪽 위에서 비스듬히 내려다봄 (방향은 천천히 따라감)
     topH += wrapA(subj.h - topH) * (1 - Math.exp(-dt * 1.8));
@@ -2443,7 +2496,7 @@ function renderList() {
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
-  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : MODES[SET.diff].name + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : ''));
+  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : (SET.acro && AFc().acro && SET.diff === 'sport' ? 'ACRO' : MODES[SET.diff].name) + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : ''));
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
@@ -2676,7 +2729,7 @@ function updateGhost(t, dt) {
 }
 // 고정익의 pitch 는 'Climb각'(+ 위), 쿼드는 '앞으로 숙임'(+ 아래) -> 그릴 때 부호를 맞춤
 function visPitch(st) { return st !== ghostS && AFc().cls === 'wing' ? -st.pitch : st.pitch; }
-function placeModel(mdl, st) { mdl.g.position.copy(st.p); eul.set(-visPitch(st), -st.h, -st.roll); mdl.g.quaternion.setFromEuler(eul); }
+function placeModel(mdl, st) { mdl.g.position.copy(st.p); if (st.q) mdl.g.quaternion.copy(st.q); else { eul.set(-visPitch(st), -st.h, -st.roll); mdl.g.quaternion.setFromEuler(eul); } }
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
 function handleKeys() {
@@ -2713,13 +2766,14 @@ function handleKeys() {
     else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }
     else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('Light On', 'LIGHT ON') : L2x('Light Off', 'LIGHT OFF'), '#ffe9a0', 0.9); }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
-    else if (k === 'KeyH') { SET.assist = !SET.assist; saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }
+    else if (k === 'KeyH') { SET.assistLv = SET.assist ? 0 : 2; modeSync(); saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }
     else if (k === 'PadUp') { SET.tilt = Math.min(40, SET.tilt + 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
     else if (k === 'PadDown') { SET.tilt = Math.max(0, SET.tilt - 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
     if (S.state !== 'run') continue;
     if (S.tut && S.tut.st !== 'fly') continue;
     if (k === 'Space' && DR.alive) { if (actionKind() === 'report') missionPhoto(); else dropPayload(DR.p, DR.v, false); }   // Drop 버튼 = 임무에 따라 Drop / 사진 보고
     else if (k === 'KeyR') respawn();
+    else if (k === 'Digit0') { document.body.classList.toggle('nohud'); showMsg(document.body.classList.contains('nohud') ? 'UI OFF (0)' : 'UI ON', '#fff', 0.8); }
     else if (k === 'KeyN' && isMission() && S.running && msObj()) { S.pen += 20; msNext('SKIPPED +20s', '#ff9a40'); }
     else if (k === 'KeyN' && S.kind === 'course' && S.running && curObj() && curObj().kind !== 'land') { S.pen += 20; completeObj(2, 'SKIPPED +20s', '#ff9a40'); }
   }
@@ -3622,6 +3676,17 @@ function rcWire() {
 document.querySelectorAll('[data-start]').forEach(b => b.addEventListener('click', () => startRun(b.dataset.start)));
 function syncSeg() {
   document.querySelectorAll('#segDiff button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.diff));
+  let afOk = false; try { afOk = !!AF; } catch (e) { }   // game5 보다 먼저 불릴 수 있음
+  document.querySelectorAll('#segMode button').forEach(b => { b.classList.toggle('on', b.dataset.v === SET.mode); if (b.dataset.v === 'acro' && afOk) b.disabled = !AFc().acro; });
+  document.querySelectorAll('#segAssistLv button').forEach(b => b.classList.toggle('on', +b.dataset.v === SET.assistLv));
+  document.querySelectorAll('#segFeel button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.feel));
+  document.querySelectorAll('#segThrHover button').forEach(b => b.classList.toggle('on', b.dataset.v === (SET.thrHover || 'auto')));
+  document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
+  { const r = feelRates('p'), y = feelRates('y'); ['rc0', 'rc1', 'rc2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = r[i]; }); ['ry0', 'ry1', 'ry2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = y[i]; });
+    const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
+    if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
+    const a = afOk ? AFc() : {}; if ($('hovV')) $('hovV').textContent = a.twr ? `Pause FLIGHT ≈ ${Math.round(hoverThr(a.twr, 0.05) * 100)}% (추력비 ${a.twr})` : ''; document.body.classList.toggle('acroOk', !!a.acro); }
+  if ($('fov')) { $('fov').value = SET.fov || 82; $('fovV').textContent = (SET.fov || 82) + '°'; }
   document.querySelectorAll('#segGhost button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.ghost));
   document.querySelectorAll('#segAssist button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.assist));
   document.querySelectorAll('#segKeys button').forEach(b => b.classList.toggle('on', b.dataset.v === kbWhich())); kbHelp();
@@ -3632,7 +3697,18 @@ function syncSeg() {
   document.querySelectorAll('#segMusic button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === MUS.on));
   $('tilt').value = SET.tilt; $('tiltV').textContent = SET.tilt + '°'; $('mvol').value = Math.round(MUS.vol * 100);
 }
-document.querySelectorAll('#segDiff button').forEach(b => b.addEventListener('click', () => { SET.diff = b.dataset.v; saveSet(); syncSeg(); refreshBest(); }));
+document.querySelectorAll('#segDiff button').forEach(b => b.addEventListener('click', () => { setDiff(b.dataset.v); saveSet(); syncSeg(); refreshBest(); }));
+const modeChanged = () => { modeSync(); saveSet(); syncSeg(); refreshBest(); if (typeof afUI === 'function') afUI(); if (typeof updateTags === 'function') updateTags(); };
+document.querySelectorAll('#segMode button').forEach(b => b.addEventListener('click', () => { SET.mode = b.dataset.v; modeChanged(); }));
+document.querySelectorAll('#segAssistLv button').forEach(b => b.addEventListener('click', () => { SET.assistLv = +b.dataset.v; modeChanged(); }));
+document.querySelectorAll('#segFeel button').forEach(b => b.addEventListener('click', () => { SET.feel = b.dataset.v; if (SET.feel !== 'std') SET.rates = SET.ratesY = RATE_PRESET[SET.feel].slice(); else SET.rates = SET.ratesY = RATE_PRESET.std.slice(); modeChanged(); }));
+document.querySelectorAll('#segRatePre button').forEach(b => b.addEventListener('click', () => { SET.rates = RATE_PRESET[b.dataset.v].slice(); SET.ratesY = RATE_PRESET[b.dataset.v].slice(); saveSet(); syncSeg(); }));
+const rateIn = (ids, key) => ids.forEach((id, i) => { const e = $(id); if (!e) return; e.addEventListener('change', () => { const r = feelRates(key === 'rates' ? 'p' : 'y').slice(); r[i] = Math.max(+e.min, Math.min(+e.max, +e.value || 0)); SET[key] = r; saveSet(); syncSeg(); }); });
+rateIn(['rc0', 'rc1', 'rc2'], 'rates'); rateIn(['ry0', 'ry1', 'ry2'], 'ratesY');
+document.querySelectorAll('#segThrHover button').forEach(b => b.addEventListener('click', () => { SET.thrHover = b.dataset.v; saveSet(); syncSeg(); }));
+document.querySelectorAll('#segBoostFov button').forEach(b => b.addEventListener('click', () => { SET.boostFov = +b.dataset.v; saveSet(); syncSeg(); }));
+if ($('fov')) $('fov').addEventListener('input', () => { SET.fov = +$('fov').value; saveSet(); syncSeg(); });
+document.querySelectorAll('#camPre button').forEach(b => b.addEventListener('click', () => { const P = { novice: [12, 90], std: [15, 82], racer: [25, 110] }[b.dataset.v]; SET.tilt = P[0]; SET.fov = P[1]; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segGhost button').forEach(b => b.addEventListener('click', () => { SET.ghost = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segAssist button').forEach(b => b.addEventListener('click', () => { SET.assist = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segBelly button').forEach(b => b.addEventListener('click', () => { SET.belly = b.dataset.v === '1'; saveSet(); syncSeg(); }));
@@ -3692,7 +3768,7 @@ function kbHelp() {
   const pair = (a, b, l) => `<tr><td>${n(KB[a])} / ${n(KB[b])}</td><td>${l}</td></tr>`, one = (a, l) => `<tr><td>${n(KB[a])}</td><td>${l}</td></tr>`;
   $('kbRows').innerHTML = pair('up', 'down', 'Climb / descend') + pair('yawL', 'yawR', 'Yaw left / right') + pair('fwd', 'back', 'Forward / back') + pair('left', 'right', 'Strafe left / right') +
     one('drop', 'Drop payload') + one('boost', 'Boost on/off (anywhere, airframe top speed)') + pair('cam', 'zoom', 'Switch camera · camera distance') + one('reset', 'Restart from last checkpoint') + one('assist', 'Flight assist on/off');
-  $('keys').innerHTML = `${n(KB.up)}/${n(KB.down)} ${'climb·descend'} &nbsp;${n(KB.yawL)}/${n(KB.yawR)} ${'yaw'} &nbsp;${n(KB.fwd)}${n(KB.left)}${n(KB.back)}${n(KB.right)} ${'move'}<br>${n(KB.drop)} ${'Drop'} &nbsp;${n(KB.boost)} ${'Boost'} &nbsp;${n(KB.cam)} ${'Camera'} &nbsp;${n(KB.assist)} ${'assist'} &nbsp;B ${'music'} &nbsp;Esc ${'Pause'}`;
+  $('keys').innerHTML = `${n(KB.up)}/${n(KB.down)} ${'climb·descend'} &nbsp;${n(KB.yawL)}/${n(KB.yawR)} ${'yaw'} &nbsp;${n(KB.fwd)}${n(KB.left)}${n(KB.back)}${n(KB.right)} ${'move'}<br>${n(KB.drop)} ${'Drop'} &nbsp;${n(KB.boost)} ${'Boost'} &nbsp;${n(KB.cam)} ${'Camera'} &nbsp;${n(KB.assist)} ${'assist'} &nbsp;B ${'music'} &nbsp;0 ${'hide UI'} &nbsp;Esc ${'Pause'}`;
 }
 $('kbA').onclick = () => { KB = Object.assign({}, KB_PRESET.A); saveKB(); kbRender(); syncSeg(); $('kbHint').textContent = 'A · Default'; };
 $('kbB').onclick = () => { KB = Object.assign({}, KB_PRESET.B); saveKB(); kbRender(); syncSeg(); $('kbHint').textContent = 'B · Arrows for altitude'; };
@@ -3760,7 +3836,7 @@ async function renderMusic(style, dur, state, kind) {
   let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
   return { wav: btoa(bin), peak };
 }
-window.__sim = { renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
+window.__sim = { modeSync, setDiff, actualRate, hoverThr, renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
 // =====================================================================
 //  기체 종류 · 새 임무 (숲길 통과 · 타임 레이스 · 정찰 · 타격)
 //  속도·크기는 공개 제원 수준의 근사값 (기체 Name은 형상 참고용)
@@ -3770,13 +3846,13 @@ const AF = {
     note: 'Stabilized · hover · drop rig' },
   anafi: { tag: 'ANAFI', name: 'Parrot ANAFI USA', sub: 'Compact recon quad · 37 cm · 0.5 kg', cls: 'quad', top: 14.7, vmax: { train: 9, easy: 12, sport: 14.7 }, tilt: { train: 25, easy: 32, sport: 40 }, climb: 4, sink: 4, yaw: 140, tw: 1.15, R: 0.17, endur: 32, reconD: 520,
     note: '32× zoom · long-range recon · IP53' },
-  fpv: { tag: 'FPV', name: 'FPV racer', sub: '5-inch · 0.65 kg', cls: 'quad', top: 39, vmax: { train: 12, easy: 24, sport: 39 }, tilt: { train: 30, easy: 50, sport: 72 }, climb: 15, sink: 9, yaw: 320, tw: 3.5, R: 0.13, endur: 5, acro: true,
-    note: 'Very fast · Acro option in Sport' },
+  fpv: { tag: 'FPV', name: 'FPV racer', sub: '5-inch · 0.65 kg', cls: 'quad', top: 39, vmax: { train: 12, easy: 24, sport: 39 }, tilt: { train: 30, easy: 50, sport: 72 }, climb: 15, sink: 9, yaw: 320, tw: 3.5, R: 0.13, endur: 5, acro: true, mass: 0.65, twr: 4.5, tauM: 0.1,
+    note: 'Very fast · full manual in ACRO mode (flips, inverted)' },
   fw: { tag: 'RAVEN', name: 'RQ-11B Raven', sub: 'Fixed-wing recon · hand-launched · 1.37 m span · 2.1 kg', cls: 'wing', cruise: 13, top: 22.6, stall: 8.7, span: 1.37, R: 0.45, endur: '60~90', bank: 50, nmax: 1.8, minAgl: 26, prate: 70, rrate: 160,
     note: 'Cannot hover · turns by banking · watch the stall' },
   puma: { tag: 'PUMA', name: 'RQ-20B Puma', sub: 'Fixed-wing recon · 2.8 m span · 6.1 kg', cls: 'wing', cruise: 14, top: 23, stall: 10.3, span: 2.8, R: 0.9, endur: 210, bank: 45, nmax: 1.6, minAgl: 30, prate: 50, rrate: 90, reconD: 600,
     note: '3.5 h endurance · stable big wing · wide turns' },
-  kfpv: { tag: 'K-FPV', name: 'Kamikaze FPV', sub: '7-inch · dummy warhead · 1.6 kg', cls: 'quad', top: 30, vmax: { train: 12, easy: 20, sport: 30 }, tilt: { train: 30, easy: 45, sport: 65 }, climb: 10, sink: 8, yaw: 240, tw: 2.2, R: 0.17, endur: 8, acro: true, kam: true,
+  kfpv: { tag: 'K-FPV', name: 'Kamikaze FPV', sub: '7-inch · dummy warhead · 1.6 kg', cls: 'quad', top: 30, vmax: { train: 12, easy: 20, sport: 30 }, tilt: { train: 30, easy: 45, sport: 65 }, climb: 10, sink: 8, yaw: 240, tw: 2.2, R: 0.17, endur: 8, acro: true, kam: true, mass: 1.6, twr: 2.8, tauM: 0.13,
     note: 'Detonates on contact · flies straight into the target' },
   kfw: { tag: 'K-FW', name: 'Loitering fixed-wing', sub: 'Loitering type · 0.7 m span', cls: 'wing', cruise: 26, top: 44, stall: 15, span: 0.7, R: 0.3, endur: 15, bank: 60, nmax: 2.6, minAgl: 10, prate: 90, rrate: 220, kam: true,
     note: 'Air-launched · dives onto the target' }
@@ -3791,9 +3867,10 @@ function isMission(k) { k = k || S.kind; return k === 'forest' || k === 'race' |
 MS_OK.field = ['x2d', 'anafi', 'fpv', 'fw', 'puma']; MS_NAME.field = window.SIM_LANG === 'en' ? 'Field airstrip' : '야전 착륙장';
 // Difficulty + 기체 -> FLIGHT 특성
 function effMode() {
-  const m = MODES[SET.diff], a = AFc(); if (a.id === 'x2d') return m;
-  const o = Object.assign({}, m), dk = a.vmax[SET.diff] ? SET.diff : 'easy'; o.vmax = a.vmax[dk]; o.maxTilt = a.tilt[dk] * DEG;
-  o.yawRate = a.yaw * DEG * (SET.diff === 'train' ? 0.45 : SET.diff === 'easy' ? 0.7 : 1);
+  const m = MODES[SET.diff], a = AFc(), fk = SET.feel === 'train' ? 'train' : SET.feel === 'real' ? 'sport' : 'easy';   // FLIGHT감: 속도·기울기·yaw 한계
+  const o = Object.assign({}, m);
+  if (a.vmax) { o.vmax = a.vmax[fk] || a.vmax.easy; o.maxTilt = a.tilt[fk] * DEG; }
+  if (a.yaw && a.id !== 'x2d') o.yawRate = a.yaw * DEG * (fk === 'train' ? 0.45 : fk === 'easy' ? 0.7 : 1);
   if (a.acro && SET.acro && SET.diff === 'sport') { o.althold = false; o.acro = true; o.brake = 0; }
   return o;
 }
@@ -3879,6 +3956,7 @@ function setAirframe(id) {
   }
   DR.R = AFc().R;
   ui.payload.style.display = AFc().drop ? '' : 'none';
+  if (typeof syncSeg === 'function') syncSeg();
 }
 
 // ---------------- 고정익 FLIGHT ----------------
@@ -4198,7 +4276,7 @@ function msStart(kind) {
   const SC = scenStart(kind, a); if (SC) L = SC;
   if (typeof isC1 === 'function' && isC1(kind)) L = c1Start(a);
   if (wingRwyOK(a) && ['recon', 'fire', 'ridge'].includes(kind)) L = L.concat([rtbObj(a)]);   // 고정익: 임무 끝에 활주로 착륙
-  L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; MS.list = L; MS.kind = kind; MS.t0 = 0; MS.events = []; S.decoyHit = 0;
+  L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; MS.list = L; MS.kind = kind; MS.splits = []; { const el = $('split'); if (el) el.classList.remove('on'); } MS.t0 = 0; MS.events = []; S.decoyHit = 0;
   // 시작 위치: 고정익·Loitering fixed-wing은 공중에서
   const c1s = typeof isC1 === 'function' && isC1(kind) ? c1StartPose() : null;
   const p0 = c1s ? c1s.p : kind === 'field' && RWY && a.cls !== 'wing' ? RWY.pads[0].clone().setY(RWY.pads[0].y + 0.06) : startPos(), o = msObj(); let h = startHead();
@@ -4214,6 +4292,7 @@ function msStart(kind) {
 function msNext(msg, col) {
   const o = msObj(); if (!o) return;
   o.done = true; dbfObj(o.label, true); sfx('good'); showMsg(msg || (o.label + ' ✓'), col || '#5dff9a', 1.3);
+  splitMark();
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0; commAck(o, S.kind);
   S.respawn = S.kind === 'strike' ? null : { p: DR.p.clone(), h: DR.h };
   renderList();
@@ -4229,9 +4308,21 @@ function passCross(o, prev, cur) {
 }
 // 통과점 하나만 실패로 두고 다음 목표로
 const RACE_PEN = 8;   // 레이스: 놓친 링 하나당 +8 s
+// 구간 기록: 통과점마다 지금 시간을 적고, 같은 임무·기체·모드의 Best 구간과 비교해 녹/적 델타 표시 (Liftoff 랩 타이머식)
+const SPLIT = { t: 0 };
+function splitKey() { return 'fpvsim_ms_split_' + S.kind + '_' + AFc().id + '_' + SET.diff + SITE_KEY; }
+function splitMark() {
+  if (!(S.kind === 'race' || S.kind === 'ridge' || S.kind === 'forest')) return;
+  const now = S.t + S.pen; MS.splits = MS.splits || []; while (MS.splits.length <= MS.idx) MS.splits.push(now);   // 건너뛴 링도 같은 시각으로 채워 인덱스를 맞춤
+  let best = null; try { best = JSON.parse(localStorage.getItem(splitKey()) || 'null'); } catch (e) { }
+  const i = MS.idx, el = $('split'); if (!el || !best || best[i] == null) return;
+  const d = now - best[i]; el.textContent = (d <= 0 ? '−' : '+') + Math.abs(d).toFixed(1) + ' s'; el.innerHTML += `<small>${L2('최고 대비', 'vs best')}</small>`;
+  el.classList.toggle('good', d <= 0); el.classList.toggle('bad', d > 0); el.classList.add('on'); SPLIT.t = 2.6;
+}
+function splitTick(dt) { if (SPLIT.t > 0) { SPLIT.t -= dt; if (SPLIT.t <= 0) { const el = $('split'); if (el) el.classList.remove('on'); } } }
 function msSkip() {
   const o = msObj(); if (!o) return;
-  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3);
+  o.done = true; o.miss = true; if (S.kind === 'race') S.pen += RACE_PEN; dbfObj(o.label, false); sfx('bad'); showMsg(o.label + ' ✗ → NEXT', '#ff9a40', 1.3); splitMark();
   comm(`${CS}, CONTROL. You missed that checkpoint. Press on to the next.`, `${o.label} 실패 · 다음 목표로`);
   MS.idx++; while (MS.list[MS.idx] && MS.list[MS.idx].done) MS.idx++; S.recT = 0;
   S.respawn = { p: DR.p.clone(), h: DR.h }; renderList();
@@ -4299,7 +4390,13 @@ const PH = { rt: null, lut: null, last: null, lastT: 0 };
 const DBF = { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0 };
 function dbfStart() { Object.assign(DBF, { dist: 0, vmax: 0, altMax: 0, resp: 0, pens: [], objs: [], pen0: 0, flyT: 0 }); }
 function dbfObj(label, ok) { if (S.state === 'run') DBF.objs.push({ label: String(label || ''), ok, t: S.t }); }
+// Flight time 시간 (모든 모드 · 로컬 저장)
+const TOT = (() => { let t = 0; try { t = +localStorage.getItem('fpvsim_fpv_flyT') || 0; } catch (e) { } return { t, save: 0 }; })();
+function totFlyText() { const h = Math.floor(TOT.t / 3600), m = Math.floor(TOT.t % 3600 / 60); return L2('Flight time ', 'Flight time ') + (h ? h + 'h ' : '') + m + 'm'; }
+function totFlyUI() { const e = $('totFly'); if (e) e.textContent = totFlyText(); }
 function dbfTick(dt) {
+  splitTick(dt);
+  if (S.state === 'run' && DR.alive && !DR.landed) { TOT.t += dt; TOT.save += dt; if (TOT.save > 15) { TOT.save = 0; try { localStorage.setItem('fpvsim_fpv_flyT', String(Math.round(TOT.t))); } catch (e) { } } }
   if (S.state !== 'run' || !S.running) return;
   if (DR.alive && !DR.landed) { const v = DR.v.length(); DBF.dist += v * dt; DBF.vmax = Math.max(DBF.vmax, v); DBF.flyT += dt; DBF.altMax = Math.max(DBF.altMax, DR.p.y - groundAt(DR.p.x, DR.p.z)); }
   if (S.pen > DBF.pen0 + 0.01) { DBF.pens.push({ t: S.t, d: S.pen - DBF.pen0, why: S.lastMsg && S.t - (S.lastMsgT || 0) < 2 && /\+\s?\d+\s?(s|초)|MISS|IMPACT|SKIP|번짐|spread/i.test(S.lastMsg) ? S.lastMsg : (S.kind === 'fire' ? L2('불씨 번짐', 'fire spread') : '') }); DBF.pen0 = S.pen; }
@@ -4507,7 +4604,7 @@ function msFinish() {
     if (rp) { rp.style.display = ph.length ? 'flex' : 'none'; rp.innerHTML = ph.map((p, i) => `<figure><a href="${p.url}" download="report_${S.kind}_${i + 1}.jpg"><img src="${p.url}" alt=""></a>${L2('보고 ', 'Report ')}${i + 1}${p.xy ? ' · ' + p.xy[0].toFixed(0) + ', ' + p.xy[1].toFixed(0) : ''}</figure>`).join(''); }
     const key = 'fpvsim_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY; let best = null;
     try { best = parseFloat(localStorage.getItem(key)); } catch (e) { }
-    if (!best || total < best) { try { localStorage.setItem(key, String(total)); } catch (e) { } ui.resBest.textContent = '★ New best'; }
+    if (!best || total < best) { try { localStorage.setItem(key, String(total)); if (MS.splits) localStorage.setItem(splitKey(), JSON.stringify(MS.splits)); } catch (e) { } ui.resBest.textContent = '★ New best'; }
     else ui.resBest.textContent = 'Best ' + fmt(best);
   }, 1400);
 }
@@ -4556,6 +4653,7 @@ function afUI() {
     for (const st of L) { const b = document.createElement('button'); b.className = 'stc' + (st.id === SITE.id ? ' on' : ''); b.innerHTML = `<b>${stName(st)}</b><small>${st.flat ? 'Flat · standard obstacle course' : 'Real terrain · ' + (st.course ? 'course laid along a route' : 'DEM')}</small>`;
       b.onclick = () => { if (st.id === SITE.id) return; siteSelect(st.id); location.reload(); }; sp.appendChild(b); } }
   const segA = $('segAcro'); if (segA) segA.querySelectorAll('button').forEach(x => x.classList.toggle('on', (x.dataset.v === '1') === !!SET.acro));
+  if (typeof syncSeg === 'function') syncSeg();   // ACRO 가능 여부 · Pause FLIGHT 스로틀 표시
   if (typeof MENU !== 'undefined' && $('msDetail')) { menuAfPanel(); menuDetail(); }
 }
 document.querySelectorAll('#segAcro button').forEach(b => b.addEventListener('click', () => { SET.acro = b.dataset.v === '1'; saveSet(); afUI(); }));
@@ -5683,7 +5781,7 @@ function wizGo(n) {
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
   if (n === 3 && typeof isC1 === 'function') { if (SET.af === 'c1' && !isC1(MENU.ms)) MENU.ms = 'class1'; else if (SET.af !== 'c1' && isC1(MENU.ms)) MENU.ms = 'course'; }   // 1종 연습기 → 1종 코스로
-  if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
+  if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; totFlyUI(); const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
   const md = $('wzMode'); if (md) { md.style.display = HAS_INTRO ? '' : 'none'; md.textContent = MENU.mode === 'vr' ? '🥽 VR' : '🖥 PC'; }
   if ($('wz1Back')) $('wz1Back').style.visibility = HAS_INTRO ? '' : 'hidden';
   try { window.dispatchEvent(new Event('resize')); } catch (e) { }
@@ -6103,7 +6201,7 @@ function vrMenuClick(hand) {
   if (id === 'video') { if (REC) LAST_REC = recFinish(); XR.afterExit = 'video'; vrStop(); return; }
   if (id === 'map') { if (SET.vrMap === false) { SET.vrMap = true; mapZoom(false); } else if (!MAPZ.on) mapZoom(true); else { mapZoom(false); SET.vrMap = false; } saveSet(); return; }   // 지도 → 전체 → Off
   if (id === 'guide') { SET.guide = !SET.guide; saveSet(); return; }
-  if (id.startsWith('diff:')) { SET.diff = id.slice(5); saveSet(); return; }
+  if (id.startsWith('diff:')) { setDiff(id.slice(5)); saveSet(); return; }
   if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
   if (id.startsWith('cam:')) { const v = id.slice(4); if (v === 'fpv') SET.vrCam = 'fpv'; else { SET.vrCam = 'chase'; SET.zoom = +v.slice(1); } saveSet(); vrApplyCam(); return; }
@@ -6268,12 +6366,15 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 SETTINGS ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
   const H = {
     segDiff: { train: ['느리고, 스틱을 놓으면 멈추고, 다음 과제 쪽으로 방향을 잡아 줍니다 · 처음 FLIGHT에', 'Slow, stops when you let go, turns toward the next task · for first flights'], easy: ['고도를 유지하고 약하게 assist합니다', 'Holds altitude with light assistance'], atti: ['위치를 잡아 주지 않고 자세만 유지 · 바람에 밀리고 관성으로 미끄러짐 · 실기체 감각', 'Holds attitude only, not position · drifts with wind and momentum · like the real aircraft'], sport: ['assist None · 가장 빠르고 민감합니다', 'No assistance · fastest and most sensitive'] },
+    segMode: { gps: ['위치를 잡아 줍니다 · 스틱을 놓으면 멈춤', 'Holds position · stops when you let go'], atti: ['자세만 유지 · 바람에 밀리고 관성으로 미끄러짐', 'Holds attitude only · drifts with wind and momentum'], man: ['놓으면 수평 · 기울기 제한 안에서 직접 조종', 'Levels when released · you fly within the tilt limit'], acro: ['기울기 제한 None · 플립·배면 가능 · 추력∝yaw수² (FPV 기체)', 'No tilt limit · flips and inverted flight · thrust ∝ rpm² (FPV airframes)'] },
+    segAssistLv: { 2: ['자동 방향 · 게이트 유도 · 지형 추종 · 브레이크 (H 키로 끄기)', 'Auto heading, gate guidance, terrain follow, brake (H toggles)'], 1: ['게이트 유도만 약하게', 'Light gate guidance only'], 0: ['assist 없이 직접 조종합니다', 'You fly without assistance'] },
+    segFeel: { train: ['속도·기울기·yaw을 낮춰 둠 · 첫 FLIGHT에', 'Speed, tilt and yaw rate reduced · for first flights'], std: ['제원의 중간 · Betaflight 기본 Rates', 'Mid-range performance · Betaflight default rates'], real: ['제원 그대로 · 가장 빠르고 민감', 'Full performance · fastest and most sensitive'] },
     segExpo: { real: ['스틱을 민 만큼 그대로 반응 · RC 조종기와 같은 느낌', 'Responds exactly to stick travel · feels like an RC transmitter'], soft: ['가운데 부근이 둔해서 미세 조종이 쉽습니다', 'Softer around centre for easy fine control'] },
     segAssist: { 1: ['자세·고도를 잡아 줍니다 (H 키로 켜기/끄기)', 'Steadies attitude and altitude (H toggles)'], 0: ['assist 없이 직접 조종합니다', 'You fly without assistance'] },
     segGuide: { 1: ['다음 과제 쪽 화살표를 보여 줍니다', 'Shows an arrow toward the next task'], 0: ['화살표 없이 지도와 무전만으로 찾아갑니다', 'No arrow · navigate by map and radio'] },
@@ -6289,7 +6390,11 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
     segMusic: { 1: ['Music On · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['Music Off', 'Music off'] },
     segKeys: { A: ['W/S climb·descend · A/D yaw · 방향키 move', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·yaw, WASD로 move', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 set manually합니다', 'Assign every key yourself'] },
   };
-  const HW = { segDiff: {   // 고정익일 때 설명
+  const HW = { segMode: {   // 고정익일 때 설명
+    gps: ['자동조종: 고도·속도 유지, 지형 피, 실속 보호', 'Autopilot: holds height and speed, avoids terrain, stall protection'],
+    atti: ['자세 안정 수동: 놓으면 수평 · 스로틀 직접 · altitude hold·실속 보호 None', 'Stabilised manual: levels when released · direct throttle · no height hold or stall protection'],
+    man: ['완전 수동: 놓아도 기운 채 유지 · 실속·스핀 가능', 'Full manual: stays banked when released · stalls and spins possible'],
+    acro: ['완전 수동 (고정익은 수동과 같음)', 'Full manual (same as Manual for fixed wing)'] }, segDiff: {   // 고정익일 때 설명
     train: ['자동조종: 고도·속도 유지, 지형 피, 실속 보호 · 기울기 35°까지', 'Autopilot: holds height and speed, avoids terrain, stall protection · bank ≤35°'],
     easy: ['자동조종 + 최대 기울기 · 느릴 땐 실속 안 나게 기울기 제한', 'Autopilot with full bank · bank limited at low speed to prevent stall'],
     atti: ['자세 안정 수동: 놓으면 수평 · 스로틀 직접 · altitude hold·실속 보호 None', 'Stabilised manual: levels when released · direct throttle · no height hold or stall protection'],
@@ -6298,7 +6403,7 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
   const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
   Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
   // 빠른 SETTINGS (코스 고르는 화면)
-  const QS = [['segDiff', '🎚', 'Difficulty', 'Mode'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', 'Guide', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
+  const QS = [['segMode', '🎚', 'FLIGHT 모드', 'Mode'], ['segFeel', '🏎', 'FLIGHT감', 'Feel'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', 'Guide', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
   const bar = $('qsBar');
   const draw = () => {
     P.querySelectorAll('small.oh').forEach(h => { const m = (AFc().cls === 'wing' && HW[h.dataset.for]) || H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });

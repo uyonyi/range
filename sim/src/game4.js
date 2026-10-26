@@ -261,6 +261,17 @@ function rcWire() {
 document.querySelectorAll('[data-start]').forEach(b => b.addEventListener('click', () => startRun(b.dataset.start)));
 function syncSeg() {
   document.querySelectorAll('#segDiff button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.diff));
+  let afOk = false; try { afOk = !!AF; } catch (e) { }   // game5 보다 먼저 불릴 수 있음
+  document.querySelectorAll('#segMode button').forEach(b => { b.classList.toggle('on', b.dataset.v === SET.mode); if (b.dataset.v === 'acro' && afOk) b.disabled = !AFc().acro; });
+  document.querySelectorAll('#segAssistLv button').forEach(b => b.classList.toggle('on', +b.dataset.v === SET.assistLv));
+  document.querySelectorAll('#segFeel button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.feel));
+  document.querySelectorAll('#segThrHover button').forEach(b => b.classList.toggle('on', b.dataset.v === (SET.thrHover || 'auto')));
+  document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
+  { const r = feelRates('p'), y = feelRates('y'); ['rc0', 'rc1', 'rc2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = r[i]; }); ['ry0', 'ry1', 'ry2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = y[i]; });
+    const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
+    if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
+    const a = afOk ? AFc() : {}; if ($('hovV')) $('hovV').textContent = a.twr ? `정지 비행 ≈ ${Math.round(hoverThr(a.twr, 0.05) * 100)}% (추력비 ${a.twr})` : ''; document.body.classList.toggle('acroOk', !!a.acro); }
+  if ($('fov')) { $('fov').value = SET.fov || 82; $('fovV').textContent = (SET.fov || 82) + '°'; }
   document.querySelectorAll('#segGhost button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.ghost));
   document.querySelectorAll('#segAssist button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.assist));
   document.querySelectorAll('#segKeys button').forEach(b => b.classList.toggle('on', b.dataset.v === kbWhich())); kbHelp();
@@ -271,7 +282,18 @@ function syncSeg() {
   document.querySelectorAll('#segMusic button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === MUS.on));
   $('tilt').value = SET.tilt; $('tiltV').textContent = SET.tilt + '°'; $('mvol').value = Math.round(MUS.vol * 100);
 }
-document.querySelectorAll('#segDiff button').forEach(b => b.addEventListener('click', () => { SET.diff = b.dataset.v; saveSet(); syncSeg(); refreshBest(); }));
+document.querySelectorAll('#segDiff button').forEach(b => b.addEventListener('click', () => { setDiff(b.dataset.v); saveSet(); syncSeg(); refreshBest(); }));
+const modeChanged = () => { modeSync(); saveSet(); syncSeg(); refreshBest(); if (typeof afUI === 'function') afUI(); if (typeof updateTags === 'function') updateTags(); };
+document.querySelectorAll('#segMode button').forEach(b => b.addEventListener('click', () => { SET.mode = b.dataset.v; modeChanged(); }));
+document.querySelectorAll('#segAssistLv button').forEach(b => b.addEventListener('click', () => { SET.assistLv = +b.dataset.v; modeChanged(); }));
+document.querySelectorAll('#segFeel button').forEach(b => b.addEventListener('click', () => { SET.feel = b.dataset.v; if (SET.feel !== 'std') SET.rates = SET.ratesY = RATE_PRESET[SET.feel].slice(); else SET.rates = SET.ratesY = RATE_PRESET.std.slice(); modeChanged(); }));
+document.querySelectorAll('#segRatePre button').forEach(b => b.addEventListener('click', () => { SET.rates = RATE_PRESET[b.dataset.v].slice(); SET.ratesY = RATE_PRESET[b.dataset.v].slice(); saveSet(); syncSeg(); }));
+const rateIn = (ids, key) => ids.forEach((id, i) => { const e = $(id); if (!e) return; e.addEventListener('change', () => { const r = feelRates(key === 'rates' ? 'p' : 'y').slice(); r[i] = Math.max(+e.min, Math.min(+e.max, +e.value || 0)); SET[key] = r; saveSet(); syncSeg(); }); });
+rateIn(['rc0', 'rc1', 'rc2'], 'rates'); rateIn(['ry0', 'ry1', 'ry2'], 'ratesY');
+document.querySelectorAll('#segThrHover button').forEach(b => b.addEventListener('click', () => { SET.thrHover = b.dataset.v; saveSet(); syncSeg(); }));
+document.querySelectorAll('#segBoostFov button').forEach(b => b.addEventListener('click', () => { SET.boostFov = +b.dataset.v; saveSet(); syncSeg(); }));
+if ($('fov')) $('fov').addEventListener('input', () => { SET.fov = +$('fov').value; saveSet(); syncSeg(); });
+document.querySelectorAll('#camPre button').forEach(b => b.addEventListener('click', () => { const P = { novice: [12, 90], std: [15, 82], racer: [25, 110] }[b.dataset.v]; SET.tilt = P[0]; SET.fov = P[1]; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segGhost button').forEach(b => b.addEventListener('click', () => { SET.ghost = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segAssist button').forEach(b => b.addEventListener('click', () => { SET.assist = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segBelly button').forEach(b => b.addEventListener('click', () => { SET.belly = b.dataset.v === '1'; saveSet(); syncSeg(); }));
@@ -331,7 +353,7 @@ function kbHelp() {
   const pair = (a, b, l) => `<tr><td>${n(KB[a])} / ${n(KB[b])}</td><td>${l}</td></tr>`, one = (a, l) => `<tr><td>${n(KB[a])}</td><td>${l}</td></tr>`;
   $('kbRows').innerHTML = pair('up', 'down', '상승 / 하강') + pair('yawL', 'yawR', '왼쪽 / 오른쪽 회전') + pair('fwd', 'back', '전진 / 후진') + pair('left', 'right', '왼쪽 / 오른쪽 이동') +
     one('drop', '탑재물 투하') + one('boost', '부스트 켜기/끄기 (어디서나, 기체 최고 속도)') + pair('cam', 'zoom', '카메라 전환 · 카메라 거리') + one('reset', '마지막 통과 지점에서 다시') + one('assist', '비행 보조 켜기/끄기');
-  $('keys').innerHTML = `${n(KB.up)}/${n(KB.down)} ${'상승·하강'} &nbsp;${n(KB.yawL)}/${n(KB.yawR)} ${'회전'} &nbsp;${n(KB.fwd)}${n(KB.left)}${n(KB.back)}${n(KB.right)} ${'이동'}<br>${n(KB.drop)} ${'투하'} &nbsp;${n(KB.boost)} ${'부스트'} &nbsp;${n(KB.cam)} ${'카메라'} &nbsp;${n(KB.assist)} ${'보조'} &nbsp;B ${'음악'} &nbsp;Esc ${'일시정지'}`;
+  $('keys').innerHTML = `${n(KB.up)}/${n(KB.down)} ${'상승·하강'} &nbsp;${n(KB.yawL)}/${n(KB.yawR)} ${'회전'} &nbsp;${n(KB.fwd)}${n(KB.left)}${n(KB.back)}${n(KB.right)} ${'이동'}<br>${n(KB.drop)} ${'투하'} &nbsp;${n(KB.boost)} ${'부스트'} &nbsp;${n(KB.cam)} ${'카메라'} &nbsp;${n(KB.assist)} ${'보조'} &nbsp;B ${'음악'} &nbsp;0 ${'UI 숨김'} &nbsp;Esc ${'일시정지'}`;
 }
 $('kbA').onclick = () => { KB = Object.assign({}, KB_PRESET.A); saveKB(); kbRender(); syncSeg(); $('kbHint').textContent = 'A · 기본 배치'; };
 $('kbB').onclick = () => { KB = Object.assign({}, KB_PRESET.B); saveKB(); kbRender(); syncSeg(); $('kbHint').textContent = 'B · 방향키로 고도'; };
@@ -399,4 +421,4 @@ async function renderMusic(style, dur, state, kind) {
   let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 8192) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 8192));
   return { wav: btoa(bin), peak };
 }
-window.__sim = { renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };
+window.__sim = { modeSync, setDiff, actualRate, hoverThr, renderMusic, STREES, groundAt, SET, advance, S, DR, IN, OBJS, OBJ, GH, startRun, keys, pressed, collide, setPose(p, v, h) { DR.p.copy(p); DR.v.copy(v); DR.h = h; DR.landed = false; }, W, camera, renderer, scene, SET, loadOrthoFile, course2utm, MODES, predictImpact, tutStart, LESSONS, replayStart, RP, get LAST_REC() { return LAST_REC; }, BEST, readDem, buildTerrainPkg, TER, SITE, EARTH, terrainAt, groundAt, agl,  music: () => ({ timer: !!MUS.timer, step: MUS.step, on: MUS.on, style: SONG.style, sec: SECTIONS[SONG.sec].n, bar: SONG.bar, prog: SONG.prog && SONG.prog.map(c => c[0]).join(","), motif: SONG.motif && SONG.motif.join(" ") }) };

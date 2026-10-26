@@ -16,6 +16,9 @@ canvas#c{display:block;width:100vw;height:100vh}
 .mono{font-family:"SF Mono",Menlo,Consolas,monospace}
 .hidden{display:none!important}
 #hud{position:fixed;inset:0;pointer-events:none}
+#split{position:absolute;left:16px;top:118px;font:700 20px/1 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 8px rgba(0,0,0,.7);opacity:0;transition:opacity .4s;pointer-events:none}#split.on{opacity:1}#split.good{color:#5dff9a}#split.bad{color:#ff6a5a}#split small{font-size:11px;font-weight:600;opacity:.8;margin-left:6px}
+body.touch #split{top:92px;font-size:16px}
+body.nohud #osd,body.nohud #obj,body.nohud #list,body.nohud #map,body.nohud #sticks,body.nohud #keys,body.nohud #bottom,body.nohud #guide,body.nohud #navArrow,body.nohud #radio,body.nohud #belly,body.nohud #split,body.nohud #c1g,body.nohud #c1p,body.nohud .c1w{visibility:hidden!important}
 #osd{position:absolute;left:16px;top:14px;font:600 15px/1.45 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.6);letter-spacing:.02em}
 #osd b{color:var(--amber);font-weight:600;display:inline-block;width:52px}
 #osd .big{font-size:26px;line-height:1.2}
@@ -185,6 +188,12 @@ body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bot
 .otab{display:none;min-height:150px}.otab.on{display:block}
 .optCard .opt.col>div{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;align-items:center;width:100%}
 .optCard .opt.col>div>.seg,.optCard .opt.col>div>input,.optCard .opt.col>div>.oh{grid-column:2}
+.optCard .opt.col>#feelAdv{display:block;grid-column:1/-1;border:1px solid #2c3540;border-radius:8px;padding:8px 10px;margin-top:4px;font-size:12.5px;color:var(--mute)}
+#feelAdv .fh{display:flex;justify-content:space-between;align-items:center;color:var(--fg);margin-bottom:6px}
+#feelAdv .frow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0}
+#feelAdv label{display:inline-flex;gap:4px;align-items:center}#feelAdv input[type=number]{width:62px;background:#1a2129;color:var(--fg);border:1px solid #33404b;border-radius:5px;padding:3px 5px;font:inherit}
+.seg.small button{padding:4px 8px;font-size:11.5px}
+body:not(.acroOk) #feelAdv{opacity:.45}
 .oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}
 .qsbar{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;padding:6px 0 4px}
 .qsbar+.go{margin-top:4px}
@@ -326,6 +335,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
   <div id="irTag" class="hidden">IR · WHITE-HOT</div>
   <div id="vig" class="hidden"></div>
   <div id="osd"></div>
+  <div id="split"></div>
   <div id="obj"><div id="objNext"></div><div id="objMsg"></div></div>
   <div id="list"></div>
   <canvas id="map" width="180" height="300"></canvas>
@@ -423,7 +433,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       </section>
       </div>
       <div id="vrNote" class="vrnote hidden"><span id="vrNoteT"></span><button id="vrResume" class="primary hidden">VR로 돌아가기</button></div>
-      <div class="wzbtns"><button id="wz3Back">◀ 기체</button><span class="wzmid"><button id="bOpt">⚙ 옵션</button><button id="bCtl">🎮 조작 안내</button></span><span id="wzWho" class="wzwho"></span><button id="msGoF" class="primary">출격 ▶</button></div>
+      <div class="wzbtns"><button id="wz3Back">◀ 기체</button><span class="wzmid"><button id="bOpt">⚙ 옵션</button><button id="bCtl">🎮 조작 안내</button></span><span id="wzWho" class="wzwho"></span><span id="totFly" class="wzwho mono" title="누적 비행 시간"></span><button id="msGoF" class="primary">출격 ▶</button></div>
     </div>
   </div>
 </div>
@@ -433,13 +443,19 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
     <h1>OPTIONS</h1><h2>옵션 · 비행 모드와 화면·환경</h2>
     <div class="otabs" id="optTabs"><button data-t="fly" class="on">✈️ 비행</button><button data-t="env">🌤 날씨·시간</button><button data-t="view">🖥 화면</button><button data-t="snd">🔊 소리</button><button data-t="dev">🎮 조작 장치</button><button data-t="gis">🗺 지형</button></div>
     <div class="otab" data-t="fly"><div class="opt col">
-      <div>조종 난이도 <span class="seg" id="segDiff"><button data-v="train" class="on">입문</button><button data-v="easy">쉬움</button><button data-v="atti">ATTI</button><button data-v="sport">스포츠</button></span></div>
+      <div>비행 모드 <span class="seg" id="segMode"><button data-v="gps" class="on">GPS · 위치 유지</button><button data-v="atti">ATTI · 자세만</button><button data-v="man">수동 · 자세 보조</button><button data-v="acro">ACRO · 완전 수동</button></span></div>
+      <div>비행 보조 <span class="seg" id="segAssistLv"><button data-v="2" class="on">전체</button><button data-v="1">약하게</button><button data-v="0">끔</button></span></div>
+      <div>비행감 <span class="seg" id="segFeel"><button data-v="train">입문</button><button data-v="std" class="on">표준</button><button data-v="real">실기체</button></span></div>
       <div>스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span></div>
-      <div>비행 보조 <span class="seg" id="segAssist"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>가이드 <span class="seg" id="segGuide"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
-      <div>FPV · 자폭 FPV 수동 조종 (Acro, 스포츠 난이도에서) <span class="seg" id="segAcro"><button data-v="0" class="on">끔 · 자세 보조</button><button data-v="1">켬 · 수동</button></span></div>
+      <div id="feelAdv" class="feeladv">
+        <div class="fh">ACRO 세부 (FPV · 자폭 FPV) <span class="seg small" id="segRatePre"><button data-v="train">입문</button><button data-v="std">Betaflight 기본</button><button data-v="racer">레이서</button></span></div>
+        <div class="frow">Rates 롤·피치 <label>중심 <input id="rc0" type="number" min="10" max="400" step="5"></label><label>최대 <input id="rc1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="rc2" type="number" min="0" max="1" step="0.05"></label> <span class="mono" id="rcV"></span></div>
+        <div class="frow">Rates 요 <label>중심 <input id="ry0" type="number" min="10" max="400" step="5"></label><label>최대 <input id="ry1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="ry2" type="number" min="0" max="1" step="0.05"></label></div>
+        <div class="frow">스로틀 중앙 = 정지 비행 <span class="seg small" id="segThrHover"><button data-v="auto" class="on">자동 (조종기만 하단 기준)</button><button data-v="1">항상</button><button data-v="0">끔 · 하단 = 아이들</button></span> <span class="mono" id="hovV"></span></div>
+      </div>
     </div>
-    <div class="note">난이도 — <b>입문</b>: 느리고, 스틱을 놓으면 멈추고, 다음 과제 쪽으로 자동으로 방향을 잡고, 게이트 가운데로 살짝 끌어줌 · <b>쉬움</b>: 고도 유지 + 약한 보조 · <b>스포츠</b>: 보조 없음. 충돌하면 튕기고 벌점(입문 2초 · 쉬움 3초 · 스포츠 5초)만 붙고 비행은 계속됩니다.</div></div>
+    <div class="note"><b>비행 모드</b> — GPS: 스틱을 놓으면 멈춤 · ATTI: 자세만 잡고 관성·바람에 흐름 · 수동: 기울기 제한 안에서 자세 보조 · ACRO: 기울기 제한 없음(플립·배면), 추력∝회전수², 하단 스틱 아이들. <b>보조</b> — 전체: 자동 방향·게이트 유도·지형 추종 · 약하게: 게이트 유도만. <b>비행감</b> — 입문: 속도·기울기 제한 · 표준 · 실기체: 제원 그대로. 충돌하면 튕기고 벌점.</div></div>
     <div class="otab" data-t="env"><div class="opt col">
       <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="2">해질녘</button><button data-v="1">밤</button></span></div>
       <div>날씨 <span class="seg" id="segWx"><button data-v="clear" class="on">맑음</button><button data-v="rain">비</button><button data-v="snow">눈</button></span></div>
@@ -450,6 +466,8 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div>계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>FPV 카메라 기울기 <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
+      <div>FPV 시야각 (FOV) <span class="seg"><input id="fov" type="range" min="70" max="120" value="82" style="vertical-align:middle"> <span id="fovV" class="mono">82°</span> <span class="seg small" id="camPre"><button data-v="novice">초보 (12° · 90°)</button><button data-v="std">기본 (15° · 82°)</button><button data-v="racer">레이서 (25° · 110°)</button></span></span></div>
+      <div>부스트 때 시야각 확대 <span class="seg" id="segBoostFov"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
       <div>시작할 때 전체 화면 <span class="seg" id="segFull"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
     </div></div>
     <div class="otab" data-t="snd"><div class="opt col">
