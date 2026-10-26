@@ -418,6 +418,11 @@ function refreshBest() {
   let b = null; try { b = parseFloat(localStorage.getItem('hroc_fpv_best_' + SET.diff)); } catch (e) { }
   ui.best.textContent = b ? `최고 기록 (${MODES[SET.diff].name}): ${fmt(b)} · 기준 비행 ${fmt(GH.total)}` : `기준 비행 (영상 경로): ${fmt(GH.total)}`;
 }
+// 앱으로 설치 (PWA): 브라우저가 설치를 허락하면(beforeinstallprompt) 첫 화면에 버튼 표시 · 이미 설치된 창에서는 숨김
+{ let dp = null; const bi = $('bInstall');
+  addEventListener('beforeinstallprompt', e => { e.preventDefault(); dp = e; if (bi && !matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) bi.classList.remove('hidden'); });
+  addEventListener('appinstalled', () => { dp = null; if (bi) bi.classList.add('hidden'); });
+  if (bi) bi.onclick = async () => { if (!dp) return; dp.prompt(); try { await dp.userChoice; } catch (e) { } dp = null; bi.classList.add('hidden'); }; }
 loadBest(); rcWire(); syncSeg(); refreshBest(); restoreOrtho(); siteUI();
 setInterval(() => { const gp = getPad(); const el = $('padStatus'); if (el) el.textContent = gp ? '🎮 ' + gp.id.replace(/\(.*?\)/g, '').slice(0, 48) + (gp.mapping === 'standard' ? ' · 표준 배치' : '') : ''; }, 1000);
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });

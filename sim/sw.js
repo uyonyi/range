@@ -1,5 +1,5 @@
 // FPV Terrain Trainer · service worker (자동 생성: src/build.py)
-const VER = '2e4be07c6e', CACHE = 'fpvsim-' + VER, CORE = ["en.html", "index.html", "js/app.en.js?v=7f7bd7a3", "js/app.ko.js?v=160bae58", "lib/proj4.js", "lib/three.min.js", "sites/yeongin.js?v=7804484e", "sites/yeongin_ground.webp?v=853664ca", "sites/yeongin_ground_lo.webp?v=af40bcdf", "vr/en.html", "vr/index.html", "vr/js/app.en.js?v=7f7bd7a3", "vr/js/app.ko.js?v=160bae58"];
+const VER = '4bc2333483', CACHE = 'fpvsim-' + VER, CORE = ["en.html", "icons/favicon-32.png", "icons/icon-192.png", "index.html", "js/app.en.js?v=173f0916", "js/app.ko.js?v=72afa2e9", "lib/proj4.js", "lib/three.min.js", "manifest.en.webmanifest", "manifest.webmanifest", "sites/yeongin.js?v=7804484e", "sites/yeongin_ground.webp?v=853664ca", "sites/yeongin_ground_lo.webp?v=af40bcdf", "vr/en.html", "vr/index.html", "vr/js/app.en.js?v=173f0916", "vr/js/app.ko.js?v=72afa2e9"];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fpvsim-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

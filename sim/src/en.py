@@ -171,7 +171,7 @@ EN = {'확인·사진': 'Confirm/photo', '확인 · 사진 보고': 'Confirm · 
 'READY · W 로 이륙': 'READY · W to take off',
 'READY · 왼쪽 스틱 위로 이륙': 'READY · left stick up to take off',
 '${MODES[SET.diff].name} · 과제 ${done}/${OBJS.length} 성공': '${MODES[SET.diff].name} · ${done}/${OBJS.length} tasks completed',
-'비행 시간': 'Flight time', '기체 바꾸기 ◀': 'Change airframe ◀', 'UI 숨김': 'hide UI', '누적 비행 ': 'Flight time ',
+'비행 시간': 'Flight time', '<button id="bInstall" class="instbtn hidden" title="홈 화면·바탕화면에 앱으로 설치 (오프라인 실행)">⬇ 앱으로 설치</button>': '<button id="bInstall" class="instbtn hidden" title="Install as an app on your home screen or desktop (works offline)">⬇ Install app</button>', '기체 바꾸기 ◀': 'Change airframe ◀', 'UI 숨김': 'hide UI', '누적 비행 ': 'Flight time ',
 '벌점': 'Penalty',
 '합계': 'Total',
 '충돌': 'Impacts',
