@@ -2207,7 +2207,7 @@ function xrPads() {
   return { L, R };
 }
 // VR 스틱 모드: 쿼드·고정익 따로 기억 (고정익 기본 = 모드 1: 오른쪽 스틱 위아래가 스로틀)
-function vrStickMode() { return AFc().cls === 'wing' ? (SET.vrModeW || 1) : (SET.vrMode || 2); }
+function vrStickMode() { return AFc().cls === 'wing' ? (SET.vrModeW || 1) : (SET.vrMode || 1); }   // 쿼드 기본도 모드 1 (사용자 피드백: 좌우가 반대로 느껴짐)
 function xrInput(dt) {
   const { L: Lg, R: Rg } = xrPads();
   const ax = (g, i) => (g && g.axes && g.axes.length > i ? g.axes[i] || 0 : 0), bt = (g, i) => !!(g && g.buttons && g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.5));
