@@ -231,7 +231,7 @@ function c1Menu(k) {
   if (on && !C1.hidObj) { C1.hidObj = []; const c = c1W(0, 30, 0); for (const id in OBJ) { const g = OBJ[id] && OBJ[id].g; if (g && g.visible && g.position.distanceTo(c) > 60) { g.visible = false; C1.hidObj.push(g); } }
     if (typeof FLANE !== 'undefined' && FLANE && FLANE.G && FLANE.G.visible) { FLANE.G.visible = false; C1.hidObj.push(FLANE.G); } }
   if (!on && C1.hidObj) { C1.hidObj.forEach(g => { g.visible = true; }); C1.hidObj = null; }
-  if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; }
+  if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; C1.demo = false; const b = $('c1demo'); if (b) b.classList.add('hidden'); const g = $('c1g'); if (g) g.classList.add('hidden'); const na = $('c1p'); if (na) na.classList.add('hidden'); }
   C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
   if (ui.map) ui.map.style.display = on ? 'none' : '';

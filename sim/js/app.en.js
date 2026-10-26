@@ -6927,7 +6927,7 @@ function c1Menu(k) {
   if (on && !C1.hidObj) { C1.hidObj = []; const c = c1W(0, 30, 0); for (const id in OBJ) { const g = OBJ[id] && OBJ[id].g; if (g && g.visible && g.position.distanceTo(c) > 60) { g.visible = false; C1.hidObj.push(g); } }
     if (typeof FLANE !== 'undefined' && FLANE && FLANE.G && FLANE.G.visible) { FLANE.G.visible = false; C1.hidObj.push(FLANE.G); } }
   if (!on && C1.hidObj) { C1.hidObj.forEach(g => { g.visible = true; }); C1.hidObj = null; }
-  if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; }
+  if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; C1.demo = false; const b = $('c1demo'); if (b) b.classList.add('hidden'); const g = $('c1g'); if (g) g.classList.add('hidden'); const na = $('c1p'); if (na) na.classList.add('hidden'); }
   C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
   if (ui.map) ui.map.style.display = on ? 'none' : '';
@@ -7274,7 +7274,9 @@ function c1Step(prev, cur, dt) {
   // 버튼으로 Pause 구호를 했으면 Pause 지점 도착 때 "Pause", 그 뒤 1초마다 "하나…다섯" (단계가 먼저 끝나도 다섯까지, 움직이면 멈춤)
   if (st.call && st.call.count && st.armedEval) { if (st.arrT == null || C1.t - st.arrT > st.t + 0.6) { st.arrT = C1.t - st.t; st.cnt = Math.floor(st.t); } }
   c1Count(st); if (C1V.cst && C1V.cst !== st) { if (M.hs > 0.6 || (C1V.cst.cnt || 0) >= 5 || C1.t - C1V.cst.arrT > 6.5) C1V.cst = null; else c1Count(C1V.cst); }
-  if (done) { if (st.call && st.call.count && st.arrT != null && (st.cnt || 0) < 5) C1V.cst = st; if (st.call && st.call.after && st.callSaid === 'btn') c1Say(L2(st.call.after[0], st.call.after[1]), 'me'); c1OkFlash(st); c1Next(); }
+  // 구호(기기 음성)가 아직 나오는 중이면 끝날 때까지 next lesson로 넘어가지 않음 (직접 말한 구호는 바로)
+  if (done && st.callSaid && st.callSaid !== 'voice' && C1.t < (C1.meUntil || 0) - 0.15 && !st.call.count) { st.waitSay = true; return; }
+  if (done) { st.waitSay = false; if (st.call && st.call.count && st.arrT != null && (st.cnt || 0) < 5) C1V.cst = st; if (st.call && st.call.after && st.callSaid === 'btn') c1Say(L2(st.call.after[0], st.call.after[1]), 'me'); c1OkFlash(st); c1Next(); }
 }
 let _c1dk = false;
 function fromDemo(k) { return _c1dk || ['KeyC', 'PadRB', 'KeyZ', 'KeyR'].includes(k) || /^Digit[1-9]$/.test(k); }
@@ -7579,7 +7581,7 @@ function c1Panel(show) {
 #c1p canvas{width:100%;height:auto;max-height:150px;object-fit:contain;margin-top:6px;border-radius:6px;background:#1b2a1a}#c1p .note{color:#8f9aa3;font-size:11px;margin-top:4px}
 body.c1on #tbBoost,body.c1on #tbDrop,body.c1on #tbPhoto,body.c1on #tbGuide,body.c1on #tbBelly,body.c1on #tbIR{display:none!important}
 #c1p .cl{color:#7fd0ff;margin:2px 0}#c1p .bt button#c1Gp.on{background:#1f5a32;border-color:#5dff9a;color:#bfffd2;font-weight:700}#c1p .bt button#c1Gp.off{background:#5a3a14;border-color:#ffb030;color:#ffe2b0;font-weight:700}
-#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .co{margin:3px 0;font-size:12.5px;line-height:1.45}#c1p .co:empty{display:none}#c1p .co div{padding:1px 0}#c1p .co .cg{color:#7dffa8}#c1p .co .cy{color:#ffd166}#c1p .co .cr{color:#ff7a6a}#c1p .co i{font-style:normal;color:#9fb3c8;font-size:11px}#c1p .co b{color:#fff}body.touch #c1p .co{font-size:11px;margin:1px 0}body.touch #c1p .co div:nth-child(n+2){display:none}body.touch #c1p .co div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.72);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:auto;cursor:pointer}#c1demo.small{padding:3px 10px;font-size:12px}#c1demo.small span{display:none}#c1demo.small b::after{content:' ▸';opacity:.7}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
+#c1p i.pb{display:inline-block;width:70px;height:7px;background:#2a333c;border-radius:4px;vertical-align:middle;overflow:hidden}#c1p i.pb i{display:block;height:100%;background:#5dff9a}#c1p .okf{font-weight:700;font-size:14px}#c1p .dlg{margin:4px 0 2px;display:flex;flex-direction:column;gap:3px}#c1p .dlg.hidden{display:none}#c1p .dlg .ex,#c1p .dlg .me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:5px 8px;border-radius:8px;font-size:12.5px;line-height:1.4}#c1p .dlg .ex{background:rgba(255,200,40,.10);border-left:3px solid #ffc828}#c1p .dlg .ex b{color:#ffc828}#c1p .dlg .me{background:rgba(127,208,255,.10);border-left:3px solid #7fd0ff}#c1p .dlg .me b{color:#7fd0ff}#c1p .dlg .me span{flex:1 1 100%;color:#fff;font-weight:600}#c1p .dlg .me em{font-style:normal;color:#7dffa8;font-size:11.5px}#c1p .dlg .me.wait span{font-weight:400;color:#c9d4dc}#c1p .dlg .me i{font-style:normal;color:#9fb3c8;font-size:10.5px}#c1p .dlg #c1SayB{flex:0 0 auto;padding:7px 14px;border-radius:8px;border:1px solid #7fd0ff;background:#14506e;color:#fff;font-weight:700;font-size:13px;animation:c1need 1s ease-in-out infinite}#c1p .dlg #c1SayB small{margin-left:5px;font-size:9px;opacity:.7;border:1px solid #6a7580;border-radius:3px;padding:0 2px}#c1p .dlg .nx{font-size:11.5px;color:#9fb3c8;padding:0 8px}body.touch #c1p .dlg .ex{display:none}body.touch #c1p .dlg{margin:1px 0}body.touch #c1p .dlg .me{padding:2px 6px;font-size:11px;flex-wrap:nowrap;gap:6px}body.touch #c1p .dlg .me b,body.touch #c1p .dlg .me i{display:none}body.touch #c1p .dlg .me span{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}body.touch #c1p .dlg #c1SayB{padding:4px 10px;font-size:12px}body.touch #c1p .dlg .nx{display:none}body.touch #c1p .dlg #c1SayB small{display:none}body.touch #c1p{display:flex;flex-direction:column}body.touch #c1p>*{flex:0 0 auto;min-height:0}body.touch #c1p .co,body.touch #c1p .tip{flex:0 1 auto;overflow:hidden}body.touch #c1p .bts{margin-top:auto}body.touch #c1p .m{display:none}body.touch #c1p .t{font-size:11px}#c1p .co{margin:3px 0;font-size:12.5px;line-height:1.45}#c1p .co:empty{display:none}#c1p .co div{padding:1px 0}#c1p .co .cg{color:#7dffa8}#c1p .co .cy{color:#ffd166}#c1p .co .cr{color:#ff7a6a}#c1p .co i{font-style:normal;color:#9fb3c8;font-size:11px}#c1p .co b{color:#fff}body.touch #c1p .co{font-size:11px;margin:1px 0}body.touch #c1p .co div:nth-child(n+2){display:none}body.touch #c1p .co div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#c1p .bt.main button{flex:1 1 0;font-size:13px;padding:8px 4px;font-weight:700}#c1p .bt.sub{margin-top:4px}#c1p .bt.sub button{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 3px;background:#151c22}#c1p .bt button#c1Em{background:#4a1a1a;border-color:#ff6060;color:#ffd0d0}body.touch #c1p .bts{display:flex;gap:3px;margin-top:3px}body.touch #c1p .bts .bt{margin:0;flex:1 1 0}body.touch #c1p .bts .bt.main{flex:1.3 1 0}body.touch #c1p .bt button{white-space:nowrap;overflow:hidden;letter-spacing:-.3px}#c1p .bt button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}body.touch #c1p .bt button small{display:none}#c1p .bt button.need{background:#14506e;border-color:#7fd0ff;color:#fff;font-weight:700;animation:c1need 1s ease-in-out infinite}@keyframes c1need{0%,100%{box-shadow:0 0 0 0 rgba(127,208,255,0);filter:brightness(1)}50%{box-shadow:0 0 0 4px rgba(127,208,255,.75);filter:brightness(1.45)}}#c1p.demo .bts,body.touch #c1p.demo .bts{display:none}#c1demo{position:fixed;left:50%;transform:translateX(-50%);top:58px;z-index:30;max-width:min(680px,92vw);background:rgba(20,16,40,.72);border:1px solid #c9a2ff;border-radius:8px;padding:6px 12px;color:#efe6ff;font-size:13px;line-height:1.45;pointer-events:auto;cursor:pointer}#c1demo.small{padding:3px 10px;font-size:12px}#c1demo.small span{display:none}#c1demo.small b::after{content:' ▸';opacity:.7}#c1demo b{color:#c9a2ff;margin-right:6px}#c1demo.hidden{display:none}body.touch #c1demo{top:auto;bottom:8px;font-size:11px;max-width:60vw}#c1p .cl i{color:#9aa6ad;font-style:normal}#c1p .bt button.on{background:#2c5a36;border-color:#5dff9a}
 #c1cap{position:fixed;left:50%;top:136px;transform:translateX(-50%);max-width:min(760px,92vw);background:rgba(8,12,18,.86);border:1px solid #ffc828;border-radius:10px;padding:8px 14px;color:#fff;font:15px/1.4 system-ui,sans-serif;z-index:8;opacity:0;transition:opacity .25s;pointer-events:none}
 #c1cap.on{opacity:1}#c1cap b{color:#ffc828;margin-right:6px}#c1cap.me{border-color:#7fd0ff}#c1cap.me b{color:#7fd0ff}
 #c1m{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}#c1m.hidden{display:none}
@@ -7613,8 +7615,8 @@ body.touch #c1cap{top:auto;bottom:6px}
     document.head.appendChild(css);
     el = document.createElement('div'); el.id = 'c1p'; el.className = 'hidden';
     el.innerHTML = `<div class="t" id="c1T"></div><div class="m" id="c1Mn"></div><div class="tip" id="c1Tip"></div><div class="s" id="c1St"></div>
-<div class="cl" id="c1Cl"></div><div class="co" id="c1Co"></div><div class="r" id="c1R"></div>
-<div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 next lesson로 (KEYBOARD Enter)', 'Done, go to next step (Enter key)')}">${L2('Next ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Cb" title="${L2('내(응시자) 구호 외치기 — 기기가 응시자 목SOUND로 대신 말함 · 마이크로 직접 말해도 됨 (KEYBOARD Q)', 'Say my (candidate) call — the device speaks it in the candidate voice · or say it into the mic (Q key)')}">${L2('🗣 내 구호', '🗣 MY CALL')}<small>Q</small></button><button id="c1Em" title="${L2('비상 선언 (KEYBOARD E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button><button id="c1Gp" title="${L2('GPS 스위치 (H)', 'GPS switch (H)')}">GPS</button><button id="c1More" title="${L2('SETTINGS 더보기', 'More settings')}">⋯</button></div><div class="bt sub"><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1MapB" title="${L2('시험장 지도 보기', 'Show the field map')}">🗺</button></div></div>
+<div class="dlg" id="c1Dlg"></div><div class="cl" id="c1Cl"></div><div class="co" id="c1Co"></div><div class="r" id="c1R"></div>
+<div class="bts"><div class="bt main"><button id="c1Ok" title="${L2('완료하고 next lesson로 (KEYBOARD Enter)', 'Done, go to next step (Enter key)')}">${L2('Next ▶', 'NEXT ▶')}<small>Enter</small></button><button id="c1Em" title="${L2('비상 선언 (KEYBOARD E)', 'Declare emergency (E key)')}">${L2('🚨 비상', '🚨 EMER')}<small>E</small></button><button id="c1Gp" title="${L2('GPS 스위치 (H)', 'GPS switch (H)')}">GPS</button><button id="c1More" title="${L2('SETTINGS 더보기', 'More settings')}">⋯</button></div><div class="bt sub"><button id="c1Md">${L2('모드 Y', 'MODE Y')}</button><button id="c1Hr">🕐</button><button id="c1Vw">${L2('시점 C', 'VIEW C')}</button><button id="c1An">📢</button><button id="c1Vo">🔊</button><button id="c1Mic">🎤</button><button id="c1MapB" title="${L2('시험장 지도 보기', 'Show the field map')}">🗺</button></div></div>
 <canvas id="c1Map" width="260" height="200"></canvas><div class="note" id="c1Note"></div><div class="note">${C1DISC()}</div>`;
     document.body.appendChild(el);
     const tap = (id, k) => { const b = $(id); b.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Key(k); }; };
@@ -7622,7 +7624,8 @@ body.touch #c1cap{top:auto;bottom:6px}
     $('c1MapB').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1map = !SET.c1map; saveSet(); };
     $('c1Tip').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); C1.tipOpen = !$('c1Tip').classList.contains('open'); };
     tap('c1Ok', 'Enter'); tap('c1Md', 'KeyY'); tap('c1Gp', 'KeyH');
-    $('c1Hr').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const L = [9, 11, 13, 15, 17]; SET.c1hour = L[(L.indexOf(SET.c1hour | 0) + 1) % L.length] || 11; saveSet(); c1Sun(); showMsg(L2('시험 시각 ', 'Test time ') + SET.c1hour + L2('시 · 해 위치·그림자 반영', ':00 · sun and shadows updated'), '#ffc828', 1.6); }; tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC'); tap('c1Cb', 'KeyQ');
+    $('c1Hr').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const L = [9, 11, 13, 15, 17]; SET.c1hour = L[(L.indexOf(SET.c1hour | 0) + 1) % L.length] || 11; saveSet(); c1Sun(); showMsg(L2('시험 시각 ', 'Test time ') + SET.c1hour + L2('시 · 해 위치·그림자 반영', ':00 · sun and shadows updated'), '#ffc828', 1.6); }; tap('c1Em', 'KeyE'); tap('c1Vw', 'KeyC');
+    el.addEventListener('pointerdown', e => { const b = e.target.closest('#c1SayB'); if (b) { e.stopPropagation(); e.preventDefault(); c1Key('KeyQ'); } });
     $('c1An').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); SET.c1ann = SET.c1ann === false; saveSet(); c1AnnBtn(); showMsg(SET.c1ann === false ? L2('시험위원 지시 방송 Off (응시자 구호로 진행)', 'Examiner announcements off (candidate-led)') : L2('시험위원 지시 방송 On', 'Examiner announcements on'), '#ffc828', 1.6); };
     $('c1Vo').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); if (SET.c1voice === false) { SET.c1voice = true; saveSet(); } c1VoiceUnlock(); c1VoiceTest(); };
     $('c1Vo').oncontextmenu = e => { e.preventDefault(); SET.c1voice = SET.c1voice === false; saveSet(); showMsg(SET.c1voice === false ? L2('시험장 음성 Off', 'Test-field voice off') : L2('시험장 음성 On', 'Test-field voice on'), '#ffc828', 1.4); };
@@ -7689,14 +7692,23 @@ function c1Tick(dt) {
     const open = C1.demo || (C1.tipOpen != null ? C1.tipOpen : C1.t - C1.tipT < 15);
     if (tip && !C1.exam) { tp.innerHTML = `<b>📘 ${L2('요령', 'How to')}${open ? '' : ' ▸'}</b> <span>${L2(tip[0], tip[1])}</span>`; tp.classList.toggle('open', open); } else tp.innerHTML = ''; }
   el.classList.toggle('map', !!SET.c1map && !C1.exam);
-  $('c1St').textContent = st ? st.lab : '';
-  { const cl = $('c1Cl'); let h = '';
-    const ctx = st && st.call ? (st.call.count ? (L2(st.call.ko, st.call.en) ? L2(st.call.ko, st.call.en) + ' → ' : '') + L2('(도착 후) Pause. 하나, 둘, 셋, 넷, 다섯', '(on arrival) hold, one … five') : L2(st.call.ko, st.call.en)) : '';
-    if (st && st.k === 'inspect' && st.call && !st.callSaid) h = L2('점검 항목을 모두 판정하면 보고 구호가 자동으로 나갑니다', 'When every item is judged, the report call is made for you');
-    else if (st && st.call) h = st.callSaid ? `✓ ${L2('구호', 'Call')}: ${ctx} <i>(${st.callSaid === 'voice' ? L2('음성', 'voice') : st.callSaid === 'auto' ? L2('자동', 'auto') : L2('버튼', 'button')})</i>` : (C1.exam ? `${L2('지금 내 구호 차례 ▶ 🗣 내 구호 버튼 or 직접 말하기', 'Your call now ▶ 🗣 MY CALL button or say it')}` : `${L2('내 구호', 'My call')}: “${ctx}” <i>(${L2('🗣 내 구호 버튼 · 🎤 말하기', '🗣 MY CALL · 🎤 say it')})</i>`);
-    if (C1V.heardT > 0) h += `<br><i>🎤 ${C1V.heard}</i>`;
-    const vs = c1VoiceStatus(); if (vs) h += `<br><i style="color:#ffb070">${vs}</i>`;
-    cl.innerHTML = h; }
+  $('c1St').textContent = st ? ((IS_TOUCH && m) ? `${C1.mi + 1}/${C1.M.length} · ` : '') + st.lab : '';
+  { // 대화창: 시험위원 마지막 지시 → 내 구호 (외치기 버튼 / 말하는 중 / 완료) → 그 다음에 일어날 일
+    const dg = $('c1Dlg'); let h = '';
+    const callTx = st && st.call ? L2(st.call.ko, st.call.en) : '';
+    const ex = C1.lastEx && SET.c1ann !== false ? C1.lastEx : '';
+    if (ex) h += `<div class="ex"><b>📢 ${L2('시험위원', 'Examiner')}</b><span>${ex}</span></div>`;
+    if (st && st.call && callTx) {
+      const speaking = C1.t < (C1.meUntil || 0) - 0.1 && st.callSaid;
+      if (st.k === 'inspect' && !st.callSaid) h += `<div class="me wait"><b>🗣 ${L2('응시자', 'Me')}</b><span>${L2('점검을 마치면 보고 구호가 자동으로 나갑니다', 'Report call is made for you after the check')}</span></div>`;
+      else if (!st.callSaid) h += `<div class="me need"><b>🗣 ${L2('응시자', 'Me')}</b><span>“${callTx}”</span><button id="c1SayB">${L2('외치기', 'Say it')}<small>Q</small></button><i>${L2('🎤 직접 말해도 됩니다', '🎤 or say it yourself')}</i></div>`;
+      else h += `<div class="me done"><b>🗣 ${L2('응시자', 'Me')}</b><span>“${callTx}”</span><em>${speaking ? L2('말하는 중…', 'speaking…') : '✓ ' + (st.callSaid === 'voice' ? L2('직접 말함', 'spoken') : st.callSaid === 'auto' ? L2('자동', 'auto') : L2('완료', 'done'))}</em></div>`;
+      if (st.call.count) h += `<div class="nx">→ ${L2('도착해 멈추면 “Pause. 하나…다섯” 은 자동으로', 'On arrival the “hold, one…five” count is automatic')}</div>`;
+      else if (st.waitSay) h += `<div class="nx">→ ${L2('구호가 끝나면 next lesson', 'Next step after the call')}</div>`;
+    } else if (st && (st.k === 'prep' || st.k === 'arm' || st.k === 'disarm') && !C1.demo) h += `<div class="nx">→ ${L2('Next ▶ (Enter) 로 진행', 'NEXT ▶ (Enter) to continue')}</div>`;
+    if (C1V.heardT > 0) h += `<div class="nx">🎤 ${C1V.heard}</div>`;
+    dg.innerHTML = h; dg.classList.toggle('hidden', !h);
+    const cl = $('c1Cl'); const vs = c1VoiceStatus(); cl.innerHTML = vs ? `<i style="color:#ffb070">${vs}</i>` : ''; }
   { const co = $('c1Co'); if (co) co.innerHTML = (!C1.exam && !C1.demo && st) ? c1Coach(st, M) : ''; }
   const e = st && st.err, f = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d || 1), cls = (x, t) => Math.abs(x) <= t ? 'ok' : 'bad';
   let r = C1.exam ? `<b>${L2('스키드 높이', 'Skid h')}</b><span>${M.alt.toFixed(2)} m</span><b>${L2('기수', 'Heading')}</b><span>${c1Wrap(M.hdg).toFixed(0)}°</span>` : '';
@@ -7711,7 +7723,7 @@ function c1Tick(dt) {
   if (st && st.k === 'ctl') { const sn = st.seen || {}, ck = k => sn[k] ? '✓' : '·'; r += `<b>${L2('점검 조작', 'Checks')}</b><span>${L2('전', 'F')}${ck('p+')} ${L2('후', 'B')}${ck('p-')} ${L2('좌', 'L')}${ck('r-')} ${L2('우', 'R')}${ck('r+')} ${L2('러더', 'Rud')}${ck('y-')}${ck('y+')}</span>`; }
   if (st && st.k === 'arm' && st.csc) r += `<b>${L2('시동', 'Start')}</b><span>${L2('두 스틱 아래·안쪽 0.5초 (KEYBOARD S+A+↓+→)', 'Both sticks down-in 0.5 s (keys S+A+↓+→)')}</span>`;
   { const needCall = !!(st && st.call && !st.callSaid && st.k !== 'inspect'), needOk = !C1.demo && !!(st && (st.k === 'prep' || (st.k === 'arm' && DR.landed) || (st.k === 'disarm' && DR.landed && Math.hypot(DR.v.x, DR.v.z) < 0.3)));
-    const ob = $('c1Ok'), cb = $('c1Cb'); if (ob) ob.classList.toggle('need', needOk && !needCall); if (cb) cb.classList.toggle('need', needCall && !C1.demo); el.classList.toggle('demo', !!C1.demo); c1DemoBanner(m); }
+    const ob = $('c1Ok'); if (ob) ob.classList.toggle('need', needOk && !needCall); el.classList.toggle('demo', !!C1.demo); c1DemoBanner(m); }
   { const gp = $('c1Gp'); if (gp) { gp.textContent = C1.mode === 'gps' ? 'GPS ON' : C1.mode === 'atti' ? 'GPS OFF' : 'MANUAL'; gp.className = C1.mode === 'gps' ? 'on' : 'off'; } const hb = $('c1Hr'); if (hb) hb.textContent = '🕐 ' + (SET.c1hour || 11) + L2('시', ':00'); }
   if (st && st.k === 'hold' && st.armedEval) { const pc = Math.min(1, st.t / st.T); r += `<b>${L2('Pause', 'Hold')}</b><span><i class="pb"><i style="width:${(pc * 100).toFixed(0)}%"></i></i> ${st.t.toFixed(1)} / ${st.T} s${pc >= 1 ? ' ✓' : ''}</span>`; }
   if (C1.ok && C1.ok.t > 0) r = `<span class="okf ${C1.ok.bad ? 'bad' : 'ok'}" style="grid-column:1/3">${C1.ok.text}</span>` + r;
@@ -7741,7 +7753,7 @@ function c1Camera(dt, subj) {
     camPos.lerp(want, 1 - Math.exp(-dt * 5)); camera.position.copy(camPos); camLook.lerp(subj.p, 1 - Math.exp(-dt * 9)); camera.lookAt(camLook); camera.fov = 60; camera.near = 0.05; return true;
   }
   if (C1.introCam) {   // 대기 천막에서 시험장을 바라봄 (호명 방송 중)
-    camera.position.copy(c1W(-9, -7.5, 1.7)); camLook.copy(c1W(0, 24, 2)); camera.up.set(0, 1, 0); camera.lookAt(camLook); camera.fov = 55; camera.near = 0.1; return true;
+    camera.position.copy(c1W(-9, -3.6, 1.7)); camLook.copy(c1W(0, 24, 2)); camera.up.set(0, 1, 0); camera.lookAt(camLook); camera.fov = 55; camera.near = 0.1; return true;
   }
   camera.position.copy(c1W(0, 0, c1p('eye')));
   // 기체와 그 아래 바닥(지점·고깔·그림자)이 함께 보이도록: 둘 사이를 바라보고 화각을 넓힘
@@ -7749,7 +7761,7 @@ function c1Camera(dt, subj) {
   camLook.lerp(tgt, 1 - Math.exp(-dt * 7)); if (camLook.distanceTo(tgt) > 30) camLook.copy(tgt);
   camera.up.set(0, 1, 0); camera.lookAt(camLook);
   const d = camera.position.distanceTo(subj.p), a = _c1cv.copy(subj.p).sub(camera.position).angleTo(_c1cw.copy(gp).sub(camera.position)) / DEG;
-  const want = clamp(Math.max(2 * Math.atan(7.5 / Math.max(d, 1)) / DEG, a * 1.7 + 6) * (SET.c1zoom || 1), 30, 75);
+  const want = clamp(Math.max(2 * Math.atan(7.5 / Math.max(d, 1)) / DEG, a * 1.7 + 6) * (SET.c1zoom || (C1.demo ? 0.75 : 1)), 24, 75);   // 시범FLIGHT은 조금 당겨서
   camera.fov += (want - camera.fov) * (1 - Math.exp(-dt * 3)); camera.near = 0.1;
   return true;
 }
@@ -7860,6 +7872,7 @@ function c1Say(text, who) {
   const ak = C1A.st === 'ready' ? c1AKey(text, who) : null;
   const dur = ak ? C1A.idx[ak][2] + 0.35 : Math.max(1.4, text.length * (window.SIM_LANG === 'en' ? 0.065 : 0.13) + 0.5);
   c1Caption(text, who, dur); C1.sayUntil = Math.max(C1.sayUntil || 0, C1.t || 0) + dur;
+  if (who === 'me') { C1.meUntil = C1.sayUntil; C1.lastMe = text; } else { C1.exUntil = C1.sayUntil; C1.lastEx = text; }   // 구호가 끝날 때까지 단계 완료를 기다리기 위한 시각
   (C1V.log = C1V.log || []).push((ak ? '' : '[NOKEY] ') + (who === 'me' ? 'ME: ' : 'EX: ') + text); if (C1V.log.length > 300) C1V.log.shift();
   try {
     if (ak && SET.c1voice !== false) { if (!TEST) c1APlay(ak); C1V.nRec = (C1V.nRec || 0) + 1; }
@@ -8034,14 +8047,14 @@ function c1VRon() { return ((typeof XR_ON !== 'undefined' && XR_ON && !XR.menu) 
 function c1XRInit() {
   if (C1XR.rig) return;
   const rig = new THREE.Group(); scene.add(rig); const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 9000); rig.add(cam);
-  const b = vrPlane(0.62, 0.42, 1024, 694, { depthTest: false }); b.m.position.set(-0.32, 1.02, -0.5); b.m.rotation.set(-0.62, 0.42, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);
+  const b = vrPlane(0.56, 0.38, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.62); b.m.rotation.set(-0.5, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 눈을 향해 살짝 기울임 (기체 시야를 가리지 않게 아래쪽)
   Object.assign(C1XR, { rig, cam, board: b });
 }
 function c1XRUpdate(dt) {
   c1XRInit(); const R = C1XR.rig;
-  const at = C1.introCam ? c1W(-9, -7.5, 0) : c1W(0, 0, 0);
+  const at = C1.introCam ? c1W(-9, -3.6, 0) : c1W(0, 0, 0);
   const raise = XR.local ? c1p('eye') : 0;   // 바닥 기준 공간이 없으면 눈높이만큼 올림 (안내판은 그만큼 내림)
-  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.02 - raise;
+  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.08 - raise;
   R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
   if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
   C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';
