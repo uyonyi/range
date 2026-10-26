@@ -266,7 +266,9 @@ function syncSeg() {
   document.querySelectorAll('#segAssistLv button').forEach(b => b.classList.toggle('on', +b.dataset.v === SET.assistLv));
   document.querySelectorAll('#segFeel button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.feel));
   document.querySelectorAll('#segThrHover button').forEach(b => b.classList.toggle('on', b.dataset.v === (SET.thrHover || 'auto')));
-  document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
+  document.querySelectorAll('#segRumble button').forEach(b => b.classList.toggle('on', +b.dataset.v === (SET.rumble == null ? 1 : +SET.rumble)));
+  document.querySelectorAll('#segRumble button').forEach(b => b.addEventListener('click', () => { SET.rumble = +b.dataset.v; saveSet(); syncSeg(); rumble(0.6, 0.6, 200); }));
+document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === (SET.boostFov !== 0)));
   { const r = feelRates('p'), y = feelRates('y'); ['rc0', 'rc1', 'rc2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = r[i]; }); ['ry0', 'ry1', 'ry2'].forEach((id, i) => { const e = $(id); if (e && document.activeElement !== e) e.value = y[i]; });
     const pre = Object.keys(RATE_PRESET).find(k => k !== 'real' && RATE_PRESET[k].join() === r.join()); document.querySelectorAll('#segRatePre button').forEach(b => b.classList.toggle('on', b.dataset.v === pre));
     if ($('rcV')) $('rcV').textContent = `반스틱 ${actualRate(0.5, r[0], r[1], r[2]).toFixed(0)}°/s · 풀스틱 ${r[1]}°/s`;
