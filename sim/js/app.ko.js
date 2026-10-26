@@ -6269,7 +6269,7 @@ Object.assign(window.__sim, { RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSens
   const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
   Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
   // 빠른 설정 (코스 고르는 화면)
-  const QS = [['segDiff', '🎚', '난이도', 'Mode'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '가이드', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
+  const QS = [['segDiff', '🎚', '난이도', 'Mode'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '가이드', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
   const bar = $('qsBar');
   const draw = () => {
     P.querySelectorAll('small.oh').forEach(h => { const m = (AFc().cls === 'wing' && HW[h.dataset.for]) || H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
