@@ -53,7 +53,7 @@ async function readDem(file, crsOverride) {
     for (let i = 0; i < w * h; i++) { const v = parseFloat(tok()); data[i] = (isNaN(v) || v === nod) ? NaN : v; if (i % 400000 === 0) await new Promise(r => setTimeout(r, 0)); }
     R = { w, h, data, x0: xl, y0: yl + h * cs, dx: cs, dy: -cs, crs: null, crsSrc: '' };
   } else {
-    if (!window.GeoTIFF) throw new Error('GeoTIFF 해석기가 없습니다');
+    if (!window.GeoTIFF && !(window.ensureGeoTIFF && await window.ensureGeoTIFF())) throw new Error('GeoTIFF 해석기가 없습니다');
     const tiff = await GeoTIFF.fromBlob(file); const img = await tiff.getImage(0);
     let w = img.getWidth(), h = img.getHeight(); const bb = img.getBoundingBox();
     const scale = Math.max(1, Math.sqrt(w * h / 16e6));          // 너무 크면 1600만 화소로 줄여 읽음

@@ -2,6 +2,7 @@
   python3 build.py            -> 내부용 단일 HTML (KO/EN, 기본 코스 포함)
   python3 build.py public DIR -> 공개용 여러 파일 (GitHub Pages, 영인산 현장만)
   python3 build.py check DIR  -> 공개 빌드 후 배포 전 점검 (node tests/check.js)
+  공개판은 node_modules/.bin/terser 가 있으면 축소본으로 나감 (npm i) · 바닥 사진은 tools/mk_ground.js 로 미리 생성
 """
 import json, base64, re, sys, os, shutil
 from en import EN
@@ -92,44 +93,89 @@ def build_public(outdir, site_ids=('yeongin',)):
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
         s = dict(all_sites[sid])
-        if s.get('ortho') and not s['ortho'].startswith('data:'):   # 정사영상: 같은 폴더로 복사 + 바뀌면 새로 받게 ?v=
+        for key in ('ortho', 'ground', 'groundLo'):   # 정사영상(tif, 올린 파일 대비용)·바닥 사진(webp): 같은 폴더로 복사 + 바뀌면 새로 받게 ?v=
+            if not s.get(key) or s[key].startswith('data:'): continue
             import hashlib
-            src = '/home/claude/range/sim/' + s['ortho'].split('?')[0]
+            src = '/home/claude/range/sim/' + s[key].split('?')[0]
             if os.path.exists(src):
-                dst = f"{outdir}/{s['ortho'].split('?')[0]}"
+                dst = f"{outdir}/{s[key].split('?')[0]}"
                 if os.path.abspath(src) != os.path.abspath(dst): shutil.copy(src, dst)
-                s['ortho'] = s['ortho'].split('?')[0] + '?v=' + hashlib.md5(open(src, 'rb').read()).hexdigest()[:8]
+                s[key] = s[key].split('?')[0] + '?v=' + hashlib.md5(open(src, 'rb').read()).hexdigest()[:8]
         data = {'objs': s['course']['objs'], 'wp': s['course']['wp']}
         js = '// 현장 데이터 (자동 생성: tools/)\nwindow.SIM_NOFLAT=true;\nwindow.SIM_SITES=(window.SIM_SITES||[]).concat([' + json.dumps(s, ensure_ascii=False) + ']);\n'
         js += 'window.SIM_DATA=window.SIM_DATA||' + json.dumps(data, ensure_ascii=False) + ';\n'
         open(f'{outdir}/sites/{sid}.js', 'w', encoding='utf-8').write(js)
-    build_pages(outdir, site_ids, vr=False)
+    pre = build_pages(outdir, site_ids, vr=False)
     os.makedirs(outdir + '/vr/js', exist_ok=True)
-    build_pages(outdir + '/vr', site_ids, vr=True)
+    pre += build_pages(outdir + '/vr', site_ids, vr=True)
+    write_sw(outdir, pre)
     tot = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(outdir) for f in fs)
     print('public build ->', outdir, tot // 1024, 'KB')
 
 
+def write_sw(outdir, pre):
+    """서비스 워커: 핵심 파일은 설치 때 받아 두고(오프라인 실행), 음성·해석기 같은 큰 파일은 처음 쓸 때 받아 캐시. 버전(VER)이 바뀌면 옛 캐시는 지움"""
+    import hashlib, glob
+    core = ['lib/three.min.js', 'lib/proj4.js'] + pre
+    for s in glob.glob(outdir + '/sites/*.js'):   # 현장 데이터 안의 ?v= 포함 바닥 사진 주소
+        txt = open(s, encoding='utf-8').read()
+        core += re.findall(r'"(sites/[^"]+\.webp\?v=[0-9a-f]+)"', txt)
+    core = sorted(set(core))
+    ver = hashlib.md5(''.join(core).encode()).hexdigest()[:10]
+    sw = """// FPV Terrain Trainer · service worker (자동 생성: src/build.py)
+const VER = '%s', CACHE = 'fpvsim-' + VER, CORE = %s;
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fpvsim-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+self.addEventListener('fetch', e => {
+  const r = e.request; if (r.method !== 'GET') return; const u = new URL(r.url); if (u.origin !== location.origin) return;
+  if (r.mode === 'navigate') {   // 페이지: 네트워크 먼저 (새 버전 바로 반영), 안 되면 캐시
+    e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); return res; }).catch(() => caches.match(r, { ignoreSearch: true }).then(m => m || caches.match(u.pathname.endsWith('/') ? u.pathname + 'index.html' : r))));
+    return;
+  }
+  // 나머지: 캐시 먼저 (?v= 로 버전이 붙어 있어 안전), 없으면 받아서 캐시 (음성 조각·GeoTIFF 해석기 등)
+  e.respondWith(caches.match(r).then(m => m || fetch(r).then(res => { if (res.ok && (res.type === 'basic' || res.type === 'default')) { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); } return res; })));
+});
+""" % (ver, json.dumps(core))
+    open(outdir + '/sw.js', 'w', encoding='utf-8').write(sw)
+def minify_js(src, path):
+    """공개판 앱 코드 축소 (terser 가 있으면: 용량 ~45% · 파싱 시간 단축). 없으면 그대로"""
+    import subprocess, tempfile
+    tb = os.path.join('node_modules', '.bin', 'terser')
+    if not os.path.exists(tb) or os.environ.get('SIM_NOMIN'): return src
+    with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f: f.write(src); tmp = f.name
+    try:
+        r = subprocess.run([tb, tmp, '-c', 'passes=1', '-m', '--comments', 'false', '--ecma', '2020'], capture_output=True, text=True, encoding='utf-8')
+        if r.returncode != 0: print('terser failed, using plain source:', r.stderr[:300]); return src
+        return '// built from sim/src (see src/build.py) · ' + hashlib_short(src) + '\n' + r.stdout
+    finally: os.unlink(tmp)
+def hashlib_short(s):
+    import hashlib; return hashlib.md5(s.encode()).hexdigest()[:8]
 def build_pages(outdir, site_ids, vr):
     """PC 판(outdir) 또는 VR 판(outdir/vr: 라이브러리·현장 데이터는 한 단계 위 폴더 공유)"""
     up = '../' if vr else ''
     import hashlib
+    pre = []   # 서비스 워커가 미리 받아 둘 파일
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
         t, game = sources(lang, 'public', c1=True)
         game = game.replace("'hroc_", "'fpvsim_").replace("open('hroc_fpv'", "open('fpvsim'")   # 저장 키 분리
-        open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(game)
-        tags = {'THREE': up + 'lib/three.min.js', 'GEOTIFF': up + 'lib/geotiff.js', 'PROJ4': up + 'lib/proj4.js'}
+        open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(minify_js(game, f'{outdir}/js/app.{lang}.js'))
+        tags = {'THREE': up + 'lib/three.min.js', 'PROJ4': up + 'lib/proj4.js'}
         for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
+        t = t.replace('<script>/*GEOTIFF*/</script>', f"<script>window.SIM_GEOTIFF_URL='{up}lib/geotiff.js';</script>")   # 사진·DEM 파일을 올릴 때만 불러옴
         import hashlib
         ver = hashlib.md5(game.encode()).hexdigest()[:8]
-        sites = ''.join(f'<script src="{up}sites/{sid}.js?v={ver}"></script>' for sid in site_ids)
+        sv = {sid: hashlib.md5(open(f"{outdir if not vr else outdir[:-3]}/sites/{sid}.js", 'rb').read()).hexdigest()[:8] for sid in site_ids}   # 현장 데이터는 그 파일 내용으로 버전
+        sites = ''.join(f'<script src="{up}sites/{sid}.js?v={sv[sid]}"></script>' for sid in site_ids)
         other = 'index.html' if lang == 'en' else 'en.html'
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
         flags = "window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';"
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
+        t = t.replace('</body>', f"<script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('{up}sw.js').catch(()=>{{}}));</script>\n</body>")   # 오프라인·재방문 캐시 (sw.js)
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
+        pre += [f'{"vr/" if vr else ""}{page}', f'{"vr/" if vr else ""}js/app.{lang}.js?v={ver}'] + ([f'sites/{sid}.js?v={sv[sid]}' for sid in site_ids] if not vr else [])
+    return pre
 
 
 def build_dual(mobile=False, out='hroc_fpv_simulator.html', vr=False, civil=False):
