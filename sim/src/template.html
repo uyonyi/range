@@ -18,7 +18,7 @@ canvas#c{display:block;width:100vw;height:100vh}
 #hud{position:fixed;inset:0;pointer-events:none}
 #split{position:absolute;left:16px;top:118px;font:700 20px/1 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 8px rgba(0,0,0,.7);opacity:0;transition:opacity .4s;pointer-events:none}#split.on{opacity:1}#split.good{color:#5dff9a}#split.bad{color:#ff6a5a}#split small{font-size:11px;font-weight:600;opacity:.8;margin-left:6px}
 body.touch #split{top:92px;font-size:16px}
-body.nohud #osd,body.nohud #obj,body.nohud #list,body.nohud #map,body.nohud #sticks,body.nohud #keys,body.nohud #bottom,body.nohud #guide,body.nohud #navArrow,body.nohud #radio,body.nohud #belly,body.nohud #split,body.nohud #c1g,body.nohud #c1p,body.nohud .c1w{visibility:hidden!important}
+body.nohud #hud>:not(#tc):not(#vig):not(#flash):not(#cross):not(#irTag),body.nohud #navArrow,body.nohud #radio,body.nohud #c1g,body.nohud #c1p,body.nohud .c1w,body.nohud #c1demo,body.nohud #lyBar,body.nohud #tbar{visibility:hidden!important}body.nohud #hud>#obj #objMsg{visibility:visible}
 #osd{position:absolute;left:16px;top:14px;font:600 15px/1.45 "SF Mono",Menlo,Consolas,monospace;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.6);letter-spacing:.02em}
 #osd b{color:var(--amber);font-weight:600;display:inline-block;width:52px}
 #osd .big{font-size:26px;line-height:1.2}
@@ -193,6 +193,7 @@ body.uas:not(.touch) #radio{bottom:auto;top:96px}body.uas:not(.touch) #guide{bot
 #feelAdv .frow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:4px 0}
 #feelAdv label{display:inline-flex;gap:4px;align-items:center}#feelAdv input[type=number]{width:62px;background:#1a2129;color:var(--fg);border:1px solid #33404b;border-radius:5px;padding:3px 5px;font:inherit}
 .seg.small button{padding:4px 8px;font-size:11.5px}
+#msTabs button.hid{display:none}
 .gpf{outline:3px solid var(--amber)!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(255,200,40,.18)!important;position:relative;z-index:2}input.gpf{outline-offset:4px}
 body:not(.acroOk) #feelAdv{opacity:.45}
 .oh{display:block;font-size:11.5px;color:var(--mute);line-height:1.35;margin-top:1px}

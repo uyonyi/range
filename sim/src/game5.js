@@ -364,6 +364,13 @@ function passCP(label, q, hw, y0, y1, ring) {
   return { kind: 'ms', t: 'pass', label, c, n, r, hw, y0, y1, ring, mk: mid.clone(),
     pts(p) { const ld = guideLead(), cc = this.ring ? this.c : mid, bf = p.clone().sub(cc).dot(n); return bf < -ld - 2 ? [p.clone(), cc.clone().addScaledVector(n, -ld), cc.clone(), cc.clone().addScaledVector(n, 3)] : [p.clone(), cc.clone(), cc.clone().addScaledVector(n, 3)]; } };
 }
+// 링 높이 보정: 링 아래쪽이 주변 지형·나무 꼭대기(반지름 R+1 m 안)보다 여유를 두고 뜨도록 (낮게 생성돼 구조물과 겹치지 않게)
+function clearAlt(d, s, alt, R) {
+  const c = W(d, s, 0), g0 = c.y; let top = g0;
+  for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; top = Math.max(top, terrainAt(c.x + Math.cos(a) * (R + 1), c.z + Math.sin(a) * (R + 1))); }
+  if (STREES && STREES.topAt) top = Math.max(top, STREES.topAt(c.x, c.z, R + 1));
+  return Math.max(alt, top - g0 + R + 2.5);
+}
 // 레이스 링
 const RACE = (function () {
   if (!PATHL) return [];
@@ -372,7 +379,7 @@ const RACE = (function () {
   for (let i = 0; i < alts.length; i++) {
     const s = 30 + i * (PATHL.total - 50) / (alts.length - 1), q0 = PATHL.at(s), la = lats[i];
     const q = Object.assign({}, q0, { d: q0.d - q0.ts * la, s: q0.s + q0.td * la }), cp = passCP('RING ' + (i + 1), q, 0, alts[i], alts[i], 3.2);
-    cp.q = q; cp.alt = alts[i]; cp.mk = W(q.d, q.s, alts[i]); cp.c = cp.mk.clone(); const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), mat(i === alts.length - 1 ? 0x5dff9a : 0xffc828, { emissive: 0x332200, roughness: 0.4 }));
+    cp.q = q; cp.alt = clearAlt(q.d, q.s, alts[i], 3.2); cp.mk = W(q.d, q.s, cp.alt); cp.c = cp.mk.clone(); const tor = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), mat(i === alts.length - 1 ? 0x5dff9a : 0xffc828, { emissive: 0x332200, roughness: 0.4 }));
     tor.position.copy(cp.c); tor.lookAt(cp.c.clone().add(cp.n)); MSG.race.add(tor); cp.mesh = tor; ringDecor(cp); L.push(cp);
   }
   return L;
@@ -430,7 +437,7 @@ function msStart(kind) {
   MS.idx = 0; S.photos = []; PH.lastSim = undefined; S.lost = 0; droneM.cans.forEach(c => c.visible = kind === 'sar'); S.kitErr = undefined; S.sarXY = null; S.hitsS = 0; S.errS = []; S.recT = 0; S.deadT = 0; S.running = true;
   const a = AFc(); let L = [];
   if (kind === 'forest' && FLANE) L = FLANE.cps.map(c => passCP(c.label, c.q, c.hw, c.y0, c.y1));
-  if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
+  if (kind === 'race') { L = RACE; MSG.race.visible = true; const k = a.cls === 'wing' ? 2.2 : 1; RACE.forEach(r => { r.ring = 3.2 * k; r.mesh.scale.setScalar(3.2 * k); const al = clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt, r.ring); r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); }); }
   if (kind === 'recon') L = reconPick();
   if (kind === 'fire') L = firePick();
   if (kind === 'strike') L = strikePick();
@@ -1219,7 +1226,7 @@ function scenStart(kind, a) {
   }
   if (kind === 'ridge' && RIDGE) {
     MSG.ridge.visible = true; const k = a.cls === 'wing' ? 2.2 : 1;
-    RIDGE.list.forEach(r => { r.ring = 6 * k; const al = a.cls === 'wing' ? 38 : 18; r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(6 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
+    RIDGE.list.forEach(r => { r.ring = 6 * k; const al = clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18, r.ring); r.c = W(r.q.d, r.q.s, al); r.mk = r.c.clone(); r.mesh.position.copy(r.c); r.mesh.scale.setScalar(6 * k); r.mesh.lookAt(r.c.clone().add(r.n)); });
     return RIDGE.list;
   }
   return null;
@@ -1875,8 +1882,8 @@ function menuDetail() {
   document.querySelector('.msStageW').style.setProperty('--cc', col);
   $('mdCat').textContent = CAT_N()[cat]; $('mdTitle').textContent = inf.t; $('mdDesc').textContent = inf.d; $('mdTip').textContent = inf.tip;
   const ok = MS_OK[k] || [];
-  $('mdAf').innerHTML = (ok.length === AF_IDS.length ? '' : ok.map(id => `<button data-af="${id}" class="${id === SET.af ? 'on' : ''}">${AF[id].name}</button>`).join(''));
-  $('mdAf').querySelectorAll('button').forEach(b => b.onclick = () => { MENU.afNote = ''; setAirframe(b.dataset.af); afUI(); });
+  $('mdAf').innerHTML = `<button class="on" data-af="${SET.af}">${AFc().name}</button><button class="mini" id="mdAfChg">${L2('기체 바꾸기 ◀', 'Change airframe ◀')}</button>`;
+  { const c = $('mdAfChg'); if (c) c.onclick = () => wizGo(2); }
   const best = menuBest(k), meta = [];
   if (isMission(k)) meta.push(L2('기준 ', 'Par ') + fmt(msPar(k, [1, 2, 3, 4])));
   if (best) meta.push(L2('내 최고 ', 'Best ') + `<b>${fmt(best)}</b>`);
@@ -1900,22 +1907,23 @@ function msVis() {
   // 타일에 내 최고 기록 · 추천 순서 번호
   document.querySelectorAll(`#msGrid [data-g]`).forEach(b => { const k = b.dataset.ms, best = (k === 'course' || isMission(k)) ? menuBest(k) : null; let e = b.querySelector('.best'); if (best) { if (!e) { e = document.createElement('span'); e.className = 'best'; b.appendChild(e); } e.textContent = '★ ' + fmt(best); } else if (e) e.remove(); });
   ['basic', 'exam', 'skill', 'mission'].forEach(gg => { let i = 0; document.querySelectorAll(`#msGrid [data-g="${gg}"]`).forEach(b => { if (b.dataset.site === '0' || b.dataset.ms === 'free' || b.dataset.ms === 'demo' || b.querySelector('.rec')) return; i++; let e = b.querySelector('.ord'); if (!e) { e = document.createElement('span'); e.className = 'ord'; b.appendChild(e); } e.textContent = L2('추천 ', 'step ') + i; }); });
-  document.querySelectorAll('#msTabs [data-g]').forEach(b => b.classList.toggle('on', b.dataset.g === g));
-  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0'));
+  document.querySelectorAll('#msGrid [data-ms]').forEach(b => b.classList.toggle('hid', b.dataset.g !== g || b.dataset.site === '0' || !msAfOk(b.dataset.ms)));
+  document.querySelectorAll('#msTabs [data-g]').forEach(b => { b.classList.toggle('on', b.dataset.g === g); b.classList.toggle('hid', !msInGrp(b.dataset.g).length); });   // 고른 기체로 할 수 있는 임무가 없는 종류는 탭도 숨김
 }
-function msInGrp(g) { return [...document.querySelectorAll(`#msGrid [data-g="${g}"]`)].filter(b => b.dataset.site !== '0').map(b => b.dataset.ms); }
+// 기체는 2단계에서 고르고, 3단계는 그 기체로 할 수 있는 임무만 보여 줌 (임무에 맞춰 기체를 바꾸지 않음)
+function msAfOk(k) { const ok = MS_OK[k]; return !ok || !ok.length || ok.includes(SET.af); }
+function msInGrp(g) { return [...document.querySelectorAll(`#msGrid [data-g="${g}"]`)].filter(b => b.dataset.site !== '0' && msAfOk(b.dataset.ms)).map(b => b.dataset.ms); }
 function menuTab(g) {
   const L = msInGrp(g); if (!L.length) return;
   const last = (MENU.lastIn || {})[g]; menuSel(L.includes(last) ? last : L[0]);
 }
 function menuSel(k, go) {
-  const t = msTile(k); if (!t || t.dataset.site === '0') k = 'course';
+  let t = msTile(k); if (!t || t.dataset.site === '0' || !msAfOk(k)) {   // 이 기체로 못 하는 임무면 같은 종류 → 전체에서 할 수 있는 첫 임무로
+    const g0 = t ? t.dataset.g : 'basic', L = msInGrp(g0).length ? msInGrp(g0) : MS_GRP.flatMap(msInGrp); k = L[0] || 'free'; t = msTile(k);
+  }
   MENU.ms = k; MENU.g = msTile(k).dataset.g; (MENU.lastIn = MENU.lastIn || {})[MENU.g] = k;
   try { localStorage.setItem('hroc_menu_ms', k); } catch (e) { }
-  // 고른 기체로 못 하는 임무면 알맞은 기체로 바꿔 줌
-  const ok = MS_OK[k] || [];
-  if (ok.length && !ok.includes(SET.af)) { const prev = AFc().name; MENU.afNote = L2(`${prev} 로는 할 수 없어 ${AF[ok[0]].name} 로 바꿨습니다`, `Switched from ${prev} to ${AF[ok[0]].name} for this mission`); setAirframe(ok[0]); afUI(); }
-  else if (k !== MENU.prevMs) MENU.afNote = '';
+  MENU.afNote = '';
   MENU.prevMs = k; msVis(); menuDetail(); if (go) menuGo();
 }
 document.querySelectorAll('#msTabs [data-g]').forEach(b => b.addEventListener('click', () => menuTab(b.dataset.g)));
@@ -2008,7 +2016,7 @@ function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.S
 if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
 // 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
 { const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('hroc_menu_ms'); } catch (e) { }
-  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
+  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
     c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; } }
 if ($('introVR')) $('introVR').onclick = () => {
   const n = $('introNote');
@@ -2023,8 +2031,8 @@ function menuShow(k) {
   if (typeof c1Menu === 'function') c1Menu(k);
   Object.values(MSG).forEach(g => g.visible = false);
   const a = AFc(), kw = a.cls === 'wing' ? 2.2 : 1;
-  if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt)); }); }
-  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18); r.mesh.position.copy(c); r.mesh.scale.setScalar(6 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
+  if (k === 'race' && RACE.length) { MSG.race.visible = true; RACE.forEach(r => { r.mesh.scale.setScalar(3.2 * kw); r.mesh.position.copy(W(r.q.d, r.q.s, clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? r.alt * 0.8 + 30 : r.alt, 3.2 * kw))); }); }
+  if (k === 'ridge' && RIDGE) { MSG.ridge.visible = true; RIDGE.list.forEach(r => { const c = W(r.q.d, r.q.s, clearAlt(r.q.d, r.q.s, a.cls === 'wing' ? 38 : 18, 6 * kw)); r.mesh.position.copy(c); r.mesh.scale.setScalar(6 * kw); r.mesh.lookAt(c.clone().add(r.n)); }); }
   if (k === 'fire' && FIRE.length) { MSG.fire.visible = true; FIRE.forEach((f, i) => { f.on = f.active = i < 3; f.g.visible = i < 3; f.g.scale.setScalar(1); }); }
   if (k === 'sar' && SAR) MSG.sar.visible = true;
   if (k === 'track' && TRACK) { MSG.track.visible = true; if (!(TRACK.s > 0)) TRACK.s = TRACK.total * 0.2; }
