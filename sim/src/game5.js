@@ -488,6 +488,12 @@ function msStep(prev, cur, dt) {
         MS.idx = j; comm(`${CS}, CONTROL. You missed a checkpoint. Press on.`, `${missed.join(', ')} 실패 · 계속 진행`);
         msNext(`${missed.join(' · ')} ✗ → ${q.label} ✓`, '#ff9a40'); return;
       }
+      /* 링·통과점을 옆으로 지나쳐 뒤에 두고 멀어지면 바로 실패 처리 → 가이드가 뒤를 가리키며 남지 않음 */
+      if (o.c && o.n) {
+        const bf = _mv.subVectors(cur, o.c).dot(o.n), away = DR.v.dot(o.n) > -0.5, lat = o.ring ? cur.distanceTo(o.c) : Math.hypot(cur.x - o.c.x, cur.z - o.c.z);
+        const rr = o.ring || Math.max(o.hw || 0, 3), far = Math.max(10, rr * 2);
+        if (away && (bf > far || (bf > 4 && lat > rr * 2.5 + 4))) { msSkip(); return; }
+      }
       const nx = MS.list[MS.idx + 1];
       if (nx && nx.c) {
         const A = o.c, dx = nx.c.x - A.x, dz = nx.c.z - A.z, L2 = dx * dx + dz * dz, dA = Math.hypot(cur.x - A.x, cur.z - A.z);
