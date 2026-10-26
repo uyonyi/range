@@ -2,19 +2,26 @@
 //  VR (Quest 등): 1종 연습은 고글 화면이 아니라 조종자 자리(P)에 서서 맨눈으로 기체를 보는 방식
 //  · 머리를 돌려 기체를 따라 봄 · 왼손 앞 아래에 안내판 · A 확인 · X 비상(점검 때는 불량) · Y 모드 · R트리거 구호 · B 메뉴
 // =====================================================================
+const _c1fw = new V3();
 var C1XR = { rig: null, cam: null, board: null, t: 0, sel: 0, selT: 0 };
 function c1VRon() { return ((typeof XR_ON !== 'undefined' && XR_ON && !XR.menu) || window.C1_VRTEST) && isC1() && S.state !== 'menu'; }
 function c1XRInit() {
   if (C1XR.rig) return;
   const rig = new THREE.Group(); scene.add(rig); const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 9000); rig.add(cam);
-  const b = vrPlane(0.56, 0.38, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.62); b.m.rotation.set(-0.5, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 눈을 향해 살짝 기울임 (기체 시야를 가리지 않게 아래쪽)
+  const b = vrPlane(0.5, 0.34, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.6); b.m.rotation.set(-0.55, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 높이는 매 프레임 실제 머리 높이 기준으로 (앉아서 써도 시야를 안 가림)
   Object.assign(C1XR, { rig, cam, board: b });
 }
 function c1XRUpdate(dt) {
   c1XRInit(); const R = C1XR.rig;
   const at = C1.introCam ? c1W(-9, -3.6, 0) : c1W(0, 0, 0);
   const raise = XR.local ? c1p('eye') : 0;   // 바닥 기준 공간이 없으면 눈높이만큼 올림 (안내판은 그만큼 내림)
-  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.08 - raise;
+  R.position.copy(at); R.position.y += raise;
+  // 안내판: 실제 머리 높이보다 50 cm 아래 (앉았든 섰든) · 정면을 보면 거의 투명, 내려다보면 또렷
+  { const cam = C1XR.cam, hy = cam.position.y > 0.3 ? cam.position.y : c1p('eye') - raise, ty = clamp(hy - 0.5, 0.25, 2.0);
+    C1XR.by = C1XR.by == null ? ty : C1XR.by + (ty - C1XR.by) * Math.min(1, dt * 4); C1XR.board.m.position.y = C1XR.by;
+    const fw = _c1fw.set(0, 0, -1).applyQuaternion(cam.quaternion), down = -fw.y;   // 0 = 수평, 1 = 수직 아래
+    const look = S.brief || (st0 => st0 && (st0.k === 'inspect' || st0.k === 'oral'))(c1Cur());   // 점검·구술·브리핑 중엔 항상 또렷
+    const want = look ? 1 : clamp((down - 0.22) / 0.2, 0.12, 1); C1XR.bo = C1XR.bo == null ? want : C1XR.bo + (want - C1XR.bo) * Math.min(1, dt * 6); C1XR.board.m.material.opacity = C1XR.bo; }
   R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
   if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
   C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';

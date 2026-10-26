@@ -1918,7 +1918,7 @@ const MODES = {
   sport: { name: 'SPORT', maxTilt: 38 * DEG, vmax: 14, yawRate: 220 * DEG, althold: false, brake: 0, assist: 0, autoYaw: false, margin: 0, hitPen: 5 }
 };
 const ZOOMS = [{ d: 7.0, h: 2.4, fov: 64 }, { d: 4.2, h: 1.4, fov: 60 }, { d: 2.4, h: 0.8, fov: 56 }];   // 추적 카메라 거리 (멀리·보통·가까이)
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 2, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
+const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 1, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
 // 저장 구조: 일반 설정은 평탄, 종목별 설정은 하위 묶음 (c1: 1종 실기). 구버전(평탄 c1xxx 키)도 읽음
 const SET_GROUPS = ['c1'];
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
@@ -5947,7 +5947,7 @@ function xrPads() {
   return { L, R };
 }
 // VR 스틱 모드: 쿼드·고정익 따로 기억 (고정익 기본 = 모드 1: 오른쪽 스틱 위아래가 스로틀)
-function vrStickMode() { return AFc().cls === 'wing' ? (SET.vrModeW || 1) : (SET.vrMode || 2); }
+function vrStickMode() { return AFc().cls === 'wing' ? (SET.vrModeW || 1) : (SET.vrMode || 1); }   // 쿼드 기본도 모드 1 (사용자 피드백: 좌우가 반대로 느껴짐)
 function xrInput(dt) {
   const { L: Lg, R: Rg } = xrPads();
   const ax = (g, i) => (g && g.axes && g.axes.length > i ? g.axes[i] || 0 : 0), bt = (g, i) => !!(g && g.buttons && g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.5));
@@ -7644,7 +7644,7 @@ body.touch #c1cap{top:auto;bottom:6px}
     // 제목줄: 끌어서 옮기기 · 짧게 누르면 접기/펴기 · 두 번 누르면 원래 자리 (자리·접힘은 기기별로 기억)
     const tb = $('c1T'); let dg = null;
     tb.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const r = el.getBoundingClientRect(); dg = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, w: r.width, mv: false }; try { tb.setPointerCapture(e.pointerId); } catch (_) { } };
-    tb.onpointermove = e => { if (!dg) return; const dx = e.clientX - dg.x, dy = e.clientY - dg.y; if (!dg.mv && Math.hypot(dx, dy) < 6) return; dg.mv = true; c1PanelPos(dg.l + dx, dg.t + dy, dg.w); };
+    tb.onpointermove = e => { if (!dg || IS_TOUCH) return; const dx = e.clientX - dg.x, dy = e.clientY - dg.y; if (!dg.mv && Math.hypot(dx, dy) < 6) return; dg.mv = true; c1PanelPos(dg.l + dx, dg.t + dy, dg.w); };   // 모바일: 자리 고정 (스틱 영역과 겹치지 않게)
     tb.onpointerup = e => { if (!dg) return; const d = dg; dg = null; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
       if (d.mv) { const r = el.getBoundingClientRect(); SET[k] = [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; saveSet(); return; }
       const now = performance.now(); if (now - (tb._last || 0) < 350) { SET[k] = null; saveSet(); c1PanelPos(); tb._last = 0; return; } tb._last = now;
@@ -7657,6 +7657,7 @@ body.touch #c1cap{top:auto;bottom:6px}
 }
 function c1PanelPos(x, y, w) {
   const el = $('c1p'); if (!el) return; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
+  if (IS_TOUCH) { SET.c1posT = null; el.style.left = el.style.top = el.style.right = el.style.width = ''; return; }   // 모바일은 기본 자리만
   if (x == null && SET[k]) [x, y, w] = SET[k];
   if (x == null) { el.style.left = el.style.top = el.style.right = el.style.width = ''; return; }
   const W = innerWidth, H = innerHeight, ww = Math.min(w || el.offsetWidth, W - 8);
@@ -7922,6 +7923,7 @@ function c1VoiceStatus() {
 function c1VoiceTest() { C1V.err = null; c1VoiceUnlock(); const vs = c1VoicePick(); c1Say(L2('음성 안내 시험입니다. 잘 들리십니까?', 'Voice check. Can you hear me?') + (vs.length ? '' : ''), 'ex'); }
 function c1Caption(text, who, dur) {
   let el = $('c1cap'); if (!el) { el = document.createElement('div'); el.id = 'c1cap'; document.body.appendChild(el); }
+  if (IS_TOUCH && who === 'me') { el.classList.remove('on'); return; }   // 모바일: 내 구호는 패널 대화창에 있으니 자막은 시험위원만
   el.innerHTML = `<b>${who === 'me' ? L2('🗣 응시자', '🗣 Candidate') : L2('📢 시험위원', '📢 Examiner')}</b> ${text}`; el.className = who === 'me' ? 'me on' : 'on';
   clearTimeout(c1Caption.t); c1Caption.t = setTimeout(() => el.classList.remove('on'), (dur + 1.2) * 1000);
 }
@@ -8054,19 +8056,26 @@ Object.assign(C1EV, {
 //  VR (Quest 등): 1종 연습은 고글 화면이 아니라 조종자 자리(P)에 서서 맨눈으로 기체를 보는 방식
 //  · 머리를 돌려 기체를 따라 봄 · 왼손 앞 아래에 안내판 · A 확인 · X 비상(점검 때는 불량) · Y 모드 · R트리거 구호 · B 메뉴
 // =====================================================================
+const _c1fw = new V3();
 var C1XR = { rig: null, cam: null, board: null, t: 0, sel: 0, selT: 0 };
 function c1VRon() { return ((typeof XR_ON !== 'undefined' && XR_ON && !XR.menu) || window.C1_VRTEST) && isC1() && S.state !== 'menu'; }
 function c1XRInit() {
   if (C1XR.rig) return;
   const rig = new THREE.Group(); scene.add(rig); const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 9000); rig.add(cam);
-  const b = vrPlane(0.56, 0.38, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.62); b.m.rotation.set(-0.5, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 눈을 향해 살짝 기울임 (기체 시야를 가리지 않게 아래쪽)
+  const b = vrPlane(0.5, 0.34, 1024, 694, { depthTest: false }); b.m.position.set(0, 1.08, -0.6); b.m.rotation.set(-0.55, 0, 0, 'YXZ'); b.m.renderOrder = 30; rig.add(b.m);   // 눈앞 아래 가운데 · 높이는 매 프레임 실제 머리 높이 기준으로 (앉아서 써도 시야를 안 가림)
   Object.assign(C1XR, { rig, cam, board: b });
 }
 function c1XRUpdate(dt) {
   c1XRInit(); const R = C1XR.rig;
   const at = C1.introCam ? c1W(-9, -3.6, 0) : c1W(0, 0, 0);
   const raise = XR.local ? c1p('eye') : 0;   // 바닥 기준 공간이 없으면 눈높이만큼 올림 (안내판은 그만큼 내림)
-  R.position.copy(at); R.position.y += raise; C1XR.board.m.position.y = 1.08 - raise;
+  R.position.copy(at); R.position.y += raise;
+  // 안내판: 실제 머리 높이보다 50 cm 아래 (앉았든 섰든) · 정면을 보면 거의 투명, 내려다보면 또렷
+  { const cam = C1XR.cam, hy = cam.position.y > 0.3 ? cam.position.y : c1p('eye') - raise, ty = clamp(hy - 0.5, 0.25, 2.0);
+    C1XR.by = C1XR.by == null ? ty : C1XR.by + (ty - C1XR.by) * Math.min(1, dt * 4); C1XR.board.m.position.y = C1XR.by;
+    const fw = _c1fw.set(0, 0, -1).applyQuaternion(cam.quaternion), down = -fw.y;   // 0 = 수평, 1 = 수직 아래
+    const look = S.brief || (st0 => st0 && (st0.k === 'inspect' || st0.k === 'oral'))(c1Cur());   // 점검·구술·브리핑 중엔 항상 또렷
+    const want = look ? 1 : clamp((down - 0.22) / 0.2, 0.12, 1); C1XR.bo = C1XR.bo == null ? want : C1XR.bo + (want - C1XR.bo) * Math.min(1, dt * 6); C1XR.board.m.material.opacity = C1XR.bo; }
   R.rotation.set(0, -C1S.h, 0); R.updateMatrixWorld(true);
   if (window.C1_VRTEST) { C1XR.cam.position.set(0, c1p('eye'), 0); C1XR.cam.updateMatrixWorld(); C1XR.cam.lookAt(DR.p); C1XR.cam.aspect = innerWidth / innerHeight; C1XR.cam.updateProjectionMatrix(); }
   C1XR.board.m.visible = S.state === 'run' || S.state === 'pause' || S.state === 'result';

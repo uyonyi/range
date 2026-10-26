@@ -74,6 +74,7 @@ function c1VoiceStatus() {
 function c1VoiceTest() { C1V.err = null; c1VoiceUnlock(); const vs = c1VoicePick(); c1Say(L2('음성 안내 시험입니다. 잘 들리십니까?', 'Voice check. Can you hear me?') + (vs.length ? '' : ''), 'ex'); }
 function c1Caption(text, who, dur) {
   let el = $('c1cap'); if (!el) { el = document.createElement('div'); el.id = 'c1cap'; document.body.appendChild(el); }
+  if (IS_TOUCH && who === 'me') { el.classList.remove('on'); return; }   // 모바일: 내 구호는 패널 대화창에 있으니 자막은 시험위원만
   el.innerHTML = `<b>${who === 'me' ? L2('🗣 응시자', '🗣 Candidate') : L2('📢 시험위원', '📢 Examiner')}</b> ${text}`; el.className = who === 'me' ? 'me on' : 'on';
   clearTimeout(c1Caption.t); c1Caption.t = setTimeout(() => el.classList.remove('on'), (dur + 1.2) * 1000);
 }

@@ -424,7 +424,7 @@ body.touch #c1cap{top:auto;bottom:6px}
     // 제목줄: 끌어서 옮기기 · 짧게 누르면 접기/펴기 · 두 번 누르면 원래 자리 (자리·접힘은 기기별로 기억)
     const tb = $('c1T'); let dg = null;
     tb.onpointerdown = e => { e.stopPropagation(); e.preventDefault(); const r = el.getBoundingClientRect(); dg = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, w: r.width, mv: false }; try { tb.setPointerCapture(e.pointerId); } catch (_) { } };
-    tb.onpointermove = e => { if (!dg) return; const dx = e.clientX - dg.x, dy = e.clientY - dg.y; if (!dg.mv && Math.hypot(dx, dy) < 6) return; dg.mv = true; c1PanelPos(dg.l + dx, dg.t + dy, dg.w); };
+    tb.onpointermove = e => { if (!dg || IS_TOUCH) return; const dx = e.clientX - dg.x, dy = e.clientY - dg.y; if (!dg.mv && Math.hypot(dx, dy) < 6) return; dg.mv = true; c1PanelPos(dg.l + dx, dg.t + dy, dg.w); };   // 모바일: 자리 고정 (스틱 영역과 겹치지 않게)
     tb.onpointerup = e => { if (!dg) return; const d = dg; dg = null; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
       if (d.mv) { const r = el.getBoundingClientRect(); SET[k] = [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; saveSet(); return; }
       const now = performance.now(); if (now - (tb._last || 0) < 350) { SET[k] = null; saveSet(); c1PanelPos(); tb._last = 0; return; } tb._last = now;
@@ -437,6 +437,7 @@ body.touch #c1cap{top:auto;bottom:6px}
 }
 function c1PanelPos(x, y, w) {
   const el = $('c1p'); if (!el) return; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
+  if (IS_TOUCH) { SET.c1posT = null; el.style.left = el.style.top = el.style.right = el.style.width = ''; return; }   // 모바일은 기본 자리만
   if (x == null && SET[k]) [x, y, w] = SET[k];
   if (x == null) { el.style.left = el.style.top = el.style.right = el.style.width = ''; return; }
   const W = innerWidth, H = innerHeight, ww = Math.min(w || el.offsetWidth, W - 8);
