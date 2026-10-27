@@ -20,8 +20,8 @@ window.addEventListener('error',function(e){show((e.message||'error')+(e.filenam
 .boot .bfoot{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(320px,60vw);text-align:center;transition:opacity .4s}.boot.picking .bfoot,.boot.gating .bfoot{opacity:0}
 .boot .bbar{height:3px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}.boot .bbar i{display:block;height:100%;width:0;background:#ffc828;transition:width .4s ease}
 .boot .btxt{margin-top:7px;font:600 11px/1 "SF Mono",Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.75)}.boot.ready .btxt{color:#5dff9a}
-.boot .bskip,.boot .bsnd{position:absolute;right:calc(16px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));margin:0;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);color:#fff;font-size:12px}.boot.logo .bskip,.boot.gating .bskip,.boot.logo .bsnd{display:none}
-.boot .bsnd{right:calc(112px + env(safe-area-inset-right));border-color:rgba(255,200,40,.7);color:#ffc828;background:rgba(0,0,0,.5)}
+.boot .bskip,.boot .bsnd{position:absolute;right:calc(16px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));margin:0;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);color:#fff;font-size:12px}.boot.logo .bskip,.boot.gating .bskip{display:none}.boot.logo .bsnd{right:calc(16px + env(safe-area-inset-right))}
+.boot .bsnd{right:calc(112px + env(safe-area-inset-right));z-index:6;border-color:rgba(255,200,40,.7);color:#ffc828;background:rgba(0,0,0,.5)}.boot .bsnd.wait{animation:sndW 1.6s ease-in-out infinite}@keyframes sndW{50%{background:rgba(255,200,40,.28)}}
 .boot .battr{position:absolute;left:12px;bottom:8px;font:10px system-ui,sans-serif;color:rgba(255,255,255,.45)}
 .boot .bgate{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,88vw);padding:18px 18px 12px;text-align:center;cursor:default;background:rgba(10,14,18,.86);border:1px solid rgba(255,255,255,.14);border-top:3px solid #ffc828;border-radius:4px}.boot.gating .bgate{display:block}.boot.gating .btitle{display:none}
 .boot .bgate b{display:block;font:700 22px "SF Mono",Menlo,monospace;letter-spacing:.08em;color:#fff}.boot .bgate small{display:block;margin-top:4px;font-size:13px;color:#9aa6ad}.boot .bgate .pindots{margin:14px 0 16px}.boot .bgate .bmsg{min-height:17px;margin:8px 0 0;font-size:12.5px;color:#ff6a5a}
@@ -447,20 +447,26 @@ $('bootGateT').textContent=L('입장 번호 4자리','Enter the 4-digit code');s
 //  같은 소리 장치를 게임이 이어 씀(window.__bootAudio) → 첫 화면 음악도 다시 허락받지 않고 바로
 var M={on:false,done:false};
 (function(){var mu=BT.getAttribute('data-music'),AC=window.AudioContext||window.webkitAudioContext,s={};if(!hasVid||!mu||!AC||!window.fetch)return;
-try{s=JSON.parse(localStorage.getItem('fpvsim_fpv_music')||'{}')}catch(e){}if(s.on===false||s.vol===0)return;
-try{M.ctx=new AC()}catch(e){return}M.on=true;M.vol=s.vol!=null?+s.vol:0.5;window.__bootAudio=M;
-if(!seen)fetch(mu).then(function(r){return r.arrayBuffer()}).then(function(ab){return new Promise(function(ok,no){M.ctx.decodeAudioData(ab,ok,no)})}).then(function(b){M.buf=b;msync();}).catch(function(){});})();
+try{s=JSON.parse(localStorage.getItem('fpvsim_fpv_music')||'{}')}catch(e){}
+try{M.ctx=new AC()}catch(e){return}M.on=!(s.on===false||s.vol===0);M.vol=s.vol>0?+s.vol:0.5;M.mu=mu;window.__bootAudio=M;
+M.ctx.onstatechange=function(){sndUI();msync();};if(!seen&&M.on)mload();})();
+function mload(){if(M.ld||!M.ctx)return;M.ld=1;fetch(M.mu).then(function(r){return r.arrayBuffer()}).then(function(ab){return new Promise(function(ok,no){M.ctx.decodeAudioData(ab,ok,no)})}).then(function(b){M.buf=b;msync();}).catch(function(){});}
+function msave(){try{var s=JSON.parse(localStorage.getItem('fpvsim_fpv_music')||'{}');s.on=M.on;if(M.on&&!(s.vol>0))s.vol=M.vol;localStorage.setItem('fpvsim_fpv_music',JSON.stringify(s));}catch(e){}try{window.dispatchEvent(new Event('bootsound'))}catch(e){}}   // 게임의 음악 켬/끔과 같은 설정
 function unlock(cb){if(M.ctx&&M.ctx.state!=='running'){try{var p=M.ctx.resume();if(p&&p.then)p.then(function(){if(cb)cb()},function(){});}catch(e){}}else if(cb)cb();}
 function mstart(off){if(!M.buf||M.src||gone)return;var c=M.ctx,s=c.createBufferSource(),g=c.createGain();s.buffer=M.buf;g.gain.value=Math.min(1,M.vol*1.1);s.connect(g);g.connect(c.destination);s.start(0,Math.max(0,Math.min(off,M.buf.duration-0.1)));M.src=s;M.g=g;M.started=true;
 s.onended=function(){if(M.src!==s)return;M.src=null;M.done=true;try{window.dispatchEvent(new Event('bootcue'))}catch(e){}};}
 function mstop(sec){var s=M.src,g=M.g;if(!s)return;M.src=null;try{g.gain.setTargetAtTime(0,M.ctx.currentTime,sec/3);s.stop(M.ctx.currentTime+sec+0.1)}catch(e){}}
-function chime(){var c=M.ctx;if(!M.on||!c||c.state!=='running')return;var t=c.currentTime+0.06,o=c.createGain(),d=c.createDelay(1),fb=c.createGain(),lp=c.createBiquadFilter();o.gain.value=Math.min(1,M.vol*1.4);o.connect(c.destination);
+function chime(){var c=M.ctx;if(!M.on||!c||c.state!=='running'||M.chimed)return;M.chimed=1;var t=c.currentTime+0.06,o=c.createGain(),d=c.createDelay(1),fb=c.createGain(),lp=c.createBiquadFilter();o.gain.value=Math.min(1,M.vol*1.4);o.connect(c.destination);
 d.delayTime.value=0.13;fb.gain.value=0.3;lp.type='lowpass';lp.frequency.value=3200;o.connect(d);d.connect(lp);lp.connect(fb);fb.connect(d);lp.connect(c.destination);   // 또롱: 종 두 음 (D6 → A6) + 짧은 메아리, 소리 파일 없이 합성
 [[1174.66,0,1.5,0.5],[1760,0.17,2.3,0.55]].forEach(function(n){[[1,1],[2,0.3],[3.01,0.12],[4.17,0.05]].forEach(function(p){var os=c.createOscillator(),g=c.createGain(),a=t+n[1],e=a+n[2]/(p[0]>1?p[0]*0.7:1);os.type='sine';os.frequency.value=n[0]*p[0];
 g.gain.setValueAtTime(0.0001,a);g.gain.exponentialRampToValueAtTime(n[3]*p[1]*0.35,a+0.004);g.gain.exponentialRampToValueAtTime(0.0001,e);os.connect(g);g.connect(o);os.start(a);os.stop(e+0.05);});});}
-function msync(){if(!M.on||gone)return;if(M.ctx.state!=='running'){if(st==='intro'&&!seen&&M.buf!==null)snd.classList.remove('hidden');return;}
-snd.classList.add('hidden');if(!M.buf||M.src||M.done||M.started)return;if(st==='intro'&&/playing/.test(BT.className))mstart(v.currentTime+0.04);}
-snd.addEventListener('pointerdown',function(e){e.stopPropagation();});snd.addEventListener('click',function(e){e.stopPropagation();snd.classList.add('hidden');unlock(msync);});
+function sndUI(){if(!M.ctx||gone||!st||st==='gate'||seen){snd.classList.add('hidden');return;}var run=M.ctx.state==='running';snd.classList.remove('hidden');snd.classList.toggle('wait',M.on&&!run);
+snd.textContent=!M.on?L('🔇 소리 켜기','🔇 Sound on'):run?L('🔊 소리 끄기','🔊 Mute'):L('🔈 누르면 소리','🔈 Tap for sound');}
+function msync(){if(!M.ctx||!M.on||gone||M.ctx.state!=='running')return;if(st==='splash'&&!M.chimed)chime();if(!M.buf||M.src||M.done)return;
+if(st==='intro'&&/playing/.test(BT.className))mstart(v.currentTime+0.04);else if(st==='logo'&&!M.started)mstart(HIT-0.04);}   // 지금 화면에 맞는 소리: 로고 또롱 · 인트로 곡(영상 시점에 맞춰) · 로고 화면은 제목 화음부터
+function first(){if(M.ctx&&M.on&&M.ctx.state!=='running'){unlock(function(){sndUI();msync();});return true;}return false;}   // 브라우저가 소리를 막고 있으면 처음 누른 것은 '소리 켜기'로
+snd.addEventListener('pointerdown',function(e){e.stopPropagation();});
+snd.addEventListener('click',function(e){e.stopPropagation();if(M.on&&M.ctx.state==='running'){M.on=false;mstop(0.3);msave();sndUI();return;}M.on=true;M.started=false;msave();mload();unlock(function(){sndUI();msync();});sndUI();});
 // ---- 흐름: 입장 번호 → 인트로 → 로고(고르기) → 끝
 // ---- 영상 미리 받기: 페이지를 열자마자 영상 파일 전체를 받아 두고(입장 번호·로고 동안) 다 받은 뒤 재생 → 재생 중 끊김(버퍼링) 없음
 //  휴대폰 브라우저는 preload 를 무시하기도 해서 직접 받음(fetch → blob) · 못 받으면 예전처럼 브라우저가 스트리밍 · 서비스 워커가 캐시해 두 번째부터는 바로
@@ -469,20 +475,20 @@ var VB={ok:false,fail:false};function vstream(){if(VB.s)return;VB.s=1;try{v.prel
 if(!u||!window.fetch||!window.URL||!URL.createObjectURL){vstream();return;}VB.t0=Date.now();
 fetch(u).then(function(r){if(!r.ok)throw 0;return r.blob();}).then(function(b){VB.url=URL.createObjectURL(b);VB.ok=true;VB.ms=Date.now()-VB.t0;}).catch(function(){VB.fail=true;vstream();});})();
 window.__bootVideo=VB;
-function splash(){if(seen||!hasVid){startIntro();return;}st='splash';BT.classList.add('splash');chime();var s0=Date.now();
+function splash(){if(seen||!hasVid){startIntro();return;}st='splash';BT.classList.add('splash');chime();sndUI();var s0=Date.now();
 setTimeout(function go(){if(st!=='splash')return;if(!VB.ok&&!VB.fail&&v.readyState<4&&Date.now()-s0<20000){if(Date.now()-s0>2500)BT.classList.add('slow');setTimeout(go,120);return;}   // 다 받을 때까지 로고 (느린 망이면 불러오기 막대를 보여 주며 최대 20초, 그 뒤엔 받으면서 재생)
 if(VB.ok&&!VB.set){VB.set=1;v.src=VB.url;}else vstream();BT.classList.remove('splash');startIntro();},1300);}
-function startIntro(){st='intro';if(seen||!hasVid){toLogo();return;}
+function startIntro(){st='intro';sndUI();if(seen||!hasVid){toLogo();return;}
 try{var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){}
 var t1=Date.now();setTimeout(function wd(){if(st!=='intro'||/playing/.test(BT.className)||v.currentTime>0)return;if(v.readyState<3&&Date.now()-t1<9000){setTimeout(wd,400);return;}toLogo();},1500);msync();}   // 영상을 받는 중이면 9초까지 기다림 · 받았는데 안 나오면(저전력 모드 등) 바로 로고로
 function toLogo(){if(st==='logo'||gone)return;var shown=v.ended||v.currentTime>=4.55;st='logo';BT.classList.remove('splash');if(endImg){BT.style.backgroundImage='url('+endImg+')';BT.classList.add('still');}   // 로고 바탕은 늘 마지막 장면 (능선 전경)
-if(!shown)BT.classList.add('skip');BT.classList.add('logo');snd.classList.add('hidden');try{v.pause()}catch(e){}
-if(M.src&&!shown&&M.ctx.currentTime>0){mstop(0.12);M.started=false;mstart(HIT-0.04);}chk();}   // 건너뛰면 음악은 제목 화음부터
+if(!shown)BT.classList.add('skip');BT.classList.add('logo');try{v.pause()}catch(e){}
+if(M.src&&!shown&&M.ctx.currentTime>0){mstop(0.12);mstart(HIT-0.04);}sndUI();chk();}   // 건너뛰면 음악은 제목 화음부터
 function chk(){if(gone||st!=='logo'||!rd)return;if(seen||!hasVid){end();return;}pick();}
 function pick(){if(picked)return;picked=true;var ok=false;try{ok=!!(window.__bootPick&&window.__bootPick(pk,end));}catch(e){ok=false;}
 if(!ok){pk.innerHTML='';var b=document.createElement('button');b.className='primary';b.textContent=L('▶ 시작','▶ Start');b.onclick=end;pk.appendChild(b);}
 BT.classList.add('picking');pk.style.pointerEvents='none';setTimeout(function(){pk.style.pointerEvents='';},450);if(!touch)setTimeout(function(){var f=pk.querySelector('button');try{if(f)f.focus()}catch(e){}},80);}
-function end(){if(gone)return;gone=true;BT.classList.add('out');try{sessionStorage.setItem('fpvsim_boot','1')}catch(e){}if(M.on){unlock();mstop(1.4);}window.__bootDone=true;
+function end(){if(gone)return;gone=true;BT.classList.add('out');snd.classList.add('hidden');try{sessionStorage.setItem('fpvsim_boot','1')}catch(e){}if(M.on){unlock();mstop(1.4);}window.__bootDone=true;
 try{window.dispatchEvent(new Event('bootend'))}catch(e){}setTimeout(function(){if(BT.parentNode)BT.parentNode.removeChild(BT);try{v.pause();if(VB.url)URL.revokeObjectURL(VB.url);}catch(e){}},650);}
 window.__boot=set;window.__bootReady=function(){if(rd)return;rd=true;set(100,'READY');BT.classList.add('ready');chk();};
 if(seen)BT.classList.add('seen');
@@ -490,10 +496,10 @@ v.addEventListener('ended',toLogo);var ss=v.getElementsByTagName('source');if(ss
 v.addEventListener('error',function(){if(VB.set&&!VB.bad){VB.bad=1;try{v.removeAttribute('src');v.preload='auto';v.load();var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){toLogo();}return;}toLogo();});   // 받아 둔 파일을 못 틀면 예전처럼 스트리밍
 v.addEventListener('playing',function(){BT.classList.add('playing');msync();if(!v.__cap){v.__cap=1;setTimeout(function(){if(st==='intro')toLogo();},8000);}});
 setTimeout(function(){rd=true;chk();},45000);window.addEventListener('error',function(){rd=true;chk();});
-BT.addEventListener('pointerdown',function(e){if((st==='intro'||st==='splash')&&!(e.target.closest&&e.target.closest('#bootSnd'))){e.preventDefault();toLogo();}});
+BT.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#bootSnd,#bootPick button,#bootPad'))return;if(first())return;if(st==='intro'||st==='splash')toLogo();});
 window.addEventListener('keydown',function(e){if(gone)return;var k=e.key;
 if(st==='gate'){if(/^\d$/.test(k))gpress(k);else if(k==='Backspace')gpress('del');e.preventDefault();e.stopImmediatePropagation();return;}
-if(st==='intro'||st==='splash'){unlock();toLogo();e.preventDefault();}else if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();
+if(st==='intro'||st==='splash'){if(!first())toLogo();e.preventDefault();}else{first();if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();}
 if(st==='logo'&&/^Arrow/.test(k)){var bs=pk.getElementsByTagName('button'),c=[].indexOf.call(bs,document.activeElement),d=/Right|Down/.test(k)?1:-1;if(bs.length)try{bs[(c+d+bs.length)%bs.length].focus()}catch(x){}}
 e.stopImmediatePropagation();},true);
 if(needGate){st='gate';BT.classList.add('gating');}else splash();   // 입장 번호를 이미 넣은 기기는 인트로가 바로 (소리는 허락된 창이면 같이, 아니면 '소리 켜기')
