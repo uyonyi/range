@@ -5,7 +5,7 @@ const OUT = __dirname + '/fr/';
 const ONLY = process.env.SHOT ? process.env.SHOT.split(',') : null;
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const p = await b.newPage({ viewport: { width: 960, height: 540 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.setDefaultTimeout(300000); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('http://localhost:8768/index.html?test', { timeout: 120000 }); await p.waitForTimeout(8000);
   await p.evaluate(() => {
     const s = __sim; document.querySelector('#segMusic button[data-v="0"]').click(); s.SET.voice = false;
@@ -27,7 +27,7 @@ const ONLY = process.env.SHOT ? process.env.SHOT.split(',') : null;
   const shot = async (name, n, fn) => {
     if (ONLY && !ONLY.includes(name)) return;
     const dir = OUT + name + '/'; fs.mkdirSync(dir, { recursive: true });
-    for (let i = 0; i < n; i++) { await p.evaluate(fn, [i, n]); await p.screenshot({ path: dir + String(i).padStart(4, '0') + '.jpg', type: 'jpeg', quality: 93 }); }
+    for (let i = 0; i < n; i++) { await p.evaluate(fn, [i, n]); await p.screenshot({ path: dir + String(i).padStart(4, '0') + '.jpg', type: 'jpeg', quality: 93, timeout: 300000 }); }
     console.log(name, 'done', errs.slice(0, 2));
   };
   // ---- 1 계곡 전경: 앞으로 천천히 다가가며 내려옴 ----
