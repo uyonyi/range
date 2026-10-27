@@ -244,6 +244,7 @@ function replayKey(k) {
 }
 function toMenu() {
   S.state = 'menu'; S.kind = 'course'; S.tut = null; musicSetLevelPaused(false);
+  try { commReset(); } catch (e) { } try { if (typeof c1VoiceStop === 'function') c1VoiceStop(); } catch (e) { }   // 메뉴로 나가면 무전·시험장 안내를 바로 끊음 (밀린 것까지)
   ['pause', 'result'].forEach(k => ui[k].classList.add('hidden')); ui.hud.classList.add('hidden'); ui.menu.classList.remove('hidden');
   $('rp').classList.add('hidden'); $('tut').classList.add('hidden'); ui.hud.classList.remove('replaying');
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
