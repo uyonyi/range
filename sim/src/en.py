@@ -43,7 +43,7 @@ EN = {'확인·사진': 'Confirm/photo', '확인 · 사진 보고': 'Confirm · 
 '<b>오른쪽 스틱</b>↕ 전진·후진 · ↔ 좌우 이동': '<b>Right stick</b>↕ forward·back · ↔ sideways',
 'A 투하 · 사진 보고(산불·수색) · B 카메라 전환 · Y 다시 시작 · RT 투하 · LT 부스트(ATTI 모드는 없음) · LB/RB 카메라 · X 보조 켜기/끄기 · 십자키 ↑↓ 카메라 각도 · ← 아래 카메라 · START 일시정지 · 오른쪽 스틱 누르기 조명': 'A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause · R-stick click light',
 'RC 조종기 (USB 조이스틱 모드)': 'RC transmitter (USB joystick mode)',
-'조종기를 USB로 연결하고 조종기 설정에서 축(스로틀·요·피치·롤)과 버튼을 지정합니다. 스틱 반응은 옵션에서 실기체(선형)로 바꿀 수 있습니다.': 'Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options.', '메뉴에서는 D패드·스틱으로 이동, A 선택, B 뒤로, LB/RB 탭 전환.': 'In menus: D-pad/stick to move, A select, B back, LB/RB switch tabs.',
+'조종기를 USB로 연결하고 조종기 설정에서 축(스로틀·요·피치·롤)과 버튼을 지정합니다. 스틱 반응은 옵션에서 실기체(선형)로 바꿀 수 있습니다.': 'Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options.', '메뉴에서는 D패드·스틱으로 이동, A 선택, B 뒤로, LB/RB 탭 전환. 비행 중 왼쪽 스틱 누르기(LS) = 화면 표시 숨기기/보이기.': 'In menus: D-pad/stick to move, A select, B back, LB/RB switch tabs. In flight, click the left stick (LS) to hide/show the HUD.',
 '조종기 설정 열기': 'Open RC setup',
 '자세한 조작 방법': 'Full controls guide',
 '어떻게 비행할까요?': 'How do you want to fly?',

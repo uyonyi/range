@@ -135,7 +135,7 @@ body.touch .panel{touch-action:pan-y}
 #tbLight{width:46px;height:46px;font-size:18px;right:calc(350px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbLight.off{filter:grayscale(1);opacity:.5}
 #tbIR{width:46px;height:46px;font-size:12px;right:calc(294px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
-#tbZoom,#tbFull,#tbGuide{width:46px;height:46px;font-size:12px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
+#tbZoom,#tbFull,#tbGuide,#tbHud{width:46px;height:46px;font-size:12px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 body.touch #keys,body.touch #sticks,body.touch #list{display:none!important}
 body.touch #osd{font-size:14px;left:calc(10px + env(safe-area-inset-left));top:8px}body.touch #osd .big{font-size:19px}body.touch #osd b{width:40px}
 body.touch #objNext{font-size:13px;padding:5px 10px}body.touch #objMsg{font-size:20px}
@@ -356,7 +356,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
     <div class="tz" id="tzL"><div class="base"><div class="knob"></div></div><span class="lbl">↕ climb·descend ↔ yaw</span></div>
     <div class="tz" id="tzR"><div class="base"><div class="knob"></div></div><span class="lbl">↕ forward·back ↔ strafe</span></div>
     <div class="tb" id="tbDrop">DROP</div><div class="tb hidden" id="tbPhoto">📷</div><div class="tb" id="tbCam">CAM</div><div class="tb" id="tbReset">⟲</div>
-    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbLight">💡</div><div class="tb" id="tbIR">IR</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
+    <div class="tb" id="tbAssist">AST</div><div class="tb" id="tbZoom">ZM</div><div class="tb" id="tbGuide">GD</div><div class="tb" id="tbHud">UI</div><div class="tb" id="tbBoost">BST</div><div class="tb" id="tbBelly">↓CAM</div><div class="tb" id="tbLight">💡</div><div class="tb" id="tbIR">IR</div><div class="tb" id="tbFull">⛶</div><div class="tb" id="tbPause">❚❚</div>
   </div>
   <div id="tut" class="hidden"></div>
   <div id="rp" class="hidden"><button id="rpBack">⏪ 5s</button><button id="rpPlay">❚❚</button><button id="rpFwd">5s ⏩</button><input id="rpSeek" type="range" min="0" max="100" step="0.01"><span id="rpTime"></span><button id="rpSpd">×1</button><button id="rpCam">Camera</button><button id="rpVid">⬇ Save video</button><button id="rpClose">Close</button></div>
@@ -519,7 +519,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
       <div class="thumbs"><div><b>Left stick</b>↕ climb·descend · ↔ yaw (Mode 2)</div><div><b>Right stick</b>↕ forward·back · ↔ sideways</div></div>
       <div class="note">A drop · photo report (fire·SAR) · B camera · Y restart · RT drop · LT boost (none in ATTI) · LB/RB camera · X assist on/off · D-pad ↑↓ camera tilt · ← lower camera · START pause · R-stick click light</div>
       <h3>RC transmitter (USB joystick mode)</h3>
-      <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. In menus: D-pad/stick to move, A select, B back, LB/RB switch tabs. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
+      <div class="note">Connect the transmitter by USB and assign axes (throttle·yaw·pitch·roll) and buttons in RC setup. Set stick feel to Real (linear) in Options. In menus: D-pad/stick to move, A select, B back, LB/RB switch tabs. In flight, click the left stick (LS) to hide/show the HUD. <button id="bRC2" class="mini">Open RC setup</button> <span id="padStatus2"></span></div>
     </div>
     <div class="touchOnly">
       <h3>TOUCH CONTROLS</h3>
@@ -686,7 +686,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script>window.SIM_GEOTIFF_URL='../lib/geotiff.js';</script>
 <script src="../lib/proj4.js"></script>
 <script src="../sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='en';window.SIM_VR=true;window.SIM_BASE='../';window.SIM_TREES_V='789408ab';</script>
-<script src="js/app.en.js?v=08c282f9"></script>
+<script src="js/app.en.js?v=20781737"></script>
 <script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('../sw.js').catch(()=>{}));</script>
 </body>
 </html>

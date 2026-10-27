@@ -935,7 +935,7 @@ function frame(now, noRender) {
   if (o && o.kind === 'bunker') { o.hint = S.scanned ? o.hint2 : o.hint1; o.mk = S.scanned ? o.mk2 : o.mk1; }
   if (o) {
     if (o.hint) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); } }
-    marker.visible = !!o.mk && !searchIn(o, subj.p); if (marker.visible) { marker.position.copy(o.mk).add(new V3(0, Math.sin(S.simT * 3) * 0.15, 0)); marker.rotation.y += dt * 2; const d = camera.position.distanceTo(marker.position); const sc = Math.max(1, d / 22); marker.scale.set(sc, sc * 1.5, sc); }
+    marker.visible = !!o.mk && !searchIn(o, subj.p) && !((o.kind === 'ms' ? o.t === 'pass' : !!openingOf(o)) && o.mk.distanceTo(subj.p) < 35);   // 게이트·링이 눈앞에 보이면 마름모 표시는 숨김 if (marker.visible) { marker.position.copy(o.mk).add(new V3(0, Math.sin(S.simT * 3) * 0.15, 0)); marker.rotation.y += dt * 2; const d = camera.position.distanceTo(marker.position); const sc = Math.max(1, d / 22); marker.scale.set(sc, sc * 1.5, sc); }
   } else marker.visible = false;
   const subjPos = subj.p;
   const inB = S.state !== 'menu' && insideBunker(subjPos);
