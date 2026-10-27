@@ -352,6 +352,7 @@ addEventListener('pointerdown', () => { initAudio(); musicStart(); });
 // 휴대폰은 '누르는 순간'이 소리 허락으로 치지 않음 → 손을 뗄 때·클릭·키(이름 입력 중 타자 포함)에도 소리 장치를 깨우고 음악 시작
 ['pointerup', 'touchend', 'click', 'keydown'].forEach(ev => addEventListener(ev, () => { initAudio(); musicStart(); }, true));
 // 첫 화면: 인트로 음악이 끝나거나(로고 화면) 첫 화면이 걷히면 메뉴 음악
+addEventListener('bootsound', () => { const B = window.__bootAudio; if (!B) return; MUS.on = !!B.on; musicSetLevel(); try { syncSeg(); } catch (e) { } });   // 첫 화면의 소리 끄기/켜기 = 음악 켬/끔 설정
 { const bootMusic = () => { initAudio(); musicStart(); }; addEventListener('bootcue', bootMusic); addEventListener('bootend', bootMusic); if (window.__bootDone && window.__bootAudio) setTimeout(bootMusic, 0); }
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function getPad() {
