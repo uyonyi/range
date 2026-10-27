@@ -91,7 +91,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
-    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.webm', 'intro.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
@@ -185,7 +185,7 @@ def build_pages(outdir, site_ids, vr):
         rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
         flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';"
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
-        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
+        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
         t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv)
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')

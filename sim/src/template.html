@@ -392,7 +392,7 @@ body.touch #map{border-radius:9px}
 </style>
 </head>
 <body>
-<div id="boot" class="boot"><video id="bootVid" autoplay muted playsinline preload="auto" poster="{{BOOT}}lib/intro.jpg?v={{INTRO_V}}"><source src="{{BOOT}}lib/intro.mp4?v={{INTRO_V}}" type="video/mp4"></video><div class="bshade"></div>
+<div id="boot" class="boot"><video id="bootVid" autoplay muted playsinline preload="auto" poster="{{BOOT}}lib/intro.jpg?v={{INTRO_V}}"><source src="{{BOOT}}lib/intro.mp4?v={{INTRO_V}}" type="video/mp4"><source src="{{BOOT}}lib/intro.webm?v={{INTRO_V}}" type="video/webm"></video><div class="bshade"></div>
   <div class="btitle"><b>{{H1}}</b><span>실제 지형 드론 훈련 시뮬레이터</span></div>
   <div class="bfoot"><div class="bbar"><i id="bootBar"></i></div><div id="bootTxt" class="btxt">LOADING</div></div>
   <button id="bootSkip" class="bskip">건너뛰기 ▸</button><div class="battr">지형 © 국토지리정보원 · Copernicus DEM</div></div>
@@ -405,9 +405,9 @@ function chk(){if(rd&&(vd||(seen&&Date.now()-T0>900)))end();}
 function skip(){vd=true;B.classList.add('skip');try{v.pause()}catch(e){}chk();}
 window.__boot=set;window.__bootReady=function(){if(rd)return;rd=true;set(100,'READY');B.classList.add('ready');chk();setTimeout(chk,950);};
 if(seen)B.classList.add('seen');
-v.addEventListener('ended',function(){vd=true;chk();});v.addEventListener('error',function(){vd=true;B.classList.add('skip');chk();},true);
+v.addEventListener('ended',function(){vd=true;chk();});var fail=function(){vd=true;B.classList.add('skip');chk();},ss=v.getElementsByTagName('source');if(ss.length)ss[ss.length-1].addEventListener('error',fail);v.addEventListener('error',fail);
 v.addEventListener('playing',function(){B.classList.add('playing');});
-try{var pp=v.play();if(pp&&pp.catch)pp.catch(function(){vd=true;B.classList.add('skip');chk();});}catch(e){vd=true;}
+try{var pp=v.play();if(pp&&pp.catch)pp.catch(function(){});}catch(e){}setTimeout(function(){if(!/playing/.test(B.className))fail();},3500);
 setTimeout(function(){vd=true;B.classList.add('skip');chk();},9000);setTimeout(function(){rd=true;vd=true;chk();},45000);
 window.addEventListener('error',function(){rd=true;vd=true;chk();});
 B.addEventListener('pointerdown',function(e){e.preventDefault();skip();});document.addEventListener('keydown',function(){if(!gone)skip();});
