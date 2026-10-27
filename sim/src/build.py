@@ -9,7 +9,8 @@ from en import EN
 SIM_ROOT = os.environ.get('SIM_ROOT') or ('/home/claude/range/sim' if os.path.isdir('/home/claude/range/sim') else os.path.abspath('..'))   # 공개 사이트 폴더 (바닥 사진·정사영상 원본이 있는 곳) · CI 에서는 저장소의 sim/
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2m.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game3e.js', 'game4.js', 'game5.js', 'game6.js']
-LATE_FILES = ['game6t.js', 'game6p.js', 'game6w.js', 'game6b.js']   # 고급 나무 모형 (lib/trees.json · trees_atlas.webp, 없으면 기존 나무 그대로) · 송전선·전봇대 · 날씨 효과 · 건물 다듬기
+LATE_FILES = ['game6t.js', 'game6p.js', 'game6w.js', 'game6b.js', 'game6r.js']   # 고급 나무 모형 (lib/trees.json · trees_atlas.webp, 없으면 기존 나무 그대로) · 송전선·전봇대 · 날씨 효과 · 건물 다듬기 · 조종사 로그인·랭킹
+RANK_API = 'https://fpv-rank.unsokyi1.workers.dev'   # 조종사 로그인·점수·랭킹 서버 (server/worker.js · Cloudflare Worker + D1) · 공개판에만 넣음, 비우면 로그인·랭킹 없이 이름만
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
 TITLES = {
     'civil': {'TITLE': 'FPV Terrain Trainer · Civil', 'H1': 'FPV TERRAIN TRAINER',
@@ -183,7 +184,7 @@ def build_pages(outdir, site_ids, vr):
         tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
         mv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('music.json', 'music.mp3') if os.path.exists(f))).hexdigest()[:8]   # 배경음악 악기 묶음 버전
         rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
-        flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';"
+        flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';" + (f"window.SIM_API='{RANK_API}';" if RANK_API else '')
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
         iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
         t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv)

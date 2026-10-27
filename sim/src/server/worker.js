@@ -2,22 +2,25 @@
 //
 //  필요한 연결은 하나: D1 데이터베이스를 변수 이름 DB 로 바인딩 (표·비밀값은 처음 요청 때 스스로 만듦)
 //  웹(GitHub Pages)과 나중의 앱이 같은 주소를 씀 · 비밀번호(4자리)는 서버 비밀값으로 해시해 저장 · 5번 틀리면 10분 잠금
+//  로컬 시험: node server/dev.mjs (같은 코드를 node:sqlite 로 실행)
 //
-//  GET  /                       → 상태
-//  GET  /check?name=이름         → { ok, err?, taken }           (쓸 수 있는 이름인지)
-//  POST /register {name, pin}    → { ok, name, token }            (새 조종사)
-//  POST /login    {name, pin}    → { ok, name, token }
-//  POST /score    {token, kind, score, grade, time, diff, af} → { ok, best, rank }
-//  GET  /rank?kind=course&limit=50 → { ok, list: [{ name, score, grade, time, diff, af, at, runs }] }
-//  GET  /kinds                   → { ok, kinds: [{ kind, n }] }   (기록이 있는 코스·임무)
+//  GET  /                         → 상태
+//  GET  /check?name=이름           → { ok, err?, taken }           (쓸 수 있는 이름인지)
+//  POST /register {name, pin}      → { ok, name, token }            (새 조종사 · 같은 이름은 한 명만)
+//  POST /login    {name, pin}      → { ok, name, token }
+//  POST /score    {token, kind, score, grade, time, diff, af} → { ok, best, rank, n, score, time }
+//  POST /me       {token}          → { ok, name, best: [{ kind, score, grade, time, diff, af, at, runs, rank, n }] }
+//  POST /delete   {name, pin}      → { ok }                          (계정과 기록 지우기)
+//  GET  /rank?kind=…&limit=50      → { ok, kind, n, list: [{ name, score, grade, time, diff, af, at, runs }] }
+//  GET  /kinds                     → { ok, kinds: [{ kind, n }] }   (기록이 있는 코스·임무)
 
-const VER = 1;
+const VER = 2;
 
 // ---- 이름 검사 (웹 페이지와 같은 규칙: game6r.js) ----
 const BAD_KO = ['시발', '씨발', '씨바', '시바', '씨빨', '시빨', '쉬발', '쓰발', '씌발', '싸발', '좆', '좃', '씹', '존나', '졸라', '병신', '븅신', '빙신', '등신', '지랄', '염병', '옘병', '개새', '개색', '개섹', '개세', '새끼', '섀끼', '쌔끼', '새기', '미친놈', '미친년', '미친새', '닥쳐', '꺼져', '엠창', '애미', '니미', '느금', '니엄마', '니애미', '창녀', '걸레년', '보지', '자지', '섹스', '쎅스', '성교', '강간', '자위', '딸딸이', '야동', '쌍놈', '쌍년', '호로', '후장', '틀딱', '한남충', '김치녀', '된장녀', '맘충', '급식충', '메갈', '일베', '홍어', '짱깨', '쪽바리', '깜둥', '나치', '히틀러', '자살', '살인', '테러', '마약', '필로폰', '대마초', '도박'];
 const BAD_EN = ['fuck', 'fuk', 'fck', 'phuck', 'shit', 'bitch', 'bastard', 'asshole', 'dickhead', 'cunt', 'pussy', 'porn', 'rape', 'nigg', 'faggot', 'fagot', 'retard', 'slut', 'whore', 'nazi', 'hitler', 'cocksuck', 'motherf', 'jerkoff', 'wank', 'penis', 'vagina', 'boob', 'suicide', 'terror'];
 const RESERVED = ['admin', 'administrator', 'root', 'system', 'moderator', 'operator', 'staff', 'official', 'control', 'guest', 'null', 'undefined', 'test', '관리자', '운영자', '운영진', '시스템', '공식', '손님', '게스트', '컨트롤', '관제'];
-function nameNorm(s) { return String(s || '').normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim(); }
+function nameNorm(s) { return String(s || '').normalize('NFKC').replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim(); }
 function nameKey(s) { return nameNorm(s).toLowerCase().replace(/[\s_\-.]/g, ''); }   // 중복 확인용 (띄어쓰기·밑줄·대소문자 무시)
 function nameCheck(raw) {
   const name = nameNorm(raw), n = [...name].length;
@@ -28,7 +31,7 @@ function nameCheck(raw) {
   const en = name.toLowerCase().replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't').replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1');
   const en2 = name.toLowerCase().replace(/[^a-z]/g, '');
   if (BAD_KO.some(w => ko.includes(w)) || BAD_EN.some(w => en.includes(w.replace(/(.)\1+/g, '$1')) || en2.includes(w))) return { ok: false, err: 'word' };
-  const k = nameKey(name); if (RESERVED.some(w => k === w || k.startsWith(w) && w.length >= 4)) return { ok: false, err: 'reserved' };
+  const k = nameKey(name); if (RESERVED.some(w => /[가-힣]/.test(w) ? k.includes(w) : k === w || k.startsWith(w) && w.length >= 4)) return { ok: false, err: 'reserved' };   // 한글 예약어는 어디에 있어도 · 영어는 앞부분
   return { ok: true, name, key: k };
 }
 
@@ -53,10 +56,32 @@ async function setup(db) {
   if (!row) { await db.prepare("INSERT OR IGNORE INTO meta (k, v) VALUES ('secret', ?1)").bind(rnd(32)).run(); row = await db.prepare("SELECT v FROM meta WHERE k = 'secret'").first(); }
   READY = { secret: row.v }; return READY;
 }
-async function tokenFor(secret, key) { const p = b64u(enc(JSON.stringify({ k: key, t: Date.now() }))); return p + '.' + await hmac(secret, p); }
-async function tokenKey(secret, tok) {
+// 로그인 표: 이름 키 + 계정 만든 시각(c) → 계정을 지우고 같은 이름으로 새로 만들면 옛 표는 못 씀
+async function tokenFor(secret, key, created) { const p = b64u(enc(JSON.stringify({ k: key, c: created, t: Date.now() }))); return p + '.' + await hmac(secret, p); }
+async function tokenOf(secret, tok) {
   const [p, s] = String(tok || '').split('.'); if (!p || !s || !same(s, await hmac(secret, p))) return null;
-  try { const o = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); return Date.now() - o.t < 400 * 864e5 ? o.k : null; } catch (e) { return null; }
+  try { const o = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); return Date.now() - o.t < 400 * 864e5 ? o : null; } catch (e) { return null; }
+}
+async function player(db, secret, tok) {   // 표 → 조종사 (없거나 지워진 계정이면 null)
+  const o = await tokenOf(secret, tok); if (!o) return null;
+  const p = await db.prepare('SELECT nkey, name, created FROM players WHERE nkey = ?1').bind(o.k).first();
+  return p && p.created === o.c ? p : null;
+}
+async function auth(db, secret, name, pin) {   // 이름 + 비밀번호 확인 (5번 틀리면 10분 잠금)
+  const key = nameKey(name), p = await db.prepare('SELECT * FROM players WHERE nkey = ?1').bind(key).first();
+  if (!p) return { err: { ok: false, err: 'no_user' } };
+  const now = Date.now(); if (p.lock_until > now) return { err: { ok: false, err: 'locked', wait: Math.ceil((p.lock_until - now) / 1000) } };
+  if (!same(await hmac(secret, p.salt + ':' + String(pin || '')), p.hash)) {
+    const f = p.fails + 1; await db.prepare('UPDATE players SET fails = ?2, lock_until = ?3 WHERE nkey = ?1').bind(key, f >= 5 ? 0 : f, f >= 5 ? now + 10 * 60e3 : 0).run();
+    return { err: { ok: false, err: f >= 5 ? 'locked' : 'wrong', left: Math.max(0, 5 - f), wait: f >= 5 ? 600 : 0 } };
+  }
+  if (p.fails) await db.prepare('UPDATE players SET fails = 0, lock_until = 0 WHERE nkey = ?1').bind(key).run();
+  return { p, key };
+}
+async function place(db, kind, score, time) {   // 순위(1부터) · 그 판의 전체 인원
+  const r = await db.prepare('SELECT COUNT(*) AS n FROM best WHERE kind = ?1 AND (score > ?2 OR (score = ?2 AND time < ?3))').bind(kind, score, time).first();
+  const t = await db.prepare('SELECT COUNT(*) AS n FROM best WHERE kind = ?1').bind(kind).first();
+  return { rank: (r ? r.n : 0) + 1, n: t ? t.n : 0 };
 }
 
 export default {
@@ -76,26 +101,24 @@ export default {
       if (path === '/register') {
         const c = nameCheck(body.name); if (!c.ok) return J(c, 200, cors);
         if (!/^\d{4}$/.test(String(body.pin || ''))) return J({ ok: false, err: 'pin' }, 200, cors);
-        const salt = rnd(12), hash = await hmac(secret, salt + ':' + body.pin);
-        const r = await db.prepare('INSERT OR IGNORE INTO players (nkey, name, salt, hash, created) VALUES (?1, ?2, ?3, ?4, ?5)').bind(c.key, c.name, salt, hash, Date.now()).run();
-        if (!r.meta || !r.meta.changes) return J({ ok: false, err: 'taken' }, 200, cors);
-        return J({ ok: true, name: c.name, token: await tokenFor(secret, c.key) }, 200, cors);
+        const salt = rnd(12), hash = await hmac(secret, salt + ':' + body.pin), now = Date.now();
+        await db.prepare('INSERT OR IGNORE INTO players (nkey, name, salt, hash, created) VALUES (?1, ?2, ?3, ?4, ?5)').bind(c.key, c.name, salt, hash, now).run();
+        const row = await db.prepare('SELECT salt, created FROM players WHERE nkey = ?1').bind(c.key).first();
+        if (!row || row.salt !== salt) return J({ ok: false, err: 'taken' }, 200, cors);   // 같은 이름(띄어쓰기·대소문자 무시)이 이미 있음
+        return J({ ok: true, name: c.name, token: await tokenFor(secret, c.key, row.created) }, 200, cors);
       }
       if (path === '/login') {
-        const key = nameKey(body.name), p = await db.prepare('SELECT * FROM players WHERE nkey = ?1').bind(key).first();
-        if (!p) return J({ ok: false, err: 'no_user' }, 200, cors);
-        const now = Date.now(); if (p.lock_until > now) return J({ ok: false, err: 'locked', wait: Math.ceil((p.lock_until - now) / 1000) }, 200, cors);
-        if (!same(await hmac(secret, p.salt + ':' + String(body.pin || '')), p.hash)) {
-          const f = p.fails + 1; await db.prepare('UPDATE players SET fails = ?2, lock_until = ?3 WHERE nkey = ?1').bind(key, f >= 5 ? 0 : f, f >= 5 ? now + 10 * 60e3 : 0).run();
-          return J({ ok: false, err: f >= 5 ? 'locked' : 'wrong', left: Math.max(0, 5 - f), wait: f >= 5 ? 600 : 0 }, 200, cors);
-        }
-        if (p.fails) await db.prepare('UPDATE players SET fails = 0, lock_until = 0 WHERE nkey = ?1').bind(key).run();
-        return J({ ok: true, name: p.name, token: await tokenFor(secret, key) }, 200, cors);
+        const a = await auth(db, secret, body.name, body.pin); if (a.err) return J(a.err, 200, cors);
+        return J({ ok: true, name: a.p.name, token: await tokenFor(secret, a.key, a.p.created) }, 200, cors);
+      }
+      if (path === '/delete') {
+        const a = await auth(db, secret, body.name, body.pin); if (a.err) return J(a.err, 200, cors);
+        await db.batch([db.prepare('DELETE FROM best WHERE nkey = ?1').bind(a.key), db.prepare('DELETE FROM players WHERE nkey = ?1').bind(a.key)]);
+        return J({ ok: true }, 200, cors);
       }
       if (path === '/score') {
-        const key = await tokenKey(secret, body.token); if (!key) return J({ ok: false, err: 'token' }, 200, cors);
-        const p = await db.prepare('SELECT name FROM players WHERE nkey = ?1').bind(key).first(); if (!p) return J({ ok: false, err: 'no_user' }, 200, cors);
-        const kind = String(body.kind || ''), score = Math.round(+body.score), time = +body.time;
+        const p = await player(db, secret, body.token); if (!p) return J({ ok: false, err: 'token' }, 200, cors);
+        const key = p.nkey, kind = String(body.kind || ''), score = Math.round(+body.score), time = +body.time;
         if (!/^[a-z0-9_]{2,20}$/.test(kind) || !(score >= 0 && score <= 100) || !(time > 0 && time < 7200)) return J({ ok: false, err: 'bad' }, 200, cors);
         const grade = String(body.grade || '').slice(0, 2), diff = String(body.diff || '').replace(/[^a-z]/g, '').slice(0, 8), af = String(body.af || '').replace(/[^a-z0-9]/g, '').slice(0, 8), now = Date.now();
         const old = await db.prepare('SELECT score, time FROM best WHERE nkey = ?1 AND kind = ?2').bind(key, kind).first();
@@ -104,13 +127,19 @@ export default {
         else if (better) await db.prepare('UPDATE best SET score = ?3, grade = ?4, time = ?5, diff = ?6, af = ?7, at = ?8, runs = runs + 1, name = ?9 WHERE nkey = ?1 AND kind = ?2').bind(key, kind, score, grade, time, diff, af, now, p.name).run();
         else await db.prepare('UPDATE best SET runs = runs + 1 WHERE nkey = ?1 AND kind = ?2').bind(key, kind).run();
         const b = await db.prepare('SELECT score, time FROM best WHERE nkey = ?1 AND kind = ?2').bind(key, kind).first();
-        const r = await db.prepare('SELECT COUNT(*) AS n FROM best WHERE kind = ?1 AND (score > ?2 OR (score = ?2 AND time < ?3))').bind(kind, b.score, b.time).first();
-        return J({ ok: true, best: better, rank: (r ? r.n : 0) + 1 }, 200, cors);
+        return J(Object.assign({ ok: true, best: better, score: b.score, time: b.time }, await place(db, kind, b.score, b.time)), 200, cors);
+      }
+      if (path === '/me') {
+        const p = await player(db, secret, body.token); if (!p) return J({ ok: false, err: 'token' }, 200, cors);
+        const L = (await db.prepare('SELECT kind, score, grade, time, diff, af, at, runs FROM best WHERE nkey = ?1').bind(p.nkey).all()).results || [];
+        for (const b of L) Object.assign(b, await place(db, b.kind, b.score, b.time));
+        return J({ ok: true, name: p.name, best: L }, 200, cors);
       }
       if (path === '/rank') {
         const kind = String(url.searchParams.get('kind') || 'course'), lim = Math.max(1, Math.min(100, +url.searchParams.get('limit') || 50));
         const L = await db.prepare('SELECT name, score, grade, time, diff, af, at, runs FROM best WHERE kind = ?1 ORDER BY score DESC, time ASC LIMIT ?2').bind(kind, lim).all();
-        return J({ ok: true, kind, list: L.results || [] }, 200, cors);
+        const t = await db.prepare('SELECT COUNT(*) AS n FROM best WHERE kind = ?1').bind(kind).first();
+        return J({ ok: true, kind, n: t ? t.n : 0, list: L.results || [] }, 200, cors);
       }
       if (path === '/kinds') {
         const L = await db.prepare('SELECT kind, COUNT(*) AS n FROM best GROUP BY kind ORDER BY n DESC').all();

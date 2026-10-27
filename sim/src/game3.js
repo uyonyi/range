@@ -845,6 +845,7 @@ function handleKeys() {
     if (k === 'KeyT') { irCycle(); continue; }
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }
+    if ((S.state === 'menu' || S.state === 'result') && typeof rkModal === 'function' && rkModal()) continue;   // 로그인·랭킹 창 (game6r.js)
     if (S.state === 'menu') {
       if (k === 'Escape') { if (!closePanels() && MENU.step > 1) wizGo(MENU.step - 1); continue; }
       if (['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel'].some(p => !$(p).classList.contains('hidden'))) continue;

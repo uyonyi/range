@@ -597,6 +597,7 @@ function debriefShow(ok, n, par) {
     if (!tips.length) tips.push(R.g === 'S' ? L2('깔끔한 비행 — 다음 난이도나 바람 설정으로 올려보기', 'Clean flight — try the next difficulty or add wind') : L2('큰 실수 없음 — 같은 임무를 한 번 더 하며 기준 시간을 당겨보기', 'No major errors — fly it again and chase the par time'));
     h = `<h4>${L2('다음에는', 'NEXT TIME')}</h4>` + tips.slice(0, 3).map(x => `<div class="ln"><span>• ${x}</span></div>`).join('') + h; }
   const d = $('resDebrief'); if (d) d.innerHTML = h;
+  try { if (typeof rkSubmit === 'function') rkSubmit(R); } catch (e) { }
 }
 // ---- 항공(UAS)식 계기: 피치 사다리 · 속도/고도 테이프 · HSI(방위 원판 + 목표 방위 바늘 + 바람) ----
 function hudMode() { const m = SET.hud || 'auto'; return m === 'auto' ? (AFc().cls === 'wing' ? 'uas' : 'fpv') : m; }
@@ -2059,7 +2060,9 @@ try { SET.pilot = localStorage.getItem('fpvsim_pilot') || ''; } catch (e) { SET.
 function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
 function wizGo(n) {
   n = Math.max(HAS_INTRO ? 0 : 1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
-  if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16); SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
+  if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16), bad = typeof pilotNameBad === 'function' ? pilotNameBad(v) : '';
+    if (bad) { const h = document.querySelector('#menuCard .s1 .wzhint'); if (h) { if (!h.dataset.t) h.dataset.t = h.textContent; h.textContent = bad; h.classList.add('bad'); } try { $('pilotName').focus(); } catch (e) { } return; }
+    SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
   MENU.step = n; c.dataset.step = n; closePanels(); setTimeout(msGoFSync, 0);
   if (n === 1) { const i = $('pilotName'); i.value = SET.pilot || ''; pilotSetUI(); if (!IS_TOUCH) setTimeout(() => { try { i.focus(); i.select(); } catch (e) { } }, 30); }
   if (n === 2) { afUI(); }
@@ -2070,7 +2073,8 @@ function wizGo(n) {
   try { window.dispatchEvent(new Event('resize')); } catch (e) { }
   if (ui.menu) ui.menu.scrollTop = 0;
 }
-if ($('pilotName')) { $('pilotName').value = SET.pilot || ''; $('pilotName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wizGo(2); } }); }
+if ($('pilotName')) { $('pilotName').value = SET.pilot || ''; $('pilotName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); wizGo(2); } });
+  $('pilotName').addEventListener('input', () => { const h = document.querySelector('#menuCard .s1 .wzhint'); if (h && h.dataset.t) { h.textContent = h.dataset.t; h.classList.remove('bad'); } }); }
 [['wz1Next', 2], ['wz2Back', 1], ['wz2Next', 3], ['wz3Back', 2]].forEach(([id, n]) => { if ($(id)) $(id).onclick = () => wizGo(n); });
 if ($('bOpt')) $('bOpt').onclick = () => openPanel('optPanel');
 if ($('bCtl')) $('bCtl').onclick = () => { openPanel('ctlPanel'); try { kbHelp(); } catch (e) { } };
@@ -2295,7 +2299,7 @@ function menuRenderPost() {
 }
 document.addEventListener('keydown', e => {
   if (S.state !== 'menu' || ui.menu.classList.contains('hidden') || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) return;
-  if (MENU.step !== 3 || ['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel', 'optPanel', 'ctlPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
+  if (MENU.step !== 3 || ['setPanel', 'recPanel', 'helpPanel', 'tutMenu', 'kbPanel', 'credPanel', 'optPanel', 'ctlPanel', 'acctPanel', 'rankPanel'].some(p => $(p) && !$(p).classList.contains('hidden'))) return;
   // 좌우: 같은 종류 안에서 · 위아래: 종류 바꾸기
   if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { const gi = MS_GRP.indexOf(MENU.g || 'basic'), d = e.code === 'ArrowUp' ? -1 : 1; menuTab(MS_GRP[(gi + d + MS_GRP.length) % MS_GRP.length]); e.preventDefault(); return; }
   const L = msInGrp(MENU.g || 'basic'), i = L.indexOf(MENU.ms), d = e.code === 'ArrowLeft' ? -1 : 1;
