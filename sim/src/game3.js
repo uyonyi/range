@@ -658,6 +658,7 @@ function drawMapBg() {
     for (const rd of O.roads) { g.strokeStyle = rd.w >= 6 ? 'rgba(235,225,200,.8)' : 'rgba(210,200,175,.6)'; g.lineWidth = rd.w >= 6 ? 1.6 : 1; g.beginPath(); rd.p.forEach(([x, z], i) => { const q = mxy(-z, x); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
     for (const [x, z, k] of O.blds) { const q = mxy(-z, x); g.fillStyle = k === 'gh' ? 'rgba(230,240,245,.85)' : k === 'shop' ? '#e0a040' : '#d8d0c0'; g.fillRect(q[0] - 1, q[1] - 1, 2, 2); }
   }
+  if (window.__POWER) window.__POWER.mapDraw(g, mxy);   // 송전선
   // 비행 구역 경계 (점선 원)
   { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
 }
@@ -954,7 +955,7 @@ function frame(now, noRender) {
   const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt); try { TREES3.tick(now / 1000); } catch (e) { }
+  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt); try { TREES3.tick(now / 1000); } catch (e) { } if (window.__POWER) window.__POWER.tick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   audioUpdate(demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, subj.v ? subj.v.length() : 0, (S.state === 'run' && !tutHold && !(DR.landed && IN.thr <= 0.05)) || S.state === 'demo' || (S.state === 'replay' && RP.playing));
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
