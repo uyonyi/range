@@ -28,6 +28,9 @@ window.addEventListener('error',function(e){show((e.message||'error')+(e.filenam
 .boot .battr{position:absolute;left:12px;bottom:8px;font:10px system-ui,sans-serif;color:rgba(255,255,255,.45)}
 .boot .bgate{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,88vw);padding:18px 18px 12px;text-align:center;cursor:default;background:rgba(10,14,18,.86);border:1px solid rgba(255,255,255,.14);border-top:3px solid #ffc828;border-radius:4px}.boot.gating .bgate{display:block}.boot.gating .btitle{display:none}
 .boot .bgate b{display:block;font:700 22px "SF Mono",Menlo,monospace;letter-spacing:.08em;color:#fff}.boot .bgate small{display:block;margin-top:4px;font-size:13px;color:#9aa6ad}.boot .bgate .pindots{margin:14px 0 16px}.boot .bgate .bmsg{min-height:17px;margin:8px 0 0;font-size:12.5px;color:#ff6a5a}
+.boot .btap{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;color:#fff;pointer-events:none;text-shadow:0 2px 12px rgba(0,0,0,.6)}.boot.tapping .btap{display:block;animation:bpIn .5s ease both}.boot.tapping .bskip{display:none}
+.boot .btap i{display:flex;align-items:center;justify-content:center;width:84px;height:84px;margin:0 auto 12px;padding-left:6px;box-sizing:border-box;border-radius:50%;background:rgba(255,200,40,.94);color:#111;font:700 34px/1 system-ui,sans-serif;font-style:normal;text-shadow:none;animation:btPulse 1.8s ease-out infinite}.boot .btap b{display:block;font:700 18px system-ui,sans-serif;letter-spacing:.06em}.boot .btap small{display:block;margin-top:5px;font-size:12.5px;color:rgba(255,255,255,.8)}
+@keyframes btPulse{0%{box-shadow:0 0 0 0 rgba(255,200,40,.55)}100%{box-shadow:0 0 0 24px rgba(255,200,40,0)}}
 .boot .bpick{display:none;position:absolute;left:50%;top:58%;transform:translateX(-50%);gap:10px;flex-wrap:wrap;justify-content:center;width:min(780px,94vw)}.boot.picking .bpick{display:flex;animation:bpIn .5s ease both}
 .boot .bpick button{margin:0;min-width:190px;padding:12px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(8,12,16,.62);color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}.boot .bpick button:hover,.boot .bpick button:focus-visible{border-color:#ffc828;outline:none}
 .boot .bpick button.primary{background:#ffc828;color:#111;border-color:#ffc828}.boot .bpick button small{display:block;margin-top:2px;font-size:11.5px;font-weight:600;opacity:.75}
@@ -408,6 +411,7 @@ body.touch #map{border-radius:9px}
 <div id="boot" class="boot" data-music="../lib/intro.mp3?v=b474538a"><video id="bootVid" muted playsinline preload="auto" poster="../lib/intro.jpg?v=b474538a" data-end="../lib/intro_end.jpg?v=b474538a"><source src="../lib/intro.mp4?v=b474538a" type="video/mp4"><source src="../lib/intro.webm?v=b474538a" type="video/webm"></video><div class="bshade"></div>
   <div class="btitle"><b>FPV TERRAIN TRAINER</b><span>실제 지형 드론 훈련 시뮬레이터</span></div>
   <div id="bootGate" class="bgate"><b>FPV</b><small id="bootGateT"></small><div id="bootDots" class="pindots"><i></i><i></i><i></i><i></i></div><div id="bootPad" class="pinpad"><button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button><button>8</button><button>9</button><span></span><button>0</button><button data-k="del">⌫</button></div><p id="bootMsg" class="bmsg"></p></div>
+  <div id="bootTap" class="btap"><i>▶</i><b id="bootTapB"></b><small id="bootTapS"></small></div>
   <div id="bootPick" class="bpick"></div>
   <div class="bfoot"><div class="bbar"><i id="bootBar"></i></div><div id="bootTxt" class="btxt">LOADING</div></div>
   <button id="bootSnd" class="bsnd hidden"></button><button id="bootSkip" class="bskip">건너뛰기 ▸</button><div class="battr">지형 © 국토지리정보원 · Copernicus DEM</div></div>
@@ -440,7 +444,7 @@ if(ST(mid,GM,GN)===GF){try{localStorage.setItem(GK,mid)}catch(e){}try{sessionSto
 gw++;var wt=gw>=5?Math.min(30,5*(gw-4)):0;glock=Date.now()+wt*1000;msg.textContent=wt?L('번호가 맞지 않습니다 · '+wt+'초 뒤 다시','Wrong code · retry in '+wt+'s'):L('번호가 맞지 않습니다','Wrong code');
 dots.className='pindots';void dots.offsetWidth;dots.className='pindots bad';setTimeout(function(){gv='';gdraw();},350);}
 var pb=$('bootPad').getElementsByTagName('button');for(var i=0;i<pb.length;i++)pb[i].addEventListener('click',function(e){e.stopPropagation();gpress(this.getAttribute('data-k')||this.textContent);});
-$('bootGateT').textContent=L('입장 번호 4자리','Enter the 4-digit code');snd.textContent=L('🔇 소리 켜기','🔇 Sound on');
+$('bootGateT').textContent=L('입장 번호 4자리','Enter the 4-digit code');$('bootTapB').textContent=L('눌러서 시작','Tap to start');$('bootTapS').textContent=L('🔊 소리와 함께','🔊 with sound');snd.textContent=L('🔇 소리 켜기','🔇 Sound on');
 // ---- 인트로 음악 (lib/intro.mp3 · 영상에 박을 맞춘 곡): 소리가 허락되면(입장 번호를 누른 뒤 · 설치한 앱) 영상과 같이, 아니면 '소리 켜기' 로 그 시점부터 · 음악을 끈 사람은 없음
 //  같은 소리 장치를 게임이 이어 씀(window.__bootAudio) → 첫 화면 음악도 다시 허락받지 않고 바로
 var M={on:false,done:false};
@@ -475,11 +479,15 @@ v.addEventListener('playing',function(){BT.classList.add('playing');msync();if(!
 setTimeout(function(){rd=true;chk();},45000);window.addEventListener('error',function(){rd=true;chk();});
 BT.addEventListener('pointerdown',function(e){if(st==='intro'&&!(e.target.closest&&e.target.closest('#bootSnd'))){e.preventDefault();toLogo();}});
 window.addEventListener('keydown',function(e){if(gone)return;var k=e.key;
+if(st==='tap'){tapGo();e.preventDefault();e.stopImmediatePropagation();return;}
 if(st==='gate'){if(/^\d$/.test(k))gpress(k);else if(k==='Backspace')gpress('del');e.preventDefault();e.stopImmediatePropagation();return;}
 if(st==='intro'){unlock();toLogo();e.preventDefault();}else if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();
 if(st==='logo'&&/^Arrow/.test(k)){var bs=pk.getElementsByTagName('button'),c=[].indexOf.call(bs,document.activeElement),d=/Right|Down/.test(k)?1:-1;if(bs.length)try{bs[(c+d+bs.length)%bs.length].focus()}catch(x){}}
 e.stopImmediatePropagation();},true);
-if(needGate){st='gate';BT.classList.add('gating');}else startIntro();
+function tapGo(){if(st!=='tap')return;st='';BT.classList.remove('tapping');unlock();startIntro();}
+function begin(){if(M.on&&!seen&&M.ctx&&M.ctx.state!=='running'){st='tap';BT.classList.add('tapping');}else startIntro();}   // 소리는 사람이 누른 뒤에만 나므로: 입장 번호를 이미 넣은 기기는 '눌러서 시작' 한 번 → 인트로가 늘 음악과 함께
+BT.addEventListener('click',function(e){if(st==='tap'){e.preventDefault();tapGo();}});
+if(needGate){st='gate';BT.classList.add('gating');}else setTimeout(begin,150);   // 소리가 이미 허락된 창(설치한 앱 등)인지 잠깐 보고
 if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
