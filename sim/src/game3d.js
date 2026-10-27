@@ -133,30 +133,60 @@ function guideChevrons(curve, L, col, sp, wing) {
   }
   m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
 }
-function hideGuide() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
-// 다음 목표 방향 표시: 화면 안이면 목표 아래에 거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 (VR·1종 제외)
+function hideGuide() { BEACON.g.visible = false; GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+// ---- 지상 목표 찾기 (정찰·산불·수색·활주로·패드): 목표에 하늘로 솟은 빛기둥 + 바닥 고리 · 멀리서도 보임 ----
+const TGT_STYLE = { recon: [0x4fe3ff, 'RECON', '정찰'], fire: [0xff8a2a, 'FIRE', '산불'], sarfind: [0x5dff9a, 'SAR', '수색'], sarkit: [0x5dff9a, 'DROP', '투하'], rwyland: [0xffd23a, 'RWY', '활주로'], land: [0xffd23a, 'PAD', '패드'], padland: [0xffd23a, 'PAD', '패드'] };   // 타격·차량 추적은 빛기둥 없음 (기만체·은밀 추적이 쉬워지지 않게)
+function tgtStyle(o) { const st = (o && TGT_STYLE[o.t]) || (o && o.kind === 'drop' ? [0xffc828, 'DROP', '투하'] : o && o.kind === 'land' ? [0xffd23a, 'PAD', '패드'] : null); return st; }
+const BEACON = (function () {
+  const g = new THREE.Group(); g.visible = false; scene.add(g);
+  const col = { value: new THREE.Color(0x4fe3ff) }, fade = { value: 1 }, tm = { value: 0 };
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true).translate(0, 0.5, 0), new THREE.ShaderMaterial({ uniforms: { uC: col, uF: fade, uT: tm }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+    vertexShader: 'varying vec2 vU; varying vec3 vN, vV; void main() { vU = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 uC; uniform float uF, uT; varying vec2 vU; varying vec3 vN, vV; void main() { float rim = 1.0 - abs(dot(normalize(vN), normalize(vV))); float a = (0.25 + 0.75 * pow(1.0 - rim, 1.5)) * pow(1.0 - vU.y, 1.4); a *= 0.85 + 0.15 * sin(vU.y * 40.0 - uT * 6.0); gl_FragColor = vec4(uC * a * uF * 0.9, 1.0); }' }));
+  beam.renderOrder = 9; beam.frustumCulled = false; g.add(beam);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+  ring.renderOrder = 9; g.add(ring);
+  return { g, beam, ring, col, fade, tm };
+})();
+function beaconUpdate(o, subj) {
+  const st = tgtStyle(o), B = BEACON;
+  if (!st || !o.mk || S.state !== 'run' || (typeof isC1 === 'function' && isC1())) { B.g.visible = false; return; }
+  const x = o.mk.x, z = o.mk.z, gy = groundAt(x, z), d = Math.hypot(subj.p.x - x, subj.p.z - z), r = o.search ? o.search.r : o.t === 'rwyland' ? 12 : 8;
+  B.g.visible = true; B.g.position.set(x, gy, z); B.col.value.setHex(st[0]); B.ring.material.color.setHex(st[0]);
+  const w = clamp(d * 0.012, 1.2, 9);   // 멀수록 굵게 (화면에서 비슷한 두께)
+  B.beam.scale.set(w, clamp(60 + d * 0.08, 60, 160), w); B.ring.scale.set(r, 1, r); B.ring.position.y = 0.4;
+  B.fade.value = clamp((d - 25) / 60, 0, 1) * (ENV.ir ? 0.6 : 1);   // 가까우면 빛기둥은 사라지고 바닥 고리만
+  B.ring.material.opacity = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(S.simT * 4)); B.tm.value = S.simT;
+}
+// 다음 목표 방향 표시: 화면 안이면 목표 위에 ◇ + 이름·거리, 화면 밖이면 가장자리에 그쪽을 가리키는 화살표 + 거리 + 돌 방향 (VR·1종 제외)
 const _nv = new V3();
-function navArrow(tgt, subj) {
-  let el = $('navArrow'); if (!el) { el = document.createElement('div'); el.id = 'navArrow'; el.innerHTML = '<i>➤</i><b></b>'; document.body.appendChild(el); }
+function navArrow(tgt, subj, o) {
+  let el = $('navArrow'); if (!el) { el = document.createElement('div'); el.id = 'navArrow'; el.innerHTML = '<i>➤</i><b></b><em></em>'; document.body.appendChild(el); }
   if (!tgt || XR_ON || S.state !== 'run') { el.classList.add('hidden'); return; }
   const dist = tgt.distanceTo(subj.p); if (dist < 4) { el.classList.add('hidden'); return; }
+  const st = tgtStyle(o), en = window.SIM_LANG === 'en', hd = subj.h != null ? subj.h : DR.h, dx = tgt.x - subj.p.x, dz = tgt.z - subj.p.z;
+  let turn = Math.atan2(dx * Math.cos(hd) + dz * Math.sin(hd), dx * Math.sin(hd) - dz * Math.cos(hd)) / DEG;   // 오른쪽 + · 왼쪽 −
+  const tt = Math.abs(turn) < 10 ? (en ? 'ahead ▲' : '정면 ▲') : turn > 0 ? `${Math.round(turn)}° ▶` : `◀ ${Math.round(-turn)}°`;
+  el.style.setProperty('--nc', st ? '#' + st[0].toString(16).padStart(6, '0') : '#ffc828');
+  const em = el.lastChild, lab = (st ? (en ? st[1] : st[2]) + ' · ' : '') + tt; if (em.textContent !== lab) em.textContent = lab;
   _nv.copy(tgt).project(camera); const behind = _nv.z > 1;
   let x = _nv.x, y = _nv.y; if (behind) { x = -x; y = -y; }
   const W = innerWidth, H = innerHeight, mx = 0.80, my = 0.74;   // 가장자리 여백 (계기·목록 피함)
   const inside = !behind && Math.abs(x) < mx && Math.abs(y) < my;
   let sx, sy, rot;
-  if (inside) { sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H + 34; rot = 90; }   // 목표 아래쪽에 ▼ + 거리
+  if (inside) { sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = 0; }   // 목표 자리에 ◇ + 거리
   else { const k = Math.max(Math.hypot(x / mx, y / my), 1e-6); x /= k; y /= k; /* 타원 가장자리: 모서리의 계기·목록을 피함 */ sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = Math.atan2(-(y), x) / Math.PI * 180; }
   el.classList.remove('hidden'); el.classList.toggle('edge', !inside);
   el.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%,-50%)`;
-  el.firstChild.style.transform = `rotate(${rot.toFixed(0)}deg)`;
-  const txt = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist.toFixed(0) + ' m'; if (el.lastChild.textContent !== txt) el.lastChild.textContent = txt;
+  el.firstChild.style.transform = inside ? '' : `rotate(${rot.toFixed(0)}deg)`; const ic = inside ? '◇' : '➤'; if (el.firstChild.textContent !== ic) el.firstChild.textContent = ic;
+  const txt = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist.toFixed(0) + ' m', bd = el.children[1]; if (bd.textContent !== txt) bd.textContent = txt;
 }
 function updateGuide(subj) {
   const active = S.state === 'run' && DR.alive && !(S.tut && S.tut.st !== 'fly');
   const o = active ? curObj() : null;
   GUIDE.next = null;
   if (!o || (typeof isC1 === 'function' && isC1())) { hideGuide(); return; }
+  beaconUpdate(o, subj);
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
     hideGuide(); if (!SET.guide) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
@@ -164,7 +194,7 @@ function updateGuide(subj) {
   // 수색 구역(산불·실종자) 안: 경로 띠는 끄되 안내는 끊지 않음 — 구역 중심 화살표 + 할 일·고도 안내
   if (o.kind === 'ms' && searchIn(o, subj.p)) {
     GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;
-    navArrow(o.mk, subj);
+    navArrow(o.mk, subj, o);
     if (!SET.guide) { $('guide').classList.add('hidden'); return; }
     const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
     const en = window.SIM_LANG === 'en';
@@ -180,8 +210,8 @@ function updateGuide(subj) {
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
   GUIDE.next = pts[1];
-  navArrow(o.mk || pts[pts.length - 1], subj);
-  if (!SET.guide) { hideGuide(); return; }
+  navArrow(o.mk || pts[pts.length - 1], subj, o);
+  if (!SET.guide) { const keep = BEACON.g.visible; hideGuide(); BEACON.g.visible = keep; return; }
   // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
   { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
     const to = pts[1].clone().sub(pts[0]); to.y = 0; const dist = to.length(); if (dist > 0.5) to.divideScalar(dist);

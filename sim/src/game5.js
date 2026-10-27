@@ -321,8 +321,9 @@ function lostDrone(why) {
   if (S.kind === 'strike') showMsg(why === 'stk' ? 'HIT' : 'MISS · 기체 손실', '#ff6060', 1.6);
   else { showMsg(a.kam ? 'DETONATED · 기체 손실' : 'CRASH · 기체 손실', '#ff5050', 1.6); if (S.kind === 'race' || S.kind === 'forest' || S.kind === 'recon') S.pen += 10; }
   droneM.g.visible = false;
-  if (isMission() && !(a.kam && S.kind === 'strike')) comm(`${CS}, CONTROL, we lost your feed. Relaunching from the start point.`, '영상 끊김 · 출발점에서 재발진');
-  else if (a.kam && S.kind === 'strike') comm('Miss, no effect on target. Next drone is up.', '빗나감 · 다음 기체 발진');
+  if (isMission() && !(a.kam && S.kind === 'strike')) comm(`${CS}, CONTROL, we lost your feed. Relaunching from the start point.`, '영상 끊김 · 출발점에서 재발진', 'CONTROL', 'lost', true);
+  else if (a.kam && S.kind === 'strike') comm('Miss, no effect on target. Next drone is up.', '빗나감 · 다음 기체 발진', 'CONTROL', 'lost', true);
+  else commInterrupt();   // 무전이 남아 있으면 끊음
 }
 function deadTick(dt) { S.deadT -= dt; if (S.deadT <= 0) { respawn(); } }
 
@@ -778,13 +779,13 @@ function msFinish() {
 }
 function msOsd() {
   const o = msObj(), a = AFc(); let h = '';
-  if (a.cls === 'wing') h += `<div><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼ · ' + L2('기수 내리고 스로틀', 'nose down, power') + '</div>' : S.stallWarn ? '<div style="color:#ffb030">' + L2('실속 주의 · 속도', 'STALL WARNING · speed') + '</div>' : '');
+  if (a.cls === 'wing') h += `<div class="x"><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼ · ' + L2('기수 내리고 스로틀', 'nose down, power') + '</div>' : S.stallWarn ? '<div style="color:#ffb030">' + L2('실속 주의 · 속도', 'STALL WARNING · speed') + '</div>' : '');
   if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
-  else if (isMission()) h += `<div><b>HIT</b>${S.impacts}</div>`;
+  else if (isMission()) h += `<div class="x"><b>HIT</b>${S.impacts}</div>`;
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
-  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? '<div style="color:#9aa6ad">열화상(T)으로 확인</div>' : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : '열화상 끔 · T'}</div>`;
+  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? '<div class="x" style="color:#9aa6ad">열화상(T)으로 확인</div>' : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : '열화상 끔 · T'}</div>`;
   h += scenOsd(o);
-  if (o && o.t === 'recon') h += `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('건물 포착 · SPACE/📷 보고', 'TARGET · SPACE/📷 to report') : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
+  if (o && o.t === 'recon') h += `<div${o.inView ? '' : ' class="x"'} style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('건물 포착 · SPACE/📷 보고', 'TARGET · SPACE/📷 to report') : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
   return h;
 }
 function msListHTML() {
@@ -841,6 +842,20 @@ const STARS = (function () {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
   const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe6ff, size: 2, sizeAttenuation: false, fog: false })); m.visible = false; scene.add(m); return m;
 })();
+// 열화상 하늘: 맑은 하늘은 아주 차가워 위쪽이 검고, 지평선 쪽은 대기 온도라 회색
+const IR_BG = {};
+function irBg(n) { const k = n ? 'n' : 'd'; if (IR_BG[k]) return IR_BG[k]; const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256), h = n ? '#666666' : '#7a7a7a';
+  gr.addColorStop(0, n ? '#050505' : '#151515'); gr.addColorStop(0.5, n ? '#161616' : '#2c2c2c'); gr.addColorStop(0.72, h); gr.addColorStop(1, h); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return (IR_BG[k] = t); }
+// 열상 잡티(감지기 잡음): 화면 위 아주 옅은 알갱이 · 매 프레임 위치를 바꿔 지글거림
+function irGrain(on) {
+  let el = $('irGrain'); if (!on) { if (el) el.style.display = 'none'; return; }
+  if (!el) { el = document.createElement('div'); el.id = 'irGrain'; const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), d = g.createImageData(128, 128);
+    for (let i = 0; i < d.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } g.putImageData(d, 0, 0);
+    el.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.13;mix-blend-mode:overlay;background:url(${c.toDataURL()});background-size:128px 128px;image-rendering:pixelated`;
+    const cv = document.getElementById('c'); cv && cv.parentNode ? cv.parentNode.insertBefore(el, cv.nextSibling) : document.body.appendChild(el);
+    (function jig() { if (el.style.display !== 'none') el.style.backgroundPosition = `${(Math.random() * 128) | 0}px ${(Math.random() * 128) | 0}px`; requestAnimationFrame(jig); })(); }
+  el.style.display = XR_ON ? 'none' : '';
+}
 function envHemi() { return ENV.ir ? 0.55 : ENV.night ? 0.3 : 0.5; }
 function envApply() {
   const n = ENV.night, ir = ENV.ir, dk = ENV.dusk && !n, wx = ENV.wx || 'clear', wet = wx !== 'clear';
@@ -849,37 +864,54 @@ function envApply() {
   if (typeof c1Sun === 'function' && typeof isC1 === 'function' && isC1() && S.state !== 'menu') c1Sun();   // 1종: 시험 시각의 해 위치
   sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? 0.85 : DAY0.sun * (wet ? 0.45 : 1); sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
   hemi.color.copy(n ? new THREE.Color(0x4a5f8a) : dk ? new THREE.Color(0x9a7a8e) : wet ? new THREE.Color(0xb9c2cc) : DAY0.hs); hemi.groundColor.copy(n ? new THREE.Color(0x0c0c10) : dk ? new THREE.Color(0x3a2a20) : DAY0.hg);
-  const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? (n ? 0x0b0b0b : 0x2a2a2a) : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;
-  sky.visible = bg === null; scene.background = bg === null ? null : bg === 'dusk' ? (wet ? DUSK_WET_BG : DUSK_BG) : new THREE.Color(bg);
+  const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? 'ir' : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;
+  sky.visible = bg === null; scene.background = bg === null ? null : bg === 'ir' ? irBg(n) : bg === 'dusk' ? (wet ? DUSK_WET_BG : DUSK_BG) : new THREE.Color(bg);
   // 안개 색은 하늘보다 어둡게: 먼 산이 밝은 띠(눈 덮인 산처럼)로 뜨지 않고 어두운 능선 실루엣으로 겹쳐 보이게
-  const fogC = bg === null ? DAY0.fog : bg === 'dusk' ? (wet ? 0x4f4a4e : 0x6a5662) : wx === 'rain' && !n && !ir ? 0x737b82 : bg;
-  scene.fog.color.copy(fogC instanceof THREE.Color ? fogC : new THREE.Color(fogC));
-  scene.fog.near = n ? 60 : wet ? 15 : dk ? 60 : DAY0.fn; scene.fog.far = n ? (wet ? 600 : 1100) : wx === 'snow' ? 330 : wx === 'rain' ? (dk ? 420 : 480) : dk ? 1300 : DAY0.ff;
+  const fogC = ir ? null : bg === null ? DAY0.fog : bg === 'dusk' ? (wet ? 0x4f4a4e : 0x6a5662) : wx === 'rain' && !n && !ir ? 0x737b82 : bg;   // 열화상: 먼 곳은 대기 온도(중간 회색)로 수렴
+  if (ir) scene.fog.color.setRGB(n ? 0.4 : 0.48, n ? 0.4 : 0.48, n ? 0.4 : 0.48);   // 열화상: 먼 곳은 대기 온도(중간 회색)로 수렴 (안개는 화면 값 그대로 섞임)
+  else scene.fog.color.copy(fogC instanceof THREE.Color ? fogC : new THREE.Color(fogC));
+  scene.fog.near = ir ? 80 : n ? 60 : wet ? 15 : dk ? 60 : DAY0.fn; scene.fog.far = ir ? (wet ? 700 : 1700) : n ? (wet ? 600 : 1100) : wx === 'snow' ? 330 : wx === 'rain' ? (dk ? 420 : 480) : dk ? 1300 : DAY0.ff;
   wxSetup();
   STARS.visible = n && !ir;
   spot.distance = n ? 45 : 14; spot.angle = n ? 0.6 : 0.7;
   // 밤: 게이트·링은 LED 테두리처럼 빛나게
   const glow = n && !ir; if (FLANE) FLANE.gateM.emissive.set(glow ? 0x803000 : 0x000000); RACE.forEach(r => r.mesh.material.emissive.set(glow ? 0x664400 : 0x332200));
   groundMat.emissive.set(ir ? (n ? 0x262626 : 0x484848) : 0x000000);
-  renderer.domElement.style.filter = ir ? 'grayscale(1) contrast(1.35) brightness(1.2)' : '';
-  $('irTag') && $('irTag').classList.toggle('hidden', !ir);
+  renderer.domElement.style.filter = ir ? 'grayscale(1) contrast(1.12) brightness(1.04) blur(0.35px)' + (ENV.irBH ? ' invert(1)' : '') : '';   // 열상 카메라: 해상도가 낮아 조금 흐림 · 흑색 고온은 반전
+  if ($('irTag')) { $('irTag').classList.toggle('hidden', !ir); $('irTag').textContent = 'IR · ' + (ENV.irBH ? 'BLACK-HOT' : 'WHITE-HOT'); }
+  irGrain(ir);
 }
 // 열화상: 재질을 열 세기(회색)로 바꿈. 사진 바닥은 그대로 (흑백이 되면 맨땅=밝고 숲=어두움)
 const IR_MAT = new Map(), IR_ORIG = new Map();
 function irMat(m, heat, ib) {
   const k = m.uuid + ':' + heat + ':' + ENV.night + ':' + ib; if (IR_MAT.has(k)) return IR_MAT.get(k);
+  // 열화상은 빛이 아니라 '스스로 내는 열'로 보임: 밝기 = 물체 온도(자체 발광) + 해가 데운 면 약간(낮) · 조명(드론 등·밤)에는 거의 안 바뀜
   const c = m.color ? m.color : new THREE.Color(0.5, 0.5, 0.5), l = (0.3 * c.r + 0.59 * c.g + 0.11 * c.b);
-  const base = (ib !== undefined ? ib : clamp(0.28 + l * 0.3, 0.2, 0.55)) * (ENV.night ? 0.55 : 1), amb = ENV.night ? 0.05 : 0.1, e = Math.min(1, heat + amb);
-  const nm = new THREE.MeshLambertMaterial({ color: new THREE.Color(base, base, base), emissive: new THREE.Color(e, e, e), vertexColors: !!m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite });
+  //  (값은 선형 · 톤매핑 전: 0.1 ≈ 화면 35%, 0.2 ≈ 53%, 0.8 ≈ 86%)
+  const env = ib !== undefined ? ib : clamp(0.28 + l * 0.3, 0.2, 0.55), e = (ENV.night ? 0.05 + env * 0.38 : 0.045 + env * 0.42) + heat * 1.2, sh = ENV.night ? 0.03 : 0.1;
+  const nm = new THREE.MeshLambertMaterial({ color: new THREE.Color(sh, sh, sh), emissive: new THREE.Color(e, e, e), vertexColors: !!m.vertexColors, side: m.side, transparent: m.transparent, opacity: m.opacity, depthWrite: m.depthWrite });
   IR_MAT.set(k, nm); return nm;
 }
+// 땅(사진 바닥): 사진 밝기를 지표 온도처럼 — 낮엔 맨땅·길이 뜨겁고 숲이 시원(대비 큼), 밤엔 대비가 줄고 전체가 중간 회색
+const IR_GND = new Map();
+function irGround(m) {
+  const k = m.uuid + ':' + !!ENV.night; if (IR_GND.has(k)) return IR_GND.get(k);
+  const base = ENV.night ? 0.07 : 0.05, gain = ENV.night ? 0.25 : 0.6, nm = new THREE.MeshBasicMaterial({ map: m.map, vertexColors: false, fog: true });
+  nm.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    { float lu = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); diffuseColor.rgb = vec3(${base.toFixed(3)} + lu * ${gain.toFixed(3)}); }`); };
+  nm.toneMapped = true;
+  nm.customProgramCacheKey = () => 'irg' + base; IR_GND.set(k, nm); return nm;
+}
+// 백색 고온(WHITE-HOT) → 흑색 고온(BLACK-HOT) → 끔 (T · IR 버튼)
+function irCycle() { if (!ENV.ir) { ENV.irBH = false; irSet(true); } else if (!ENV.irBH) { ENV.irBH = true; envApply(); showMsg('THERMAL · ' + L2('흑색=고온', 'BLACK-HOT'), '#ffffff', 1); } else { ENV.irBH = false; irSet(false); } }
 function irSet(on) {
   const was = ENV.ir; ENV.ir = on; envApply(); if (was === on) return;
   scene.traverse(o => {
     if (!o.isMesh || o === sky) return;
     if (o.userData.irOnly) { o.visible = on; return; }
     if (on) {
-      const m = o.material; if (Array.isArray(m) || !m || m.isMeshBasicMaterial || m.isShaderMaterial || m.map) return;
+      const m = o.material; if (m && (m === groundMat || (m.userData && m.userData.terrain))) { IR_ORIG.set(o, m); o.material = irGround(m); return; }
+      if (Array.isArray(m) || !m || m.isMeshBasicMaterial || m.isShaderMaterial || m.map) return;
       IR_ORIG.set(o, m); o.material = irMat(m, o.userData.heat || 0, o.userData.irBase);
     } else if (IR_ORIG.has(o)) o.material = IR_ORIG.get(o);
   });
@@ -1043,7 +1075,7 @@ function windAt(p) {
 function windOsd(p) {
   if ((!WIND.lv && !wxFxOn()) || !TER.h) return '';
   const w = windAt(p), sp = Math.hypot(w.x, w.z), rel = wrapA(Math.atan2(w.x, -w.z) - DR.h);
-  return `<div><b>WIND</b>${sp.toFixed(1)} m/s <span style="display:inline-block;transform:rotate(${(rel / DEG).toFixed(0)}deg)">↑</span></div>`;
+  return `<div class="x"><b>WIND</b>${sp.toFixed(1)} m/s <span style="display:inline-block;transform:rotate(${(rel / DEG).toFixed(0)}deg)">↑</span></div>`;
 }
 document.querySelectorAll('#segWind button').forEach(b => b.addEventListener('click', () => { SET.wind = +b.dataset.v; WIND.lv = SET.wind; saveSet(); syncWind(); }));
 function syncWind() { document.querySelectorAll('#segWind button').forEach(x => x.classList.toggle('on', +x.dataset.v === (SET.wind || 0))); }
@@ -1566,10 +1598,19 @@ function squelch(open) {
   const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = open ? 1300 : 900; g.gain.setValueAtTime(0.03, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08); o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + 0.1);
 }
 // en: 영어 교신, ko: 한국어 자막 (한국어 화면에서만)
-function comm(en, ko, from, tag) {
+// pri: 급한 무전(추락·기체 손실 등) — 말하던 것을 끊고 밀린 무전을 버린 뒤 바로 · 밀린 무전은 10초 넘으면 버림 (늦게 나와 상황과 어긋나지 않게)
+function comm(en, ko, from, tag, pri) {
   if (S.state !== 'run' && S.state !== 'result') return;
   if (tag) COMM.q = COMM.q.filter(m => m.tag !== tag);   // 같은 종류(코스 안내)는 최신 것만
-  COMM.q.push({ en, ko, from: from || 'CONTROL', tag }); if (COMM.q.length > 6) COMM.q.shift();
+  const m = { en, ko, from: from || 'CONTROL', tag, t: S.simT || 0, pri: !!pri };
+  if (pri) { commInterrupt(); COMM.q = COMM.q.filter(x => x.pri); COMM.q.push(m); return; }
+  COMM.q.push(m); if (COMM.q.length > 4) COMM.q.splice(COMM.q.findIndex(x => !x.pri), 1);
+}
+function commInterrupt() {   // 지금 나가는 무전을 끊음
+  COMM.cur = (COMM.cur || 0) + 1; COMM.sp = false; COMM.busy = 0; radioT = Math.min(radioT, 0.3);
+  try { if (COMM.src) COMM.src.stop(); } catch (e) { } COMM.src = null;
+  try { if (window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); } catch (e) { }
+  try { commStatic(false); } catch (e) { } if (MUS.bus && AU.ctx) musicSetLevel();
 }
 // 코스 음성 안내: 과제를 마칠 때마다 다음 과제를 불러 줌 (슬라럼 같은 연속 과제는 처음·끝만)
 function courseCallSay(l) { return String(l).replace(/360°/g, 'three sixty').replace(/H-PAD/g, 'H pad').replace(/\s*·\s*/g, ', ').replace(/\s*\(([^)]*)\)/g, ', $1').replace(/\bLOW\b/g, 'Low').replace(/\b([A-Z])([A-Z]{3,})\b/g, (m, a, b) => a + b.toLowerCase()).replace(/(\d+)\/(\d+)/g, '$1 of $2'); }
@@ -1700,6 +1741,8 @@ function commTick(dt) {
   if (!COMM.sp) COMM.busy -= dt; radioT -= dt;
   if (radioT <= 0 && !COMM.sp) { const el = $('radio'); if (el) el.classList.remove('show'); }
   if (COMM.busy > 0 || !COMM.q.length) return;
+  while (COMM.q.length && !COMM.q[0].pri && (S.simT || 0) - COMM.q[0].t > 10) COMM.q.shift();   // 너무 늦은 무전은 버림
+  if (!COMM.q.length) return;
   const m = COMM.q.shift(), el = $('radio'); if (!el) return;
   el.innerHTML = `<div class="rf">📻 ${m.from}</div><div class="re">${m.en}</div>` + (window.SIM_LANG !== 'en' && m.ko ? `<div class="rk">${m.ko}</div>` : '');
   if (m.from === 'CONTROL' && !/missed/i.test(m.en)) ORDER.m = { en: m.en, ko: m.ko, t: S.t };   // 마지막 명령은 화면에 남김
@@ -2208,7 +2251,7 @@ VRS.onBeforeRender = () => { XR.headP.copy(camera.position); XR.headQ.copy(camer
 VRS.onAfterRender = () => { if (XR.camP) { camera.position.copy(XR.camP); camera.quaternion.copy(XR.camQ); camera.updateMatrixWorld(); } };
 function vrApplyCam() { S.cam = CAMS.indexOf(SET.vrCam === 'chase' ? 'CHASE' : 'FPV'); }
 function vrEnv(v) {
-  if (v === 'ir') { irSet(!ENV.ir); return; }
+  if (v === 'ir') { irCycle(); return; }
   setTod(v === 'night' ? 'night' : v === 'dusk' ? 'dusk' : 'day');
 }
 function voiceInfo() {
@@ -2307,7 +2350,7 @@ function xrInput(dt) {
   if (B) vrMenuOpen();
   if (Y) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 카메라 ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 카메라 끔', 'Lower camera off'), '#ffc828', 1); }
   if (LS) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
-  if (RS) irSet(!ENV.ir);
+  if (RS) irCycle();
   if (X) pressed.push('KeyL');   // 조명 켜기/끄기
 }
 // 머리 방향 모드: 고개를 돌린 쪽으로 기체가 돌고, 왼쪽 스틱 앞뒤 = 속도, 고개를 들거나 숙이면 그쪽으로 오르내림

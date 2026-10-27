@@ -697,6 +697,8 @@ function drawMap(gpos) {
     g.fillStyle = '#ffc828'; g.fillText(String(i + 1), p[0] - 3, p[1] + 4); }); }
   if (o && o.mk && o.search && S.kind === 'sar') { const p = mxy(...toDS(o.mk)); g.font = '700 10px monospace'; g.fillStyle = '#ffc828'; g.fillText('SAR', p[0] - 9, p[1] + 4); }
   else if (o && o.mk && !o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
+  // 지금 목표까지 점선 (지상 목표 찾기)
+  if (o && o.mk && S.state === 'run' && S.state !== 'demo') { const a = mxy(...toDS(DR.p)), b = mxy(...toDS(o.mk)); g.save(); g.setLineDash([4, 3]); g.lineWidth = 1.6; g.strokeStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.moveTo(clamp(a[0], 2, 178), clamp(a[1], 2, 298)); g.lineTo(clamp(b[0], 2, 178), clamp(b[1], 2, 298)); g.stroke(); g.restore(); }
   if (gpos) { const [d, s] = toDS(gpos); const p = mxy(d, s); g.fillStyle = '#4fe3ff'; g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fill(); }
   if (S.state !== 'demo') {
     const src = S.state === 'replay' ? RP.pose : DR;
@@ -783,9 +785,9 @@ function updateHUD(dt, subj) {
   const sIn = searchIn(o, subj.p), dist = o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : o.mk.distanceTo(subj.p)) : null;
   const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : (S.kind === 'course' || isMission()) ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
   ui.osd.innerHTML = `<div class="big">${fmt(tm)}${(S.kind === 'course' || isMission()) && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
-    `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span style="color:#9aa6ad;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
+    `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span class="x" style="color:#8fa0a9;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
     (dist !== null ? `<div><b>${o.search ? 'AREA' : 'DIST'}</b>${dist.toFixed(0)} m</div>` : sIn ? `<div style="color:#ffc828">${L2x('수색 구역 안', 'IN SEARCH AREA')}</div>` : '') +
-    (S.kind === 'course' ? `<div><b>HIT</b>${S.impacts}</div>` : '') +
+    (S.kind === 'course' ? `<div class="x"><b>HIT</b>${S.impacts}</div>` : '') +
     (o && o.kind === 'orbit' ? `<div style="color:#4fe3ff">ORBIT ${Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0)}%</div>` : '') +
     (S.state === 'run' && (isMission() || AFc().cls === 'wing') ? msOsd() : '') + (S.state === 'run' ? windOsd(subj.p) : '') +
     (S.boosting ? '<div style="color:#ff9a40">BOOST ▲▲</div>' : '') +
@@ -837,7 +839,7 @@ function handleKeys() {
     if (S.brief && (k === 'Enter' || k === 'Space' || k === 'PadA' || (k === 'KeyQ' && typeof isC1 === 'function' && isC1()))) { if (BRIEF_GO) BRIEF_GO(); continue; }
     if (k === 'KeyF') { toggleFull(); continue; }
     if (k === KB.boost) { boostToggle(); continue; }
-    if (k === 'KeyT') { irSet(!ENV.ir); continue; }
+    if (k === 'KeyT') { irCycle(); continue; }
     if (k === 'KeyB') { MUS.on = !MUS.on; musicSetLevel(); saveMusic(); syncSeg(); if (S.state !== 'menu') showMsg(MUS.on ? 'MUSIC ON' : 'MUSIC OFF', '#fff', 0.8); continue; }
     if (S.state === 'replay') { replayKey(k.replace(/^(MV_|X_)/, '')); continue; }
     if (S.state === 'menu') {
@@ -942,7 +944,7 @@ function frame(now, noRender) {
   const inB = S.state !== 'menu' && insideBunker(subjPos);
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;
   hemi.intensity = lerp(hemi.intensity, inB ? 0.04 : envHemi(), 1 - Math.exp(-dt * 5));
-  spot.intensity = lerp(spot.intensity, (lightOn() || inB || nearB) && S.state !== 'menu' && !(typeof isC1 === 'function' && isC1() && !ENV.night) ? 4.5 : 0, 1 - Math.exp(-dt * 8));
+  spot.intensity = lerp(spot.intensity, (lightOn() || inB || nearB) && S.state !== 'menu' && !ENV.ir && !(typeof isC1 === 'function' && isC1() && !ENV.night) ? 4.5 : 0, 1 - Math.exp(-dt * 8));   // 열화상에는 조명이 안 보임
   { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);

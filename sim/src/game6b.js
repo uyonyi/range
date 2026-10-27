@@ -105,7 +105,7 @@ const BLD3 = (function buildings3() {
     const WALLS = [0xf3efe6, 0xe8e2d4, 0xeeeae2, 0xdcd6c8], ROOFS = [0x3f6fa8, 0xa8483f, 0x4f7a4a, 0x6c6f72, 0x2f5a8a];
     VEC.bld.forEach(([d, s, w, l, ang, h], i) => {
       const c0 = W(d, s, 0), a = ang * DEG, ca = Math.cos(a), sa = Math.sin(a); let lo = 1e9, hi = -1e9;
-      for (const [u, v] of [[-w / 2, -l / 2], [w / 2, -l / 2], [w / 2, l / 2], [-w / 2, l / 2]]) { const dd = d + u * ca - v * sa, ss = s + u * sa + v * ca, y = terrainAt(ss, -dd); lo = Math.min(lo, y); hi = Math.max(hi, y); }
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) { const u = (i / 4 - 0.5) * w, v = (j / 4 - 0.5) * l, dd = d + u * ca - v * sa, ss = s + u * sa + v * ca, y = terrainAt(ss, -dd); lo = Math.min(lo, y); hi = Math.max(hi, y); }   // 바닥 전체(5×5 점)에서 가장 낮은·높은 땅
       const area = w * l, kind = h >= 6.5 ? 'block' : area > 260 ? 'barn' : 'house', H = (kind === 'block' ? h : Math.min(h, kind === 'barn' ? 5 : 3.2)) + (hi - lo), seed = (i * 0.618) % 1;
       const wall = kind === 'barn' ? [0xc5ccd2, 0xd8d4c8, 0xa9b6c2][i % 3] : WALLS[i % 4], roof = kind === 'block' ? 0xb0aca4 : kind === 'barn' ? [0x5b7fa6, 0x8a8f96, 0x9a5a48][i % 3] : ROOFS[i % 5];
       // 몸 회전: 원래 상자와 같게 (rotation.y = π/2 − a, 크기 w×l)
@@ -118,6 +118,9 @@ const BLD3 = (function buildings3() {
   if (typeof OUTER !== 'undefined' && OUTER && OUTER.B && OUTER.BM) {
     const WALL = [0xf1ede4, 0xe6dfcf, 0xf4f2ec, 0xdcd3bf], ROOF = [0x3f6fa8, 0xa8483f, 0x4f7a4a, 0x5b5f66, 0x2f5a8a];
     OUTER.B.forEach((b, k) => { if (b.kind === 'gh') return; const cc = Math.sin(k * 12.9898) * 43758.5453, rr = cc - Math.floor(cc);
+      // 바닥 전체에서 땅 높이를 재서: 낮은 쪽은 기초가 드러나게, 높은 쪽 바닥 위로 벽 높이를 줌 (비탈에서 위쪽이 묻히지 않게) · 충돌 상자도 같이
+      { const c = Math.cos(b.yaw), sn = Math.sin(b.yaw); let lo = 1e9, hi = -1e9; for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) { const u = (i / 4 - 0.5) * b.w, v = (j / 4 - 0.5) * b.l, g = groundAt(b.x + u * c + v * sn, b.z - u * sn + v * c); lo = Math.min(lo, g); hi = Math.max(hi, g); }
+        const top = Math.max(b.y + b.h, hi + b.h); b.y = Math.min(b.y, lo - 0.3); b.h = top - b.y; }
       const kind = b.kind === 'shop' ? 'shop' : b.kind === 'barn' ? 'barn' : 'house';
       building(kind, b.x, b.z, b.y, b.y + b.h + 0.3, b.w, b.l, b.yaw, kind === 'barn' ? 0xb8c0c8 : WALL[(rr * 4) | 0], kind === 'barn' ? 0x8a8f96 : kind === 'shop' ? 0xa8a49c : ROOF[(rr * 5) | 0], rr); nOut++; });
     [OUTER.BM.bodies, OUTER.BM.roofs].forEach(m => { if (m) m.visible = false; });
@@ -177,7 +180,7 @@ const BLD3 = (function buildings3() {
   function tick(dt) {
     const n = ENV.night ? 1 : ENV.dusk ? 0.35 : 0;
     if (n !== lastN) { lastN = n; MATS.forEach(m => m.emissiveIntensity = n); if (LAMP) { LAMP.hm.material.emissiveIntensity = n ? 1.6 : 0; LAMP.pm.visible = n > 0.5 && !ENV.ir; } }
-    if (ENV.ir !== lastIr) { lastIr = ENV.ir; if (LAMP) LAMP.pm.visible = lastN > 0.5 && !ENV.ir; MESH.forEach(me => { if (ENV.ir) { ORIG.set(me, me.material); me.material = irMat(plain, me.userData.heat || 0, undefined); } else if (ORIG.has(me)) me.material = ORIG.get(me); }); }
+    if (ENV.ir !== lastIr) { lastIr = ENV.ir; if (LAMP) LAMP.pm.visible = lastN > 0.5 && !ENV.ir; MESH.forEach(me => { if (ENV.ir) { ORIG.set(me, me.material); me.material = irMat(plain, (me.userData.heat || 0) * (ENV.night ? 0.6 : 0.2), 0.3); } else if (ORIG.has(me)) me.material = ORIG.get(me); }); }
     if (MAST) MAST.lamp.visible = (performance.now() % 1500) < 750;
   }
   return { G, nIn, nOut, MAST, tick, FAC, LIST, DASH, LAMP };

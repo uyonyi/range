@@ -5,7 +5,7 @@
 //  종: 0 활엽(참나무류) · 1 소나무 · 2 관목 · 3 조림 침엽 / 세밀도: 0 가까이 · 1 중간 · 2 멀리(임포스터: 세로 판 십자 + 가로 판)
 // =====================================================================
 const TREES3 = (function () {
-  const st = { ready: false, mat: null, geo: null, time: { value: 0 }, ir: { value: 0 }, irv: { value: 0.13 } };
+  const st = { ready: false, mat: null, geo: null, time: { value: 0 }, ir: { value: 0 }, irv: { value: 0.13 }, ire: { value: 0.3 } };
   if (window.SIM_NOTREES3 || location.protocol === 'file:' && !window.SIM_TREES_JSON) return st;
   const base = window.SIM_BASE || '';
   // 색(불투명 RGB)·투명도(A) 그림 두 장을 합쳐 RGBA 배열로 (아래위 뒤집어 three 의 uv 와 맞춤)
@@ -49,14 +49,15 @@ const TREES3 = (function () {
   function makeMat(tex) {
     const m = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0 });
     m.onBeforeCompile = sh => {
-      sh.uniforms.uTime = st.time; sh.uniforms.uIR = st.ir; sh.uniforms.uIRv = st.irv;
+      sh.uniforms.uTime = st.time; sh.uniforms.uIR = st.ir; sh.uniforms.uIRv = st.irv; sh.uniforms.uIRe = st.ire;
       sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
           { float hh = max(0.0, position.y); vec3 ip = instanceMatrix[3].xyz; float ph = ip.x * 0.13 + ip.z * 0.17;
             transformed.x += sin(uTime * 1.3 + ph) * 0.022 * hh * hh; transformed.z += cos(uTime * 1.07 + ph * 1.3) * 0.018 * hh * hh; }
         #endif`);
-      sh.fragmentShader = 'uniform float uIR; uniform float uIRv;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-        if (uIR > 0.5) diffuseColor.rgb = vec3(uIRv);`).replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+      sh.fragmentShader = 'uniform float uIR; uniform float uIRv; uniform float uIRe;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        if (uIR > 0.5) diffuseColor.rgb = vec3(uIRv);`).replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        if (uIR > 0.5) totalEmissiveRadiance += vec3(uIRe);   // 열화상: 나무 온도 (밤엔 열린 땅보다 따뜻, 낮엔 시원)`).replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         #ifdef DOUBLE_SIDED
           normal *= faceDirection;   // 잎 판 뒷면도 바깥쪽 법선 그대로 (수관 덩어리처럼 빛을 받게)
         #endif`);
@@ -117,7 +118,7 @@ const TREES3 = (function () {
       apply();
     } catch (e) { st.err = String(e); }
   }
-  st.setIR = (on, night) => { st.ir.value = on ? 1 : 0; st.irv.value = 0.13 * (night ? 0.55 : 1); };
+  st.setIR = (on, night) => { st.ir.value = on ? 1 : 0; st.irv.value = night ? 0.02 : 0.07; st.ire.value = night ? 0.11 : 0.065; };
   st.tick = t => { st.time.value = t; };
   setTimeout(load, window.SIM_VR ? 400 : 600);
   return st;
