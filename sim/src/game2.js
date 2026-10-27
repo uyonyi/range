@@ -241,9 +241,10 @@ function initAudio() {
     AU.wg = ctx.createGain(); AU.wg.gain.value = 0; ns.connect(bp); bp.connect(AU.wg); AU.wg.connect(AU.master); ns.start();
   } catch (e) { AU.ctx = null; }
 }
-function audioUpdate(thrust, speed, active) {
+function audioUpdate(thrust, speed, active, motorOn) {   // motorOn: 새 모터 소리(game2m)가 돌고 있으면 예전 합성음은 끔 (바람 소리는 그대로)
   if (!AU.ctx) return; const t = AU.ctx.currentTime;
   const on = AU.on && active ? 1 : 0;
+  if (motorOn) { AU.mg.gain.setTargetAtTime(0, t, 0.05); AU.wg.gain.setTargetAtTime(on * Math.min(speed / 25, 1) * 0.14, t, 0.1); return; }
   AU.o1.frequency.setTargetAtTime(95 + thrust * 170 + speed * 2, t, 0.05); AU.o2.frequency.setTargetAtTime(190 + thrust * 330 + speed * 4, t, 0.05);
   AU.mg.gain.setTargetAtTime(on * (0.05 + thrust * 0.07), t, 0.08); AU.wg.gain.setTargetAtTime(on * Math.min(speed / 25, 1) * 0.14, t, 0.1);
 }

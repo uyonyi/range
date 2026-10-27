@@ -1539,9 +1539,26 @@ function commStatic(on, dur) {
   const g = ctx.createGain(); g.gain.value = 0.0001; s.connect(hp); hp.connect(bp); bp.connect(g); g.connect(AU.master); s.start(t);
   const T = Math.min(dur || 6, 20);
   // 아주 옅은 쉬 소리만 (말소리를 가리지 않게)
-  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.0035, t + 0.15);
-  g.gain.setValueAtTime(0.0035, t + T); g.gain.exponentialRampToValueAtTime(0.0001, t + T + 0.2); s.stop(t + T + 0.3);
+  const lv = 0.0035 + 0.02 * commRange();   // 멀수록 잡음이 큼
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(lv, t + 0.15);
+  g.gain.setValueAtTime(lv, t + T); g.gain.exponentialRampToValueAtTime(0.0001, t + T + 0.2); s.stop(t + T + 0.3);
   COMM.st = { s, g };
+}
+// 무전기 소리: 좁은 대역(300~3100 Hz) · 가운데 강조 · 약한 찌그러짐 · 압축 — 실제 무전기처럼 · 멀어지면 말이 잠깐씩 끊김
+function commRange() { const L = MS.launch ? MS.launch.p : null; return L && DR.p ? clamp((DR.p.distanceTo(L) - 300) / 900, 0, 1) : 0; }   // 이륙 지점에서 300 m 넘으면 조금씩
+const RADIO_CURVE = (() => { const n = 1024, c = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); } return c; })();
+function radioChain(c, gain) {
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; hp.Q.value = 0.8;
+  const pk = c.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 1900; pk.Q.value = 0.9; pk.gain.value = 5;
+  const ws = c.createWaveShaper(); ws.curve = RADIO_CURVE; ws.oversample = '2x';
+  const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3100; lp.Q.value = 0.9;
+  const cp = c.createDynamicsCompressor(); cp.threshold.value = -24; cp.ratio.value = 6; cp.attack.value = 0.003; cp.release.value = 0.12;
+  const g = c.createGain(); g.gain.value = gain;
+  hp.connect(pk); pk.connect(ws); ws.connect(lp); lp.connect(cp); cp.connect(g); g.connect(AU.master);
+  const rk = commRange();
+  if (rk > 0.3) { const t0 = c.currentTime, at = []; for (let k = 0; k < 7; k++) if (Math.random() < rk) at.push(t0 + 0.4 + Math.random() * 4.5); at.sort((x, y) => x - y);
+    let last = 0; for (const x of at) { if (x < last + 0.3) continue; const dip = gain * (0.12 + 0.3 * (1 - rk)), len = 0.06 + Math.random() * 0.14; g.gain.setValueAtTime(gain, x); g.gain.linearRampToValueAtTime(dip, x + 0.025); g.gain.setValueAtTime(dip, x + len); g.gain.linearRampToValueAtTime(gain, x + len + 0.05); last = x + len + 0.05; } }
+  return hp;
 }
 function squelch(open) {
   const ctx = AU.ctx; if (!ctx || !AU.master) return; const t = ctx.currentTime;
@@ -1606,8 +1623,7 @@ function rvSpeak(plan, est) {
   if (!AU.ctx) { setTimeout(done, est * 900); return; }
   Promise.all(plan.map(rvBuf)).then(bs => {
     if (COMM.cur !== myId) return; const c = AU.ctx;
-    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 280; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3600;
-    const g = c.createGain(); g.gain.value = 1.35; hp.connect(lp); lp.connect(g); g.connect(AU.master);
+    const hp = radioChain(c, 1.15);
     let t = c.currentTime + 0.06; const S2 = [];
     bs.forEach((b, i) => { const s = c.createBufferSource(); s.buffer = b; s.connect(hp); s.start(t); S2.push(s); t += b.duration + (plan[i].replace('op|', '').indexOf(' ') > 0 && i < bs.length - 1 && plan[i + 1].replace('op|', '').indexOf(' ') > 0 ? 0.14 : 0.03); });
     S2[S2.length - 1].onended = done; COMM.src = { stop() { S2.forEach(s => { try { s.stop(); } catch (e) { } }); } }; COMM.rvOk = true;
@@ -1634,14 +1650,30 @@ function commSpeakFallback(text, est) {
     if (COMM.cur !== myId || !d.buf) return done();
     AU.ctx.decodeAudioData(d.buf).then(b => {
       if (COMM.cur !== myId) return; const c = AU.ctx, s = c.createBufferSource(); s.buffer = b;
-      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3400;
-      const g = c.createGain(); g.gain.value = 1.5; s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(AU.master); s.onended = done; s.start(); COMM.src = s; COMM.fbOk = true;
+      s.connect(radioChain(c, 1.3)); s.onended = done; s.start(); COMM.src = s; COMM.fbOk = true;
     }).catch(e => { COMM.fbErr = 'decode: ' + (e && e.message || e); done(); });
   };
   w.postMessage({ id, text });
   setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(10, est * 2.2) * 1000);
 }
-function commSpeak(text, est) {
+// 한국어 무전: 기기에 있는 한국어 음성으로 자막(ko)을 읽음 · 한국어 음성이 없으면(예: Quest 브라우저) 영어 무전으로
+function koVoice() { try { const V = speechSynthesis.getVoices(); return V.find(v => /^ko/i.test(v.lang) && /Natural|Online|Neural|Google/i.test(v.name)) || V.find(v => /^ko/i.test(v.lang)) || null; } catch (e) { return null; } }
+function commSpeakKo(text, est, op) {
+  const v = koVoice(); if (!v) return false;
+  const myId = (COMM.cur = (COMM.cur || 0) + 1); COMM.sp = true; let started = false;
+  const done = () => { if (COMM.cur === myId) commSpeechDone(); };
+  if (COMM.src) { try { COMM.src.stop(); } catch (e) { } COMM.src = null; }
+  const u = new SpeechSynthesisUtterance(String(text).replace(/\s*·\s*/g, ', ').replace(/(\d+)\s*m\b/g, '$1미터')); u.lang = v.lang; u.voice = v; u.rate = 1.08; u.pitch = op ? 1.2 : 0.85; u.volume = 1;
+  u.onstart = () => { started = true; }; u.onend = done; u.onerror = e => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; done(); };
+  (COMM.keep = COMM.keep || []).push(u); if (COMM.keep.length > 8) COMM.keep.shift();
+  try { if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { done(); }
+  setTimeout(() => { if (COMM.cur === myId && !started) done(); }, 3000);
+  setTimeout(() => { if (COMM.cur === myId) done(); }, Math.max(8, est * 2) * 1000);
+  return true;
+}
+function commSpeak(text, est, ko) {
+  if (ko && SET.radioLang === 'ko' && window.SIM_LANG !== 'en' && commSpeakKo(ko, est, COMM.spk === 'op')) return;
+  if (ko && SET.radioLang === 'ko' && window.SIM_LANG !== 'en' && !COMM.koWarn) { COMM.koWarn = true; showMsg(L2('이 기기에는 한국어 음성이 없어 영어 무전으로 들려줍니다', 'No Korean voice on this device — English radio'), '#ffd27a', 2.5); }
   const pl = rvPlan(text, COMM.spk); if (pl) return rvSpeak(pl, est);
   if (needFallbackVoice() && TTSW.ok !== false && ttsWorker()) return commSpeakFallback(text, est);
   const done = () => { if (COMM.cur === myId) commSpeechDone(); };
@@ -1677,7 +1709,7 @@ function commTick(dt) {
   if (SET.voice !== false && (RV.st === 'ready' || window.speechSynthesis || (needFallbackVoice() && TTSW.ok !== false))) {
     if (AU.ctx && AU.ctx.state !== 'running') try { AU.ctx.resume(); } catch (e) { }
     if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetAtTime(musicLevel() * 0.25, AU.ctx.currentTime, 0.1);
-    COMM.busy = 999; radioT = 999; commSpeak(sp, dur);
+    COMM.busy = 999; radioT = 999; commSpeak(sp, dur, m.ko);
   } else setTimeout(() => squelch(false), dur * 900);
 }
 // 임무 시작 교신
@@ -1696,7 +1728,7 @@ function commStart(kind) {
     ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 비행 승인. 능선 위 돌풍 주의.'],
     field: [`${CS}, CONTROL. Field strip is yours. ${AFc().cls === 'wing' ? 'Take off, fly the pattern and land on the runway.' : 'Hop the pads, land gently on the centre of each.'} ${w}`, AFc().cls === 'wing' ? '야전 착륙장 사용 승인. 이륙 후 장주 비행, 활주로 착륙.' : '야전 착륙장 사용 승인. 패드를 옮겨 다니며 가운데에 살살 착륙.']
   }[kind];
-  if (T) { comm(T[0], T[1]); if (isMission(kind)) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); }
+  if (T) { comm(T[0], T[1]); if (ENV.wx === 'rain') comm('Rain over the range, expect reduced visibility.', '비가 내림. 시야 감소 주의.'); else if (ENV.wx === 'snow') comm('Snow over the range, expect reduced visibility.', '눈이 내림. 시야 감소 주의.'); if (isMission(kind)) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); }
 }
 let COMM_LAST = 0;
 function commAck(o, kind) {   // 목표 하나 끝났을 때
@@ -1817,6 +1849,8 @@ $('credClose').onclick = () => $('credPanel').classList.add('hidden');
 // 화면 아래 작은 출처 (현장 자료가 있을 때)
 (function () { const el = $('attrib'); if (!el) return; el.textContent = SITE.credits ? (EN_ ? 'Map data © NGII Korea · 1:5,000 topo map · orthoimage 2025 · Copernicus DEM GLO-30' : '지도 자료 © 국토지리정보원 · 수치지형도 1:5,000 · 정사영상 2025 · Copernicus DEM GLO-30') : ''; })();
 
+document.querySelectorAll('#segRadioLang button').forEach(b => { b.classList.toggle('on', b.dataset.v === (SET.radioLang || 'en')); b.addEventListener('click', () => { SET.radioLang = b.dataset.v; saveSet(); COMM.koWarn = false; document.querySelectorAll('#segRadioLang button').forEach(x => x.classList.toggle('on', x === b)); }); });
+if (window.SIM_LANG === 'en' && $('segRadioLang')) $('segRadioLang').style.display = 'none';
 document.querySelectorAll('#segVoice button').forEach(b => { b.classList.toggle('on', (b.dataset.v === '1') === (SET.voice !== false)); b.addEventListener('click', () => { SET.voice = b.dataset.v === '1'; saveSet(); document.querySelectorAll('#segVoice button').forEach(x => x.classList.toggle('on', x === b)); if (!SET.voice) try { speechSynthesis.cancel(); } catch (e) { } }); });
 
 // =====================================================================
@@ -2558,6 +2592,8 @@ Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWx
     segFull: { 1: ['출격할 때 전체 화면으로 바꿉니다', 'Switches to full screen at launch'], 0: ['창 크기 그대로 비행합니다', 'Stays in the window'] },
     segVoice: { 1: ['CONTROL(남)·EAGLE ONE(여) 영어 무전을 소리로 들려줍니다', 'Plays CONTROL (male) and EAGLE ONE (female) radio'], 0: ['무전은 글자로만 보입니다', 'Radio shown as text only'] },
     segMusic: { 1: ['배경음악 켬 · 오른쪽 막대로 크기 조절', 'Music on · slider sets the level'], 0: ['배경음악 끔', 'Music off'] },
+    segRadioLang: { en: ['실제 군·항공 무전처럼 영어로 (한국어 자막)', 'English radio'], ko: ['기기의 한국어 음성으로 자막을 읽어 줍니다 (한국어 음성이 없는 기기는 영어)', 'Korean (device voice)'] },
+    segMusSyn: { 0: ['실제 악기 녹음(CC0)으로 연주', 'Recorded instruments (CC0)'], 1: ['예전 합성음', 'Classic synth'] },
     segRumble: { 0: ['진동 없음', 'No rumble'], 1: ['충돌·링 통과·착지·실속 때 짧게 (Xbox 등 게임패드 · VR 컨트롤러 · 휴대폰)', 'Short pulses on hits, gates, landing, stall (gamepads, VR controllers, phones)'], 2: ['여기에 높은 스로틀·부스트·고속 바람의 약한 상시 진동 추가', 'Plus a light constant buzz at high throttle, boost and speed'] },
     segKeys: { A: ['W/S 상승·하강 · A/D 회전 · 방향키 이동', 'W/S climb·descend · A/D yaw · arrows move'], B: ['방향키로 고도·회전, WASD로 이동', 'Arrows for altitude and yaw, WASD to move'], C: ['키를 하나씩 직접 지정합니다', 'Assign every key yourself'] },
   };

@@ -141,7 +141,8 @@ const POWER = (function powerLines() {
     if ((warnT -= dt) > 0 || S.state !== 'run' || !DR.alive) return;
     const p = DR.p; let dmin = 1e9, hv = 0;
     for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) { const L = GRID.get((Math.floor(p.x / GC) + ox) + ',' + (Math.floor(p.z / GC) + oz)); if (L) for (const i of L) { const d = wireDist(p, i); if (d < dmin) { dmin = d; hv = SEG[i][2]; } } }
-    if (dmin < (hv ? 30 : 12)) { showMsg(L2x(`⚠ 전선 주의 · ${dmin.toFixed(0)} m`, `⚠ WIRES · ${dmin.toFixed(0)} m`), '#ffb030', 1.4); sfx('bad'); rumble(0.15, 0.3, 90); warnT = 4; }
+    if (dmin < (hv ? 30 : 12)) { showMsg(L2x(`⚠ 전선 주의 · ${dmin.toFixed(0)} m`, `⚠ WIRES · ${dmin.toFixed(0)} m`), '#ffb030', 1.4); sfx('bad'); rumble(0.15, 0.3, 90); warnT = 4;
+      if (S.t - (api0.cT || -99) > 30) { api0.cT = S.t; comm('Eagle One, Control. Power lines close aboard, climb and give them room.', '전선 근접. 상승해서 거리를 두세요.', 'CONTROL', 'wire'); } }   // 무전도 (30초에 한 번)
     else warnT = 0.4;
   }
   // 지도: 송전선(주황 점선 + 철탑 점)
