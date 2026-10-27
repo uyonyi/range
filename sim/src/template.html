@@ -417,7 +417,7 @@ body.touch #map{border-radius:9px}
 if(/[?&]test/.test(q)&&!/[?&]intro/.test(q)){BT.parentNode.removeChild(BT);window.__boot=window.__bootReady=function(){};window.__bootDone=true;return;}
 var $=function(i){return document.getElementById(i)},v=$('bootVid'),bar=$('bootBar'),tx=$('bootTxt'),snd=$('bootSnd'),pk=$('bootPick'),dots=$('bootDots'),msg=$('bootMsg');
 var EN=document.documentElement.lang==='en',L=function(k,e){return EN?e:k},rd=false,gone=false,pr=0,st='',picked=false,seen=false,HIT=60/126*8;
-try{seen=!!sessionStorage.getItem('fpvsim_boot')}catch(e){}
+try{seen=!!sessionStorage.getItem('fpvsim_boot');var nv=performance.getEntriesByType&&performance.getEntriesByType('navigation')[0];if(nv&&nv.type==='reload')seen=false;}catch(e){}   // 같은 창에서 언어 바꿈 등은 인트로 없이 바로 · 새로고침(F5)은 처음처럼 인트로부터
 var hasVid=v.getElementsByTagName('source').length>0,endImg=hasVid&&v.getAttribute('data-end'),touch=matchMedia&&matchMedia('(pointer: coarse)').matches;   // 영상·입장 번호·음악은 공개판만 (한 파일 판은 제목만)
 function set(p,t){if(p>pr){pr=p;bar.style.width=p+'%';}if(t)tx.textContent=t;}
 // ---- 입장 번호 (간단한 출입 확인 · 이 기기에서 한 번 맞히면 기억): 번호 자체는 없고 소금+SHA-256 1만2천 번 반복한 값만 (game5.js 와 같은 방식)
