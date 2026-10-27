@@ -135,7 +135,7 @@ body.touch .panel{touch-action:pan-y}
 #tbLight{width:46px;height:46px;font-size:18px;right:calc(350px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 #tbLight.off{filter:grayscale(1);opacity:.5}
 #tbIR{width:46px;height:46px;font-size:12px;right:calc(294px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
-#tbZoom,#tbFull,#tbGuide,#tbHud{width:46px;height:46px;font-size:12px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
+#tbZoom,#tbFull,#tbGuide,#tbHud{width:46px;height:46px;font-size:12px}#tbGuide{flex-direction:column;line-height:1.05}#tbGuide small{font:600 9px system-ui,sans-serif;color:#9fe9ff;letter-spacing:-.2px}#tbGuide{right:calc(238px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbZoom{right:calc(126px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}#tbFull{right:calc(182px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top))}
 body.touch #keys,body.touch #sticks,body.touch #list{display:none!important}
 body.touch #osd{font-size:14px;left:calc(10px + env(safe-area-inset-left));top:8px}body.touch #osd .big{font-size:19px}body.touch #osd b{width:40px}
 body.touch #objNext{font-size:13px;padding:5px 10px}body.touch #objMsg{font-size:20px}
@@ -479,7 +479,7 @@ body.touch #map{border-radius:9px}
       <div>Assistance <span class="seg" id="segAssistLv"><button data-v="2" class="on">Full</button><button data-v="1">Light</button><button data-v="0">Off</button></span></div>
       <div>Feel <span class="seg" id="segFeel"><button data-v="train">Beginner</button><button data-v="std" class="on">Standard</button><button data-v="real">Real aircraft</button></span></div>
       <div>Stick feel <span class="seg" id="segExpo"><button data-v="real">Real (linear)</button><button data-v="soft" class="on">Soft (expo)</button></span></div>
-      <div>Guide <span class="seg" id="segGuide"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
+      <div>Nav aids <span class="seg" id="segGuide"><button data-v="3" class="on">Guide</button><button data-v="2">Target</button><button data-v="1">Map</button><button data-v="0">Radio</button></span></div>
       <div id="feelAdv" class="feeladv">
         <div class="fh">ACRO details (FPV · kamikaze FPV) <span class="seg small" id="segRatePre"><button data-v="train">Beginner</button><button data-v="std">Betaflight default</button><button data-v="racer">Racer</button></span></div>
         <div class="frow">Rates roll·pitch <label>Center <input id="rc0" type="number" min="10" max="400" step="5"></label><label>Max <input id="rc1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="rc2" type="number" min="0" max="1" step="0.05"></label> <span class="mono" id="rcV"></span></div>
@@ -487,7 +487,7 @@ body.touch #map{border-radius:9px}
         <div class="frow">Throttle centre = hover <span class="seg small" id="segThrHover"><button data-v="auto" class="on">Auto (gamepad: bottom = idle)</button><button data-v="1">Always</button><button data-v="0">Off · bottom = idle</button></span> <span class="mono" id="hovV"></span></div>
       </div>
     </div>
-    <div class="note"><b>Flight mode</b> — GPS: stops when you let go · ATTI: attitude only, drifts with momentum and wind · Manual: stabilised within the tilt limit · ACRO: no tilt limit (flips, inverted), thrust ∝ rpm², bottom stick = idle. <b>Assistance</b> — Full: auto heading, gate guidance, terrain follow · Light: gate guidance only. <b>Feel</b> — Beginner: speed and tilt limited · Standard · Real aircraft: full specs. Collisions bounce and cost penalty time.</div></div>
+    <div class="note"><b>Flight mode</b> — GPS: stops when you let go · ATTI: attitude only, drifts with momentum and wind · Manual: stabilised within the tilt limit · ACRO: no tilt limit (flips, inverted), thrust ∝ rpm², bottom stick = idle. <b>Assistance</b> — Full: auto heading, gate guidance, terrain follow · Light: gate guidance only. <b>Feel</b> — Beginner: speed and tilt limited · Standard · Real aircraft: full specs. Collisions bounce and cost penalty time. <b>Nav aids</b> — Guide: target markers + chevrons and stick hints · Target: ◇ and beacon only · Map: on the map only · Radio: radio bearings only. The default follows the difficulty (Training Guide · Easy/ATTI Target · Sport Map); a change lasts for this sortie · in flight press GD or V.</div></div>
     <div class="otab" data-t="env"><div class="opt col">
       <div>Time <span class="seg" id="segTime"><button data-v="0" class="on">Day</button><button data-v="2">Dusk</button><button data-v="1">Night</button></span></div>
       <div>Weather <span class="seg" id="segWx"><button data-v="clear" class="on">Clear</button><button data-v="rain">Rain</button><button data-v="snow">Snow</button></span></div>
@@ -550,7 +550,7 @@ body.touch #map{border-radius:9px}
     <div class="touchOnly">
       <h3>TOUCH CONTROLS</h3>
       <div class="thumbs"><div><b>Left thumb</b>Press and drag on the left side<br>↕ climb·descend · ↔ yaw</div><div><b>Right thumb</b>Press and drag on the right side<br>↕ forward·back · ↔ strafe</div></div>
-      <div class="note">DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD guide · ZM camera distance · ⛶ full screen · ❚❚ pause</div>
+      <div class="note">DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD nav aids · ZM camera distance · ⛶ full screen · ❚❚ pause</div>
     </div>
     <div class="btns" style="margin-top:18px"><button id="bHelp2">Full controls guide</button><button class="primary" id="ctlClose">Close</button></div>
   </div>
@@ -592,7 +592,7 @@ body.touch #map{border-radius:9px}
       <div id="kbdHelp" class="kbd"></div>
       <table style="margin-top:10px">
         <tbody id="kbRows"></tbody>
-        <tr><td>F · V · N</td><td>Full screen · guide on/off · skip current task (+20 s)</td></tr>
+        <tr><td>F · V · N</td><td>Full screen · nav aids (Guide → Target → Map → Radio) · skip current task (+20 s)</td></tr>
         <tr><td>X</td><td>Belly camera on/off (shown large automatically for drops and orbit)</td></tr>
         <tr><td>G · P · L</td><td>Ghost · reference path line · drone light</td></tr>
         <tr><td>B · M · Esc</td><td>Music · all sound · pause</td></tr>
@@ -712,7 +712,7 @@ body.touch #map{border-radius:9px}
 <script>window.SIM_GEOTIFF_URL='lib/geotiff.js';</script>
 <script src="lib/proj4.js"></script>
 <script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';window.SIM_RV_V='60de2668';</script>
-<script src="js/app.en.js?v=026de8a1"></script>
+<script src="js/app.en.js?v=ac5993e8"></script>
 <script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

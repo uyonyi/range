@@ -638,7 +638,7 @@ function uasDraw(g, W, H, sb, o, sIn, hsiY) {
   // 기체 모양 (원판 가운데)
   g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy - 16); g.lineTo(hx, hy + 14); g.moveTo(hx - 14, hy - 2); g.lineTo(hx + 14, hy - 2); g.moveTo(hx - 6, hy + 12); g.lineTo(hx + 6, hy + 12); g.stroke();
   // 목표 방위 바늘 (수색 구역 안에서는 감춤)
-  if (o && o.mk && !sIn) { const d = o.mk.clone().sub(sb.p), brg = ((wdeg(d) % 360) + 360) % 360, a = (brg - hdg - 90) * DEGR, dist = o.search ? Math.max(0, Math.hypot(d.x, d.z) - o.search.r) : Math.hypot(d.x, d.z);
+  if (o && o.mk && !sIn && glMap()) { const d = o.mk.clone().sub(sb.p), brg = ((wdeg(d) % 360) + 360) % 360, a = (brg - hdg - 90) * DEGR, dist = o.search ? Math.max(0, Math.hypot(d.x, d.z) - o.search.r) : Math.hypot(d.x, d.z);
     g.strokeStyle = CY; g.fillStyle = CY; g.lineWidth = 4; g.beginPath(); g.moveTo(hx - Math.cos(a) * (R - 18), hy - Math.sin(a) * (R - 18)); g.lineTo(hx + Math.cos(a) * (R - 22), hy + Math.sin(a) * (R - 22)); g.stroke();
     g.save(); g.translate(hx + Math.cos(a) * (R - 18), hy + Math.sin(a) * (R - 18)); g.rotate(a); g.beginPath(); g.moveTo(10, 0); g.lineTo(-10, -9); g.lineTo(-10, 9); g.closePath(); g.fill(); g.restore();
     T(L2('목표 ', 'TGT ') + String(Math.round(brg)).padStart(3, '0') + '°', hx - R - 22, hy - 14, 18, CY, 'right'); T((dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : Math.round(dist) + ' m'), hx - R - 22, hy + 12, 18, CY, 'right'); }
@@ -674,7 +674,7 @@ function snapPhoto(cap, tp) {
     const seen = (c) => { const q = tp.clone().project(c); return q.z < 1 && q.z > -1 && Math.abs(q.x) < 0.8 && Math.abs(q.y) < 0.8; };
     if (tp && !seen(camera)) { const lc = XR_ON && (SET.vrPip | 0) > 0 ? VR_PIP.cam : (typeof bellyMode === 'function' && bellyMode() !== null ? bellyCam : null); if (lc && seen(lc)) { cam = lc; PH.via = 'lower'; } }
     if (tp && cam === camera && !seen(camera)) { PH.via = 'gimbal'; { cam = PH.cam || (PH.cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.05, 4000)); cam.position.copy(DR.p).add(new V3(0, -0.15, 0)); cam.lookAt(tp); cam.updateMatrixWorld(); } }
-    const hid = []; const hide = o => { if (o && o.visible) { o.visible = false; hid.push(o); } }; GUIDE.meshes.forEach(m => hide(m.g)); hide(marker); hide(impactRing);   // 사진엔 안내 표시 없이
+    const hid = []; const hide = o => { if (o && o.visible) { o.visible = false; hid.push(o); } }; GUIDE.meshes.forEach(m => hide(m.g)); [marker, impactRing, GCHEV.m, GPATH.m, GAXIS.m, BEACON.g].forEach(hide); OBJS.forEach(q => hide(q.hint));   // 사진엔 안내 표시 없이 (쉐브론·빛기둥·과제 강조까지)
     renderer.setRenderTarget(PH.rt); renderer.clear(); renderer.render(scene, cam); hid.forEach(o => o.visible = true); const px = new Uint8Array(W0 * H0 * 4); renderer.readRenderTargetPixels(PH.rt, 0, 0, W0, H0, px);
     renderer.setRenderTarget(cur); renderer.xr.enabled = xe; camera.aspect = asp; camera.updateProjectionMatrix();
     const c = document.createElement('canvas'); c.width = W0; c.height = H0; const g = c.getContext('2d'), id = g.createImageData(W0, H0), lin = PH.rt.texture.encoding !== THREE.sRGBEncoding;
@@ -1463,7 +1463,7 @@ let BRIEF_GO = null;
 // 시간에 따른 사건 (불씨 추가·번짐, 실종자 구역 좁힘, 차량 정차·속도 변화)
 function msEvents(dt) {
   if (S.state !== 'run' || S.brief || !isMission()) return;
-  MS.t0 += dt; const t = MS.t0;
+  MS.t0 += dt; const t = MS.t0; navRadio(dt);
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
       if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; if (STREES.scorch) STREES.scorch(f.g.position, 9); const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
@@ -1482,6 +1482,22 @@ function msEvents(dt) {
     if (T.stopT > 0) { T.stopT -= dt; T.v = 0; if (T.stopT <= 0) comm('Target is moving again. Stay on it.', '차량 다시 출발 · 계속 추적'); }
     else { T.v = T.base * (0.8 + 0.35 * Math.sin(T.tt * 0.11 + T.ph)); if (T.stops.length && T.s > T.stops[0]) { T.stops.shift(); T.stopT = 6 + Math.random() * 6; comm('Target has stopped. Hold your standoff, keep eyes on.', '차량 정차 · 거리 유지하며 관측'); } }
   }
+}
+// 안내 0 (무전): 화면·지도에 목표가 없으므로 CONTROL 이 현 위치 기준 방위·거리를 불러 줌
+//  새 목표가 뜰 때(조금 뒤) · 45초마다 · 수색 구역이 좁혀지거나 옮겨질 때 · 구역 안이나 80 m 안(눈으로 보일 거리)에서는 쉼
+const NAVR = { key: null, t: 0 };
+function navRadio(dt) {
+  if (gdLevel() > 0 || (typeof isC1 === 'function' && isC1())) { NAVR.key = null; return; }
+  const o = msObj(); if (!o || !o.mk || o.done) return;
+  const key = MS.idx + ':' + (o.search ? o.search.r + ':' + o.mk.x.toFixed(0) + ':' + o.mk.z.toFixed(0) : '');
+  if (MS.t0 < 0.2) NAVR.key = null;   // 새 비행
+  if (key !== NAVR.key) { NAVR.key = key; NAVR.t = 2; }
+  if (searchIn(o, DR.p)) { NAVR.t = Math.max(NAVR.t, 20); return; }   // 구역 안: 눈·열화상으로 찾기 (나가면 20초 뒤 다시)
+  if ((NAVR.t -= dt) > 0 || COMM.sp || COMM.busy > 0 || COMM.q.length) return;   // 명령·확인 무전이 다 나간 뒤 (밀려서 버려지지 않게)
+  NAVR.t = 45;
+  if (Math.hypot(o.mk.x - DR.p.x, o.mk.z - DR.p.z) < 80) return;
+  const b = brgFrom(DR.p, o.mk);
+  comm(`${CS}, CONTROL. ${o.search ? 'Search area bearing' : 'Bearing'} ${b.brgW}, about ${b.distW} meters from your position. Over.`, `${o.search ? '수색 구역 ' : ''}방위 ${b.brg}° · 현 위치에서 약 ${b.dist} m`, null, 'vec');
 }
 // 실종자·차량 무작위 배치 (scenStart 에서 부름)
 const SAR_POOL = (function () {
@@ -1512,7 +1528,7 @@ function fromLaunch(p) {
   const st = startPos(), dx = p.x - st.x, dz = p.z - st.z, h = Math.atan2(dx, -dz), brg = ((Math.round(((SITE.brg || 0) + h * 180 / Math.PI) / 5) * 5) % 360 + 360) % 360, dist = Math.max(50, Math.round(Math.hypot(dx, dz) / 50) * 50);
   return { brg: String(brg).padStart(3, '0'), dist, brgW: String(brg).padStart(3, '0').split('').map(c => DIG[+c]).join(' '), distW: numWords(dist) };
 }
-function numWords(n) { const U = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'], h = Math.floor(n / 100), r = n % 100; return [h ? (h >= 10 ? 'one thousand' : U[h] + ' hundred') : '', r === 50 ? 'fifty' : r ? String(r) : ''].filter(Boolean).join(' '); }
+function numWords(n) { if (n >= 1000) return 'one thousand' + (n % 1000 ? ' ' + numWords(n % 1000) : ''); const U = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'], h = Math.floor(n / 100), r = n % 100; return [h ? (h >= 10 ? 'one thousand' : U[h] + ' hundred') : '', r === 50 ? 'fifty' : r ? String(r) : ''].filter(Boolean).join(' '); }
 // 실종자 단서: 배낭(가까이 가야 보임) · 신호 거울 반짝임(낮)/손전등(밤)
 function sarClues(dt, cur) {
   if (!SAR || !MSG.sar || !MSG.sar.visible) return;
@@ -2412,7 +2428,7 @@ function vrMenuDraw() {
   row(y, L2('시간대', 'Time')); [['day', L2('낮', 'Day'), SET.tod === 'day' && !ENV.ir], ['dusk', L2('해질녘', 'Dusk'), SET.tod === 'dusk' && !ENV.ir], ['night', L2('밤', 'Night'), SET.tod === 'night' && !ENV.ir], ['ir', L2('열화상', 'Thermal'), !!ENV.ir]].forEach(([v, n, on], i) => btn('env:' + v, 190 + i * 200, y, 188, RW, n, on)); y += RH;
   row(y, L2('날씨', 'Weather')); [['clear', L2('맑음', 'Clear')], ['rain', L2('비', 'Rain')], ['snow', L2('눈', 'Snow')]].forEach(([v, n], i) => btn('wx:' + v, 190 + i * 200, y, 188, RW, n, (SET.wx || 'clear') === v)); btn('wxfx', 790, y, 188, RW, L2('기상 영향 ', 'Effects ') + (SET.wxFx ? L2('켬', 'on') : L2('끔', 'off')), !!SET.wxFx); y += RH;
   row(y, L2('표시', 'Display')); btn('scr:head', 190, y, 188, RW, L2('고글 화면', 'Goggles'), SET.vrScreen !== 'space'); btn('scr:space', 390, y, 188, RW, L2('공간 화면', 'Fixed screen'), SET.vrScreen === 'space');
-  btn('map', 590, y, 188, RW, SET.vrMap === false ? L2('지도 끔', 'Map off') : MAPZ.on ? L2('지도 전체', 'Map: all') : L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('경로 안내', 'Guide'), !!SET.guide); y += RH;
+  btn('map', 590, y, 188, RW, SET.vrMap === false ? L2('지도 끔', 'Map off') : MAPZ.on ? L2('지도 전체', 'Map: all') : L2('지도', 'Map'), SET.vrMap !== false); btn('guide', 790, y, 188, RW, L2('안내 ', 'Nav ') + L2(GL_NM[gdLevel()][0], GL_NM[gdLevel()][1]), gdLevel() >= 2); y += RH;   // 안내 단계: 가이드 → 목표 → 지도 → 무전
   row(y, L2('스틱 반응', 'Stick feel')); [['real', L2('실기체 (선형)', 'Real (linear)')], ['soft', L2('부드럽게 (엑스포)', 'Soft (expo)')]].forEach(([v, n], i) => btn('expo:' + v, 190 + i * 200, y, 188, RW, n, stickExpo(true) === v)); y += RH;
   row(y, L2('계기', 'Instruments')); [['auto', L2('자동', 'Auto')], ['fpv', L2('간단 (FPV)', 'Simple (FPV)')], ['uas', L2('항공 (UAS)', 'Aviation (UAS)')]].forEach(([v, n], i) => btn('hud:' + v, 190 + i * 200, y, 188, RW, n + (v === 'auto' ? ' · ' + (hudMode() === 'uas' ? 'UAS' : 'FPV') : ''), (SET.hud || 'auto') === v)); y += RH + 4;
   g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '500 19px system-ui, sans-serif';
@@ -2448,7 +2464,7 @@ function vrMenuClick(hand) {
   if (id === 'replay') { if (REC) LAST_REC = recFinish(); XR.menu = false; replayStart(LAST_REC, 'menu'); vrApplyCam(); if (SET.vrCam !== 'chase' && S.cam !== 0) S.cam = 0; return; }
   if (id === 'video') { if (REC) LAST_REC = recFinish(); XR.afterExit = 'video'; vrStop(); return; }
   if (id === 'map') { if (SET.vrMap === false) { SET.vrMap = true; mapZoom(false); } else if (!MAPZ.on) mapZoom(true); else { mapZoom(false); SET.vrMap = false; } saveSet(); return; }   // 지도 → 전체 → 끔
-  if (id === 'guide') { SET.guide = !SET.guide; saveSet(); return; }
+  if (id === 'guide') { glCycle(); return; }
   if (id.startsWith('diff:')) { setDiff(id.slice(5)); saveSet(); return; }
   if (id.startsWith('mode:')) { if (AFc().cls === 'wing') SET.vrModeW = +id.slice(5); else SET.vrMode = +id.slice(5); saveSet(); return; }
   if (id.startsWith('scr:')) { vrScreenMode(id.slice(4)); return; }
@@ -2497,11 +2513,13 @@ function vrOsdDraw() {
     g.strokeStyle = '#5dff9a'; g.lineWidth = 5; g.beginPath(); g.arc(m.x, m.y, 16, 0, Math.PI * 2); g.moveTo(m.x - 40, m.y); g.lineTo(m.x - 16, m.y); g.moveTo(m.x + 16, m.y); g.lineTo(m.x + 40, m.y); g.moveTo(m.x, m.y - 16); g.lineTo(m.x, m.y - 30); g.stroke(); } }
   // 다음 목표 표시: 화면 안이면 마름모, 밖이면 가장자리 화살표
   const o = isMission() ? msObj() : curObj();
-  const sIn = searchIn(o, sb.p); if (sIn) sh(L2('수색 구역 안 · 눈과 열화상으로 찾기', 'In search area · find it by eye and thermal'), W2 / 2, 164, 24, '#ffc828', 'center');
-  if (o && o.mk && S.state !== 'demo' && !sIn) { const t = o.mk.clone().project(camera), beh = t.z > 1; let x = t.x, y = t.y; if (beh) { x = -x; y = -y; }
+  const sIn = searchIn(o, sb.p); if (sIn && glMap()) sh(L2('수색 구역 안 · 눈과 열화상으로 찾기', 'In search area · find it by eye and thermal'), W2 / 2, 164, 24, '#ffc828', 'center');
+  // 목표 표시 (안내 2 이상): 고글 화면 위 ◇ · 가장자리 화살표
+  if (o && o.mk && S.state !== 'demo' && !sIn && glTgt()) { const t = o.mk.clone().project(camera), beh = t.z > 1; let x = t.x, y = t.y; if (beh) { x = -x; y = -y; }
     const inside = !beh && Math.abs(x) < 0.92 && Math.abs(y) < 0.88, dist = o.search ? Math.max(0, Math.hypot(o.mk.x - sb.p.x, o.mk.z - sb.p.z) - o.search.r) : camera.position.distanceTo(o.mk);
-    if (inside) { const px = (x + 1) / 2 * W2, py = (1 - y) / 2 * H2; g.strokeStyle = '#ffc828'; g.lineWidth = 4; g.beginPath(); g.moveTo(px, py - 22); g.lineTo(px + 22, py); g.lineTo(px, py + 22); g.lineTo(px - 22, py); g.closePath(); g.stroke(); sh(Math.round(dist) + ' m', px, py + 28, 28, '#ffc828', 'center'); }
-    else if (!UAS) { const an0 = Math.atan2(y, x), ex = Math.cos(an0) * 0.55, ey = Math.sin(an0) * 0.58, px = (ex + 1) / 2 * W2, py = (1 - ey) / 2 * H2, an = Math.atan2(-ey, ex);   // 안쪽 타원 위 (하부 카메라·지도와 안 겹치게)
+    const nearDoor = inside && dist < 35 && (o.kind === 'ms' ? o.t === 'pass' : !!openingOf(o));   // 게이트·링이 눈앞이면 ◇ 빼기 (PC navArrow 와 같은 규칙)
+    if (inside && !nearDoor) { const px = (x + 1) / 2 * W2, py = (1 - y) / 2 * H2; g.strokeStyle = '#ffc828'; g.lineWidth = 4; g.beginPath(); g.moveTo(px, py - 22); g.lineTo(px + 22, py); g.lineTo(px, py + 22); g.lineTo(px - 22, py); g.closePath(); g.stroke(); sh(Math.round(dist) + ' m', px, py + 28, 28, '#ffc828', 'center'); }
+    else if (!inside && !UAS) { const an0 = Math.atan2(y, x), ex = Math.cos(an0) * 0.55, ey = Math.sin(an0) * 0.58, px = (ex + 1) / 2 * W2, py = (1 - ey) / 2 * H2, an = Math.atan2(-ey, ex);   // 안쪽 타원 위 (하부 카메라·지도와 안 겹치게)
       g.save(); g.translate(px, py); g.rotate(an); g.fillStyle = '#ffc828'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 4; g.beginPath(); g.moveTo(34, 0); g.lineTo(-14, -24); g.lineTo(-4, 0); g.lineTo(-14, 24); g.closePath(); g.stroke(); g.fill(); g.restore();
       sh(Math.round(dist) + ' m', px - Math.cos(an) * 60, py - Math.sin(an) * 60 - 14, 28, '#ffc828', 'center'); } }
   // 큰 숫자 계기
@@ -2526,7 +2544,7 @@ function vrOsdDraw() {
   // 등고선 지도 (PC 화면처럼 오른쪽 아래, 가운데 쪽으로 당겨 둠)
   if (SET.vrMap !== false && ui.map) { const mw = 198, mh = 330, mx = W2 - 250, my = H2 - mh - 34; g.globalAlpha = 0.92; g.fillStyle = 'rgba(6,10,14,.75)'; g.fillRect(mx - 4, my - 4, mw + 8, mh + 8); g.filter = 'brightness(1.6) contrast(1.15)'; g.drawImage(ui.map, mx, my, mw, mh); g.filter = 'none'; g.globalAlpha = 1; g.strokeStyle = 'rgba(255,200,40,.8)'; g.lineWidth = 2; g.strokeRect(mx - 4, my - 4, mw + 8, mh + 8); }
   // 경로 안내 문구 (예: 고도 내리기 3.2 m (왼쪽 스틱 ↓))
-  if (SET.guide) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2 - (UAS ? 0 : 70), (UAS ? 196 : H2 - 200) + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
+  if (glFly()) { const ge = $('guide'); if (ge && !ge.classList.contains('hidden')) { const L = [...ge.children].map(e => [e.textContent, e.className]).filter(x => x[0]).slice(0, 3); L.forEach(([t, c], i) => sh(t, W2 / 2 - (UAS ? 0 : 70), (UAS ? 196 : H2 - 200) + i * 38, 30, c === 'ok' ? '#5dff9a' : c === 'warn' ? '#ff9a40' : '#4fe3ff', 'center')); } }
   if (SET.vrCam !== 'chase' && !UAS) { g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3; g.beginPath(); g.moveTo(W2 / 2 - 22, H2 / 2); g.lineTo(W2 / 2 - 7, H2 / 2); g.moveTo(W2 / 2 + 7, H2 / 2); g.lineTo(W2 / 2 + 22, H2 / 2); g.moveTo(W2 / 2, H2 / 2 + 7); g.lineTo(W2 / 2, H2 / 2 + 16); g.stroke(); }
   g.textAlign = 'left'; tex.needsUpdate = true;
 }
@@ -2614,7 +2632,7 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 설정 ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
@@ -2625,7 +2643,7 @@ Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWx
     segFeel: { train: ['속도·기울기·회전을 낮춰 둠 · 첫 비행에', 'Speed, tilt and yaw rate reduced · for first flights'], std: ['제원의 중간 · Betaflight 기본 Rates', 'Mid-range performance · Betaflight default rates'], real: ['제원 그대로 · 가장 빠르고 민감', 'Full performance · fastest and most sensitive'] },
     segExpo: { real: ['스틱을 민 만큼 그대로 반응 · RC 조종기와 같은 느낌', 'Responds exactly to stick travel · feels like an RC transmitter'], soft: ['가운데 부근이 둔해서 미세 조종이 쉽습니다', 'Softer around centre for easy fine control'] },
     segAssist: { 1: ['자세·고도를 잡아 줍니다 (H 키로 켜기/끄기)', 'Steadies attitude and altitude (H toggles)'], 0: ['보조 없이 직접 조종합니다', 'You fly without assistance'] },
-    segGuide: { 1: ['다음 과제 쪽 화살표를 보여 줍니다', 'Shows an arrow toward the next task'], 0: ['화살표 없이 지도와 무전만으로 찾아갑니다', 'No arrow · navigate by map and radio'] },
+    segGuide: { 3: ['목표 ◇·빛기둥 + 쉐브론 경로·조작 안내 · 입문 기본', 'Target markers + chevron path and stick hints · Training default'], 2: ['목표 ◇·빛기둥만 · 비행 경로는 스스로 · 쉬움·ATTI 기본', 'Target markers only · fly your own line · Easy/ATTI default'], 1: ['화면 표시 없이 지도로 찾아감 · 스포츠 기본', 'No screen markers · navigate by the map · Sport default'], 0: ['지도에도 없음 · 무전 방위·거리만', 'Not on the map · radio bearings only'] },
     segAcro: { 0: ['스틱을 놓으면 기체가 수평으로 돌아옵니다', 'The aircraft levels out when you let go'], 1: ['기울어진 채로 유지되는 완전 수동 · 숙련자용', 'Fully manual, stays banked · for experienced pilots'] },
     segTime: { 0: ['밝은 낮 · 가장 잘 보입니다', 'Daylight · best visibility'], 2: ['해가 낮아 그림자가 길고 역광이 생깁니다', 'Low sun, long shadows and glare'], 1: ['어두움 · IR 카메라와 조명이 중요합니다', 'Dark · IR camera and lights matter'] },
     segWx: { clear: ['비·눈을 고르면 시야가 줄고 산불 감시는 쉽니다', 'Rain or snow cuts visibility and stops fire watch'], rain: ['빗줄기·안개로 시야가 줄어듭니다 · 산불 감시 불가', 'Rain and fog cut visibility · no fire watch'], snow: ['땅과 나무가 눈에 덮입니다 · 산불 감시 불가', 'Ground and trees under snow · no fire watch'] },
@@ -2654,7 +2672,7 @@ Object.assign(window.__sim, { splitKey, RWY, rwyLocal, rwyApproach, msObj, setWx
   const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
   Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
   // 빠른 설정 (코스 고르는 화면)
-  const QS = [['segMode', '🎚', '비행 모드', 'Mode'], ['segFeel', '🏎', '비행감', 'Feel'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '가이드', 'Guide'], ['segVoice', '🔊', '음성', 'Voice']];
+  const QS = [['segMode', '🎚', '비행 모드', 'Mode'], ['segFeel', '🏎', '비행감', 'Feel'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '안내', 'Nav'], ['segVoice', '🔊', '음성', 'Voice']];
   const bar = $('qsBar');
   const draw = () => {
     P.querySelectorAll('small.oh').forEach(h => { const m = (AFc().cls === 'wing' && HW[h.dataset.for]) || H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
