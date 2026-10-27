@@ -301,6 +301,9 @@ const TOUCH = { on: false, thr: 0, yaw: 0, pitch: 0, roll: 0 };
 const IS_TOUCH = !!window.SIM_MOBILE || ((('ontouchstart' in window) || navigator.maxTouchPoints > 0) && window.matchMedia && matchMedia('(pointer: coarse)').matches);
 
 const IN = { thr: 0, yaw: 0, pitch: 0, roll: 0, src: 'KEY' };
+// 조종기 모드 (휴대폰 터치·게임패드): 2 = 왼쪽 스틱 상승·회전 / 오른쪽 전진·좌우 (기본) · 1 = 왼쪽 전진·회전 / 오른쪽 상승·좌우
+//  RC 조종기를 축 지정으로 쓰면 조종기 자체 모드를 따르므로 여기서 바꾸지 않음 (게임패드 기본 축일 때만 스로틀↔피치 맞바꿈) · VR 은 vrStickMode
+function stickMode() { try { return SET.stick === 1 ? 1 : 2; } catch (e) { return 2; } }
 const ks = { thr: 0, yaw: 0, pitch: 0, roll: 0 };
 const pressed = [];
 const RC_DEFAULT = {
@@ -308,7 +311,7 @@ const RC_DEFAULT = {
   btn: { drop: { type: 'btn', i: 0 }, cam: { type: 'btn', i: 1 }, reset: { type: 'btn', i: 3 } },
   thrType: 'center', cal: {}, pad: -1
 };
-let RC = JSON.parse(JSON.stringify(RC_DEFAULT));
+let RC = JSON.parse(JSON.stringify(RC_DEFAULT)); const RC_DEF_AX = JSON.stringify(RC_DEFAULT.axes);
 try { const r = JSON.parse(localStorage.getItem('fpvsim_fpv_rc') || 'null'); if (r && r.axes) RC = Object.assign(RC, r); } catch (e) { }
 function saveRC() { try { localStorage.setItem('fpvsim_fpv_rc', JSON.stringify(RC)); } catch (e) { } }
 // ---- 키보드 지정 (사용자가 바꿀 수 있음) ----
@@ -378,9 +381,9 @@ function readInput(dt) {
   if (TOUCH.on) { for (const k of ['thr', 'yaw', 'pitch', 'roll']) if (Math.abs(TOUCH[k]) > Math.abs(IN[k])) { IN[k] = TOUCH[k]; IN.src = 'TOUCH'; } }
   const gp = getPad();
   if (gp && !RCUI.open) {
-    const st = {};
+    const st = {}, sw = stickMode() === 1 && JSON.stringify(RC.axes) === RC_DEF_AX;   // 모드 1: 기본 축(게임패드)일 때 스로틀↔피치
     for (const k of ['thr', 'yaw', 'pitch', 'roll']) {
-      const a = RC.axes[k]; let v = calAxis(gp, a.i); if (a.inv) v = -v;
+      const a = RC.axes[sw ? ({ thr: 'pitch', pitch: 'thr' }[k] || k) : k]; let v = calAxis(gp, a.i); if (a.inv) v = -v;
       st[k] = stickCurve(v, k === 'thr' && RC.thrType === 'bottom' ? 0.12 : 0.07, false);
     }
     const any = Math.abs(st.thr) + Math.abs(st.yaw) + Math.abs(st.roll) + Math.abs(st.pitch) > 0.02;

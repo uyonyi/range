@@ -4,12 +4,21 @@
 //  앞 = -z. 접이식 팔 4개(앞 팔은 프로펠러 위, 뒤 팔은 거꾸로 달린 모터),
 //  기수 아래 짐벌(컬러 + 열상 2안), 위·아래 내비게이션 어안 카메라 6개, 뒤쪽 멀티밴드 안테나
 // =====================================================================
+// 기체 색 (어두운 숲·밤 배경에서 잘 보이게): setAirframe·격납고가 PAINT 를 정해 두고 모델을 새로 만듦 · null = 원래 색
+//  pm(원래 색, 재질, 1 = 큰 면 · 2 = 어두운 면) — 칠한 색은 살짝 스스로 빛나게 (그늘·해질녘에도 보이게)
+var PAINT = null;
+const PAINTS = { white: 0xeef1f4, orange: 0xff7a1a, yellow: 0xffd23a, red: 0xe8322b, cyan: 0x3fc8ff, lime: 0x9ae63a };
+function pm(def, o, role) {
+  if (!PAINT) return mat(def, o);
+  const c = new THREE.Color(PAINT); if (role === 2) c.multiplyScalar(0.6);
+  const m = mat(c.getHex(), Object.assign({}, o, { metalness: Math.min(0.2, (o && o.metalness) || 0) })); m.emissive = c.clone(); m.emissiveIntensity = role === 2 ? 0.08 : 0.16; return m;
+}
 function makeDrone(ghost) {
   const g = new THREE.Group();
   const gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
   const m = c => gm || c;
-  const shell = m(mat(0x34383d, { roughness: 0.55, metalness: 0.15 })), shellD = m(mat(0x22252a, { roughness: 0.6 }));
-  const carbon = m(mat(0x1b1d20, { roughness: 0.42, metalness: 0.25 })), batt = m(mat(0x55595f, { roughness: 0.5 }));
+  const shell = m(pm(0x34383d, { roughness: 0.55, metalness: 0.15 }, 1)), shellD = m(pm(0x22252a, { roughness: 0.6 }, 2));
+  const carbon = m(pm(0x1b1d20, { roughness: 0.42, metalness: 0.25 }, 2)), batt = m(pm(0x55595f, { roughness: 0.5 }, 1));   // 팔(탄소)도 칠하면 어두운 숲에서 모양이 보임
   const mot = m(mat(0x8d9297, { roughness: 0.3, metalness: 0.8 })), glass = m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 }));
   const lensRing = m(mat(0x101215, { roughness: 0.3, metalness: 0.4 })), accent = m(mat(0xc8ccd0, { roughness: 0.4, metalness: 0.3 }));
   const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };

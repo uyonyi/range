@@ -1,0 +1,1 @@
+{ "private": true, "type": "module", "description": "FPV Terrain Trainer ranking API (Cloudflare Worker + D1). Deploy worker.js; test locally with node dev.mjs" }

@@ -11,6 +11,19 @@
 <script>/* 실행 오류를 화면에 표시 (기기에서 원인 확인용) */(function(){var shown=0;function show(m){if(shown++>2)return;try{var d=document.getElementById('errBox');if(!d){d=document.createElement('div');d.id='errBox';d.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#3a0d0d;color:#ffd0d0;border:1px solid #ff6060;border-radius:8px;padding:8px 10px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:30vh;overflow:auto';(document.body||document.documentElement).appendChild(d);}d.textContent+=(d.textContent?'\n':'')+'⚠ '+m;var v=document.getElementById('vrBackD');if(v)v.textContent='오류: '+m;}catch(e){}}
 window.addEventListener('error',function(e){show((e.message||'error')+(e.filename?' @ '+String(e.filename).split('/').pop()+':'+e.lineno:''));});window.addEventListener('unhandledrejection',function(e){var r=e.reason;if(r&&/radio_voice|fetch/i.test(String(r)))return;show('promise: '+(r&&r.message||r));});})();</script>
 <style>
+.boot{position:fixed;inset:0;z-index:10001;background:#05080b;overflow:hidden;cursor:pointer;transition:opacity .6s ease;-webkit-user-select:none;user-select:none;touch-action:manipulation}.boot.out{opacity:0;pointer-events:none}
+.boot video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#05080b}
+.boot .bshade{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(0,0,0,.55) 100%),linear-gradient(transparent 60%,rgba(0,0,0,.6))}
+.boot .btitle{position:absolute;left:0;right:0;top:40%;transform:translateY(-50%);text-align:center;color:#fff;opacity:0;text-shadow:0 2px 18px rgba(0,0,0,.6)}.boot.playing .btitle{animation:btIn .9s ease 3.7s forwards}
+.boot.skip .btitle,.boot.seen .btitle{animation:btIn .4s ease forwards}
+.boot .btitle b{display:block;font:800 clamp(26px,6.2vw,64px)/1.05 "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em}
+.boot .btitle span{display:block;margin-top:10px;font:600 clamp(13px,2vw,20px)/1.3 system-ui,sans-serif;letter-spacing:.12em;color:#ffc828}
+@keyframes btIn{from{opacity:0;transform:translateY(-40%)}to{opacity:1;transform:translateY(-50%)}}
+.boot .bfoot{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(320px,60vw);text-align:center}
+.boot .bbar{height:3px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}.boot .bbar i{display:block;height:100%;width:0;background:#ffc828;transition:width .4s ease}
+.boot .btxt{margin-top:7px;font:600 11px/1 "SF Mono",Menlo,monospace;letter-spacing:.14em;color:rgba(255,255,255,.75)}.boot.ready .btxt{color:#5dff9a}
+.boot .bskip{position:absolute;right:calc(16px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));margin:0;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);color:#fff;font-size:12px}.boot.skip .bskip{display:none}
+.boot .battr{position:absolute;left:12px;bottom:8px;font:10px system-ui,sans-serif;color:rgba(255,255,255,.45)}
 :root{--amber:#ffc828;--cyan:#4fe3ff;--red:#ff4d4d;--green:#5dff9a;--panel:rgba(10,13,16,.78);--line:rgba(255,255,255,.14);--text:#eef2f4;--mute:#9aa6ad}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#0b0e11;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Segoe UI",sans-serif}
@@ -251,6 +264,8 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 
 #vrBack{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.72)}#vrBack.hidden{display:none}#vrBack .vb{display:flex;flex-direction:column;gap:12px;align-items:stretch;min-width:300px;padding:22px;border:1px solid #4fe3ff;border-radius:14px;background:#0b1116}#vrBack b{font-size:24px;color:#fff;text-align:center}#vrBack p{margin:0;max-width:420px;font-size:15px;line-height:1.5;color:#cfd6da;text-align:center}#vrBack a{color:#4fe3ff;text-align:center;font-size:15px}#vrBack button:disabled{opacity:.4}#vrBack button{padding:16px;font-size:20px}
 /* ---- 시작 화면: 격납고 · 임무 트리맵 ---- */
+.rkp{z-index:60}.acard{max-width:440px}.rcard{max-width:760px}.atabs{display:flex;margin:0 0 14px}.atabs button{flex:1;margin:0 -1px 0 0;padding:9px 6px;font-size:14px}.atabs button.on{background:#3a4650;border-color:var(--amber)}.afld{display:block;margin:10px 0 0;font-size:13px;color:var(--mute)}.afld small{opacity:.8}.afld input{display:block;width:100%;margin-top:5px;font-size:20px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:#fff}.afld input[type=password]{letter-spacing:.4em;font-family:"SF Mono",Menlo,Consolas,monospace}.acard .reg{display:none}.acard .isreg .reg,.isreg .acard .reg{display:block}.amsg{min-height:18px;margin:6px 0 0;font-size:13px;color:var(--red)}.amsg.dim{color:var(--mute)}.amsg.good{color:var(--green)}.amsg.bad{color:var(--red)}.awarn{margin:12px 0 0;padding:9px 11px;border:1px solid rgba(255,200,40,.35);background:rgba(255,200,40,.08);border-radius:8px;font-size:12.5px;line-height:1.5;color:#ffe08a}.acard .btns{margin-top:14px}.acard .btns button{flex:1}.acctbox{margin:6px 0 2px}.acctbox .acin,.acctbox .acout,.acctbox .acdel{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:rgba(0,0,0,.3)}.acctbox .acin b{font-size:20px;color:#fff}.acctbox span{flex:1 1 220px;font-size:12.5px;color:var(--mute)}.acctbox button{margin:0;padding:8px 12px;font-size:13px}.acctbox button.mini{padding:6px 10px;font-size:12px;color:var(--mute)}.acctbox .acdel{display:none;margin-top:8px;border-color:rgba(255,77,77,.45)}.acctbox.deling .acdel{display:flex}.acctbox .acdel input{width:92px;font-size:18px;padding:6px 8px;letter-spacing:.3em;border-radius:6px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:#fff}.acctbox .acdel em{flex-basis:100%;font-style:normal;font-size:12.5px;color:var(--red)}button.danger{background:#5a1b1b;border-color:#a33}.wzhint.bad{color:var(--red)}.resrank{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:10px;font-size:14px}.resrank:empty{display:none}.resrank span{flex:1 1 240px}.resrank .good{color:var(--amber);font-weight:700}.resrank .dim{color:var(--mute)}.resrank button{margin:0;padding:7px 12px;font-size:13px}.rktabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.rktabs button{margin:0;padding:6px 11px;font-size:13px;border-radius:999px}.rktabs button.on{background:var(--amber);color:#111;border-color:var(--amber)}.rkme{min-height:20px;margin:2px 0 10px;font-size:13px;color:var(--mute)}.rkme b{color:#fff}.rklist{border-top:1px solid var(--line);max-height:min(56vh,520px);overflow:auto}.rkr{display:grid;grid-template-columns:40px minmax(0,1fr) 64px 74px 128px 46px;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}.rkr i{font-style:normal;text-align:center;font:700 14px "SF Mono",Menlo,monospace;color:var(--mute)}.rkr b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rkr .s{font:700 16px "SF Mono",Menlo,monospace;text-align:right}.rkr .s em{font-style:normal;margin-left:5px;font-size:12px}.rkr .t{font:13px "SF Mono",Menlo,monospace;text-align:right;color:#cfd8dc}.rkr .d,.rkr .w{font-size:11.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rkr .w{text-align:right}.rkr.me{background:rgba(255,200,40,.12);box-shadow:inset 3px 0 0 var(--amber)}.gS{color:#ffc828}.gA{color:#5dff9a}.gB{color:#4fe3ff}.gC,.gD{color:#ff9a40}.rkgap,.rkempty{padding:10px 4px;text-align:center;font-size:13px;color:var(--mute)}.rcard .btns{margin-top:14px}@media (max-width:620px){.rkr{grid-template-columns:30px minmax(0,1fr) 54px 66px;font-size:13px}.rkr .d,.rkr .w{display:none}}
+@media (max-height:540px) and (min-width:600px){.acard{max-width:700px;padding:12px 18px}.agrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.acard h1{font-size:20px}.acard h2{margin:2px 0 8px;font-size:12px}.acard .note{display:none}.afld{margin-top:5px}.afld input{font-size:17px;padding:7px 10px;margin-top:3px}.atabs{margin-bottom:4px}.atabs button{padding:6px}.awarn{margin-top:6px;padding:6px 10px;font-size:11.5px}.amsg{min-height:16px;margin-top:3px}.acard .btns{margin-top:6px}.acard .btns button{padding:8px 12px}.rcard{padding:12px 18px}.rcard h1{font-size:20px}.rcard h2{margin:2px 0 8px;font-size:12px}.rktabs button{padding:4px 9px;font-size:12px}.rklist{max-height:44vh}}
 #pinGate{z-index:90;background:rgba(6,8,10,.92)}.pincard{max-width:340px;text-align:center}.pindots{display:flex;gap:14px;justify-content:center;margin:14px 0 18px}.pindots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--amber);display:block}.pindots i.on{background:var(--amber)}.pindots.bad{animation:pinShake .35s}@keyframes pinShake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pinpad button{margin:0;padding:14px 0;font-size:22px;border-radius:10px}
 #menuCard[data-step="0"] .wzbar{display:none}#menuCard[data-step="0"]{max-width:720px}#menuCard[data-step="0"] .s0,
 #menuCard[data-step="0"] .s0{display:block!important}.s0>*{width:100%;box-sizing:border-box}
@@ -260,8 +275,28 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .stgtog{position:absolute;right:8px;bottom:8px;z-index:2;display:flex;align-items:center;gap:4px;padding:3px 5px;border-radius:16px;background:rgba(6,10,14,.55)}.stgtog .pics{display:flex;gap:2px}.stgtog .pics button{margin:0;padding:2px 5px;min-width:0;border:0;border-radius:12px;background:transparent;font-size:15px;line-height:1.2;opacity:.55;filter:grayscale(.6)}.stgtog .pics button.on{opacity:1;filter:none;background:rgba(255,200,40,.28);box-shadow:inset 0 0 0 1px rgba(255,200,40,.8)}.stgtog .pdiv{width:1px;height:16px;background:rgba(255,255,255,.25)}body.touch .stgtog .pics button{font-size:13px;padding:1px 4px}.stgtog button{padding:4px 10px;font-size:12px}
 .vrnote{margin:10px 0 0;padding:10px 12px;border:1px solid #4fe3ff;border-radius:8px;background:rgba(79,227,255,.08);display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:13px}.vrnote.hidden{display:none}#vrResume.hidden{display:none}
 #menuCard .wz{display:none}#menuCard[data-step="1"] .s1,#menuCard[data-step="2"] .s2,#menuCard[data-step="3"] .s3{display:block}
-#menuCard[data-step="1"]{max-width:620px}#menuCard[data-step="2"]{max-width:760px}
+#menuCard[data-step="1"]{max-width:860px}
+.ps .pslbl{font-size:13px;font-weight:700;margin:14px 0 6px;color:#e8eef2}.ps .pslbl small{font-weight:500;color:var(--mute);margin-left:6px;font-size:11px}
+.ps .pscards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.ps .pscards.ly{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}
+.ps .pcd{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:9px 10px;margin:0;min-width:0;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:#e8eef2}
+.ps .pcd:hover{background:rgba(255,255,255,.07)}.ps .pcd.on{border-color:var(--amber);background:rgba(255,200,40,.1);box-shadow:inset 0 0 0 1px var(--amber)}
+.ps .pcd .ic{font-style:normal;font-size:20px;line-height:1}.ps .pcd b{font-size:14px}.ps .pcd small{font-size:11px;color:var(--mute);line-height:1.35}
+.ps .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}.ps .chips em{font-style:normal;font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(79,227,255,.12);color:#9fe9ff;white-space:nowrap}
+.ps .psnote{margin:6px 0 0;font-size:11px;color:#ffc828}
+.ps .psseg{display:flex;gap:8px;flex-wrap:wrap}.ps .psseg button{flex:1 1 180px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:left;color:#e8eef2}.ps .psseg button.on{border-color:var(--amber);background:rgba(255,200,40,.1);box-shadow:inset 0 0 0 1px var(--amber)}.ps .psseg small{font-size:11px;color:var(--mute)}
+.ps .psfoot{display:flex;gap:10px;margin-top:12px}.ps .psfoot button{margin:0}
+.pv{position:relative;display:block;width:100%;aspect-ratio:16/9;margin-bottom:4px;border-radius:6px;overflow:hidden;background:linear-gradient(#5b86a8 0,#8fb3c9 38%,#4f7a45 39%,#2f5a33 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.pv i{position:absolute;display:block;border-radius:2px}
+.pv .k-osd{background:rgba(10,14,18,.78);border-left:2px solid #fff}.pv .k-nx{background:rgba(255,200,40,.9);border-radius:5px}.pv .k-ls{background:rgba(10,14,18,.72)}
+.pv .k-mp{background:#3b5f3f;box-shadow:0 0 0 1px rgba(255,255,255,.5)}.pv .k-rd{background:rgba(10,14,18,.82);box-shadow:0 0 0 1px #5dff9a}.pv .k-st{background:rgba(10,14,18,.6)}
+.pv .k-tp{box-shadow:0 0 0 1px #5dff9a;background:rgba(0,0,0,.2)}.pv .k-ld{border-top:1px solid #5dff9a;border-bottom:1px solid #5dff9a}.pv .k-hs{border:1.5px solid #5dff9a;border-radius:50%;background:rgba(0,0,0,.25)}
+.pv .k-b,.pv .k-B,.pv .k-bd,.pv .k-bb{width:5%;aspect-ratio:1;border-radius:50%;background:rgba(10,13,16,.78);box-shadow:0 0 0 1px rgba(255,255,255,.6)}.pv .k-B{width:6.5%}.pv .k-bd{width:9%;box-shadow:0 0 0 1.5px #ffc828}.pv .k-bb{width:7%;box-shadow:0 0 0 1.5px #ff9a40}
+.pv .k-sz{border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.35);background:rgba(255,255,255,.05)}
+.pv.vr{background:radial-gradient(circle at 50% 45%,#1a2530,#05080b 70%)}.pv .k-scr{background:linear-gradient(#5b86a8 0,#8fb3c9 38%,#4f7a45 39%,#2f5a33 100%);box-shadow:0 0 0 1px #4fe3ff,0 0 12px rgba(79,227,255,.25)}.pv .k-pip{background:#2a3a28;box-shadow:0 0 0 1px #ffc828}
+.pv.ed{display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,rgba(255,255,255,.04) 0 6px,transparent 6px 12px);box-shadow:inset 0 0 0 1px rgba(255,200,40,.5)}.pv.ed i{position:static;font-style:normal;font-size:22px;color:#ffc828}
+@media (max-width:700px){.ps .pscards{grid-template-columns:repeat(2,minmax(0,1fr))}}#menuCard[data-step="2"]{max-width:760px}
 .mmain.one{grid-template-columns:minmax(0,1fr)!important}
+.afpaint{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:8px 0 2px}.afpaint .lb{font-size:12px;color:var(--mute);margin-right:6px}.afpaint button{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;margin:0;padding:5px 7px;border-radius:10px;background:transparent;border:1px solid transparent}.afpaint button i{width:24px;height:24px;border-radius:50%;background:var(--pc);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28),0 0 0 1px rgba(0,0,0,.4)}.afpaint button.on{border-color:var(--amber);background:rgba(255,200,40,.1)}.afpaint button.on i{box-shadow:inset 0 0 0 2px rgba(255,255,255,.6),0 0 10px var(--pc0,transparent)}.afpaint small{font-size:10px;color:var(--mute);line-height:1}.afpaint button.on small{color:#ffc828}.afpaint .tip{font-size:11px;color:var(--mute);margin-left:6px}
 .wzbar{display:flex;gap:6px;margin:4px 0 16px}.wzbar span{flex:1;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,.05);font-size:12px;color:var(--mute);letter-spacing:.04em}
 #menuCard[data-step="1"] .wzbar [data-s="1"],#menuCard[data-step="2"] .wzbar [data-s="2"],#menuCard[data-step="3"] .wzbar [data-s="3"]{background:var(--amber);color:#111;font-weight:700}
 #menuCard[data-step="2"] .wzbar [data-s="1"],#menuCard[data-step="3"] .wzbar [data-s="1"],#menuCard[data-step="3"] .wzbar [data-s="2"]{color:#ffc828}
@@ -361,6 +396,26 @@ body.touch #map{border-radius:9px}
 </style>
 </head>
 <body>
+<div id="boot" class="boot"><video id="bootVid" autoplay muted playsinline preload="auto" poster="lib/intro.jpg?v=7ac07011"><source src="lib/intro.mp4?v=7ac07011" type="video/mp4"><source src="lib/intro.webm?v=7ac07011" type="video/webm"></video><div class="bshade"></div>
+  <div class="btitle"><b>FPV TERRAIN TRAINER</b><span>실제 지형 드론 훈련 시뮬레이터</span></div>
+  <div class="bfoot"><div class="bbar"><i id="bootBar"></i></div><div id="bootTxt" class="btxt">LOADING</div></div>
+  <button id="bootSkip" class="bskip">건너뛰기 ▸</button><div class="battr">지형 © 국토지리정보원 · Copernicus DEM</div></div>
+<script>/* 인트로 (첫 화면 · 불러오는 동안): 영상이 끝나고 준비가 되면 사라짐 · 누르면 건너뜀 · 같은 창에서 다시 열면 준비되는 대로 바로 */(function(){var B=document.getElementById('boot');if(!B)return;var q=location.search;
+if(/[?&]test/.test(q)&&!/[?&]intro/.test(q)){B.parentNode.removeChild(B);window.__boot=window.__bootReady=function(){};return;}
+var v=document.getElementById('bootVid'),bar=document.getElementById('bootBar'),tx=document.getElementById('bootTxt'),T0=Date.now(),rd=false,vd=false,gone=false,pr=0,seen=false;try{seen=!!sessionStorage.getItem('fpvsim_boot')}catch(e){}
+function set(p,t){if(p>pr){pr=p;bar.style.width=p+'%';}if(t)tx.textContent=t;}
+function end(){if(gone)return;gone=true;B.classList.add('out');try{sessionStorage.setItem('fpvsim_boot','1')}catch(e){}setTimeout(function(){if(B.parentNode)B.parentNode.removeChild(B);try{v.pause()}catch(e){}},650);}
+function chk(){if(rd&&(vd||(seen&&Date.now()-T0>900)))end();}
+function skip(){vd=true;B.classList.add('skip');try{v.pause()}catch(e){}chk();}
+window.__boot=set;window.__bootReady=function(){if(rd)return;rd=true;set(100,'READY');B.classList.add('ready');chk();setTimeout(chk,950);};
+if(seen)B.classList.add('seen');
+v.addEventListener('ended',function(){vd=true;chk();});var fail=function(){vd=true;B.classList.add('skip');chk();},ss=v.getElementsByTagName('source');if(ss.length)ss[ss.length-1].addEventListener('error',fail);v.addEventListener('error',fail);
+v.addEventListener('playing',function(){B.classList.add('playing');});
+try{var pp=v.play();if(pp&&pp.catch)pp.catch(function(){});}catch(e){}setTimeout(function(){if(!/playing/.test(B.className))fail();},3500);
+setTimeout(function(){vd=true;B.classList.add('skip');chk();},9000);setTimeout(function(){rd=true;vd=true;chk();},45000);
+window.addEventListener('error',function(){rd=true;vd=true;chk();});
+B.addEventListener('pointerdown',function(e){e.preventDefault();skip();});document.addEventListener('keydown',function(){if(!gone)skip();});
+set(6);})();</script>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
   <div id="irTag" class="hidden">IR · WHITE-HOT</div>
@@ -421,6 +476,7 @@ body.touch #map{border-radius:9px}
       <div class="pickLbl">조종사 이름</div>
       <input id="pilotName" maxlength="16" placeholder="이름 또는 호출 부호" autocomplete="off" spellcheck="false">
       <p class="wzhint">기록 · 결과 브리핑 · 보고 사진에 표시됩니다.</p>
+      <div id="pilotSet" class="ps"></div>
       <div class="wzbtns"><button id="wz1Back">◀ 처음</button><button class="primary" id="wz1Next">다음 ▶</button></div>
       <div class="note">속도·크기·상승률은 공개 제원 수준의 근사값이며, 실제 기체의 비행 특성을 그대로 재현하지는 않는 훈련 개념용 시뮬레이터입니다. 기체 이름은 형상 참고용입니다.</div>
     </section>
@@ -430,6 +486,7 @@ body.touch #map{border-radius:9px}
         <div class="pickLbl">기체 <small>공개 제원 기준 근사</small></div>
         <div class="afStageW"><canvas id="afStage"></canvas><div id="afInfo" class="afinfo"></div></div>
         <div id="afStats" class="afstats"></div>
+        <div id="afPaint" class="afpaint"></div>
         <div id="afCards" class="afcards"></div>
       </section>
       </div>
@@ -605,6 +662,7 @@ body.touch #map{border-radius:9px}
         <table>
           <tr><td>왼쪽 스틱</td><td>위아래 = 상승·하강, 좌우 = 회전</td></tr>
           <tr><td>오른쪽 스틱</td><td>위아래 = 전진·후진, 좌우 = 좌우 이동</td></tr>
+          <tr><td>모드 1</td><td>두 스틱의 위아래가 서로 바뀜 (왼쪽 = 전진·후진 · 오른쪽 = 상승·하강) · 조종사 단계에서 고름</td></tr>
           <tr><td>A · RT</td><td>탑재물 투하</td></tr>
           <tr><td>LT</td><td>부스트 (누르는 동안)</td></tr>
           <tr><td>B · LB / RB</td><td>카메라 전환</td></tr>
@@ -708,11 +766,11 @@ body.touch #map{border-radius:9px}
   </div>
 </div>
 
-<script src="lib/three.min.js"></script>
+<script src="lib/three.min.js"></script><script>window.__boot&&__boot(34,'3D ENGINE')</script>
 <script>window.SIM_GEOTIFF_URL='lib/geotiff.js';</script>
-<script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='ko';window.SIM_VR_URL='vr/';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';window.SIM_RV_V='60de2668';</script>
-<script src="js/app.ko.js?v=a5fed660"></script>
+<script src="lib/proj4.js"></script><script>window.__boot&&__boot(44,'TERRAIN DATA')</script>
+<script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='ko';window.SIM_VR_URL='vr/';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';window.SIM_RV_V='60de2668';window.SIM_API='https://fpv-rank.unsokyi1.workers.dev';</script>
+<script>window.__boot&&__boot(62,'SIMULATOR')</script><script src="js/app.ko.js?v=c45d4c37"></script>
 <script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

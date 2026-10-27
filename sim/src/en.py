@@ -581,3 +581,13 @@ EN.update({
 "DROP 투하 · BST 부스트(켜기/끄기) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 안내 단계 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지": "DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD nav aids · ZM camera distance · ⛶ full screen · ❚❚ pause",
 "전체 화면 · 안내 단계 (가이드 → 목표 → 지도 → 무전) · 현재 과제 건너뛰기 (+20초)": "Full screen · nav aids (Guide → Target → Map → Radio) · skip current task (+20 s)",
 })
+EN.update({
+"<span>실제 지형 드론 훈련 시뮬레이터</span>": "<span>Real-terrain drone training simulator</span>",
+"<button id=\"bootSkip\" class=\"bskip\">건너뛰기 ▸</button>": "<button id=\"bootSkip\" class=\"bskip\">Skip ▸</button>",
+"<div class=\"battr\">지형 © 국토지리정보원 · Copernicus DEM</div>": "<div class=\"battr\">Terrain © NGII Korea · Copernicus DEM</div>",
+"/* 인트로 (첫 화면 · 불러오는 동안): 영상이 끝나고 준비가 되면 사라짐 · 누르면 건너뜀 · 같은 창에서 다시 열면 준비되는 대로 바로 */": "/* intro while loading */",
+})
+EN.update({
+"<td>두 스틱의 위아래가 서로 바뀜 (왼쪽 = 전진·후진 · 오른쪽 = 상승·하강) · 조종사 단계에서 고름</td>": "<td>The sticks' up/down swap (left = forward/back · right = climb/descend) · chosen in the pilot step</td>",
+"<td>모드 1</td>": "<td>Mode 1</td>",
+})

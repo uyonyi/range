@@ -224,6 +224,7 @@ function rcBuild() {
   $('rcTable').querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { RC.axes[b.dataset.inv].inv = !RC.axes[b.dataset.inv].inv; rcBuild(); });
   $('rcTable').querySelectorAll('[data-detb]').forEach(b => b.onclick = () => { detect = { kind: 'btn', fn: b.dataset.detb, base: null }; $('rcHint').textContent = `${BFN[b.dataset.detb]}: 쓸 버튼이나 스위치를 누르세요(켜세요).`; });
   document.querySelectorAll('#rcThr button').forEach(b => b.classList.toggle('on', b.dataset.v === RC.thrType));
+  if (stickMode() === 1 && JSON.stringify(RC.axes) === RC_DEF_AX) $('rcHint').textContent = L2x('조종기 모드 1: 게임패드 기본 축의 스로틀과 피치를 바꿔 씁니다 (왼쪽 스틱 전진·회전 / 오른쪽 스틱 상승·좌우).', 'Mode 1: throttle and pitch are swapped on the default gamepad axes (left stick fwd·yaw / right stick climb·strafe).');
 }
 function rcPanelUpdate() {
   const gp = getPad();
@@ -324,7 +325,7 @@ document.querySelectorAll('#segBelly button').forEach(b => b.addEventListener('c
 document.querySelectorAll('#segFull button').forEach(b => b.addEventListener('click', () => { SET.autoFull = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 const PANELS = ['setPanel', 'recPanel', 'helpPanel', 'optPanel', 'ctlPanel'];
 function openPanel(id) { PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id)); if (id === 'recPanel') renderRecords(); if (id === 'helpPanel') kbHelp(); }
-function closePanels() { let any = false; PANELS.concat(['tutMenu', 'kbPanel']).forEach(p => { if (!$(p).classList.contains('hidden')) any = true; $(p).classList.add('hidden'); }); KBCAP = null; return any; }
+function closePanels() { let any = false; PANELS.concat(['tutMenu', 'kbPanel']).forEach(p => { if (!$(p).classList.contains('hidden')) any = true; $(p).classList.add('hidden'); }); KBCAP = null; if (any) try { if (MENU.step === 1) pilotSetUI(); } catch (e) { } return any; }
 $('bSet').onclick = () => openPanel('setPanel'); $('bRec').onclick = () => openPanel('recPanel'); $('bHelp').onclick = () => openPanel('helpPanel');
 $('setClose').onclick = $('recClose').onclick = $('helpClose').onclick = () => closePanels();
 $('bKB3').onclick = () => { closePanels(); kbOpen(); };

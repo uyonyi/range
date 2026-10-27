@@ -12,7 +12,8 @@ const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
 var GL = { lv: 3, kind: null, user: false, live: false, pre: null, preDiff: null };
 const GL_NM = [['무전', 'Radio'], ['지도', 'Map'], ['목표', 'Target'], ['가이드', 'Guide']];
 const GL_DESC = [['지도에도 없음', 'bearings by radio'], ['화면 표시 없음', 'no screen markers'], ['경로 없이', 'no flight path'], ['목표 + 경로·조작', 'markers + path']];   // 바꿀 때 잠깐 뜨는 한 줄
-function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; const v = { train: 3, easy: 2, atti: 2, sport: 1 }[SET.diff]; return v == null ? 2 : v; }
+function glDefFor(d) { const v = { train: 3, easy: 2, atti: 2, sport: 1 }[d]; return v == null ? 2 : v; }   // 난이도별 기본 안내 단계
+function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; return glDefFor(SET.diff); }
 function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : (GL.pre != null && GL.preDiff === SET.diff) ? GL.pre : glDef('menu'); }
 const glTgt = () => gdLevel() >= 2, glFly = () => gdLevel() >= 3, glMap = () => gdLevel() >= 1;
 function glStart(kind) {   // startRun 에서
@@ -269,11 +270,11 @@ function updateGuide(subj) {
   if (L > 1.5) guideChevrons(curve, L, gcol, Math.hypot(DR.v.x, DR.v.z), AFc().cls === 'wing'); else GCHEV.m.visible = false;
   // ---- 조작 안내 문구 ----
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
-    : XR_ON && vrStickMode() === 1 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
+    : (XR_ON ? vrStickMode() === 1 : IS_TOUCH && stickMode() === 1) ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' }
     : (IS_TOUCH || XR_ON) ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;
-  const wingF = AFc().cls === 'wing', vm0 = XR_ON ? vrStickMode() : 2;
+  const wingF = AFc().cls === 'wing', vm0 = XR_ON ? vrStickMode() : stickMode();
   /* 고정익: 선회 = 기울이기(롤) · 상승 = 스틱 당기기(뒤) · 속도 = 스로틀. 모드에 따라 스틱 위치가 다름 */
-  const WL = T ? (XR_ON && vm0 === 1 ? { pu: '왼쪽 스틱 ↓', pd: '왼쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '오른쪽 스틱 ↑', tl: '오른쪽 스틱 ↓' } : { pu: '오른쪽 스틱 ↓', pd: '오른쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '왼쪽 스틱 ↑', tl: '왼쪽 스틱 ↓' })
+  const WL = T ? (vm0 === 1 ? { pu: '왼쪽 스틱 ↓', pd: '왼쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '오른쪽 스틱 ↑', tl: '오른쪽 스틱 ↓' } : { pu: '오른쪽 스틱 ↓', pd: '오른쪽 스틱 ↑', bl: '오른쪽 스틱 ←', br: '오른쪽 스틱 →', th: '왼쪽 스틱 ↑', tl: '왼쪽 스틱 ↓' })
     : { pu: keyName(KB.back), pd: keyName(KB.fwd), bl: keyName(KB.left), br: keyName(KB.right), th: keyName(KB.up), tl: keyName(KB.down) };
   const K = a => (wingF && WL[a]) ? WL[a] : T ? T[a] : keyName(KB[a]);
   const tgt0 = (o.kind === 'orbit' || GUIDE.detour) ? pts[1] : (pts.length > 2 ? pts[pts.length - 2] : pts[1]);

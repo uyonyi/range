@@ -89,8 +89,8 @@ function c1NavTick() {
 }
 function makeC1(ghost) {
   const K = partsKit(ghost);
-  const body = K.m(mat(0x8a9098, { roughness: 0.55 })), arm = K.m(mat(0xd9dde1, { roughness: 0.5 })), mot = K.m(mat(0x808890, { roughness: 0.35, metalness: 0.6 })), skid = K.m(mat(0x2a2c30, { roughness: 0.6 }));
-  K.add(UBOX, body, 0, 0.02, 0, 0.42, 0.16, 0.42); K.add(UBOX, K.m(mat(0xd8dde2, { roughness: 0.5 })), 0, 0.12, 0, 0.3, 0.05, 0.3);
+  const body = K.m(pm(0x8a9098, { roughness: 0.55 }, 1)), arm = K.m(mat(0xd9dde1, { roughness: 0.5 })), mot = K.m(mat(0x808890, { roughness: 0.35, metalness: 0.6 })), skid = K.m(mat(0x2a2c30, { roughness: 0.6 }));
+  K.add(UBOX, body, 0, 0.02, 0, 0.42, 0.16, 0.42); K.add(UBOX, K.m(pm(0xd8dde2, { roughness: 0.5 }, 1)), 0, 0.12, 0, 0.3, 0.05, 0.3);
   K.add(UBOX, K.m(mat(0xd04040)), 0, 0.06, -0.22, 0.12, 0.05, 0.04);   // 기수 표시 (빨강)
   const props = [];
   for (let i = 0; i < 4; i++) {
