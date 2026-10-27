@@ -123,7 +123,7 @@ const OUTER = (function outerWorld() {
     bodies.push({ x: b.x, y: b.y + (b.h + 0.3) / 2, z: b.z, sx: b.w, sy: b.h + 0.3, sz: b.l, yaw: b.yaw, col: b.kind === 'barn' ? 0xa0a4a8 : WALL[(rr * 4) | 0] });
     if (b.kind === 'shop') signs.push({ x: b.x + Math.sin(b.yaw) * 0, y: b.y + b.h - 0.2, z: b.z, sx: b.w + 0.2, sy: 0.8, sz: b.l + 0.2, yaw: b.yaw, col: SIGN[(rr * 4) | 0] });
     else roofs.push({ x: b.x, y: b.y + b.h + 0.3, z: b.z, sx: b.w + 0.8, sy: b.kind === 'barn' ? 2.2 : 2.6, sz: b.l + 0.8, yaw: b.yaw, col: b.kind === 'barn' ? 0x8a8f96 : ROOF[(rr * 5) | 0] }); });
-  inst(UBOX, bodies, it => it.col); inst(roofGeo, roofs, it => it.col, { roughness: 0.6, side: THREE.DoubleSide }); inst(UBOX, signs, it => it.col, { roughness: 0.5 }); inst(ghGeo, ghs, () => 0xe8eef0, { roughness: 0.35, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+  const BM = { bodies: inst(UBOX, bodies, it => it.col), roofs: inst(roofGeo, roofs, it => it.col, { roughness: 0.6, side: THREE.DoubleSide }) }; inst(UBOX, signs, it => it.col, { roughness: 0.5 }); inst(ghGeo, ghs, () => 0xe8eef0, { roughness: 0.35, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
   // ---- 나무: 숲 칸마다 1~2 그루 + 풀밭·마을 가장자리 드문드문 · 활엽(둥근) / 침엽(원뿔) ----
   const T = [];   // [x, y, z, h, r, kind]
   for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) { const i = iy * nx + ix, t = lu[i]; if (t === 9 || t === 5 || t === 1 || t === 4) continue;
@@ -164,6 +164,6 @@ const OUTER = (function outerWorld() {
   window.__OUTER = { cand: cand.slice(0, 40).map(c => [Math.round(c.x), Math.round(c.z), +c.sc.toFixed(2)]), trees: T.length, roads: roads.map(rd => ({ w: rd.w, p: rd.p })), blds: B.map(b => [b.x, b.z, b.kind]), vil: vil.map(v => [v.x, v.z]) };
   // 코스 지도(미리 그려 둔 것)에 바깥 지역을 다시 그려 넣음
   if (typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const kb = mapBg, kv = MAPV; mapBg = MAP_CACHE.course; MAPV = MAP_CACHE.course.V || MAPV; drawMapBg(); mapBg = kb; MAPV = kv; } catch (e) { } }
-  return { lu, B, T, roads, vil, col, CK, CH };
+  return { lu, B, BM, T, roads, vil, col, CK, CH };
 })();
 })();

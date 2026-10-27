@@ -910,8 +910,8 @@ const SITE_BLD = (function siteBuildings() {
     const m = new THREE.Mesh(UBOX, wallM[k]); m.position.set(c.x, lo - 0.3 + (H + 0.3) / 2, c.z);
     // 코스 좌표 (down=x축 방향 회전) -> three: down 축 = -z, side 축 = +x
     m.rotation.y = Math.PI / 2 - a; m.scale.set(w, H + 0.3, l);   // 변 w = (down, side) 평면에서 ang 방향
-    m.castShadow = true; m.receiveShadow = true; scene.add(m); boxCol(m, 'bld');
-    const r = new THREE.Mesh(UBOX, roofM[k]); r.position.set(c.x, lo + H + 0.12, c.z); r.rotation.y = Math.PI / 2 - a; r.scale.set(w + 0.5, 0.25, l + 0.5); r.castShadow = true; scene.add(r);
+    m.castShadow = true; m.receiveShadow = true; m.userData.siteBld = 1; scene.add(m); boxCol(m, 'bld');
+    const r = new THREE.Mesh(UBOX, roofM[k]); r.position.set(c.x, lo + H + 0.12, c.z); r.rotation.y = Math.PI / 2 - a; r.scale.set(w + 0.5, 0.25, l + 0.5); r.castShadow = true; r.userData.siteBld = 1; scene.add(r);
     n++;
   }
   return n;

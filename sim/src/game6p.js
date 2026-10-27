@@ -4,6 +4,16 @@
 //  드론 사고의 큰 원인인 전선을 훈련에 넣음 — 전선·철탑·전봇대에 닿으면 충돌
 //  (실제 자료가 오기 전까지 임의 배치 · 고정 난수 → 매번 같은 자리)
 // =====================================================================
+// 바깥 숲 나무 지우기 (선로·기지국 둘레 등): test(t) 가 참인 나무를 아주 작게 · 부딪힘도 없어짐
+//  고급 나무(TREES3)는 나중에 T 를 읽어 만들므로 크기만 줄여 두면 되고, 이미 만든 나무 묶음은 그 자리 행렬을 0 으로
+function outerCutTrees(test) {
+  if (typeof OUTER === 'undefined' || !OUTER || !OUTER.T) return 0; const cut = new Set(), M4 = new THREE.Matrix4();
+  OUTER.T.forEach(t => { if (t[3] > 0.02 && test(t)) { cut.add(Math.fround(t[0]) + ',' + Math.fround(t[2])); t[3] = 0.01; t[4] = 0.01; } });
+  if (cut.size) for (const ck of OUTER.CK || []) for (const m of ck.grp.children) if (m.isInstancedMesh) { let ch = false;
+    for (let k = 0; k < m.count; k++) { m.getMatrixAt(k, M4); const e = M4.elements; if (cut.has(e[12] + ',' + e[14])) { m.setMatrixAt(k, M4.makeScale(0, 0, 0)); ch = true; } }
+    if (ch) m.instanceMatrix.needsUpdate = true; }
+  return cut.size;
+}
 const POWER = (function powerLines() {
   if (typeof OUTER === 'undefined' || !OUTER || !MID) return null;
   const r = rng(51207), SEG = [], GC = 24, GRID = new Map(), PGRID = new Map(), api0 = {};
@@ -83,7 +93,7 @@ const POWER = (function powerLines() {
     for (let i = 1; i < p.length; i++) { const [x0, z0] = p[i - 1], [x1, z1] = p[i], L0 = Math.hypot(x1 - x0, z1 - z0); acc += L0; if (acc < 45) continue; acc = 0;
       const tx = (x1 - x0) / (L0 || 1), tz = (z1 - z0) / (L0 || 1), off = rd.w / 2 + 2.2, x = x1 - tz * off * side, z = z1 + tx * off * side;
       if (inInner(x, z) || nearRwy(x, z, -60) || B.some(b => Math.abs(b.x - x) < 20 && Math.abs(b.z - z) < 20 && Math.hypot(b.x - x, b.z - z) < Math.max(b.w, b.l) * 0.7 + 1.5)) { last = null; continue; }
-      const P0 = { x, z, y: groundAt(x, z) - 0.1, yaw: Math.atan2(tx, tz) }, pi = POLES.length; POLES.push(P0); gadd(PGRID, x, z, x, z, pi);
+      const P0 = { x, z, y: groundAt(x, z) - 0.1, yaw: Math.atan2(tx, tz), rx: tz * side, rz: -tx * side }, pi = POLES.length; POLES.push(P0); gadd(PGRID, x, z, x, z, pi);
       if (last && Math.hypot(last.x - x, last.z - z) < 70) { const ax = Math.cos(P0.yaw), az = -Math.sin(P0.yaw), lx = Math.cos(last.yaw), lz = -Math.sin(last.yaw);
         for (const k of [-0.95, 0, 0.95]) span(new V3(last.x + lx * k, last.y + PH, last.z + lz * k), new V3(x + ax * k, P0.y + PH, z + az * k), 0.6, 6, LV, 0); }
       last = P0; } }
@@ -99,15 +109,10 @@ const POWER = (function powerLines() {
   wire(HV, 0x33373b); wire(LV, 0x222222);
   // 선로 아래 나무 정리 (실제 선로 관리처럼): 전선에 닿을 만한 나무 · 철탑 둘레 나무를 없앰
   // 고급 나무(TREES3)는 나중에 T 를 읽어 만들므로 크기만 줄여 두면 되고, 기본 나무 묶음은 여기서 바로 지움
-  { const T = OUTER.T || [], cut = new Set();
-    T.forEach(t => { const top = t[1] + t[3]; let hit = TW.some(q => Math.abs(q.x - t[0]) < 12 && Math.abs(q.z - t[2]) < 12); const L = hit ? null : GRID.get(gkey(t[0], t[2]));
-      if (L) for (const si of L) { const [a, b, hv] = SEG[si], ex = b.x - a.x, ez = b.z - a.z, u = clamp(((t[0] - a.x) * ex + (t[2] - a.z) * ez) / (ex * ex + ez * ez || 1), 0, 1), hd = Math.hypot(a.x + ex * u - t[0], a.z + ez * u - t[2]), wy = a.y + (b.y - a.y) * u;
-        if (hv ? hd < 10 && top > wy - 8 : hd < t[4] + 1.5 && top > wy - 2) { hit = true; break; } }
-      if (hit) { cut.add(Math.fround(t[0]) + ',' + Math.fround(t[2])); t[3] = 0.01; t[4] = 0.01; } });
-    if (cut.size) for (const ck of OUTER.CK || []) for (const m of ck.grp.children) if (m.isInstancedMesh) { let ch = false;
-      for (let k = 0; k < m.count; k++) { m.getMatrixAt(k, M4); const e = M4.elements; if (cut.has(e[12] + ',' + e[14])) { m.setMatrixAt(k, M4.makeScale(0, 0, 0)); ch = true; } }
-      if (ch) m.instanceMatrix.needsUpdate = true; }
-    api0.cut = cut.size; }
+  api0.cut = outerCutTrees(t => { const top = t[1] + t[3]; if (TW.some(q => Math.abs(q.x - t[0]) < 12 && Math.abs(q.z - t[2]) < 12)) return true; const L = GRID.get(gkey(t[0], t[2]));
+    if (L) for (const si of L) { const [a, b, hv] = SEG[si], ex = b.x - a.x, ez = b.z - a.z, u = clamp(((t[0] - a.x) * ex + (t[2] - a.z) * ez) / (ex * ex + ez * ez || 1), 0, 1), hd = Math.hypot(a.x + ex * u - t[0], a.z + ez * u - t[2]), wy = a.y + (b.y - a.y) * u;
+      if (hv ? hd < 10 && top > wy - 8 : hd < t[4] + 1.5 && top > wy - 2) return true; }
+    return false; });
   // ---- 충돌: 전선(반지름 3 cm) · 철탑(위로 갈수록 좁아지는 사각 기둥 + 팔) · 전봇대 ----
   const _a = new V3(), _b = new V3(), _q = new V3();
   function wireDist(p, i) { const [a, b] = SEG[i]; _a.subVectors(b, a); const t = clamp(_b.subVectors(p, a).dot(_a) / Math.max(1e-6, _a.lengthSq()), 0, 1); _q.copy(a).addScaledVector(_a, t); return p.distanceTo(_q); }
