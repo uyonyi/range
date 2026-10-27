@@ -1063,7 +1063,7 @@ const STREES = (function siteTrees() {
       const gk = Math.floor(w.x / GC) + ',' + Math.floor(w.z / GC); if (!GRID.has(gk)) GRID.set(gk, []); GRID.get(gk).push(i | (kind << 24));
     });
     bb.expandByScalar(4); const sph = bb.getBoundingSphere(new THREE.Sphere()); geos.forEach(g => { g.boundingSphere = sph; g.boundingBox = bb; });
-    CHUNKS.push({ im, geos, c: sph.center, r: sph.radius, lod: 2 });
+    CHUNKS.push({ im, geos, c: sph.center, r: sph.radius, lod: 2, kind, ids, bb, sph });
     im.castShadow = !LOWQ; im.receiveShadow = !LOWQ; im.frustumCulled = true; im.userData.irBase = 0.13; scene.add(im);
   }
   // 충돌: 줄기(캡슐) + 수관(세로 캡슐, 침엽수는 원뿔이라 위로 갈수록 가늘게)
@@ -1087,9 +1087,10 @@ const STREES = (function siteTrees() {
     return best;
   }
   // 카메라 거리로 세밀도 바꿈 (0.3 초마다)
+  const LODD = { near: LOWQ ? 50 : 90, mid: LOWQ ? 170 : 300 };   // 세밀도 경계 (고급 나무 모형이 오면 바꿈 · game6t.js)
   function lod(cam) {
     const far = (typeof c1VRon === 'function' && c1VRon()) ? 420 : 1e9;   // 1종 VR: 조종자가 제자리 → 먼 숲은 생략
-    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < (LOWQ ? 50 : 90) ? 0 : d < (LOWQ ? 170 : 300) ? 1 : 2;
+    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < LODD.near ? 0 : d < LODD.mid ? 1 : 2;
       k.im.visible = d < far; if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 300);
@@ -1121,7 +1122,7 @@ const STREES = (function siteTrees() {
     }
     return top;
   }
-  return { n, col: col1, lod, scorch, unscorch, hideRect, topAt };
+  return { n, col: col1, lod, scorch, unscorch, hideRect, topAt, CHUNKS, LODD, u8, BURNT };
 })();
 if (CRS_C) { for (const [d, s] of CRS_C.cones) buildCone(W(d, s, 0)); }
 else { buildLogoPanel(); buildFlag(); for (let d = 10; d <= 300; d += 15) for (const s of [-15, 15]) buildCone(W(d, s, 0)); }

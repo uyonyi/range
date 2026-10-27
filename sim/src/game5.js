@@ -884,6 +884,7 @@ function irSet(on) {
     } else if (IR_ORIG.has(o)) o.material = IR_ORIG.get(o);
   });
   if (!on) IR_ORIG.clear();
+  try { TREES3.setIR(on, ENV.night); } catch (e) { }   // 고급 나무 (잎 그림 재질은 위에서 건너뜀)
   showMsg(on ? 'THERMAL · 백색=고온' : 'VISIBLE', on ? '#ffffff' : '#9ad7ff', 1);
 }
 // 산불 불씨: 숲 속 5곳. 가시광으로는 연기만(또는 안 보임), 열화상으로는 밝게
@@ -1807,7 +1808,7 @@ function credHTML() {
   else h += row(EN_ ? 'Terrain' : '지형', SITE.flat ? (EN_ ? 'Flat ground (no terrain data)' : '평지 (지형 데이터 없음)') : (stSrc(SITE) || '-'));
   h += row(EN_ ? 'Course' : '코스', SITE.flat ? (EN_ ? 'Standard obstacle course layout' : '기본 장애물 코스 배치') : (EN_ ? 'Obstacles laid along a user-specified route' : '사용자가 지정한 경로를 따라 장애물 배치'));
   h += '</table><h3>' + (EN_ ? 'Airframe specs' : '기체 제원') + '</h3><table>' + CRED_AF.map(c => row(c[0], EN_ ? c[2] : c[1])).join('') + '</table>';
-  h += '<h3>' + (EN_ ? 'Software' : '소프트웨어') + '</h3><table>' + row('three.js r149', 'MIT') + row('geotiff.js 2.1', 'MIT') + row('proj4js 2.11', 'MIT') + '</table>';
+  h += '<h3>' + (EN_ ? 'Software' : '소프트웨어') + '</h3><table>' + row('three.js r149', 'MIT') + row('geotiff.js 2.1', 'MIT') + row('proj4js 2.11', 'MIT') + row(EN_ ? 'ez-tree 1.1 (tree models, leaf textures)' : 'ez-tree 1.1 (나무 모형·잎 그림)', 'MIT · Daniel Greenheck') + row(EN_ ? 'Radio voice: Kokoro-82M' : '무전 음성: Kokoro-82M', 'Apache-2.0') + '</table>';
   h += `<div class="note">${EN_ ? 'Speeds, sizes and handling approximate public specifications. Map data: National Geographic Information Institute (NGII), Korea.' : '속도·크기·조종 특성은 공개 제원 수준의 근사값입니다. 지도 자료 출처: 국토교통부 국토지리정보원.'}</div>`;
   return h;
 }

@@ -9,6 +9,7 @@ from en import EN
 SIM_ROOT = os.environ.get('SIM_ROOT') or ('/home/claude/range/sim' if os.path.isdir('/home/claude/range/sim') else os.path.abspath('..'))   # 공개 사이트 폴더 (바닥 사진·정사영상 원본이 있는 곳) · CI 에서는 저장소의 sim/
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game3e.js', 'game4.js', 'game5.js', 'game6.js']
+LATE_FILES = ['game6t.js']   # 고급 나무 모형 (lib/trees.json · trees_atlas.webp, 없으면 기존 나무 그대로)
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
 TITLES = {
     'civil': {'TITLE': 'FPV Terrain Trainer · Civil', 'H1': 'FPV TERRAIN TRAINER',
@@ -23,6 +24,7 @@ def sources(lang, mode, c1=None):
     if c1 is None: c1 = mode in ('private', 'civil', 'public')   # 1종 연습: 내부판·민간판·공개 PC판 (VR판 제외)
     t = open('template.html', encoding='utf-8').read()
     game = ''.join(open(f, encoding='utf-8').read() for f in FILES)
+    i = game.rstrip().rfind('})();'); game = game[:i] + ''.join(open(f, encoding='utf-8').read() for f in LATE_FILES) + '\n' + game[i:]   # 전체 함수 안 끝부분 (game6 다음)
     if c1:   # 1종 연습 (전체를 감싼 함수 안쪽, 마지막 '})();' 앞에 넣음)
         i = game.rstrip().rfind('})();'); game = game[:i] + ''.join(open(f, encoding='utf-8').read() for f in C1_FILES) + '\n' + game[i:]
     if not c1:
@@ -88,7 +90,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
-    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json'):   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp'):   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
@@ -177,7 +179,8 @@ def build_pages(outdir, site_ids, vr):
         other = 'index.html' if lang == 'en' else 'en.html'
         t = t.replace('</title>', f'</title>\n<link rel="manifest" href="{up}manifest{"" if lang == "ko" else ".en"}.webmanifest"><link rel="icon" type="image/png" sizes="32x32" href="{up}icons/favicon-32.png"><link rel="apple-touch-icon" href="{up}icons/apple-touch-icon.png"><meta name="theme-color" content="#0e1216"><meta name="apple-mobile-web-app-title" content="FPV Trainer">', 1)
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
-        flags = "window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';"
+        tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
+        flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';"
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
