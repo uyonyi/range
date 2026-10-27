@@ -181,7 +181,8 @@ def build_pages(outdir, site_ids, vr):
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
         tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
         mv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('music.json', 'music.mp3') if os.path.exists(f))).hexdigest()[:8]   # 배경음악 악기 묶음 버전
-        flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';"
+        rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
+        flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';"
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')

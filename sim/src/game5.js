@@ -1602,7 +1602,8 @@ function rvLoad() {
   if (ib && ii) { try { const s = atob(ib.textContent.trim()), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); RV.buf = u.buffer; RV.idx = JSON.parse(ii.textContent); RV.st = 'ready'; } catch (e) { RV.st = 'fail'; COMM.rvErr = 'inline: ' + e.message; } return; }
   if (location.protocol === 'file:') { RV.st = 'fail'; return; }   // 한 파일판인데 음성 묶음이 없으면 기존 엔진
   const base = (window.SIM_BASE || '') + 'lib/radio_voice';
-  Promise.all([fetch(base + '.json').then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)), fetch(base + '.bin').then(r => r.ok ? r.arrayBuffer() : Promise.reject('bin ' + r.status))])
+  const v = '?v=' + (window.SIM_RV_V || '');   // 묶음이 바뀌면 새로 받음 (캐시)
+  Promise.all([fetch(base + '.json' + v).then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)), fetch(base + '.bin' + v).then(r => r.ok ? r.arrayBuffer() : Promise.reject('bin ' + r.status))])
     .then(([i, b]) => { RV.idx = i; RV.buf = b; RV.st = 'ready'; }).catch(e => { RV.st = 'fail'; COMM.rvErr = String(e); });
 }
 setTimeout(rvLoad, window.SIM_VR ? 300 : 12000);   // 메뉴에서는 첫 화면이 다 뜬 뒤에 · 출격하면 바로 (startRun)
