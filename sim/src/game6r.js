@@ -273,4 +273,4 @@ if (RK.api) {
   if (RK.test && /[?&]login/.test(location.search) && !RK.acct) setTimeout(() => acctOpen('login'), 30);   // 시험용: 로그인 창 바로 (보통은 첫 화면 로고에서 고름)
   if (RK.acct) setTimeout(rkFlush, 4000);
 }
-if (window.__sim) Object.assign(window.__sim, { RK, rkMe, rkSubmit, rankOpen, acctOpen, acctSet, nmCheck, Sref: () => S, finishRun: () => finishRun(), MUSref: () => MUS, AUref: () => AU });
+if (window.__sim) Object.assign(window.__sim, { RK, rkMe, rkSubmit, rankOpen, acctOpen, acctSet, nmCheck, Sref: () => S, finishRun: () => finishRun(), MUSref: () => MUS, AUref: () => AU, PAINTS });

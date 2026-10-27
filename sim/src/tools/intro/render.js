@@ -36,8 +36,8 @@ const ONLY = process.env.SHOT ? process.env.SHOT.split(',') : null;
   await shot('s1', 40, ([i, n]) => { const s = __sim, t = i / (n - 1), gy = window.__G1, e = t * (2 - t);
     const cam = window.__lerp3([205, gy + 128, 85], [168, gy + 104, 28], e), look = window.__lerp3([10, gy + 2, -300], [0, gy - 2, -322], e);
     s.DR.p.set(30, gy + 25, -230); window.__cam(cam, look, 52, 0); });
-  // ---- 2 코스 통과: 기준 비행을 바짝 뒤에서 따라감 (주황 기체 = 기체 색 기능) ----
-  await p.evaluate(() => { const s = __sim; s.SET.paint = { x2d: 'orange' }; s.setAirframe('x2d'); s.toMenu(); s.startRun('demo'); window.__hide(); s.S.cam = 1; s.advance(0.2, 1 / 60, true);
+  // ---- 2 코스 통과: 기준 비행을 바짝 뒤에서 따라감 (검은 기체 · 인트로 전용 색, 메뉴의 기체 색 목록에는 없음) ----
+  await p.evaluate(() => { const s = __sim; s.PAINTS.ink = 0x16181b; s.SET.paint = { x2d: 'ink' }; s.setAirframe('x2d'); s.toMenu(); s.startRun('demo'); window.__hide(); s.S.cam = 1; s.advance(0.2, 1 / 60, true);
     window.__trk = () => { const g = s.getDroneM().g.position, p0 = [g.x, g.y, g.z], q = window.__pp;
       if (q) { const vx = p0[0] - q[0], vz = p0[2] - q[2], L = Math.hypot(vx, vz); if (L > 1e-3) { const f = [vx / L, vz / L]; window.__fw = window.__fw ? [window.__fw[0] * 0.82 + f[0] * 0.18, window.__fw[1] * 0.82 + f[1] * 0.18] : f; } }
       window.__pp = p0; };

@@ -10,6 +10,7 @@ SIM_ROOT = os.environ.get('SIM_ROOT') or ('/home/claude/range/sim' if os.path.is
 PRIV = json.load(open('private.json', encoding='utf-8')) if os.path.exists('private.json') else None   # 내부용 (저장소에 올리지 않음)
 FILES = ['game1.js', 'game2.js', 'game2m.js', 'game2b.js', 'game3.js', 'game3b.js', 'game3c.js', 'game3d.js', 'game3e.js', 'game4.js', 'game5.js', 'game6.js']
 LATE_FILES = ['game6t.js', 'game6p.js', 'game6w.js', 'game6b.js', 'game6r.js']   # 고급 나무 모형 (lib/trees.json · trees_atlas.webp, 없으면 기존 나무 그대로) · 송전선·전봇대 · 날씨 효과 · 건물 다듬기 · 조종사 로그인·랭킹
+STUDIO = 'HOVERWORKS'   # 첫 화면 회사 로고 (검은 화면 1초 · 또롱) — 이름이 정해지면 여기만 바꿈
 RANK_API = 'https://fpv-rank.unsokyi1.workers.dev'   # 조종사 로그인·점수·랭킹 서버 (server/worker.js · Cloudflare Worker + D1) · 공개판에만 넣음, 비우면 로그인·랭킹 없이 이름만
 C1_FILES = ['c1/c1_rules.js', 'c1/c1_site.js', 'c1/c1_physics.js', 'c1/c1_ui.js', 'c1/c1_voice.js', 'c1/c1_vr.js']   # 1종 실기 연습 (순서 고정 · c1/README.md)
 TITLES = {
@@ -46,7 +47,7 @@ def sources(lang, mode, c1=None):
         left = set(re.findall(r'[가-힣]+', g2 + t2))
         if left: print('LEFTOVER', list(left)[:30])
     T = PRIV['titles'] if mode == 'private' else TITLES[mode]
-    t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang])
+    t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang]).replace('{{STUDIO}}', STUDIO)
     if mode != 'public': t = re.sub(r' data-music="[^"]*"', '', t); t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
     return t, game
 
