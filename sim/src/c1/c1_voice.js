@@ -27,9 +27,15 @@ function c1APlay(k) {
   try { if (ctx.state !== 'running') ctx.resume(); } catch (e) { }
   const [o, l] = C1A.idx[k];
   const go = b => { const s = ctx.createBufferSource(); s.buffer = b; const gn = ctx.createGain(); gn.gain.value = 1.6; s.connect(gn); gn.connect(AU.master || ctx.destination);
-    const t0 = Math.max(ctx.currentTime + 0.02, C1A.until); s.start(t0); C1A.until = t0 + b.duration + 0.15; };
+    const t0 = Math.max(ctx.currentTime + 0.02, C1A.until); s.start(t0); C1A.until = t0 + b.duration + 0.15;
+    (C1A.srcs = C1A.srcs || []).push(s); s.onended = () => { const i = C1A.srcs.indexOf(s); if (i >= 0) C1A.srcs.splice(i, 1); }; };
   if (C1A.ab[k]) go(C1A.ab[k]); else ctx.decodeAudioData(C1A.buf.slice(o, o + l)).then(b => { C1A.ab[k] = b; go(b); }).catch(() => { });
   return true;
+}
+// 시험장 음성 멈춤: 메뉴로 나가거나 새 비행을 시작할 때 (예약해 둔 안내까지 모두)
+function c1VoiceStop() {
+  (C1A.srcs || []).forEach(s => { try { s.onended = null; s.stop(); } catch (e) { } }); C1A.srcs = []; C1A.until = 0;
+  try { if (window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); } catch (e) { }
 }
 function c1Say(text, who) {
   if (C1A.st === 'none') c1ALoad();
