@@ -271,8 +271,10 @@ function terrainAt(x, z) {
   const fx = (x - GS0) / TER.step, fy = (GD1 + z) / TER.step;
   if (fx < 0 || fy < 0 || fx >= TER.n - 1 || fy >= TER.n - 1) return MIDH ? MIDH(x, z) : 0;
   const ix = fx | 0, iy = fy | 0, ax = fx - ix, ay = fy - iy, n = TER.n, H = TER.h;
-  return (H[iy * n + ix] * (1 - ax) + H[iy * n + ix + 1] * ax) * (1 - ay) + (H[(iy + 1) * n + ix] * (1 - ax) + H[(iy + 1) * n + ix + 1] * ax) * ay;
+  return triH(H[iy * n + ix], H[iy * n + ix + 1], H[(iy + 1) * n + ix], H[(iy + 1) * n + ix + 1], ax, ay);
 }
+// 격자 한 칸 안의 높이: 화면에 그린 지형 그물과 똑같이 두 삼각형(대각선 (ix+1,iy)–(ix,iy+1))으로 — 양선형 보간과 1~2 m 어긋나 건물·나무가 묻히던 문제
+function triH(a, b, c, e, ax, ay) { return ax + ay <= 1 ? a + (b - a) * ax + (c - a) * ay : e + (c - e) * (1 - ax) + (b - e) * (1 - ay); }
 function applyTerrain(h) {
   TER.h = h; const pos = ground.geometry.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, h ? h[i] : 0);
@@ -346,7 +348,7 @@ const MID = (function midTerrain() {
     H[iy * nx + ix] = h;
   }
   const at = (x, z) => { const fx = (x - s0) / st, fy = (d1 + z) / st; if (fx < 0 || fy < 0 || fx >= nx - 1 || fy >= ny - 1) return farLin(x, z);
-    const ix = fx | 0, iy = fy | 0, ax = fx - ix, ay = fy - iy; return (H[iy * nx + ix] * (1 - ax) + H[iy * nx + ix + 1] * ax) * (1 - ay) + (H[(iy + 1) * nx + ix] * (1 - ax) + H[(iy + 1) * nx + ix + 1] * ax) * ay; };
+    const ix = fx | 0, iy = fy | 0, ax = fx - ix, ay = fy - iy; return triH(H[iy * nx + ix], H[iy * nx + ix + 1], H[(iy + 1) * nx + ix], H[(iy + 1) * nx + ix + 1], ax, ay); };
   // 그물: 고해상도 구역은 구멍 · 지면 무늬는 캔버스(2048²)에 토지 이용을 그려 씌움 (game6)
   const pos = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2), idx = [];
   for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) { const i = iy * nx + ix; pos[i * 3] = s0 + ix * st; pos[i * 3 + 1] = H[i]; pos[i * 3 + 2] = -(d1 - iy * st); uv[i * 2] = ix / (nx - 1); uv[i * 2 + 1] = 1 - iy / (ny - 1); }
@@ -355,7 +357,7 @@ const MID = (function midTerrain() {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
   const cv = document.createElement('canvas'); cv.width = cv.height = 2048; const cg = cv.getContext('2d'); cg.fillStyle = '#5f6b3e'; cg.fillRect(0, 0, 2048, 2048);
   const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
-  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
+  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.material.userData.terrain = true; mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
   // 원경 그물: 중간 지형 상자 안은 비움 (조각별 인덱스에서 걸러냄)
   if (FAR) { const n = FN; for (const ch of (FAR.userData.chunks || [FAR])) { const fi = ch.geometry.index.array, keep = [];
     const FP = FAR.geometry.attributes.position.array;

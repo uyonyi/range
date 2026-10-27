@@ -274,7 +274,7 @@ ol.steps{margin:0;padding-left:20px;font-size:13px;line-height:1.7;color:#cfd6da
 .s3 .msStageW{max-height:30vh}#msGoF{min-width:160px}#msGoF.hidden{display:none}.msinfo .go{margin-top:8px}
 .introG .cont{grid-column:1/-1}.introC.cont i{font-style:normal}.msgrid.tm .ord{position:absolute;left:10px;top:7px;font-size:10px;color:var(--cc);opacity:.85;letter-spacing:.04em}.msgrid.tm .rec~.ord{display:none}.msgrid.tm .best{position:absolute;left:auto;right:40px;top:7px;font-size:10px;color:var(--amber);background:rgba(0,0,0,.35);padding:1px 6px;border-radius:999px}
 #pause{z-index:40}#radio{z-index:5}
-#navArrow{position:fixed;left:0;top:0;z-index:7;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:1px;color:#ffc828;text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.7);font:700 13px "SF Mono",Menlo,Consolas,monospace}#navArrow i{font-style:normal;font-size:16px;line-height:1;display:block;transition:transform .12s}#navArrow.edge i{font-size:30px;color:#ffc828;filter:drop-shadow(0 0 6px rgba(255,200,40,.8))}#navArrow.edge{animation:navp 1s ease-in-out infinite}@keyframes navp{50%{opacity:.55}}#navArrow.hidden{display:none}body.calm #navArrow{color:#8ec5ff}#keys{transition:opacity .6s}#keys.fade{opacity:0;pointer-events:none}
+#navArrow{--nc:#ffc828;position:fixed;left:0;top:0;z-index:7;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--nc);text-shadow:0 1px 2px #000,0 0 6px rgba(0,0,0,.7);font:700 13px "SF Mono",Menlo,Consolas,monospace}#navArrow i{font-style:normal;font-size:26px;line-height:1;display:block;transition:transform .12s;filter:drop-shadow(0 0 5px var(--nc))}#navArrow b,#navArrow em{font-style:normal;background:rgba(8,12,16,.6);border-radius:9px;padding:1px 7px;color:#fff;font-weight:600;font-size:12px;white-space:nowrap}#navArrow em{color:var(--nc);font-size:11px}#navArrow.edge i{font-size:34px;color:var(--nc);filter:drop-shadow(0 0 7px var(--nc))}#navArrow.edge{animation:navp 1s ease-in-out infinite}@keyframes navp{50%{opacity:.55}}#navArrow.hidden{display:none}body.calm #navArrow{color:#8ec5ff}#keys{transition:opacity .6s}#keys.fade{opacity:0;pointer-events:none}
 body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body.calm #bottom span{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:0}body.calm #objNext{border-left-color:#8ec5ff}
 .padinfo h3{margin:14px 0 6px}
 .mmain{display:grid;grid-template-columns:minmax(280px,350px) minmax(0,1fr);gap:18px;align-items:start}
@@ -330,6 +330,32 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
   .msgrid.tm button small,.msgrid.tm button .cat{display:none}.msgrid.tm button::after{font-size:20px}.msgrid.tm button.big::after{font-size:44px}
   .msdetail{gap:8px;padding:8px;margin-top:6px}.msinfo h3{font-size:15px;margin:0 0 3px}.msinfo p{font-size:11px;margin:0 0 3px}.msinfo p.tip{display:none}.msinfo .go{padding:9px;font-size:14px}
 }
+
+/* ---- 비행 화면 정보창 정리: 반투명 유리판 · 둥근 모서리 · 작은 이름표 + 흰 숫자 · 휴대폰은 꼭 필요한 줄만 ---- */
+:root{--glass:rgba(8,12,16,.46);--glassB:rgba(255,255,255,.09)}
+#osd,#objNext,#list,#guide,#bottom span,#scope,#radio{backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+#osd{background:var(--glass);border:1px solid var(--glassB);border-radius:11px;padding:6px 11px 7px;font-size:14px;line-height:1.42;text-shadow:0 1px 2px rgba(0,0,0,.55);color:#f2f5f7}
+#osd b{color:#8fa0a9;font-weight:600;font-size:.78em;letter-spacing:.08em;width:44px}
+#osd .big{font-size:23px;line-height:1.15;color:#fff;letter-spacing:.02em}
+#osd>div{white-space:nowrap}
+#objNext{background:var(--glass);border:1px solid var(--glassB);border-left:3px solid var(--amber);border-radius:11px;padding:5px 12px;font-size:14px;max-width:52vw;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+#objNext small{color:#8fa0a9}
+#list{background:var(--glass);border:1px solid var(--glassB);border-radius:11px}
+#map{border-radius:11px;border:1px solid rgba(255,255,255,.16);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+#bottom span{background:var(--glass);border:1px solid var(--glassB);border-radius:8px}
+#scope{background:var(--glass);border-radius:11px}
+#belly{border-radius:11px;border-width:1.5px;overflow:hidden}
+#guide{background:rgba(8,12,16,.38);border-radius:12px;padding:4px 12px 5px;text-shadow:0 1px 2px #000}
+#guide:empty,#guide.hidden{background:none;padding:0}
+#radio{background:rgba(8,14,12,.6);border:1px solid rgba(93,255,154,.28);border-left:3px solid #5dff9a;border-radius:11px;padding:5px 10px 6px}
+#radio .re{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#radio .rk{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+body.touch #osd{font-size:12px;padding:4px 9px 5px;border-radius:10px}body.touch #osd .big{font-size:17px}body.touch #osd b{width:34px}
+body.touch #osd .x{display:none}
+body.touch #objNext{font-size:12px;padding:4px 10px;max-width:40vw}
+body.touch #radio{max-width:min(380px,42vw);padding:4px 8px 5px}body.touch #radio .re{font-size:10.5px;-webkit-line-clamp:2}body.touch #radio .rk{font-size:10px;-webkit-line-clamp:1}
+body.touch #guide{font-size:12px;padding:3px 10px 4px}
+body.touch #map{border-radius:9px}
 </style>
 </head>
 <body>
