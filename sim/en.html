@@ -479,7 +479,7 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
     </div></div>
     <div class="otab" data-t="snd"><div class="opt col">
       <div>Radio voice (English) <span class="seg" id="segVoice"><button data-v="1" class="on">On</button><button data-v="0">Off</button></span></div>
-      <div>Music <span class="seg" id="segMusic"><button data-v="1" class="on">On</button><button data-v="0">Off</button><input id="mvol" type="range" min="0" max="100" value="50" style="margin-left:10px;vertical-align:middle"></span></div>
+      <div>Music <span class="seg" id="segMusic"><button data-v="1" class="on">On</button><button data-v="0">Off</button><input id="mvol" type="range" min="0" max="100" value="50" style="margin-left:10px;vertical-align:middle"></span> <span class="seg" id="segMusSyn" title="Recorded instruments (CC0) or synth"><button data-v="0" class="on">Instruments</button><button data-v="1">Synth</button></span></div>
     </div></div>
     <div class="otab" data-t="dev"><div class="opt col">
       <div>Controller rumble <span class="seg" id="segRumble"><button data-v="0">Off</button><button data-v="1" class="on">Normal · hits, gates, landing</button><button data-v="2">Strong · motor and wind too</button></span></div>
@@ -685,8 +685,8 @@ body.calm{--amber:#8ec5ff}body.calm #osd,body.calm #objNext,body.calm #list,body
 <script src="lib/three.min.js"></script>
 <script>window.SIM_GEOTIFF_URL='lib/geotiff.js';</script>
 <script src="lib/proj4.js"></script>
-<script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';window.SIM_TREES_V='789408ab';</script>
-<script src="js/app.en.js?v=f0896f70"></script>
+<script src="sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='en';window.SIM_VR_URL='vr/';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';</script>
+<script src="js/app.en.js?v=eb5b8d12"></script>
 <script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

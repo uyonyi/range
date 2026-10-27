@@ -11,6 +11,7 @@ const CHORDS = [[45, [57, 60, 64]], [41, [57, 60, 65]], [48, [55, 60, 64]], [43,
 const HOOK = [[76, 0, 74, 76, 0, 72, 74, 0], [72, 0, 72, 74, 0, 77, 76, 0], [79, 0, 76, 74, 0, 72, 74, 0], [74, 0, 71, 72, 74, 0, 79, 0]];
 function musicLevel() { return MUS.on ? MUS.vol * 0.42 : 0; }
 function musicStart() {
+  try { if (AU.ctx && MUS.on && MUS.vol > 0 && !SET.musSynth) smpLoad(); } catch (e) { }   // 음악을 켠 사람만 악기 녹음을 받음 (약 2 MB)
   if (!AU.ctx || MUS.timer) return;
   const ctx = AU.ctx;
   MUS.bus = ctx.createGain(); MUS.bus.gain.value = musicLevel();
@@ -20,9 +21,59 @@ function musicStart() {
   MUS.dly = ctx.createDelay(1); MUS.dly.delayTime.value = 3 * 60 / BPM / 4;  // 리드용 딜레이
   const fb = ctx.createGain(); fb.gain.value = 0.32; const wet = ctx.createGain(); wet.gain.value = 0.28;
   MUS.dly.connect(fb); fb.connect(MUS.dly); MUS.dly.connect(wet); wet.connect(MUS.bus);
+  smpRoute(ctx);
   MUS.next = ctx.currentTime + 0.12; MUS.step = 0;
   MUS.timer = setInterval(musicSchedule, 25);
 }
+// ---- 실제 악기 녹음 (VSCO 2 CE · VCSL — Versilian Studios, CC0): lib/music.mp3 한 개에 악기 조각을 이어 붙임 (tools/music/mk_music.py)
+//  다 받기 전·못 받으면 합성음 그대로. 받으면 다음 마디부터 녹음 악기로 연주
+const SMP = { st: 'idle', buf: null, I: null, rr: {}, p: null };
+// 악기: [크기, 좌우(−1 왼쪽 ~ 1 오른쪽), 잔향 보내기, 킥에 눌림(1)]
+const SMPI = { vlnL: [0.5, -0.35, 0.55, 1], vlaL: [0.5, 0.05, 0.55, 1], celL: [0.6, 0.35, 0.5, 1], vlnT: [0.42, -0.3, 0.5, 1], vlnS: [0.5, -0.3, 0.35, 0], celS: [0.62, 0.3, 0.3, 1], cbP: [0.95, 0.15, 0.25, 1], vlnP: [0.55, -0.2, 0.4, 0],
+  hrnL: [0.5, 0.15, 0.6, 0], hrnS: [0.5, 0.15, 0.5, 0], tbnS: [0.5, 0.3, 0.45, 0], flL: [0.42, -0.1, 0.55, 0], clL: [0.45, -0.05, 0.5, 0], harp: [0.5, -0.25, 0.55, 0], pno: [0.55, 0, 0.45, 0], mar: [0.5, 0.2, 0.4, 0], glk: [0.28, -0.2, 0.55, 0], vib: [0.45, 0.05, 0.55, 0],
+  timp: [0.95, 0.1, 0.5, 0], timpR: [0.6, 0.1, 0.5, 0], bd: [1, 0, 0.3, 0], sn: [0.55, 0.05, 0.3, 0], snR: [0.4, 0.05, 0.35, 0], hhC: [0.22, 0.3, 0.12, 0], hhO: [0.22, 0.3, 0.2, 0], tamb: [0.3, -0.35, 0.25, 0], shk: [0.3, -0.35, 0.2, 0], clap: [0.4, 0, 0.3, 0],
+  crash: [0.42, -0.2, 0.45, 0], swell: [0.38, 0.2, 0.45, 0], conga: [0.5, 0.25, 0.25, 0], tomL: [0.6, 0.15, 0.35, 0], tomH: [0.55, -0.15, 0.35, 0] };
+function smpLoad() {
+  if (SMP.st !== 'idle' || !AU.ctx || window.SIM_NOSMP || location.protocol === 'file:') return SMP.p; SMP.st = 'loading';
+  const base = (window.SIM_BASE || '') + 'lib/music', v = '?v=' + (window.SIM_MUSIC_V || ''), ctx = AU.ctx;
+  SMP.p = Promise.all([fetch(base + '.json' + v).then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)), fetch(base + '.mp3' + v).then(r => r.ok ? r.arrayBuffer() : Promise.reject('mp3 ' + r.status))])
+    .then(([J, ab]) => new Promise((ok, no) => ctx.decodeAudioData(ab, ok, no)).then(buf => {
+      // 디코더 지연 재기: 맨 앞 동기 신호(J.sync 초)가 실제로 어디서 시작하는지
+      const d = buf.getChannelData(0), n = Math.min(d.length, Math.round(buf.sampleRate * 0.5)); let i = 0; while (i < n && Math.abs(d[i]) < 0.3) i++;
+      const lag = i < n ? i / buf.sampleRate - J.sync : 0, I = {};
+      for (const k in J.inst) I[k] = J.inst[k].map(e => [e[0], e[1] + lag, e[2], e[3]]);
+      SMP.buf = buf; SMP.I = I; SMP.lag = lag; SMP.st = 'ready';
+    })).catch(e => { SMP.st = 'fail'; SMP.err = String(e); });
+  return SMP.p;
+}
+function smpOn() { return SMP.st === 'ready' && !SET.musSynth; }
+// 잔향(작은 홀): 잡음이 줄어들며 고음부터 먼저 사라지는 충격 응답 · 악기마다 좌우 자리와 잔향 양
+function smpRoute(ctx) {
+  const sr = ctx.sampleRate, len = Math.round(sr * (LOWQ ? 1.5 : 2.3)), ir = ctx.createBuffer(2, len, sr);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { const t = i / sr, a = Math.exp(-t * 3.1), k = Math.min(0.95, 0.25 + t * 0.55); lp = lp * k + (Math.random() * 2 - 1) * (1 - k); d[i] = (t < 0.012 ? 0 : lp * a * 2.2); } }
+  const cv = ctx.createConvolver(); cv.buffer = ir; MUS.revIn = ctx.createGain(); MUS.revIn.gain.value = 0.55; MUS.revIn.connect(cv); cv.connect(MUS.bus);
+  MUS.ch = {};
+  for (const k in SMPI) { const c = SMPI[k], p = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); if (p.pan) p.pan.value = c[1];
+    p.connect(c[3] ? MUS.duck : MUS.bus); const sg = ctx.createGain(); sg.gain.value = c[2]; p.connect(sg); sg.connect(MUS.revIn); MUS.ch[k] = p; }
+}
+// 한 음: 가장 가까운 녹음 음을 골라 빠르기로 음높이를 맞춤 · 녹음보다 길게 잡으면 겹쳐 이어 붙임(긴 현·금관)
+//  o: { atk 어택(초), rel 끝 페이드(초), rate 음높이 없는 타악기 빠르기, nx 다음 조각 }
+function sp(key, midi, t, dur, g, o) {
+  const L = SMP.I && SMP.I[key]; if (!L || !L.length || !MUS.ch) return; const ctx = AU.ctx; o = o || {};
+  let e;
+  if (midi == null || L[0][0] == null) { SMP.rr[key] = ((SMP.rr[key] || 0) + 1) % L.length; e = L[SMP.rr[key]]; }
+  else { e = L[0]; for (const x of L) if (Math.abs(x[0] - midi) < Math.abs(e[0] - midi)) e = x; }
+  const sk = o.skip || 0, rate = midi != null && e[0] != null ? Math.pow(2, (midi - e[0]) / 12) : (o.rate || 1), len = (e[2] - sk) / rate, v = g * SMPI[key][0]; t = Math.max(0, t);
+  const want = dur || len, atk = o.atk || 0.003, s = ctx.createBufferSource(), gg = ctx.createGain(); s.buffer = SMP.buf; s.playbackRate.value = rate;
+  const seg = Math.min(want, len), rel = Math.min(o.rel || 0.2, seg * 0.4), cont = want > len + 0.05 && len > 1;
+  gg.gain.setValueAtTime(0, t); gg.gain.linearRampToValueAtTime(v, t + atk);
+  if (cont) { gg.gain.setValueAtTime(v, t + len - 0.6); gg.gain.linearRampToValueAtTime(0, t + len); }
+  else if (seg < len - 0.02) { gg.gain.setValueAtTime(v, t + Math.max(atk, seg - rel)); gg.gain.linearRampToValueAtTime(0, t + seg); }
+  s.connect(gg); gg.connect(MUS.ch[key]); s.start(t, e[1] + sk, e[2] - sk); s.stop(t + len + 0.05);
+  if (cont) sp(key, midi, t + len - 0.6, want - len + 0.6, g, { atk: 0.6, rel: o.rel });   // 다음 조각 (어택이 묻히게 서서히 들어옴)
+}
+const f2m = f => 69 + 12 * Math.log2(f / 440);
+function smpPad(n, t, dur, g, atk) { sp(n < 50 ? 'celL' : n < 62 ? 'vlaL' : 'vlnL', n, t, dur, g, { atk: atk || 0.35, rel: 0.6 }); }
 function musicSetLevel() { if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetAtTime(musicLevel(), AU.ctx.currentTime, 0.2); }
 function note(type, f, t, dur, gain, cut, dest, atk) {
   const ctx = AU.ctx, o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f;
@@ -54,6 +105,14 @@ const STYLES = {
   epic:    { bpm: 82, scale: [0, 2, 3, 5, 7, 8, 10], key: 2, progs: [['Dm', 'Bb', 'F', 'C'], ['Dm', 'C', 'Bb', 'C'], ['Bb', 'F', 'C', 'Dm'], ['Dm', 'Bb', 'Gm', 'C']], orch: true },
   // 잔잔한 현악 (합성): 느린 패드 + 하프 분산화음 · 타악기 없음 · 1종 연습·튜토리얼
   calm:    { bpm: 66, scale: [0, 2, 4, 5, 7, 9, 11], key: 5, progs: [['F', 'C', 'Dm', 'Bb'], ['Dm', 'Bb', 'F', 'C'], ['F', 'Am', 'Bb', 'C']], orch: true, soft: true }
+};
+// 녹음 악기 편성 (비트 스타일): kg 큰북 세기 · sn 뒷박 · hh 박 쪼개기 · perc 탬버린 · bass·pad·arp·lead 악기 · fill 구간 끝 채움
+const SI = {
+  drive:   { kg: 0.8, sn: 'sn', clap: 1, hh: 'hhC', perc: 'tamb', pad: 'str', arp: 'vlnS', arpO: 12, lead: 'hrn', fill: 'tom' },
+  action:  { kg: 0.95, sn: 'sn', clap: 1, hh: 'hhC', perc: 'tamb', pad: 'str', arp: 'vlnS', arpO: 12, lead: 'hrnS', timp: 1, fill: 'tom' },
+  tension: { kg: 0.7, sn: 'snSoft', hh: 'shk', pad: 'vlnT', arp: 'vlnP', arpO: 12, lead: 'clL', drone: 'celL', fill: 'timpR' },
+  forest:  { kg: 0.5, sn: 'conga', hh: 'shk', pad: 'str', arp: 'mar', arpO: 0, lead: 'flL', fill: 'conga' },
+  night:   { kg: 0.45, pad: 'vib', arp: 'pno', arpO: 0, lead: 'pno', drone: 'celL', glk: 1 }
 };
 // 비트 스타일의 킥 패턴 (구간마다 하나 골라 단조롭지 않게) · 16스텝 중 킥이 울리는 자리
 const KICKS = { four: [[0, 4, 8, 12], [0, 4, 8, 10, 12], [0, 6, 8, 12], [0, 3, 6, 8, 11, 12]], half: [[0, 8], [0, 7, 8], [0, 8, 14]], two: [[0, 10], [0, 6, 10], [0, 10, 13]], sparse: [[0]] };
@@ -90,12 +149,14 @@ function songSection() {   // 구간이 바뀔 때마다 새 화음 진행·멜�
 }
 // ---- 오케스트라 음색 (합성) ----
 function strings(f, t, dur, gain, dest, atk, cut) {   // 현: 살짝 어긋난 톱니파 3겹 + 저역 필터 + 느린 어택
+  if (smpOn()) { const m = Math.round(f2m(f)); if (dur < 0.5) sp(m < 55 ? 'celS' : 'vlnS', m, t, dur + 0.25, gain * 12); else smpPad(m, t, dur + 0.25, gain * 11, atk); return; }
   const ctx = AU.ctx, g = ctx.createGain(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.setValueAtTime(cut || 1400, t); lp.Q.value = 0.4;
   for (const d of [-7, 0, 6]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; o.connect(lp); o.start(t); o.stop(t + dur + 0.3); }
   lp.connect(g); g.connect(dest || MUS.bus);
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + (atk || 0.25)); g.gain.setValueAtTime(gain, t + Math.max(atk || 0.25, dur - 0.25)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.25);
 }
 function brass(f, t, dur, gain, dest) {   // 금관: 톱니파 2겹 + 밴드패스 + 짧은 어택·약한 비브라토
+  if (smpOn()) { const m = Math.round(f2m(f)); if (dur < 0.45) sp(m < 46 ? 'tbnS' : 'hrnS', m, t, dur + 0.3, gain * 11); else sp('hrnL', m, t, dur + 0.15, gain * 10, { atk: 0.04, rel: 0.25 }); return; }
   const ctx = AU.ctx, g = ctx.createGain(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(1600, f * 2.5); bp.Q.value = 0.7;
   const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.5; lg.gain.value = f * 0.004; lfo.connect(lg);
   for (const d of [-4, 5]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d; lg.connect(o.frequency); o.connect(bp); o.start(t); o.stop(t + dur + 0.15); }
@@ -103,17 +164,19 @@ function brass(f, t, dur, gain, dest) {   // 금관: 톱니파 2겹 + 밴드패�
   g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.045); g.gain.setValueAtTime(gain * 0.85, t + Math.max(0.05, dur - 0.08)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.12);
 }
 function timpani(f, t, gain) {   // 팀파니: 사인 음정 하강 + 짧은 잡음 타격
+  if (smpOn()) { let m = f2m(f); while (m > 46) m -= 12; while (m < 31) m += 12; sp('timp', m, t, 1.8, Math.min(1, gain * 0.9)); return; }
   const ctx = AU.ctx, o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(f * 1.6, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.06);
   g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 1);
   noiseHit(t, 'lowpass', 400, 0, gain * 0.5, 0.08);
 }
-function osnare(t, gain) { noiseHit(t, 'bandpass', 1500, 1.2, gain, 0.12); noiseHit(t, 'highpass', 4000, 0, gain * 0.4, 0.06); }   // 오케스트라 스네어
+function osnare(t, gain) { if (smpOn()) { sp('sn', null, t, 0.5, Math.min(1, gain * 2.4)); return; } noiseHit(t, 'bandpass', 1500, 1.2, gain, 0.12); noiseHit(t, 'highpass', 4000, 0, gain * 0.4, 0.06); }   // 오케스트라 스네어
 function swellCym(t, dur, gain) {   // 심벌 스웰: 잡음이 서서히 커졌다가 구간 첫 박에서 터짐
+  if (smpOn()) { const e = SMP.I.swell && SMP.I.swell[0]; if (e) { const st = t + dur - (e[3] || e[2] * 0.7), sk = Math.max(0, t - st); sp('swell', null, st + sk, 0, Math.min(1, gain * 6), { skip: sk, atk: sk ? 0.3 : 0.003 }); } return; }
   const ctx = AU.ctx, s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500; const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + dur); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 1.4);
   s.connect(f); f.connect(g); g.connect(MUS.bus); s.start(t, Math.random()); s.stop(t + dur + 1.5);
 }
-function harp(f, t, gain) { note('triangle', f, t, 1.6, gain, 2600, MUS.bus, 0.004); }   // 하프: 삼각파 짧은 어택·긴 여운
+function harp(f, t, gain) { if (smpOn()) { sp('harp', Math.round(f2m(f)), t, 2.4, Math.min(1, gain * 14)); return; } note('triangle', f, t, 1.6, gain, 2600, MUS.bus, 0.004); }   // 하프: 삼각파 짧은 어택·긴 여운
 // 오케스트라 스타일 한 스텝 (16분음표 단위) · e = 에너지 1~4 · soft = 잔잔한 현악
 function orchStep(st, sec, bar, step, ch, e, last, t, s16) {
   const soft = !!st.soft, r = SONG.rnd, beat = step % 4 === 0, half = step % 8 === 0;
@@ -137,7 +200,45 @@ function orchStep(st, sec, bar, step, ch, e, last, t, s16) {
   if (e <= 2 && sec.n !== 'intro' && step === 0 && bar % 2 === 1) { const M = SONG.motif.filter(Boolean); if (M.length) strings(mf(M[bar % M.length]), t, s16 * 12, 0.035, MUS.bus, 0.3, 2000); }   // 낮은 에너지: 높은 현이 주제 한 음씩
   // 심벌 스웰: 구간 마지막 마디 → 다음 구간 첫 박 · 첫 박 크래시
   if (last && step === 8 && e >= 2) swellCym(t, s16 * 8, 0.12);
-  if (bar === 0 && step === 0 && sec.e >= 2) noiseHit(t, 'highpass', 4000, 0, 0.14, 1.8);
+  if (bar === 0 && step === 0 && sec.e >= 2) { if (smpOn()) { sp('crash', null, t, 0, 0.7); timpani(mf(root - 12), t, 0.9); } else noiseHit(t, 'highpass', 4000, 0, 0.14, 1.8); }
+}
+// 녹음 악기로 비트 스타일 한 스텝 (합성판과 같은 자리·같은 음, 악기만 다름)
+function beatStepS(st, sec, bar, step, ch, e, last, t, s16) {
+  const I = SI[SONG.style], k = st.kick, KP = SONG.kick || KICKS.four[0];
+  const kickOn = e >= 2 && (k === 'sparse' ? step === 0 && bar % 2 === 0 : SONG.half ? step === 0 || step === 8 : KP.includes(step));
+  if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) { sp('bd', null, t, 0, (e === 1 ? 0.6 : 1) * I.kg); MUS.duck.gain.setValueAtTime(0.5, t); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3); }
+  if (I.sn && e >= 2 && k !== 'sparse' && (SONG.half ? step === 8 : (step === 4 || step === 12))) { if (I.sn === 'conga') sp('conga', null, t, 0, 0.8); else { sp('sn', null, t, 0, I.sn === 'snSoft' ? 0.45 : 0.85); if (I.clap && e >= 3) sp('clap', null, t, 0, 0.5); } }
+  if (e >= 3 && last && step >= 12 && k !== 'sparse') { if (I.fill === 'tom') sp(step < 14 ? 'tomH' : 'tomL', null, t, 0, 0.55 + (step - 12) * 0.12); else if (I.fill === 'conga') sp('conga', null, t, 0, 0.5 + (step - 12) * 0.1); else sp('sn', null, t, 0, 0.25 + (step - 12) * 0.08); }
+  if (I.fill === 'timpR' && last && step === 8 && e >= 2) sp('timpR', null, t, s16 * 8 + 0.3, 0.6, { rel: 0.3 });
+  if (st.hat && I.hh && e >= 2 && step % (16 / st.hat) === 0) { const open = I.hh === 'hhC' && e >= 3 && step % 8 === 6; sp(open ? 'hhO' : I.hh, null, t, open ? 0.45 : 0, step % 4 === 2 ? 0.75 : 0.42); }
+  if (I.perc && e >= 3 && step % 8 === 4) sp(I.perc, null, t, 0, 0.5);
+  if (I.timp && e >= 3 && step === 0) timpani(mf(ch[0] - 12), t, 0.8);
+  if (st.drone && I.drone && step === 0 && bar % 2 === 0) sp(I.drone, ch[0] >= 48 ? ch[0] - 12 : ch[0], t, s16 * 32, 0.3, { atk: 0.8, rel: 0.8 });
+  // 베이스 (첼로 스피카토·콘트라베이스 피치카토·긴 첼로)
+  const b = st.bass, bn = ch[0] - 12;
+  if (b === 'roll' && step % 4 !== 0) sp('celS', bn + 12 + (step % 4 === 2 ? 12 : 0), t, s16 * 1.3, 0.75);
+  if (b === 'oct' && step % 2 === 0) { sp('celS', bn + 12 + (step % 4 === 2 ? 12 : 0), t, s16 * 1.6, 0.8); if (step % 8 === 0) sp('cbP', bn, t, 0, 0.75); }
+  if (b === 'pulse' && step % 2 === 0) sp('cbP', bn, t, s16 * 1.8, 0.6);
+  if (b === 'walk' && step % 4 === 0) sp('cbP', bn + [0, 7, 12, 7][step / 4], t, 0, 0.85);
+  if (b === 'long' && step === 0) sp('celL', ch[0] >= 48 ? ch[0] - 12 : ch[0], t, s16 * 16 + 0.3, 0.5, { atk: 0.15, rel: 0.5 });
+  // 화음 (현 패드 · 트레몰로 · 비브라폰)
+  if (step === 0) {
+    if (I.pad === 'vib') ch[1].forEach((n, i) => sp('vib', n, t + i * 0.025, 0, 0.3));
+    else for (const n of ch[1]) sp(I.pad === 'vlnT' ? 'vlnT' : n < 62 ? 'vlaL' : 'vlnL', n + (I.pad === 'vlnT' ? 12 : 0), t, s16 * 16 + 0.4, e >= 3 ? 0.26 : 0.32, { atk: 0.3, rel: 0.6 });
+  }
+  // 분산화음 (현 스피카토·마림바·피치카토·피아노)
+  if ((e >= 3 || st.pluck) && step % (16 / st.arp) === 0) { const ar = ch[1].concat(ch[1].map(n => n + 12)), i = (step / (16 / st.arp) + bar) % ar.length; sp(I.arp, ar[i] + I.arpO, t, I.arp === 'vlnS' ? s16 * 1.5 : 0, I.arp === 'pno' ? 0.38 : 0.5); }
+  // 선율 (호른·금관 스탭·플루트·클라리넷·피아노)
+  if (sec.n !== 'intro' && sec.n !== 'brk' && step % 2 === 0) { const M = bar % 4 >= 2 ? SONG.var : SONG.motif, n = M[(bar % 2) * 8 + step / 2];
+    if (n && (e >= 3 || sec.n === 'A')) { const L = I.lead, d = s16 * 1.8;
+      if (L === 'hrn') sp(d < 0.45 ? 'hrnS' : 'hrnL', n - 12, t, d + 0.15, 0.6, { atk: 0.03 });
+      else if (L === 'hrnS') { sp('hrnS', n - 12, t, d + 0.2, 0.7); if (e >= 4) sp('tbnS', n - 24, t, d + 0.2, 0.45); }
+      else if (L === 'pno') sp('pno', n, t, 0, 0.55);
+      else sp(L, n + (L === 'flL' ? 12 : 0), t, d + 0.2, 0.5, { atk: 0.05, rel: 0.15 }); } }
+  if (I.glk && step === 8 && bar % 4 === 3) sp('glk', ch[1][2] + 24, t, 0, 0.35);
+  // 구간 끝 심벌 스웰 → 다음 구간 첫 박 크래시
+  if (last && step === 0 && e >= 2) swellCym(t, s16 * 16, 0.12);
+  if (bar === 0 && step === 0 && sec.e >= 2) sp('crash', null, t, 0, 0.6);
 }
 function musicSchedule() {
   const ctx = AU.ctx; if (!ctx) return;
@@ -158,6 +259,7 @@ function musicSchedule() {
     let e = sec.e; if (S.state === 'run' && (S.boosting || (DR.v && DR.v.length() > 14))) e = Math.min(4, e + 1); if (S.state === 'menu') e = Math.min(e, 2);
     const last = bar === sec.bars - 1;
     if (MUS.on && MUS.vol > 0 && st.orch) orchStep(st, sec, bar, step, ch, e, last, t, s16);
+    else if (MUS.on && MUS.vol > 0 && smpOn() && SI[SONG.style]) beatStepS(st, sec, bar, step, ch, e, last, t, s16);
     else if (MUS.on && MUS.vol > 0) {
       const k = st.kick, KP = SONG.kick || KICKS.four[0], kickOn = e >= 2 && (k === 'sparse' ? step === 0 && bar % 2 === 0 : SONG.half ? step === 0 || step === 8 : KP.includes(step));
       if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) {

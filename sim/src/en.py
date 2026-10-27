@@ -88,6 +88,7 @@ EN = {'확인·사진': 'Confirm/photo', '확인 · 사진 보고': 'Confirm · 
 '스포츠': 'Sport',
 '비행 보조': 'Flight assist',
 '켬': 'On',
+'<span class="seg" id="segMusSyn" title="실제 악기 녹음(CC0) 또는 합성음"><button data-v="0" class="on">실제 악기</button><button data-v="1">신스</button></span>': '<span class="seg" id="segMusSyn" title="Recorded instruments (CC0) or synth"><button data-v="0" class="on">Instruments</button><button data-v="1">Synth</button></span>',
 '끔': 'Off',
 '고스트 드론': 'Ghost drone',
 '기준 비행': 'Reference',
