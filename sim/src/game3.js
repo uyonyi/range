@@ -30,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang'];
+const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -75,7 +75,7 @@ function startRun(kind) {
   renderList(); updateTags();
   S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
   if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (리플레이·영상)
-  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? (XR_ON && vrStickMode() === 1 ? 'READY · 오른쪽 스틱 위로 이륙' : 'READY · 왼쪽 스틱 위로 이륙') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
+  showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? ((XR_ON ? vrStickMode() === 1 : stickMode() === 1) ? 'READY · 오른쪽 스틱 위로 이륙' : 'READY · 왼쪽 스틱 위로 이륙') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
   COMM.q.length = 0; if (kind === 'course') setTimeout(() => comm(`${CS}, CONTROL. Course is clear, cleared for takeoff. ${WIND.lv ? 'Winds ' + (WIND.lv === 1 ? 'three' : 'seven') + ' meters per second. ' : ''}Over.`, '코스 이상 없음 · 이륙 허가'), 1500);
 }
@@ -717,7 +717,7 @@ function drawSticks() {
     g.lineWidth = 2.2; g.strokeStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.moveTo(x + 31 - 7, 35); g.lineTo(x + 31 + 7, 35); g.moveTo(x + 31, 35 - 7); g.lineTo(x + 31, 35 + 7); g.stroke(); g.lineWidth = 1;   // 가운데(중립) 십자
     g.fillStyle = '#ffc828'; g.beginPath(); g.arc(x + 31 + sx * 27, 35 - sy * 27, 5, 0, 7); g.fill();
   };
-  box(4, IN.yaw, IN.thr); box(82, IN.roll, IN.pitch);
+  if (stickMode() === 1 && !XR_ON) { box(4, IN.yaw, IN.pitch); box(82, IN.roll, IN.thr); } else { box(4, IN.yaw, IN.thr); box(82, IN.roll, IN.pitch); }   // 조종기 모드 1 = 왼쪽 전진·회전
 }
 // 화면 좌표
 const _np = new V3();
@@ -969,4 +969,5 @@ function frame(now, noRender) {
     audioUpdate(thr, subj.v ? subj.v.length() : 0, act, mo); }
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
   if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (!noRender && !frame.boot) { frame.boot = 1; setTimeout(() => { try { if (window.__bootReady) window.__bootReady(); } catch (e) { } }, 60); }   // 첫 화면이 그려지면 인트로(불러오는 화면)를 걷음
 }

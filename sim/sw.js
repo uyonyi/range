@@ -1,9 +1,9 @@
 // FPV Terrain Trainer · service worker (자동 생성: src/build.py)
-const VER = '8d23a3cbf3', CACHE = 'fpvsim-' + VER, CORE = ["en.html", "icons/favicon-32.png", "icons/icon-192.png", "index.html", "js/app.en.js?v=ac5993e8", "js/app.ko.js?v=a5fed660", "lib/proj4.js", "lib/three.min.js", "manifest.en.webmanifest", "manifest.webmanifest", "sites/yeongin.js?v=7804484e", "sites/yeongin_ground.webp?v=853664ca", "sites/yeongin_ground_lo.webp?v=af40bcdf", "vr/en.html", "vr/index.html", "vr/js/app.en.js?v=ac5993e8", "vr/js/app.ko.js?v=a5fed660"];
+const VER = 'c4c95a226c', CACHE = 'fpvsim-' + VER, CORE = ["en.html", "icons/favicon-32.png", "icons/icon-192.png", "index.html", "js/app.en.js?v=c83c71d7", "js/app.ko.js?v=c8817ee1", "lib/proj4.js", "lib/three.min.js", "manifest.en.webmanifest", "manifest.webmanifest", "sites/yeongin.js?v=7804484e", "sites/yeongin_ground.webp?v=853664ca", "sites/yeongin_ground_lo.webp?v=af40bcdf", "vr/en.html", "vr/index.html", "vr/js/app.en.js?v=c83c71d7", "vr/js/app.ko.js?v=c8817ee1"];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fpvsim-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
-  const r = e.request; if (r.method !== 'GET') return; const u = new URL(r.url); if (u.origin !== location.origin) return;
+  const r = e.request; if (r.method !== 'GET' || r.headers.has('range')) return; const u = new URL(r.url); if (u.origin !== location.origin) return;   // 영상(부분 요청)은 브라우저에 맡김
   if (r.mode === 'navigate') {   // 페이지: 네트워크 먼저 (새 버전 바로 반영), 안 되면 캐시
     e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); return res; }).catch(() => caches.match(r, { ignoreSearch: true }).then(m => m || caches.match(u.pathname.endsWith('/') ? u.pathname + 'index.html' : r))));
     return;

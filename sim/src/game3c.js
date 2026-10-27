@@ -7,10 +7,11 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
 (function touchUI() {
   if (!IS_TOUCH) return;
   const R = 62;
-  function stick(zoneId, kx, ky) {
+  const AX = z => stickMode() === 1 ? (z === 'tzL' ? ['yaw', 'pitch'] : ['roll', 'thr']) : (z === 'tzL' ? ['yaw', 'thr'] : ['roll', 'pitch']);   // 조종기 모드 1·2
+  function stick(zoneId) {
     const zone = $(zoneId), base = zone.querySelector('.base'), knob = zone.querySelector('.knob');
     let id = null, ox = 0, oy = 0;
-    const set = (x, y) => { TOUCH[kx] = x; TOUCH[ky] = y; };
+    const set = (x, y) => { const [kx, ky] = AX(zoneId); TOUCH[kx] = x; TOUCH[ky] = y; };
     zone.addEventListener('pointerdown', e => {
       if (id !== null) return; id = e.pointerId; zone.setPointerCapture(id); initAudio(); musicStart();
       const r = zone.getBoundingClientRect(); ox = e.clientX - r.left; oy = e.clientY - r.top;
@@ -29,7 +30,7 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
     const end = e => { if (e.pointerId !== id) return; id = null; set(0, 0); base.classList.remove('on'); };
     zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
   }
-  stick('tzL', 'yaw', 'thr'); stick('tzR', 'roll', 'pitch');
+  stick('tzL'); stick('tzR');
   const tap = (id, key) => { const b = $(id); b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); initAudio(); musicStart(); pressed.push(key); b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); }); };
   tap('tbDrop', 'Space'); tap('tbPhoto', 'Enter'); tap('tbCam', 'KeyC'); tap('tbReset', 'KeyR'); tap('tbPause', 'Escape'); tap('tbAssist', 'KeyH'); tap('tbZoom', 'KeyZ'); tap('tbGuide', 'KeyV'); tap('tbHud', 'Digit0'); tap('tbBelly', 'KeyX'); tap('tbLight', 'KeyL'); tap('tbIR', 'KeyT');
   const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); boostToggle(); });   // 한 번 누르면 켜짐, 다시 누르면 꺼짐
@@ -42,6 +43,14 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
   addEventListener('resize', rot); addEventListener('orientationchange', () => setTimeout(rot, 200)); rot();
 })();
 
+// 조종기 모드가 바뀌면: 터치 값 초기화 + 스틱 아래 안내 글자
+function stickApply() {
+  for (const k of ['thr', 'yaw', 'pitch', 'roll']) TOUCH[k] = 0;
+  const m1 = stickMode() === 1, l = document.querySelector('#tzL .lbl'), r = document.querySelector('#tzR .lbl');
+  if (l) l.textContent = m1 ? L2x('↕ 전진·후진 ↔ 회전', '↕ fwd·back ↔ yaw') : L2x('↕ 상승·하강 ↔ 회전', '↕ climb·descend ↔ yaw');
+  if (r) r.textContent = m1 ? L2x('↕ 상승·하강 ↔ 좌우', '↕ climb·descend ↔ strafe') : L2x('↕ 전진·후진 ↔ 좌우', '↕ fwd·back ↔ strafe');
+}
+stickApply();
 // 시작할 때 자동 전체화면 (브라우저 규칙상 클릭·터치·키 입력이 있어야 전환됨)
 function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
 let fullAsk = 0;

@@ -16,9 +16,9 @@ function startBeforeTarget(tw, back, alt) {
 }
 const LESSONS = [
   { title: '기본 조작', sub: '이륙 · 제자리 비행 · 이동 · 착륙', custom: true,
-    text: [IS_TOUCH ? '왼쪽 스틱을 위로 밀면 올라가고 아래로 내리면 내려옵니다(좌우 = 기체 회전). 오른쪽 스틱으로 앞뒤·좌우로 움직입니다.' : '올라가기 {UP} · 내려오기 {DOWN} · 앞뒤 {FWD}/{BACK} · 좌우 이동 {LEFT}/{RIGHT} · 방향 돌리기 {YAWL}/{YAWR}. 키는 메뉴의 [키 설정]에서 바꿀 수 있습니다.',
+    text: [IS_TOUCH ? '{TOUCH1}' : '올라가기 {UP} · 내려오기 {DOWN} · 앞뒤 {FWD}/{BACK} · 좌우 이동 {LEFT}/{RIGHT} · 방향 돌리기 {YAWL}/{YAWR}. 키는 메뉴의 [키 설정]에서 바꿀 수 있습니다.',
       '입문 모드에서는 스틱(키)을 놓으면 기체가 그 자리에 멈춥니다. 급하게 누르지 말고 짧게 여러 번 눌러 보세요.',
-      '화면 왼쪽 아래 두 칸은 지금 스틱 위치입니다 (왼쪽 = 스로틀·회전, 오른쪽 = 전후·좌우).'],
+      '{STKBOX}'],
     spec: 'H 패드 지름 1.2 m · 착륙은 패드 위에서 속도가 거의 0일 때 0.8초 유지',
     start: () => ({ p: startPos(), h: startHead(), focus: OBJ.pad_start.world(0, 0, 0.5), landed: true }),
     steps: [
@@ -126,7 +126,13 @@ function tutFly() { if (S.tut && S.tut.st === 'intro') { S.tut.st = 'fly'; acc =
 function tutRetry() { tutStart(S.tut.i); tutFly(); }
 function tutNext() { if (S.tut.i + 1 < LESSONS.length) tutStart(S.tut.i + 1); else { toMenu(); } }
 function kbFill(t) {
-  const T = IS_TOUCH ? { UP: '왼쪽 스틱 ↑', DOWN: '왼쪽 스틱 ↓', YAWL: '왼쪽 스틱 ←', YAWR: '→', FWD: '오른쪽 스틱 ↑', BACK: '↓', LEFT: '오른쪽 스틱 ←', RIGHT: '→', DROP: 'DROP' } : null;
+  const m1 = stickMode() === 1;   // 조종기 모드 1: 상승·하강이 오른쪽 스틱, 전진·후진이 왼쪽 스틱
+  t = t.replace('{TOUCH1}', m1 ? L2x('오른쪽 스틱을 위로 밀면 올라가고 아래로 내리면 내려옵니다(좌우 = 옆으로 이동). 왼쪽 스틱으로 앞뒤로 움직이고 좌우로 기체를 돌립니다.', 'Push the right stick up to climb and down to descend (left/right = strafe). The left stick moves you forward and back and turns the drone.')
+    : L2x('왼쪽 스틱을 위로 밀면 올라가고 아래로 내리면 내려옵니다(좌우 = 기체 회전). 오른쪽 스틱으로 앞뒤·좌우로 움직입니다.', 'Push the left stick up to climb and down to descend (left/right = yaw). Use the right stick to move forward, back and sideways.'))
+    .replace('{STKBOX}', m1 ? L2x('화면 왼쪽 아래 두 칸은 지금 스틱 위치입니다 (왼쪽 = 전후·회전, 오른쪽 = 스로틀·좌우).', 'The two boxes at the bottom left show your current stick positions (left = pitch·yaw, right = throttle·roll).')
+    : L2x('화면 왼쪽 아래 두 칸은 지금 스틱 위치입니다 (왼쪽 = 스로틀·회전, 오른쪽 = 전후·좌우).', 'The two boxes at the bottom left show your current stick positions (left = throttle·yaw, right = pitch·roll).'));
+  const T = IS_TOUCH ? (m1 ? { UP: '오른쪽 스틱 ↑', DOWN: '오른쪽 스틱 ↓', YAWL: '왼쪽 스틱 ←', YAWR: '→', FWD: '왼쪽 스틱 ↑', BACK: '↓', LEFT: '오른쪽 스틱 ←', RIGHT: '→', DROP: 'DROP' }
+    : { UP: '왼쪽 스틱 ↑', DOWN: '왼쪽 스틱 ↓', YAWL: '왼쪽 스틱 ←', YAWR: '→', FWD: '오른쪽 스틱 ↑', BACK: '↓', LEFT: '오른쪽 스틱 ←', RIGHT: '→', DROP: 'DROP' }) : null;
   return t.replace(/\{(UP|DOWN|YAWL|YAWR|FWD|BACK|LEFT|RIGHT|DROP)\}/g, (m, k) => '<b>' + (T ? T[k] : keyName(KB[{ UP: 'up', DOWN: 'down', YAWL: 'yawL', YAWR: 'yawR', FWD: 'fwd', BACK: 'back', LEFT: 'left', RIGHT: 'right', DROP: 'drop' }[k]])) + '</b>');
 }
 function tutRender() {
