@@ -47,7 +47,7 @@ def sources(lang, mode, c1=None):
         if left: print('LEFTOVER', list(left)[:30])
     T = PRIV['titles'] if mode == 'private' else TITLES[mode]
     t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang])
-    if mode != 'public': t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
+    if mode != 'public': t = re.sub(r' data-music="[^"]*"', '', t); t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
     return t, game
 
 
@@ -92,7 +92,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
-    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.webm', 'intro.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
@@ -181,12 +181,16 @@ def build_pages(outdir, site_ids, vr):
         other = 'index.html' if lang == 'en' else 'en.html'
         t = t.replace('</title>', f'</title>\n<link rel="manifest" href="{up}manifest{"" if lang == "ko" else ".en"}.webmanifest"><link rel="icon" type="image/png" sizes="32x32" href="{up}icons/favicon-32.png"><link rel="apple-touch-icon" href="{up}icons/apple-touch-icon.png"><meta name="theme-color" content="#0e1216"><meta name="apple-mobile-web-app-title" content="FPV Trainer">', 1)
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
+        pg = '' if lang == 'ko' else 'en.html'   # 컴퓨터·VR 자동 나눔: VR 헤드셋 브라우저(Quest 등) → VR 판 · VR 을 못 하는 브라우저 → PC 판 (일부러 고를 때: ?pc · ?vr)
+        if vr: br = "<script>try{if(!/[?&](vr|test)\\b/.test(location.search)){var go=function(){location.replace('../%s?pc')};if(!navigator.xr||!navigator.xr.isSessionSupported)go();else navigator.xr.isSessionSupported('immersive-vr').then(function(ok){if(!ok)go()},go)}}catch(e){}</script>" % pg
+        else: br = "<script>try{if(/[?&]pc\\b/.test(location.search))sessionStorage.setItem('fpvsim_pc','1');if(/OculusBrowser|Quest|PicoBrowser|Wolvic/i.test(navigator.userAgent)&&!/[?&]test/.test(location.search)&&!sessionStorage.getItem('fpvsim_pc'))location.replace('vr/%s')}catch(e){}</script>" % pg
+        t = t.replace('</title>', '</title>\n' + br, 1)
         tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
         mv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('music.json', 'music.mp3') if os.path.exists(f))).hexdigest()[:8]   # 배경음악 악기 묶음 버전
         rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
         flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';" + (f"window.SIM_API='{RANK_API}';" if RANK_API else '')
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
-        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
+        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
         t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv)
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')

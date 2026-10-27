@@ -2084,7 +2084,7 @@ if ($('bHelp2')) $('bHelp2').onclick = () => openPanel('helpPanel');
 if ($('bRC2')) $('bRC2').onclick = () => { closePanels(); rcOpen(); };
 if ($('wzVR')) $('wzVR').onclick = () => { if (window.SIM_VR_URL) location.href = window.SIM_VR_URL + (window.SIM_LANG === 'en' ? 'en.html' : ''); };
 setInterval(() => { const a = $('padStatus'), b = $('padStatus2'); if (a && b) b.textContent = a.textContent; }, 1000);
-setTimeout(() => wizGo(HAS_INTRO ? 0 : 1), 0);
+setTimeout(() => wizGo(1), 0);   // 컴퓨터·VR 은 주소가 알아서 나눔 (VR 헤드셋 브라우저 → VR 판 · 다른 기기 → PC 판, build.py) · 고르는 첫 화면은 ◀ 처음 으로
 // ---- 1단계 비행 설정: 비행 난이도 묶음 · 조종기 모드 · 화면 구성(이 기기: PC·휴대폰·VR) — 고른 값이 그대로 기본 설정으로 저장됨 ----
 const FLY_PRE = [
   { id: 'train', ic: '🐣', n: ['입문', 'Beginner'], d: ['놓으면 멈춤 · 느리게 · 자동 방향', 'Stops when released · slow · auto heading'], set: { mode: 'gps', assistLv: 2, feel: 'train', expo: 'soft' } },
@@ -2169,6 +2169,7 @@ function sha256hex(str) {
 function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex('fpv~' + i + '~' + x); return x; }
 (function pinGate() {
   const SALT = 'k7Qx2#range', MID = 5000, N = 12000, FIN = '667c6eac4841dacac28af88ce9febae877dcf0556f15edc5211601d0f51bb8eb', KEY = 'fpvsim_pin_ok', el = $('pinGate'); if (!el) return;
+  if (window.__bootGate || window.SIM_GATE_OK) return;   // 공개판: 첫 화면(인트로 앞)에서 이미 물음 (template.html)
   const okMid = m => typeof m === 'string' && /^[0-9a-f]{64}$/.test(m) && pinStretch(m, MID, N) === FIN;
   let ok = false; try { ok = okMid(localStorage.getItem(KEY)); } catch (e) { }
   if (ok || window.SIM_UNLOCKED || /[?&]test/.test(location.search)) return;   // 암호로 잠근 파일은 이미 문구 암호를 거쳤으므로 다시 묻지 않음
@@ -2191,11 +2192,14 @@ function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex
 })();
 // 처음 화면: 컴퓨터 / VR 갈림길 (PC 판과 VR 판은 서로 다른 주소)
 function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
-if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : ''); else wizGo(1); };
+if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : '') + '?pc'; else wizGo(1); };   // ?pc: 헤드셋에서 일부러 PC 판으로 (자동으로 VR 판에 되돌아가지 않게)
+if ($('vrPC') && window.SIM_BASE) $('vrPC').href = window.SIM_BASE + (window.SIM_LANG === 'en' ? 'en.html' : '') + '?pc';
 // 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
 { const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
   if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
-    c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; } }
+    c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); };
+    // 1단계에도 같은 단추 (처음 화면을 건너뛰므로)
+    const nx = $('wz1Next'); if (nx && !$('wz1Cont')) { const b = document.createElement('button'); b.id = 'wz1Cont'; b.className = 'wzcont'; b.title = $('introContS').textContent; b.textContent = '↻ ' + L2('이어서: ', 'Continue: ') + (MS_NAME[lastMs] || lastMs); b.onclick = c.onclick; nx.parentNode.insertBefore(b, nx); } } }
 if ($('introVR')) $('introVR').onclick = () => {
   const n = $('introNote');
   if (window.SIM_VR) { if (VR_OK.ok) wizGo(1); else if (n) n.textContent = L2('이 기기·브라우저는 VR을 지원하지 않습니다. Meta Quest 헤드셋의 브라우저에서 이 주소를 열어 주세요.', 'This device or browser does not support VR. Open this address in the Meta Quest browser.'); return; }

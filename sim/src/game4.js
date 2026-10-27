@@ -437,15 +437,15 @@ function advance(sec, step, skipRender) { step = step || 1 / 60; const n = Math.
 
 // 시험용 핸들
 // 테스트용: 배경음악을 오프라인으로 그려 WAV(16비트) 로 돌려줌 (스타일 확인용 · ?test 에서만 씀)
-async function renderMusic(style, dur, state, kind) {
+async function renderMusic(style, dur, state, kind, cue, vol) {   // cue: 정해진 곡(인트로 음악 등) — 악기 함수를 받아 직접 음을 놓음 (tools/intro/music.js)
   if (!window.SIM_NOSMP && SMP.st !== 'fail') { initAudio(); await smpLoad(); }   // 녹음 악기 (있으면)
   const sr = 44100, off = new OfflineAudioContext(2, Math.ceil(sr * dur), sr); let fakeT = 0; Object.defineProperty(off, 'currentTime', { get: () => fakeT });
   const keep = { ctx: AU.ctx, master: AU.master, noise: AU.noise, bus: MUS.bus, duck: MUS.duck, dly: MUS.dly, timer: MUS.timer, next: MUS.next, step: MUS.step, ch: MUS.ch, revIn: MUS.revIn, state: S.state, kind: S.kind, on: MUS.on, vol: MUS.vol };
   const nb = off.createBuffer(1, sr * 2, sr); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  AU.ctx = off; AU.master = off.createGain(); AU.master.gain.value = 0.9; AU.master.connect(off.destination); AU.noise = nb; MUS.bus = null; MUS.timer = null; MUS.on = true; MUS.vol = 0.8;
+  AU.ctx = off; AU.master = off.createGain(); AU.master.gain.value = 0.9; AU.master.connect(off.destination); AU.noise = nb; MUS.bus = null; MUS.timer = null; MUS.on = true; MUS.vol = vol || 0.8;
   S.state = state || 'run'; S.kind = kind || 'ridge'; SONG.style = style; SONG.want = style; SONG.prog = null; SONG.sec = 0; SONG.bar = 0; SONG.rnd = (() => { let x = 12345; return () => (x = (x * 16807) % 2147483647) / 2147483647; })();
   musicStart(); clearInterval(MUS.timer);
-  for (fakeT = 0; fakeT < dur; fakeT += 0.1) musicSchedule();
+  if (cue) cue({ sp, timpani, brass, strings, harp, swellCym, smpPad, osnare, mf, smpOn: smpOn() }); else for (fakeT = 0; fakeT < dur; fakeT += 0.1) musicSchedule();
   const buf = await off.startRendering();
   Object.assign(AU, { ctx: keep.ctx, master: keep.master, noise: keep.noise }); Object.assign(MUS, { bus: keep.bus, duck: keep.duck, dly: keep.dly, timer: keep.timer, next: keep.next, step: keep.step, ch: keep.ch, revIn: keep.revIn, on: keep.on, vol: keep.vol }); S.state = keep.state; S.kind = keep.kind;
   const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4)); const w = (o, s2) => { for (let i = 0; i < s2.length; i++) out.setUint8(o + i, s2.charCodeAt(i)); };
