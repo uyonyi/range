@@ -1,4 +1,4 @@
-# 첫 화면 인트로 영상 (intro.mp4 · intro.jpg)
+# 첫 화면 인트로 영상 (intro.mp4 · intro.webm · intro.jpg)
 
 앱을 열면 불러오는 동안 보이는 5~6초 영상입니다. 시뮬레이터 장면을 그대로 렌더해 만듭니다.
 
@@ -12,8 +12,8 @@
 ```bash
 cd sim/src && python3 build.py public /tmp/pub && (cd /tmp/pub && python3 -m http.server 8768 &)
 node tools/intro/render.js                        # → tools/intro/fr/s1~s4/*.jpg (960×540, 24fps · 소프트웨어 렌더라 수십 분)
-sh tools/intro/compose.sh tools/intro tools/intro # → intro.mp4 · intro.jpg
-cp tools/intro/intro.mp4 tools/intro/intro.jpg .  # sim/src 에 두면 build.py 가 lib/ 로 복사
+sh tools/intro/compose.sh tools/intro tools/intro # → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro.jpg
+cp tools/intro/intro.mp4 tools/intro/intro.webm tools/intro/intro.jpg .  # sim/src 에 두면 build.py 가 lib/ 로 복사
 ```
 
 - 장면만 다시: `SHOT=s2,s3 node tools/intro/render.js` · 코스 장면 시작 시각: `T0=6.1` (기준 비행 초)
