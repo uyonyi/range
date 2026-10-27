@@ -1,8 +1,40 @@
 
 // =====================================================================
-//  가이드: 다음 과제까지 따라갈 사각 틀(3D) + 조작 안내 문구 + 아래 카메라
+//  안내 단계 · 목표 표시 · 비행 가이드(쉐브론 + 조작 안내 문구) · 아래 카메라
 // =====================================================================
 const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
+// ---- 안내 단계 (GD 버튼 · V 키 · VR 메뉴 · 옵션): 3 가이드 → 2 목표 → 1 지도 → 0 무전 → 3 ----
+//  목표 표시 "어디로" (화면 ◇·가장자리 화살표·거리, 빛기둥, 수색 구역 고리, 지금 과제 강조) ……… 2 이상
+//  비행 가이드 "어떻게" (쉐브론 경로, 조작 안내 문구, 게이트 조준 틀, 선회 원) ……………………… 3
+//  지도·항법 (지도의 목표·수색 원·점선, DIST·AREA, UAS 방위계 목표 바늘) …………………………… 1 이상 · 0 은 무전 방위·거리만
+//  단계와 상관없이 늘: 코스·임무 물체(링·게이트·패드·연기·차량)와 링 통과 방향, 다음 과제 이름, 계기, 투하 조준경, 무전
+//  기본값은 난이도: 입문 3 · 쉬움·ATTI 2 · 스포츠 1 (튜토리얼 3) · 바꾸면 그 판에만 (같은 임무 다시 포함) · 메뉴로 나가면 기본값
+var GL = { lv: 3, kind: null, user: false, live: false, pre: null, preDiff: null };
+const GL_NM = [['무전', 'Radio'], ['지도', 'Map'], ['목표', 'Target'], ['가이드', 'Guide']];
+const GL_DESC = [['지도에도 없음', 'bearings by radio'], ['화면 표시 없음', 'no screen markers'], ['경로 없이', 'no flight path'], ['목표 + 경로·조작', 'markers + path']];   // 바꿀 때 잠깐 뜨는 한 줄
+function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; const v = { train: 3, easy: 2, atti: 2, sport: 1 }[SET.diff]; return v == null ? 2 : v; }
+function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : (GL.pre != null && GL.preDiff === SET.diff) ? GL.pre : glDef('menu'); }
+const glTgt = () => gdLevel() >= 2, glFly = () => gdLevel() >= 3, glMap = () => gdLevel() >= 1;
+function glStart(kind) {   // startRun 에서
+  if (GL.live && GL.user && GL.kind === kind) { }                                        // 같은 임무 다시: 고른 단계 그대로
+  else if (GL.pre != null && GL.preDiff === SET.diff) { GL.lv = GL.pre; GL.user = true; }   // 출격 전에 옵션에서 고른 단계
+  else { GL.lv = glDef(kind); GL.user = false; }
+  GL.pre = null; GL.kind = kind; GL.live = true; glSync();
+}
+function glEnd() { GL.live = false; GL.user = false; glSync(); }   // toMenu 에서 (그 판 끝)
+function glSet(v, quiet) {
+  v = ((v % 4) + 4) % 4;
+  if (GL.live) { GL.lv = v; GL.user = true; } else { GL.pre = v; GL.preDiff = SET.diff; }
+  glSync();
+  if (!quiet && GL.live && S.state !== 'menu') showMsg(L2x('안내: ', 'NAV: ') + L2x(GL_NM[v][0], GL_NM[v][1]).toUpperCase() + ' (' + L2x(GL_DESC[v][0], GL_DESC[v][1]) + ')', '#fff', 1.6);
+}
+function glCycle() { const v = gdLevel(); glSet(v > 0 ? v - 1 : 3); }
+function glSync() {
+  const v = gdLevel(), b = $('tbGuide'), nm = L2x(GL_NM[v][0], GL_NM[v][1]);
+  if (b && b.dataset.lv !== String(v)) { b.dataset.lv = v; b.innerHTML = `GD<small>${nm}</small>`; }
+  document.querySelectorAll('#segGuide button').forEach(x => x.classList.toggle('on', +x.dataset.v === v));
+  if (S.state !== 'menu') try { updateTags(); } catch (e) { }   // 비행 화면 아래 상태 표시 (안내 …)
+}
 (function makeFrames() {
   // 비행 경로에 수직으로 서는 사각 틀 ('하늘의 길' 방식) - FPV·추적 시점 모두에서 잘 보임
   const o = 0.55, n = 0.49, arr = [];
@@ -133,7 +165,9 @@ function guideChevrons(curve, L, col, sp, wing) {
   }
   m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
 }
-function hideGuide() { BEACON.g.visible = false; GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+function hideNav() { const na = $('navArrow'); if (na) na.classList.add('hidden'); }
+function hideFly() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); }
+function hideGuide() { BEACON.g.visible = false; hideFly(); hideNav(); }
 // ---- 지상 목표 찾기 (정찰·산불·수색·활주로·패드): 목표에 하늘로 솟은 빛기둥 + 바닥 고리 · 멀리서도 보임 ----
 const TGT_STYLE = { recon: [0x4fe3ff, 'RECON', '정찰'], fire: [0xff8a2a, 'FIRE', '산불'], sarfind: [0x5dff9a, 'SAR', '수색'], sarkit: [0x5dff9a, 'DROP', '투하'], rwyland: [0xffd23a, 'RWY', '활주로'], land: [0xffd23a, 'PAD', '패드'], padland: [0xffd23a, 'PAD', '패드'] };   // 타격·차량 추적은 빛기둥 없음 (기만체·은밀 추적이 쉬워지지 않게)
 function tgtStyle(o) { const st = (o && TGT_STYLE[o.t]) || (o && o.kind === 'drop' ? [0xffc828, 'DROP', '투하'] : o && o.kind === 'land' ? [0xffd23a, 'PAD', '패드'] : null); return st; }
@@ -173,6 +207,7 @@ function navArrow(tgt, subj, o) {
   let x = _nv.x, y = _nv.y; if (behind) { x = -x; y = -y; }
   const W = innerWidth, H = innerHeight, mx = 0.80, my = 0.74;   // 가장자리 여백 (계기·목록 피함)
   const inside = !behind && Math.abs(x) < mx && Math.abs(y) < my;
+  if (inside && dist < 35 && o && (o.kind === 'ms' ? o.t === 'pass' : !!openingOf(o))) { el.classList.add('hidden'); return; }   // 게이트·링이 눈앞에 보이면 ◇ 는 빼고 문 자체(강조·조준 틀)로
   let sx, sy, rot;
   if (inside) { sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = 0; }   // 목표 자리에 ◇ + 거리
   else { const k = Math.max(Math.hypot(x / mx, y / my), 1e-6); x /= k; y /= k; /* 타원 가장자리: 모서리의 계기·목록을 피함 */ sx = (x + 1) / 2 * W; sy = (1 - y) / 2 * H; rot = Math.atan2(-(y), x) / Math.PI * 180; }
@@ -186,16 +221,17 @@ function updateGuide(subj) {
   const o = active ? curObj() : null;
   GUIDE.next = null;
   if (!o || (typeof isC1 === 'function' && isC1())) { hideGuide(); return; }
-  beaconUpdate(o, subj);
+  const tgtOn = glTgt(), flyOn = glFly();   // 목표 표시(2 이상) · 비행 가이드(3)
+  if (tgtOn) beaconUpdate(o, subj); else BEACON.g.visible = false;
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
-    hideGuide(); if (!SET.guide) return;
+    hideFly(); hideNav(); if (!flyOn) return;
     const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
   }
-  // 수색 구역(산불·실종자) 안: 경로 띠는 끄되 안내는 끊지 않음 — 구역 중심 화살표 + 할 일·고도 안내
+  // 수색 구역(산불·실종자) 안: 쉐브론은 끄고 (눈·열화상으로 찾기) 구역 중심 ◇ + 할 일·고도 안내
   if (o.kind === 'ms' && searchIn(o, subj.p)) {
-    GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;
-    navArrow(o.mk, subj, o);
-    if (!SET.guide) { $('guide').classList.add('hidden'); return; }
+    hideFly();
+    if (tgtOn) navArrow(o.mk, subj, o); else hideNav();
+    if (!flyOn) return;
     const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
     const en = window.SIM_LANG === 'en';
     if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press Enter/📷' : '불씨 포착 · 화면 가운데에 두고 Enter/📷') : (en ? 'Hiker in view · centre and Enter/📷' : '실종자 포착 · 가운데에 두고 Enter/📷'), 'ok']);
@@ -209,9 +245,9 @@ function updateGuide(subj) {
   }
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
-  GUIDE.next = pts[1];
-  navArrow(o.mk || pts[pts.length - 1], subj, o);
-  if (!SET.guide) { const keep = BEACON.g.visible; hideGuide(); BEACON.g.visible = keep; return; }
+  GUIDE.next = pts[1];   // 입문 자동 방향 보조도 씀 (안내 단계와 상관없이)
+  if (tgtOn) navArrow(o.mk || pts[pts.length - 1], subj, o); else hideNav();
+  if (!flyOn) { hideFly(); return; }
   // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
   { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
     const to = pts[1].clone().sub(pts[0]); to.y = 0; const dist = to.length(); if (dist > 0.5) to.divideScalar(dist);

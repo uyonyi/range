@@ -575,3 +575,9 @@ EN.update({
 '<b id="vrBackT">FPV 드론 VR</b><p id="vrBackD">Quest 컨트롤러로 조종하는 FPV 고글 화면 시뮬레이터입니다. 버튼을 누르면 VR 안 메뉴에서 시작합니다.</p><button id="vrBackGo" class="primary">VR 시작</button><a id="vrPC" href="../">PC·휴대폰 버전으로</a>': '<b id="vrBackT">FPV drone VR</b><p id="vrBackD">An FPV goggle-view simulator flown with Quest controllers. Press the button to start in the in-VR menu.</p><button id="vrBackGo" class="primary">Start VR</button><a id="vrPC" href="../en.html">PC / phone version</a>',
 })
 EN.update({'<button id="rpVid">⬇ 영상 저장</button>': '<button id="rpVid">⬇ Save video</button>'})
+EN.update({
+"안내 단계 <span class=\"seg\" id=\"segGuide\"><button data-v=\"3\" class=\"on\">가이드</button><button data-v=\"2\">목표</button><button data-v=\"1\">지도</button><button data-v=\"0\">무전</button></span>": "Nav aids <span class=\"seg\" id=\"segGuide\"><button data-v=\"3\" class=\"on\">Guide</button><button data-v=\"2\">Target</button><button data-v=\"1\">Map</button><button data-v=\"0\">Radio</button></span>",
+" <b>안내 단계</b> — 가이드: 목표 표시 + 쉐브론·조작 안내 · 목표: ◇·빛기둥만 · 지도: 지도에만 · 무전: 무전 방위·거리만. 기본값은 난이도(입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도), 바꾸면 이번 출격에만 · 비행 중 GD·V.": " <b>Nav aids</b> — Guide: target markers + chevrons and stick hints · Target: ◇ and beacon only · Map: on the map only · Radio: radio bearings only. The default follows the difficulty (Training Guide · Easy/ATTI Target · Sport Map); a change lasts for this sortie · in flight press GD or V.",
+"DROP 투하 · BST 부스트(켜기/끄기) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 안내 단계 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지": "DROP payload · BST boost (on/off) · CAM camera · ⟲ restart · ↓CAM belly camera · GD nav aids · ZM camera distance · ⛶ full screen · ❚❚ pause",
+"전체 화면 · 안내 단계 (가이드 → 목표 → 지도 → 무전) · 현재 과제 건너뛰기 (+20초)": "Full screen · nav aids (Guide → Target → Map → Radio) · skip current task (+20 s)",
+})

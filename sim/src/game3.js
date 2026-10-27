@@ -12,11 +12,12 @@ const MODES = {
 const ZOOMS = [{ d: 4.5, h: 1.5, fov: 62 }, { d: 2.6, h: 0.9, fov: 58 }, { d: 1.8, h: 0.6, fov: 56 }];   // 추적 카메라 거리 프리셋 (멀리·보통·가까이) · Z 키
 // 추적 카메라: 거리는 슬라이더(SET.camDist, 1.5~8 m)로 이어서 조절, 프리셋(Z)은 슬라이더 값을 바꿔 줌
 function zoomCfg() { const d = clamp(+SET.camDist || (ZOOMS[SET.zoom] || ZOOMS[1]).d, 1.5, 8); return { d, h: d * 0.34, fov: 56 + clamp((d - 2) / 4, 0, 1) * 7 }; }
-const SET = { belly: true, guide: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 1, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
+const SET = { belly: true, keymap: 'A', zoom: 1, diff: 'train', ghost: true, ghostSrc: 'ref', tilt: 15, showPath: false, light: false, assist: true, autoFull: true, af: 'x2d', acro: false, night: false, wind: 0, voice: true, vrMode: 1, vrModeW: 1, vrScreen: 'space', vrScr2: 1, vrCam: 'fpv', vrPip: 0, vrMap: true };
 // 저장 구조: 일반 설정은 평탄, 종목별 설정은 하위 묶음 (c1: 1종 실기). 구버전(평탄 c1xxx 키)도 읽음
 const SET_GROUPS = ['c1'];
 try { const s = JSON.parse(localStorage.getItem('fpvsim_fpv_settings') || '{}'); for (const g of SET_GROUPS) { const sub = s[g]; delete s[g]; if (sub && typeof sub === 'object') for (const k in sub) SET[g + k] = sub[k]; } Object.assign(SET, s); } catch (e) { }
 if (!SET.vrScr2) { SET.vrScreen = 'space'; SET.vrScr2 = 1; }   // VR 기본 화면: 공간 고정 (한 번 바꿔 줌, 그 뒤엔 고른 값 유지)
+delete SET.guide;   // 예전 가이드 켬/끔 저장값: 이제 안내 단계는 난이도 기본값 + 그 판에서만 바꿈 (game3d GL)
 if (!MODES[SET.diff]) SET.diff = 'train';
 // 비행 방식은 세 축으로 나눠 저장: 비행 모드(mode: gps·atti·man·acro) · 보조 단계(assistLv 2·1·0) · 비행감(feel: train·std·real). SET.diff/acro/assist 는 여기서 파생 (기존 코드 호환)
 function modeSync() {
@@ -29,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'guide', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang'];
+const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -56,6 +57,7 @@ function startRun(kind) {
   if (typeof c1Menu === 'function') c1Menu(kind);
   S.keysT = 0; S.keysShow = false; document.body.classList.toggle('calm', kind === 'tutorial' || (typeof isC1 === 'function' && isC1(kind)));   // 훈련·시험 모드는 차분한 톤
   S.kind = kind; S.state = kind === 'demo' ? 'demo' : 'run'; S.t = 0; S.running = false; S.finished = false; S.objIdx = 0;
+  if (kind !== 'demo') glStart(kind);   // 안내 단계: 난이도 기본값 또는 이 판에서 고른 값 (game3d)
   S.objState = OBJS.map(() => 0); S.objNear = -1; S.pen = 0; S.impacts = 0; S.payloads = 3; S.respawn = null; S.scan = 0; S.wasInside = false; S.landT = 0;
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
@@ -590,7 +592,8 @@ function renderList() {
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
-  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : (SET.acro && AFc().acro && SET.diff === 'sport' ? 'ACRO' : MODES[SET.diff].name) + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : ''));
+  const nav = S.state !== 'replay' && S.kind !== 'demo' && S.kind !== 'free' && !(typeof isC1 === 'function' && isC1()) ? ' · ' + L2x('안내 ', 'NAV ') + L2x(GL_NM[gdLevel()][0], GL_NM[gdLevel()][1].toUpperCase()) : '';   // 안내 단계 (GD · V)
+  ui.modeTag.textContent = AFc().tag + ' · ' + (S.state === 'replay' ? 'REPLAY' : S.kind === 'tutorial' ? 'TUTORIAL · ' + MODES[SET.diff].name : S.kind === 'demo' ? 'REFERENCE' : (SET.acro && AFc().acro && SET.diff === 'sport' ? 'ACRO' : MODES[SET.diff].name) + (SET.assist && MODES[SET.diff].assist ? ' · ASSIST' : '')) + nav;
   ui.cross.classList.toggle('hidden', CAMS[S.cam] !== 'FPV');
 }
 // 미니맵
@@ -688,12 +691,12 @@ MAP_CACHE.course.V = MAPV_COURSE;
 function drawMap(gpos) {
   const g = ui.map.getContext('2d'); g.clearRect(0, 0, 180, 300); g.drawImage(mapBg, 0, 0);
   const toDS = p => [-p.z, p.x];
-  const o = curObj();
+  const o0 = curObj(), o = glMap() ? o0 : null;   // 지도의 목표·수색 원·점선: 안내 1(지도) 이상 · 0(무전)이면 지도에도 없음
   if (o && o.mk && o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s), q = mxy(d + o.search.r, s), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.9)'; g.fillStyle = 'rgba(255,200,40,.14)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill(); g.stroke(); g.setLineDash([]); }
   // 산불: 다른 신고 구역(번호)과 보고 끝난 불씨(✓) 도 지도에
   if (S.kind === 'fire' && isMission() && MS.list) { g.font = '700 10px monospace'; MS.list.forEach((x, i) => { if (!x.mk) return;
     if (x.done) { const q = mxy(...toDS(x.tp)); g.fillStyle = '#9aa6ad'; g.fillText('✓' + (i + 1), q[0] + 3, q[1] - 2); g.beginPath(); g.arc(q[0], q[1], 2, 0, 7); g.fill(); return; }
-    if (!x.active) return; const p = mxy(...toDS(x.mk)); if (x !== o) { const q = mxy(...toDS(x.mk.clone().add(new V3(0, 0, -x.search.r)))), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.5)'; g.setLineDash([3, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke(); g.setLineDash([]); }
+    if (!x.active || !o) return; const p = mxy(...toDS(x.mk)); if (x !== o) { const q = mxy(...toDS(x.mk.clone().add(new V3(0, 0, -x.search.r)))), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.5)'; g.setLineDash([3, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke(); g.setLineDash([]); }
     g.fillStyle = '#ffc828'; g.fillText(String(i + 1), p[0] - 3, p[1] + 4); }); }
   if (o && o.mk && o.search && S.kind === 'sar') { const p = mxy(...toDS(o.mk)); g.font = '700 10px monospace'; g.fillStyle = '#ffc828'; g.fillText('SAR', p[0] - 9, p[1] + 4); }
   else if (o && o.mk && !o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
@@ -724,8 +727,8 @@ const impactRing = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 32), new THR
 impactRing.rotation.x = -Math.PI / 2; impactRing.renderOrder = 6; impactRing.visible = false; scene.add(impactRing);
 function updateTargeting(subj) {
   const o = curObj(), fpv = CAMS[S.cam] === 'FPV', running = S.state === 'run' && DR.alive && !(S.tut && S.tut.st === 'intro');
-  // 1) 게이트 조준 브래킷 + 비행 방향 표시
-  const op = running ? openingOf(o) : null;
+  // 1) 게이트 조준 브래킷(비행 가이드 · 안내 3) + 비행 방향 표시(계기 · 늘)
+  const op = running && glFly() ? openingOf(o) : null;
   let fpmPos = null;
   if (running && fpv && DR.v.length() > 1.0) {
     const s = toScreen(DR.p.clone().addScaledVector(DR.v, 1.2));
@@ -782,7 +785,7 @@ function updateHUD(dt, subj) {
   msgTimer -= dt; if (msgTimer <= 0) ui.objMsg.classList.remove('show');
   const spd = subj.v ? subj.v.length() * 3.6 : 0;
   const o = curObj();
-  const sIn = searchIn(o, subj.p), dist = o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : o.mk.distanceTo(subj.p)) : null;
+  const nm = glMap(), sIn = nm && searchIn(o, subj.p), dist = nm && o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : o.mk.distanceTo(subj.p)) : null;   // 목표 거리·수색 구역 = 지도·항법 정보 (안내 0 = 무전만이면 숨김)
   const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : (S.kind === 'course' || isMission()) ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
   ui.osd.innerHTML = `<div class="big">${fmt(tm)}${(S.kind === 'course' || isMission()) && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
     `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span class="x" style="color:#8fa0a9;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
@@ -858,7 +861,7 @@ function handleKeys() {
     if (k === 'KeyC' || k === 'PadRB') { S.cam = [2, 0, 1][S.cam]; updateTags(); }
     else if (k === 'PadLB') { S.cam = (S.cam + 2) % 3; updateTags(); }
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
-    else if (k === 'KeyV') { SET.guide = !SET.guide; saveSet(); syncSeg(); showMsg(SET.guide ? 'GUIDE ON' : 'GUIDE OFF', '#fff', 0.8); }
+    else if (k === 'KeyV') { if (!(typeof isC1 === 'function' && isC1())) glCycle(); }   // 안내 단계: 가이드 → 목표 → 지도 → 무전
     else if (k === 'Slash' || k === 'F1') { S.keysShow = !S.keysShow; if (S.keysShow) S.keysT = 0; }
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; SET.camDist = ZOOMS[SET.zoom].d; saveSet(); if (typeof syncSeg === 'function') syncSeg(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom] + ' · ' + SET.camDist.toFixed(1) + ' m', '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
@@ -937,9 +940,11 @@ function frame(now, noRender) {
   OBJS.forEach(ob => { if (ob.hint) ob.hint.visible = false; if (ob.hint2) { ob.hint1.visible = false; ob.hint2.visible = false; } });
   if (o && o.kind === 'bunker') { o.hint = S.scanned ? o.hint2 : o.hint1; o.mk = S.scanned ? o.mk2 : o.mk1; }
   if (o) {
-    if (o.hint) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); } }
-    marker.visible = !!o.mk && !searchIn(o, subj.p) && !((o.kind === 'ms' ? o.t === 'pass' : !!openingOf(o)) && o.mk.distanceTo(subj.p) < 35);   // 게이트·링이 눈앞에 보이면 마름모 표시는 숨김 if (marker.visible) { marker.position.copy(o.mk).add(new V3(0, Math.sin(S.simT * 3) * 0.15, 0)); marker.rotation.y += dt * 2; const d = camera.position.distanceTo(marker.position); const sc = Math.max(1, d / 22); marker.scale.set(sc, sc * 1.5, sc); }
-  } else marker.visible = false;
+    // 지금 과제 강조(게이트 막·슬라롬 쪽·투하 고리·벙커 창·패드 고리) = 목표 표시(안내 2 이상) · 탱크 선회 원 = 비행 가이드(3)
+    if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); if (o.hint) o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); }
+    if (o.hint && (o.kind === 'orbit' ? glFly() : glTgt())) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); }
+  }
+  marker.visible = false;   // 3D 마름모는 쓰지 않음: 목표 하나에 표시 하나 (PC·휴대폰 = 화면 ◇ navArrow · VR = 고글 OSD 의 ◇)
   const subjPos = subj.p;
   const inB = S.state !== 'menu' && insideBunker(subjPos);
   const nearB = OBJ.bunker1 && OBJ.bunker1.world(0, 0, 1.5).distanceTo(subjPos) < 5;

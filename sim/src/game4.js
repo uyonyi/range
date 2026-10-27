@@ -299,7 +299,7 @@ document.querySelectorAll('#segBoostFov button').forEach(b => b.classList.toggle
   document.querySelectorAll('#segGhostSrc button').forEach(b => b.classList.toggle('on', b.dataset.v === SET.ghostSrc));
   document.querySelectorAll('#segBelly button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.belly));
   document.querySelectorAll('#segFull button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.autoFull));
-  document.querySelectorAll('#segGuide button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === SET.guide));
+  glSync();   // 안내 단계 (옵션 · GD 버튼 글자)
   document.querySelectorAll('#segMusic button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === MUS.on));
   document.querySelectorAll('#segMusSyn button').forEach(b => b.classList.toggle('on', (b.dataset.v === '1') === !!SET.musSynth));
   $('tilt').value = SET.tilt; $('tiltV').textContent = SET.tilt + '°'; $('mvol').value = Math.round(MUS.vol * 100);
@@ -388,6 +388,7 @@ const KB_SHORT = { up: '상승', down: '하강', yawL: '좌회전', yawR: '우�
 const KB_GROUP = { up: 'alt', down: 'alt', yawL: 'alt', yawR: 'alt', fwd: 'mov', back: 'mov', left: 'mov', right: 'mov', boost: 'bst' };
 const KB_FIXED = { KeyF: '전체화면', KeyV: '가이드', KeyX: '아래캠', KeyB: '음악', KeyN: '건너뛰기', KeyT: '열화상', KeyM: '소리', KeyL: '조명', KeyP: '경로선', Escape: '정지' };
 KB_FIXED.KeyJ = L2x('지도 크게', 'Big map'); if (!KB_RESERVED.includes('KeyJ')) KB_RESERVED.push('KeyJ');
+KB_FIXED.KeyV = L2x('안내 단계', 'Nav aids');
 function renderKbd(el) {
   if (!el) return;
   const act = {}; Object.keys(KB).forEach(k => { if (KB[k]) act[KB[k]] = k; });
@@ -404,7 +405,7 @@ function renderKbd(el) {
 }
 $('bKB2').onclick = kbOpen;
 document.querySelectorAll('#segGhostSrc button').forEach(b => b.addEventListener('click', () => { SET.ghostSrc = b.dataset.v; saveSet(); syncSeg(); }));
-document.querySelectorAll('#segGuide button').forEach(b => b.addEventListener('click', () => { SET.guide = b.dataset.v === '1'; saveSet(); syncSeg(); }));
+document.querySelectorAll('#segGuide button').forEach(b => b.addEventListener('click', () => glSet(+b.dataset.v, true)));   // 메뉴에서 = 다음 출격에 · 비행 중(일시정지 옵션) = 이 판에
 $('bAgain').onclick = () => startRun(S.lastKind || S.kind);
 $('bOrtho').onclick = () => $('orthoFile').click();
 $('orthoFile').addEventListener('change', async e => {
