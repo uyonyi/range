@@ -14,7 +14,7 @@
 //  GET  /rank?kind=…&limit=50      → { ok, kind, n, list: [{ name, score, grade, time, diff, af, at, runs }] }
 //  GET  /kinds                     → { ok, kinds: [{ kind, n }] }   (기록이 있는 코스·임무)
 
-const VER = 2;
+const VER = 3;
 
 // ---- 이름 검사 (웹 페이지와 같은 규칙: game6r.js) ----
 const BAD_KO = ['시발', '씨발', '씨바', '시바', '씨빨', '시빨', '쉬발', '쓰발', '씌발', '싸발', '좆', '좃', '씹', '존나', '졸라', '병신', '븅신', '빙신', '등신', '지랄', '염병', '옘병', '개새', '개색', '개섹', '개세', '새끼', '섀끼', '쌔끼', '새기', '미친놈', '미친년', '미친새', '닥쳐', '꺼져', '엠창', '애미', '니미', '느금', '니엄마', '니애미', '창녀', '걸레년', '보지', '자지', '섹스', '쎅스', '성교', '강간', '자위', '딸딸이', '야동', '쌍놈', '쌍년', '호로', '후장', '틀딱', '한남충', '김치녀', '된장녀', '맘충', '급식충', '메갈', '일베', '홍어', '짱깨', '쪽바리', '깜둥', '나치', '히틀러', '자살', '살인', '테러', '마약', '필로폰', '대마초', '도박'];
@@ -56,11 +56,11 @@ async function setup(db) {
   if (!row) { await db.prepare("INSERT OR IGNORE INTO meta (k, v) VALUES ('secret', ?1)").bind(rnd(32)).run(); row = await db.prepare("SELECT v FROM meta WHERE k = 'secret'").first(); }
   READY = { secret: row.v }; return READY;
 }
-// 로그인 표: 이름 키 + 계정 만든 시각(c) → 계정을 지우고 같은 이름으로 새로 만들면 옛 표는 못 씀
+// 로그인 표: 이름 키 + 계정 만든 시각(c) → 계정을 지우고 같은 이름으로 새로 만들면 옛 표는 못 씀 · 기한은 없음 (기기에서 로그아웃하거나 계정을 지우기 전까지)
 async function tokenFor(secret, key, created) { const p = b64u(enc(JSON.stringify({ k: key, c: created, t: Date.now() }))); return p + '.' + await hmac(secret, p); }
 async function tokenOf(secret, tok) {
   const [p, s] = String(tok || '').split('.'); if (!p || !s || !same(s, await hmac(secret, p))) return null;
-  try { const o = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); return Date.now() - o.t < 400 * 864e5 ? o : null; } catch (e) { return null; }
+  try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(p.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); } catch (e) { return null; }   // 기한 없음: 같은 기기에서 로그아웃·계정 삭제 전까지 로그인 유지
 }
 async function player(db, secret, tok) {   // 표 → 조종사 (없거나 지워진 계정이면 null)
   const o = await tokenOf(secret, tok); if (!o) return null;

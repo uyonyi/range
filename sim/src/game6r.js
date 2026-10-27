@@ -54,6 +54,7 @@ const RK = { api: '', acct: null, busy: false, last: null, me: null, meAt: 0, bo
   try { const a = JSON.parse(localStorage.getItem('fpvsim_acct') || 'null'); if (RK.api && a && a.name && a.token) RK.acct = a; } catch (e) { }
   if (RK.acct) SET.pilot = RK.acct.name;
 }
+function rkMe() { return RK.guestNow ? null : RK.acct; }   // 지금 쓰는 계정 (게스트로 고르면 이번에는 없음 · 저장된 계정은 그대로)
 async function rkCall(path, body) {
   if (!RK.api) return { ok: false, err: 'net' };
   const ctl = typeof AbortController === 'function' ? new AbortController() : null, tm = setTimeout(() => { try { ctl && ctl.abort(); } catch (e) { } }, 10000);
@@ -63,7 +64,7 @@ async function rkCall(path, body) {
   } catch (e) { return { ok: false, err: 'net' }; } finally { clearTimeout(tm); }
 }
 function acctSet(a) {
-  RK.acct = a; RK.me = null;
+  RK.acct = a; RK.me = null; RK.guestNow = false;
   try { if (a) { localStorage.setItem('fpvsim_acct', JSON.stringify(a)); localStorage.setItem('fpvsim_pilot', a.name); } else localStorage.removeItem('fpvsim_acct'); } catch (e) { }
   if (a) { SET.pilot = a.name; const i = $('pilotName'); if (i) i.value = a.name; }
   acctSync();
@@ -108,7 +109,7 @@ function acctPanel() {
   p1.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (acMode === 'reg') p2.focus(); else acSubmit(); } });
   p2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); acSubmit(); } });
   $('acGo').onclick = acSubmit;
-  $('acGuest').onclick = () => { try { localStorage.setItem('fpvsim_guest', '1'); } catch (e) { } acctClose(); };
+  $('acGuest').onclick = () => { if (RK.acct) RK.guestNow = true; acctSync(); acctClose(); };
   return el;
 }
 function acModeSet(m) {
@@ -121,7 +122,7 @@ function acModeSet(m) {
 function acctOpen(m, after) {
   if (!RK.api) return; const el = acctPanel(); RK.after = after || null;
   acModeSet(m || 'login'); $('acPin').value = $('acPin2').value = '';
-  if (!$('acName').value && SET.pilot && nmCheck(SET.pilot).ok) $('acName').value = SET.pilot;
+  const pre = RK.acct ? RK.acct.name : SET.pilot; if (!$('acName').value && pre && nmCheck(pre).ok) $('acName').value = pre;
   el.classList.remove('hidden');
   const focus = () => { const g = $('pinGate'); if (g && !g.classList.contains('hidden')) { setTimeout(focus, 300); return; } if (!IS_TOUCH && !el.classList.contains('hidden')) try { ($('acName').value ? $('acPin') : $('acName')).focus(); } catch (e) { } };
   setTimeout(focus, 60);
@@ -137,9 +138,25 @@ async function acSubmit() {
   RK.busy = false; $('acGo').disabled = false;
   if (!r.ok) { say(rkErr(r)); if (r.err === 'wrong') { $('acPin').value = ''; $('acPin').focus(); } return; }
   const after = RK.after; acctSet({ name: r.name, token: r.token }); say('', 'dim'); acctClose();
-  try { localStorage.removeItem('fpvsim_guest'); } catch (e) { }
   rkFlush(); if (after) after();
 }
+
+function rkResume() { RK.guestNow = false; RK.me = null; if (RK.acct) { SET.pilot = RK.acct.name; const i = $('pilotName'); if (i) i.value = RK.acct.name; rkToast('🔑 ' + RK.acct.name + ' · ' + L2('로그인됨', 'logged in')); } acctSync(); }
+function rkToast(t) { let e = $('rkToast'); if (!e) { e = document.createElement('div'); e.id = 'rkToast'; e.className = 'rktoast'; document.body.appendChild(e); } e.textContent = t; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); clearTimeout(rkToast.t); rkToast.t = setTimeout(() => e.classList.remove('on'), 2400); }
+// 첫 화면: 인트로가 끝나고 로고가 뜨면 고르기 — 🔑 기존 계정 (이 기기에 저장된 아이디면 비밀번호 없이 바로) · 👤 게스트 · ✚ 새로 가입  (template.html 의 첫 화면이 부름)
+window.__bootPick = function (el, done) {
+  if (!RK.api) return false; const a = RK.acct;
+  el.innerHTML = `<button data-k="acct" class="primary">🔑 ${L2('기존 계정으로 로그인', 'Log in with my account')}<small>${a ? rkEsc(a.name) + ' · ' + L2('이 기기에 저장됨', 'saved on this device') : L2('아이디 · 비밀번호 4자리', 'name + 4-digit PIN')}</small></button>` +
+    `<button data-k="guest">👤 ${L2('게스트로 비행', 'Fly as guest')}<small>${L2('랭킹 없이 둘러보기', 'no leaderboard')}</small></button>` +
+    `<button data-k="reg">✚ ${L2('새로 가입', 'Sign up')}<small>${L2('조종사 이름 + 숫자 4자리', 'pilot name + 4 digits')}</small></button>`;
+  el.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; const k = b.dataset.k; done();
+    if (k === 'acct') { if (a) rkResume(); else setTimeout(() => acctOpen('login'), 250); }
+    else if (k === 'guest') { RK.guestNow = !!a; acctSync(); rkToast('👤 ' + L2('게스트로 비행 · 랭킹에 기록되지 않습니다', 'Flying as guest · not ranked')); }
+    else if (k === 'reg') { RK.guestNow = !!a; acctSync(); setTimeout(() => acctOpen('reg'), 250); }
+  };
+  return true;
+};
 
 // ---- 1단계(조종사): 로그인 상태 · 로그아웃 · 계정 삭제 / 손님이면 로그인 단추 ----
 function acctBox() {
@@ -147,7 +164,7 @@ function acctBox() {
   b = document.createElement('div'); b.id = 'acctBox'; b.className = 'acctbox'; i.insertAdjacentElement('afterend', b);
   b.addEventListener('click', async e => {
     const a = e.target.closest('button'); if (!a) return; const act = a.dataset.a;
-    if (act === 'in') acctOpen('login'); else if (act === 'reg') acctOpen('reg');
+    if (act === 'in') acctOpen('login'); else if (act === 'reg') acctOpen('reg'); else if (act === 'resume') rkResume();
     else if (act === 'out') { acctSet(null); }
     else if (act === 'del') b.classList.add('deling');
     else if (act === 'delno') { b.classList.remove('deling'); acctSync(); }
@@ -162,11 +179,11 @@ function acctBox() {
   return b;
 }
 function acctSync() {
-  const b = acctBox(), i = $('pilotName'); if (!b || !i) return; const a = RK.acct;
+  const b = acctBox(), i = $('pilotName'); if (!b || !i) return; const a = rkMe(), sv = RK.guestNow && RK.acct;
   i.classList.toggle('hidden', !!a); b.classList.remove('deling');
   b.innerHTML = a ? `<div class="acin"><b>🔑 ${rkEsc(a.name)}</b><span>${L2('로그인됨 · 코스·임무를 끝내면 점수가 랭킹에 올라갑니다', 'Logged in · finished courses and missions go on the leaderboard')}</span><button data-a="out">${L2('로그아웃', 'Log out')}</button><button data-a="del" class="mini">${L2('계정 삭제', 'Delete account')}</button></div>` +
     `<div class="acdel"><span>${L2('계정과 랭킹 기록을 모두 지웁니다 · 비밀번호 4자리', 'Deletes your account and leaderboard records · enter your PIN')}</span><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"><button data-a="delgo" class="danger">${L2('지우기', 'Delete')}</button><button data-a="delno">${L2('취소', 'Cancel')}</button><em></em></div>`
-    : `<div class="acout"><span>${L2('손님 비행 · 기록은 이 기기에만 남고 랭킹에는 오르지 않습니다', 'Guest · records stay on this device and are not ranked')}</span><button data-a="in" class="primary">🔑 ${L2('로그인', 'Log in')}</button><button data-a="reg">${L2('새 조종사 등록', 'New pilot')}</button></div>`;
+    : `<div class="acout"><span>${L2('손님 비행 · 기록은 이 기기에만 남고 랭킹에는 오르지 않습니다', 'Guest · records stay on this device and are not ranked')}</span>${sv ? `<button data-a="resume" class="primary">🔑 ${rkEsc(sv.name)}</button><button data-a="in">${L2('다른 계정', 'Other account')}</button>` : `<button data-a="in" class="primary">🔑 ${L2('로그인', 'Log in')}</button><button data-a="reg">${L2('새 조종사 등록', 'New pilot')}</button>`}</div>`;
   const w = $('wzWho'); if (w && MENU.step === 3) w.textContent = `${pilotName()} · ${AFc().name}`;
 }
 
@@ -174,20 +191,20 @@ function acctSync() {
 function rkResLine() {
   let d = $('resRank'); if (d) return d; const b = $('resBest'); if (!b) return null;
   d = document.createElement('div'); d.id = 'resRank'; d.className = 'resrank'; b.insertAdjacentElement('afterend', d);
-  d.addEventListener('click', e => { const a = e.target.closest('button'); if (!a) return; if (a.dataset.a === 'in') acctOpen('login', () => rkSend(RK.last)); else if (a.dataset.a === 'rank') rankOpen(RK.last && RK.last.k); });
+  d.addEventListener('click', e => { const a = e.target.closest('button'); if (!a) return; if (a.dataset.a === 'in') { if (RK.guestNow && RK.acct) { rkResume(); rkSend(RK.last); } else acctOpen('login', () => rkSend(RK.last)); } else if (a.dataset.a === 'rank') rankOpen(RK.last && RK.last.k); });
   return d;
 }
 function rkSubmit(R) {   // debriefShow 에서 부름 (코스·임무 완료 때 한 번)
   const d = rkResLine(); if (d) d.innerHTML = ''; RK.last = null;
   if (!RK.api || !rkKindOk(S.kind) || !rkSiteOk() || !(R.total > 0)) return;
   RK.last = { k: S.kind, sent: false, b: { kind: rkBoard(S.kind), score: R.sc, grade: R.g, time: Math.round(R.total * 100) / 100, diff: SET.diff, af: SET.af } };
-  if (RK.acct) rkSend(RK.last);
+  if (rkMe()) rkSend(RK.last);
   else if (d) d.innerHTML = `<span>🏆 ${L2('로그인하면 이 점수가 랭킹에 올라갑니다', 'Log in to post this score to the leaderboard')}</span><button data-a="in">🔑 ${L2('로그인 · 등록', 'Log in / register')}</button><button data-a="rank">${L2('랭킹 보기', 'Leaderboard')}</button>`;
 }
 async function rkSend(run) {
-  const d = rkResLine(); if (!run || run.sent || !RK.acct) return; run.sent = true;
+  const d = rkResLine(), me = rkMe(); if (!run || run.sent || !me) return; run.sent = true;
   if (d) d.innerHTML = `<span class="dim">🏆 ${L2('랭킹에 올리는 중…', 'Posting to the leaderboard…')}</span>`;
-  const r = await rkCall('/score', Object.assign({ token: RK.acct.token }, run.b)); RK.me = null;
+  const r = await rkCall('/score', Object.assign({ token: me.token }, run.b)); RK.me = null;
   if (run !== RK.last || !d) { if (!r.ok && r.err === 'net') rkQueue(run.b); return; }
   const btn = `<button data-a="rank">${L2('랭킹 보기', 'Leaderboard')}</button>`;
   if (r.ok) d.innerHTML = `<span class="${r.best ? 'good' : ''}">🏆 ${L2(`랭킹 ${r.rank}위 / ${r.n}명`, `Rank ${r.rank} of ${r.n}`)} · ${r.best ? L2('개인 최고 기록!', 'Personal best!') : L2(`개인 최고 ${r.score}점 유지`, `Your best stays ${r.score}`)}</span>${btn}`;
@@ -196,7 +213,7 @@ async function rkSend(run) {
   else d.innerHTML = `<span class="dim">🏆 ${rkErr(r)}</span>`;
 }
 // 연결이 안 될 때 남겨 두었다가 다음에 올림 (같은 조종사일 때만 · 최대 20개)
-function rkQueue(b) { try { const q = JSON.parse(localStorage.getItem('fpvsim_rank_q') || '[]'); q.push({ n: RK.acct && RK.acct.name, b }); localStorage.setItem('fpvsim_rank_q', JSON.stringify(q.slice(-20))); } catch (e) { } }
+function rkQueue(b) { try { const q = JSON.parse(localStorage.getItem('fpvsim_rank_q') || '[]'); q.push({ n: rkMe() && rkMe().name, b }); localStorage.setItem('fpvsim_rank_q', JSON.stringify(q.slice(-20))); } catch (e) { } }
 async function rkFlush() {
   if (!RK.api || !RK.acct || RK.flushing) return; let q = []; try { q = JSON.parse(localStorage.getItem('fpvsim_rank_q') || '[]'); } catch (e) { }
   if (!q.length) return; RK.flushing = true; const keep = [];
@@ -212,7 +229,7 @@ function rankPanel() {
     <div class="btns"><button class="primary" id="rkClose">${L2('닫기', 'Close')}</button><button id="rkLogin">🔑 ${L2('로그인 · 등록', 'Log in / register')}</button><button id="rkRe">↻</button></div></div>`;
   document.body.appendChild(el);
   $('rkClose').onclick = rankClose; $('rkRe').onclick = () => rankLoad(true);
-  $('rkLogin').onclick = () => acctOpen('login', () => rankLoad(true));
+  $('rkLogin').onclick = () => { if (RK.guestNow && RK.acct) { rkResume(); rankLoad(true); } else acctOpen('login', () => rankLoad(true)); };
   el.addEventListener('click', e => { if (e.target === el) rankClose(); const b = e.target.closest('#rkTabs button'); if (b) { RK.board = b.dataset.k; rankLoad(); } });
   return el;
 }
@@ -226,19 +243,19 @@ async function rankLoad(fresh) {
   const L = rkKinds(), k = RK.board, list = $('rkList'), me = $('rkMe'); if (!list) return;
   $('rkTabs').innerHTML = L.map(x => `<button data-k="${x}" class="${x === k ? 'on' : ''}">${rkEsc(rkKindName(x))}</button>`).join('');
   $('rkSub').textContent = L2('코스·임무별 최고 점수 · 같은 점수면 짧은 시간 순 · ', 'Best score per course or mission · ties go to the faster time · ') + stName(SITE);
-  $('rkLogin').classList.toggle('hidden', !!RK.acct);
+  $('rkLogin').classList.toggle('hidden', !!rkMe());
   list.innerHTML = `<div class="rkempty">${L2('불러오는 중…', 'Loading…')}</div>`; me.innerHTML = '';
   const board = rkBoard(k), my = ++RK.seq;
-  const [r, m] = await Promise.all([rkCall('/rank?kind=' + encodeURIComponent(board) + '&limit=50'), RK.acct && (fresh || !RK.me || Date.now() - RK.meAt > 30000) ? rkCall('/me', { token: RK.acct.token }) : Promise.resolve(null)]);
+  const [r, m] = await Promise.all([rkCall('/rank?kind=' + encodeURIComponent(board) + '&limit=50'), rkMe() && (fresh || !RK.me || Date.now() - RK.meAt > 30000) ? rkCall('/me', { token: rkMe().token }) : Promise.resolve(null)]);
   if (my !== RK.seq || RK.board !== k) return;
   if (m) { if (m.ok) { RK.me = m; RK.meAt = Date.now(); } else if (m.err === 'token') acctSet(null); }
   if (!r.ok) { list.innerHTML = `<div class="rkempty">${rkErr(r)}</div>`; return; }
-  const mine = RK.acct && RK.me && RK.me.best ? RK.me.best.find(b => b.kind === board) : null, myKey = RK.acct ? nmKey(RK.acct.name) : '';
-  me.innerHTML = RK.acct ? (mine ? `🔑 <b>${rkEsc(RK.acct.name)}</b> · ${L2(`${mine.rank}위 / ${mine.n}명`, `rank ${mine.rank} of ${mine.n}`)} · ${mine.score}${L2('점', ' pts')} ${mine.grade || ''} · ${fmt(mine.time)} · ${L2(`${mine.runs}번 비행`, `${mine.runs} runs`)}` : `🔑 <b>${rkEsc(RK.acct.name)}</b> · ${L2('이 코스 기록 없음 · 끝까지 비행하면 올라갑니다', 'No record here yet · finish a run to post one')}`)
+  const ac = rkMe(), mine = ac && RK.me && RK.me.best ? RK.me.best.find(b => b.kind === board) : null, myKey = ac ? nmKey(ac.name) : '';
+  me.innerHTML = ac ? (mine ? `🔑 <b>${rkEsc(ac.name)}</b> · ${L2(`${mine.rank}위 / ${mine.n}명`, `rank ${mine.rank} of ${mine.n}`)} · ${mine.score}${L2('점', ' pts')} ${mine.grade || ''} · ${fmt(mine.time)} · ${L2(`${mine.runs}번 비행`, `${mine.runs} runs`)}` : `🔑 <b>${rkEsc(ac.name)}</b> · ${L2('이 코스 기록 없음 · 끝까지 비행하면 올라갑니다', 'No record here yet · finish a run to post one')}`)
     : L2('손님은 랭킹에 오르지 않습니다 · 로그인하면 다음 비행부터 기록됩니다', 'Guests are not ranked · log in and your next finished run is posted');
   const row = (x, i) => `<div class="rkr${myKey && nmKey(x.name) === myKey ? ' me' : ''}"><i>${i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</i><b>${rkEsc(x.name)}</b><span class="s">${x.score}<em class="g${rkEsc(x.grade)}">${rkEsc(x.grade)}</em></span><span class="t">${fmt(x.time)}</span><span class="d">${MODES[x.diff] ? MODES[x.diff].name : rkEsc(x.diff)} · ${AF[x.af] ? AF[x.af].tag : rkEsc(String(x.af).toUpperCase())}</span><span class="w">${(d => `${d.getMonth() + 1}/${d.getDate()}`)(new Date(x.at))}</span></div>`;
   let h = r.list.map(row).join('');
-  if (mine && mine.rank > r.list.length) h += `<div class="rkgap">⋯</div>` + row({ name: RK.acct.name, score: mine.score, grade: mine.grade, time: mine.time, diff: mine.diff, af: mine.af, at: mine.at }, mine.rank - 1);
+  if (mine && mine.rank > r.list.length) h += `<div class="rkgap">⋯</div>` + row({ name: ac.name, score: mine.score, grade: mine.grade, time: mine.time, diff: mine.diff, af: mine.af, at: mine.at }, mine.rank - 1);
   list.innerHTML = h || `<div class="rkempty">${L2('아직 기록이 없습니다 · 첫 기록의 주인공이 되어 보세요', 'No records yet · be the first')}</div>`;
   if (r.n > r.list.length) list.insertAdjacentHTML('beforeend', `<div class="rkgap">${L2(`전체 ${r.n}명 중 상위 ${r.list.length}명`, `Top ${r.list.length} of ${r.n}`)}</div>`);
 }
@@ -253,8 +270,7 @@ if (RK.api) {
     if (e.key !== 'Escape' || !rkModal()) return; const g = $('pinGate'); if (g && !g.classList.contains('hidden')) return;
     e.stopImmediatePropagation(); e.preventDefault(); if ($('rankPanel') && !$('rankPanel').classList.contains('hidden')) rankClose(); else acctClose();
   }, true);
-  let guest = false; try { guest = localStorage.getItem('fpvsim_guest') === '1'; } catch (e) { }
-  if (!RK.acct && !guest && (!RK.test || /[?&]login/.test(location.search))) setTimeout(() => acctOpen('login'), 30);   // 처음: 로그인 창 (손님으로 계속 가능)
+  if (RK.test && /[?&]login/.test(location.search) && !RK.acct) setTimeout(() => acctOpen('login'), 30);   // 시험용: 로그인 창 바로 (보통은 첫 화면 로고에서 고름)
   if (RK.acct) setTimeout(rkFlush, 4000);
 }
-if (window.__sim) Object.assign(window.__sim, { RK, rkSubmit, rankOpen, acctOpen, acctSet, nmCheck, Sref: () => S, finishRun: () => finishRun() });
+if (window.__sim) Object.assign(window.__sim, { RK, rkMe, rkSubmit, rankOpen, acctOpen, acctSet, nmCheck, Sref: () => S, finishRun: () => finishRun(), MUSref: () => MUS, AUref: () => AU });

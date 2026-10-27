@@ -1,5 +1,5 @@
 #!/bin/sh
-# 인트로 영상 합치기: render.js 가 만든 장면 프레임(fr/s1~s4, 24fps) → 짧은 교차 전환 → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro.jpg (첫 프레임 = 영상 시작 화면과 같게)
+# 인트로 영상 합치기: render.js 가 만든 장면 프레임(fr/s1~s4, 24fps) → 짧은 교차 전환 → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro.jpg (첫 프레임 = 영상 시작 화면과 같게) · music.wav 가 있으면 intro.mp3
 # 사용: sh compose.sh <프레임 폴더(fr 의 부모)> <출력 폴더>
 set -e
 D=${1:-.}; O=${2:-.}
@@ -20,4 +20,11 @@ ffmpeg -y -hide_banner -loglevel error -i "$M" $V -pass 2 -passlogfile "$O/_vp9"
 rm -f "$O"/_vp9*
 ffmpeg -y -hide_banner -loglevel error -i "$D/fr/s1/0000.jpg" -vf "$G" -q:v 7 "$O/intro.jpg"
 rm -f "$M"
+ffmpeg -y -hide_banner -loglevel error -sseof -0.08 -i "$O/intro.webm" -frames:v 1 -q:v 6 "$O/intro_end.jpg"   # 마지막 장면 (로고 화면 바탕 · 건너뛰어도 같은 그림)
+# 음악 (music.js 가 그린 music.wav): 최고 크기를 −1.5 dBFS 로 맞추고 8.6초에서 자름 → intro.mp3 (페이지가 영상과 맞춰 틂)
+if [ -f "$D/music.wav" ]; then
+  PK=$(ffmpeg -hide_banner -i "$D/music.wav" -af volumedetect -f null - 2>&1 | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p')
+  ffmpeg -y -hide_banner -loglevel error -i "$D/music.wav" -af "volume=$(echo "-1.5 - ($PK)" | bc)dB,afade=t=in:d=0.02,afade=t=out:st=8.3:d=0.3" -t 8.6 -c:a libmp3lame -b:a 112k -ar 44100 "$O/intro.mp3"
+  ls -l "$O/intro.mp3"
+fi
 ls -l "$O/intro.mp4" "$O/intro.webm" "$O/intro.jpg"

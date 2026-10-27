@@ -11,6 +11,7 @@ const CHORDS = [[45, [57, 60, 64]], [41, [57, 60, 65]], [48, [55, 60, 64]], [43,
 const HOOK = [[76, 0, 74, 76, 0, 72, 74, 0], [72, 0, 72, 74, 0, 77, 76, 0], [79, 0, 76, 74, 0, 72, 74, 0], [74, 0, 71, 72, 74, 0, 79, 0]];
 function musicLevel() { return MUS.on ? MUS.vol * 0.42 : 0; }
 function musicStart() {
+  if (window.__bootAudio && !window.__bootDone && !window.__bootAudio.done) return;   // 인트로 음악이 울리는 동안은 기다림 (끝나거나 첫 화면이 걷히면 시작)
   try { if (AU.ctx && MUS.on && MUS.vol > 0 && !SET.musSynth) smpLoad(); } catch (e) { }   // 음악을 켠 사람만 악기 녹음을 받음 (약 2 MB)
   if (!AU.ctx || MUS.timer) return;
   const ctx = AU.ctx;
@@ -348,6 +349,10 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('pointerdown', () => { initAudio(); musicStart(); });
+// 휴대폰은 '누르는 순간'이 소리 허락으로 치지 않음 → 손을 뗄 때·클릭·키(이름 입력 중 타자 포함)에도 소리 장치를 깨우고 음악 시작
+['pointerup', 'touchend', 'click', 'keydown'].forEach(ev => addEventListener(ev, () => { initAudio(); musicStart(); }, true));
+// 첫 화면: 인트로 음악이 끝나거나(로고 화면) 첫 화면이 걷히면 메뉴 음악
+{ const bootMusic = () => { initAudio(); musicStart(); }; addEventListener('bootcue', bootMusic); addEventListener('bootend', bootMusic); if (window.__bootDone && window.__bootAudio) setTimeout(bootMusic, 0); }
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function getPad() {
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];

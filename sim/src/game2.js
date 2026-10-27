@@ -238,7 +238,7 @@ const AU = { ctx: null, on: true };
 function initAudio() {
   if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)(); AU.ctx = ctx;
+    const ctx = (window.__bootAudio && window.__bootAudio.ctx) || new (window.AudioContext || window.webkitAudioContext)(); AU.ctx = ctx;   // 첫 화면(인트로)이 만든 소리 장치를 이어 씀 — 이미 허락받았으면 메뉴 음악도 바로
     AU.master = ctx.createGain(); AU.master.gain.value = 0.55; AU.master.connect(ctx.destination);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(AU.master);
     AU.mg = ctx.createGain(); AU.mg.gain.value = 0; AU.mg.connect(lp);
