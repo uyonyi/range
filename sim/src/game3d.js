@@ -159,6 +159,12 @@ function updateGuide(subj) {
     const ang = Math.acos(clamp(hd.dot(to), -1, 1));
     GUIDE.wp = pts[1];   // 조작 안내는 실제 첫 경유점 기준 (선회 보정점이 아니라)
     if ((wing || sp > 6) && ang > 15 * DEG && dist > turnR * 1.2) { const k = Math.min(turnR * (0.4 + ang / Math.PI), dist * 0.45); const a = pts[0].clone().addScaledVector(hd, k); a.y = pts[0].y + (pts[1].y - pts[0].y) * 0.15; pts = [pts[0], a].concat(pts.slice(1)); } }
+  // 지형 위로: 긴 구간은 15 m 마다 점을 넣고 지면 + 1.5 m 아래로 내려가지 않게 (언덕 너머 목표에서 안내가 땅에 묻혀 끊기지 않게)
+  { const q = [pts[0]], keep = Math.max(1, pts.length - 2);
+    for (let k = 1; k < pts.length; k++) { const A = pts[k - 1], B = pts[k], L0 = A.distanceTo(B), n = Math.floor(L0 / 15);
+      for (let j = 1; j < n; j++) { const m = A.clone().lerp(B, j / n), g = terrainAt(m.x, m.z) + 1.5; if (m.y < g) m.y = g; q.push(m); }
+      const P = k < keep ? B.clone() : B; if (k < keep) { const g = terrainAt(P.x, P.z) + 1.2; if (P.y < g) P.y = g; } q.push(P); }
+    pts = q; }
   const curve = pts.length > 2 ? new THREE.CatmullRomCurve3(pts, false, 'centripetal') : new THREE.LineCurve3(pts[0], pts[1]);
   const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
   const L = curve.getLength(), phase = 0;   // 틀은 경로 위에 고정 (흘러가는 애니메이션은 어지러워서 뺌 · 기체가 나아가면 자연히 지나감)
@@ -168,11 +174,12 @@ function updateGuide(subj) {
   { let C = null, A = null, R = 3;
     if (o.kind === 'ms' && o.t === 'pass' && o.c && o.n) { C = o.ring ? o.c : o.mk; A = o.n; R = o.ring || 3; }
     else if (o.kind !== 'ms' && o.kind !== 'takeoff' && o.kind !== 'land' && o.kind !== 'drop' && o.kind !== 'orbit' && o.kind !== 'custom') { const op = openingOf(o); if (op && !GUIDE.detour) { C = op.b.world(op.lx, op.ly, op.lz); A = (op.side ? op.b.world(-1, 0, 0) : op.b.world(0, 1, 0)).sub(op.b.world(0, 0, 0)).normalize(); R = 2; } }
-    if (C && A && !XR_ON) guideAxis(C, A, Math.max(12, R * 4), Math.max(4, R * 1.5), gcol); else GAXIS.m.visible = false; }
+    const bf = C && A ? -_gv.subVectors(subj.p, C).dot(A) : 0, before = Math.min(Math.max(12, R * 4), bf - 4);   // 기체보다 앞쪽(게이트 쪽)만 그림
+    if (C && A && !XR_ON && before > 2) guideAxis(C, A, before, Math.max(4, R * 1.5), gcol); else GAXIS.m.visible = false; }
   GUIDE.meshes.forEach((x, i) => {
     const d = 4.5 + phase + i * GSP;   // 기체 바로 앞 틀은 추적 시점에서 화면을 가리므로 4.5 m부터
     if (d > L - 0.2 || L < 1.2) { x.g.visible = false; return; }
-    const u = d / L; curve.getPointAt(u, _gt); curve.getPointAt(Math.min(1, u + 0.02), _gq);
+    const u = d / L; curve.getPointAt(u, _gt); curve.getPointAt(Math.min(1, u + 0.02), _gq); { const g = terrainAt(_gt.x, _gt.z) + 0.6; if (_gt.y < g) { _gq.y += g - _gt.y; _gt.y = g; } }
     x.g.visible = true; x.g.position.copy(_gt); x.g.lookAt(_gq);
     const s = 0.9 + Math.min(d, 20) * 0.02; x.g.scale.set(s, s, s);
     x.m.color.set(GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff);
@@ -196,6 +203,7 @@ function updateGuide(subj) {
   const df = d.dot(fwd), dr = d.dot(rgt), dy = d.y, hd = Math.hypot(df, dr), ang = Math.atan2(dr, df) / DEG;
   const lines = [];
   const steer = () => {
+    if (DR.landed && !wingF && o.kind !== 'land') { lines.push([`먼저 이륙 · 올라가기 (${K('up')})`, '']); return; }
     if (wingF) {
       if (Math.abs(dy) > 2) lines.push([`${dy > 0 ? '고도 올리기' : '고도 내리기'} ${Math.abs(dy).toFixed(0)} m (${K(dy > 0 ? 'pu' : 'pd')})`, '']);
       if (Math.abs(ang) > 6) lines.push([`${ang > 0 ? '오른쪽으로 기울여 선회' : '왼쪽으로 기울여 선회'} (${K(ang > 0 ? 'br' : 'bl')})`, '']);

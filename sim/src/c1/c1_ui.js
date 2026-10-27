@@ -381,6 +381,7 @@ body.c1on #objNext,body.c1on #list,body.c1on #bottom,body.c1on #c1demo{display:n
 #c1p{top:108px;width:300px;max-height:calc(100vh - 120px)}
 #c1p.split{width:250px;top:108px;max-height:calc(100vh - 300px)}
 .c1w{position:fixed;z-index:6;color:#e8eef3;font:13px/1.35 system-ui,sans-serif;pointer-events:auto}.c1w.hidden,body:not(.c1on) .c1w{display:none}
+body.c1mini #c1tipW,body.c1mini #c1dlgW{display:none!important}   /* 제목줄을 눌러 접으면 안내·대화 창도 숨김 (음성은 계속) */
 #c1tipW{left:50%;top:12px;transform:translateX(-50%);width:min(680px,60vw)}#c1tipW .tip{margin:0;background:rgba(10,14,20,.72);border:1px solid rgba(201,162,255,.45);border-left:3px solid #c9a2ff;border-radius:8px;padding:5px 10px;font-size:12.5px}
 #c1dlgW{left:50%;bottom:22px;transform:translateX(-50%);width:min(620px,calc(100vw - 540px))}#c1dlgW .dlg{margin:0;background:rgba(10,14,20,.72);border:1px solid rgba(127,208,255,.35);border-radius:10px;padding:6px 8px}#c1dlgW .dlg .me span{flex:1 1 auto}#c1dlgW .dlg .me{font-size:14px}#c1dlgW .dlg .ex{font-size:12.5px}
 #c1btnW{right:12px;top:60px;width:150px}#c1btnW .bts{display:flex;flex-direction:column;gap:5px;background:rgba(10,14,20,.6);border:1px solid rgba(201,162,255,.35);border-radius:10px;padding:8px}#c1btnW .bt{display:flex;flex-wrap:wrap;gap:4px;margin:0}#c1btnW .bt.main{flex-direction:column}#c1btnW .bt.main button{width:100%;padding:9px 6px;font-size:13px;font-weight:700;border-radius:6px;border:1px solid #4a5560;background:#1d252d;color:#e8eef3}#c1btnW .bt.main button small{margin-left:4px;font-size:9px;opacity:.6;border:1px solid #6a7580;border-radius:3px;padding:0 2px}#c1btnW .bt.sub button{flex:1 1 44%;padding:5px 3px;font-size:11px;border-radius:6px;border:1px solid #4a5560;background:#151c22;color:#e8eef3}#c1btnW #c1More{flex:1 1 100%}
@@ -428,9 +429,9 @@ body.touch #c1cap{top:auto;bottom:6px}
     tb.onpointerup = e => { if (!dg) return; const d = dg; dg = null; const k = IS_TOUCH ? 'c1posT' : 'c1posP';
       if (d.mv) { const r = el.getBoundingClientRect(); SET[k] = [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; saveSet(); return; }
       const now = performance.now(); if (now - (tb._last || 0) < 350) { SET[k] = null; saveSet(); c1PanelPos(); tb._last = 0; return; } tb._last = now;
-      el.classList.toggle('mini'); SET.c1mini = el.classList.contains('mini'); saveSet(); };
+      el.classList.toggle('mini'); SET.c1mini = el.classList.contains('mini'); document.body.classList.toggle('c1mini', SET.c1mini); saveSet(); };
     tb.title = L2('끌어서 옮기기 · 누르면 접기/펴기 · 두 번 누르면 원래 자리', 'Drag to move · tap to fold/unfold · double-tap to reset');
-    el.classList.toggle('mini', !!SET.c1mini); c1PanelPos();
+    el.classList.toggle('mini', !!SET.c1mini); document.body.classList.toggle('c1mini', !!SET.c1mini); c1PanelPos();
     $('c1Mic').onpointerdown = e => { e.stopPropagation(); e.preventDefault(); c1Mic(!C1V.micOn); $('c1Mic').classList.toggle('on', C1V.micOn); };
   }
   el.classList.toggle('hidden', !show); document.querySelectorAll('.c1w').forEach(w => w.classList.toggle('hidden', !show)); c1AnnBtn(); if (!show) { const b = $('c1demo'); if (b) b.classList.add('hidden'); }
