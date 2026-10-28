@@ -702,18 +702,18 @@ function missionPhoto() {
   const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ' · ' + pilotName(), o = msObj();
   const xyS = (d, s) => { const xy = to5186(d, s); return xy ? `X ${xy[0].toFixed(0)}  Y ${xy[1].toFixed(0)}` : ''; };
   if (S.kind === 'fire') {
-    const f = MS.list.find(x => x.active && !x.done && (x.inView || (ENV.ir && S.simT - (x.seenT ?? -9) < 1.5)));
-    if (f) { comm('Control, Eagle One. Hotspot confirmed. Photo and grid sent.', '이글 원: 불씨 확인 · 사진과 좌표 전송', OP); const xy = to5186(f.d, f.s); photoAdd(snapPhoto([L2('불씨 확인 · 열화상', 'HOTSPOT · THERMAL') + '  ' + hm, xyS(f.d, f.s)], f.tp), f.label, xy, true); fireReport(f, xy); return; }
+    const f = MS.list.find(x => x.active && !x.done && (x.inView || S.simT - (x.seenT ?? -9) < 1.5));   // 열화상이든 눈이든 방금(1.5초 안) 화면에 있었으면
+    if (f) { comm('Control, Eagle One. Hotspot confirmed. Photo and grid sent.', '이글 원: 불씨 확인 · 사진과 좌표 전송', OP); const xy = to5186(f.d, f.s); photoAdd(snapPhoto([(f.via === 'ir' ? L2('불씨 확인 · 열화상', 'HOTSPOT · THERMAL') : L2('불씨 확인 · 카메라', 'FIRE · CAMERA')) + '  ' + hm, xyS(f.d, f.s)], f.tp), f.label, xy, true); fireReport(f, xy); return; }
     const seen = MS.list.find(x => x.active && !x.done && x.seenVis);
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
-    showMsg(seen ? L2('연기는 찍혔지만 불씨 확인 불가 · 열화상(T)으로 다시', 'Smoke only · switch to thermal (T) and retake') : L2('사진에 불씨 없음 · 화면 가운데에 두고 찍기', 'No hotspot in frame · center it and retake'), '#ff9a40', 1.8); return;
+    showMsg(seen ? L2('연기만 찍힘 · 더 가까이 가거나 열화상(T)으로 다시', 'Smoke only · get closer or use thermal (T) and retake') : L2('사진에 불씨 없음 · 화면에 담고 찍기', 'No fire in frame · get it on screen and retake'), '#ff9a40', 1.8); return;
   }
   if (S.kind === 'recon' && o && o.t === 'recon') {
     if (o.inView || S.simT - (o.seenT ?? -9) < 1.5) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); photoAdd(snapPhoto([L2('정찰 사진', 'RECON IMAGE') + '  ' + hm, o.label.split(' · ')[0]], o.tp), o.label, to5186(o.d || 0, o.s || 0), true); msNext('PHOTO ✓ ' + o.label.split(' · ')[0], '#5dff9a'); return; }
     photoAdd(snapPhoto([L2('사진 · 대상 없음', 'PHOTO · NO TARGET') + '  ' + hm, '']), '', null, false); showMsg(L2('사진에 대상 건물 없음 · 화면 가운데(또는 아래 카메라)에 담고 다시', 'Target not in frame · center it and retake'), '#ff9a40', 1.8); return;
   }
   if (S.kind === 'track' && o && o.t === 'track') {
-    const ok = !!o.inView; photoAdd(snapPhoto([(ok ? L2('추적 차량', 'TRACKED VEHICLE') : L2('사진', 'PHOTO')) + '  ' + hm, ''], ok && TRACK ? trackPose(TRACK.s).p : null), o.label, null, ok);
+    const ok = !!o.inView || S.simT - (o.seenT ?? -9) < 1.5; photoAdd(snapPhoto([(ok ? L2('추적 차량', 'TRACKED VEHICLE') : L2('사진', 'PHOTO')) + '  ' + hm, ''], ok && TRACK ? trackPose(TRACK.s).p : null), o.label, null, ok);
     if (ok) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); showMsg(L2('차량 사진 보고 ✓', 'Vehicle photo reported ✓'), '#5dff9a', 1.4); } else showMsg(L2('사진에 차량 없음', 'Vehicle not in frame'), '#ff9a40', 1.4); return;
   }
   if (S.kind === 'sar' && o && o.t === 'sarfind') {
@@ -735,7 +735,8 @@ function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opaci
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
   const so = msObj(); if (!so || so.t !== 'strikeAll') return false;
-  const o = STRIKE.find(t => !t.dead && (() => { const l = t.hull.worldToLocal(DR.p.clone()); return Math.abs(l.x) < 0.5 + 0.9 / 2.4 && Math.abs(l.y) < 0.5 + 0.9 / 1.3 && Math.abs(l.z) < 0.5 + 0.9 / 5.2; })());
+  const M = 1.5;   // 차체에서 1.5 m 안에서 터지면 명중 (차 옆 땅에 박혀도) · 오차는 차 중심에서 잼
+  const o = STRIKE.find(t => !t.dead && (() => { const l = t.hull.worldToLocal(DR.p.clone()); return Math.abs(l.x) < 0.5 + M / 2.4 && Math.abs(l.y) < 0.5 + M / 1.3 && Math.abs(l.z) < 0.5 + M / 5.2; })());
   if (!o) return false;
   if (o.decoy) {   // 기만체: 가시광으로는 같지만 열화상으로는 차가움
     o.dead = true; o.col.off = true; o.hull.material = mat(0x1d1d1b, { roughness: 1 }); S.decoyHit++; S.pen += 20;
@@ -786,7 +787,7 @@ function msOsd() {
   if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
   else if (isMission()) h += `<div class="x"><b>HIT</b>${S.impacts}</div>`;
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
-  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? '<div class="x" style="color:#9aa6ad">열화상(T)으로 확인</div>' : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : '열화상 끔 · T'}</div>`;
+  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? `<div style="color:#ffb070">${L2('연기만 보임 · 더 가까이 또는 열화상(T)', 'Smoke only · closer or thermal (T)')}</div>` : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : L2('연기·불꽃 찾기 · 열화상 T', 'Look for smoke/flames · thermal T')}</div>`;
   h += scenOsd(o);
   if (o && o.t === 'recon') h += `<div${o.inView ? '' : ' class="x"'} style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('건물 포착 · SPACE/📷 보고', 'TARGET · SPACE/📷 to report') : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
   return h;
@@ -1275,7 +1276,7 @@ function scenStart(kind, a) {
 }
 function scenStep(o, cur, dt) {
   if (o.t === 'sarfind') {
-    const d = o.tp.distanceTo(cur), vis = sensorSees(o.tp, cur, ENV.ir ? (AFc().reconD || 260) * 0.8 : (ENV.night ? (lightOn() ? 40 : 18) : 75));
+    const d = o.tp.distanceTo(cur), vis = sensorSees(o.tp, cur, ENV.ir ? (AFc().reconD || 260) * 0.8 : (ENV.night ? (lightOn() ? 50 : 25) : ENV.dusk ? 70 : 90));
     o.inView = vis; if (vis) o.seenT = S.simT;
   } else if (o.t === 'land') {
     const pad = startPos(); if (DR.landed && Math.hypot(DR.p.x - pad.x, DR.p.z - pad.z) < 2.5) msNext('착륙 ✓', '#5dff9a');
@@ -1283,7 +1284,7 @@ function scenStep(o, cur, dt) {
     const T = TRACK, vp = trackPose(T.s);
     if (!T.go && cur.distanceTo(vp.p) < 220) { T.go = true; showMsg('차량 출발 · 추적 시작', '#ffc828', 1.6); comm(`${CS}, target is moving. You have the eye, keep it.`, '표적 차량 이동 시작 · 관측 유지'); }
     const tp = vp.p.clone().add(new V3(0, 1, 0)), dd = cur.distanceTo(tp), see = sensorSees(tp, cur, 320);
-    o.close = dd < 25; o.inView = see && !o.close;
+    o.close = dd < 25; o.inView = see && !o.close; if (o.inView) o.seenT = S.simT;
     if (T.go) { S.trWin += dt; if (o.inView) S.trT += dt; }
     // 들킴: 운전자 시야(차 앞쪽 ±40°), 가까움, 낮은 고도(프로펠러 소리)일수록 빨리 참 · 안전하면 서서히 내려감
     if (T.go) {
@@ -1396,11 +1397,15 @@ function fireReport(f, xy) {   // 사진으로 보고한 불씨 처리 · 다음
   const nx = MS.list.find(x => !x.active && !x.done); if (nx) nx.ignT = MS.t0 + 5 + Math.random() * 6;
   MS.idx = MS.list.findIndex(x => !x.done); if (MS.idx < 0) { MS.idx = MS.list.length; msFinish(); } renderList();
 }
+// 불꽃이 눈(주간 카메라)으로 보이는 거리: 밤엔 불빛이라 더 멀리 · 줌 카메라 기체는 더 멀리 (열화상은 센서 거리의 0.8 — 늘 더 멂)
+function fireEyeR() { return (ENV.night ? 230 : ENV.dusk ? 190 : 160) * clamp((AFc().reconD || 260) / 260, 1, 1.5); }
 function fireStep(cur, dt) {
+  const irR = (AFc().reconD || 260) * 0.8, eyeR = fireEyeR();
   for (const f of MS.list) {
     if (f.done || !f.active) continue;
-    const vis = sensorSees(f.tp, cur, (AFc().reconD || 260) * 0.8);
-    f.inView = vis && ENV.ir; f.seenVis = vis && !ENV.ir; if (f.inView) f.seenT = S.simT;
+    const ir = ENV.ir && sensorSees(f.tp, cur, irR), eye = !ENV.ir && sensorSees(f.tp, cur, eyeR);
+    f.inView = ir || eye; f.via = ir ? 'ir' : eye ? 'eye' : f.via; if (f.inView) f.seenT = S.simT;
+    f.seenVis = !f.inView && !ENV.ir && sensorSees(f.tp, cur, irR);   // 연기만 보이는 거리: 더 가까이 가거나 열화상
   }
   const o = msObj(); if (o) S.recT = o.recT || 0;
 }
@@ -1442,7 +1447,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   race: ['Valley time race', 'Fly through the rings along the valley, in order, as fast as you can.', 'Boost (BST) takes you to the airframe top speed. Miss a ring and it is skipped with an 8 s penalty.'],
   recon: ['Building recon', 'Find and photograph 4 random real buildings from the topo map.', 'Hold each building centered on screen or in the belly cam for 1.5 s. Targets change every run.'],
   strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
-  fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow), switch to thermal (T), center the hotspot and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
+  fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow). Get close enough to see the flames, or use thermal (T) from farther away, keep the fire on screen and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
   sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. 2 rescue kits: drop one within 5 m.'],
   track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in the driver\'s view (ahead, low angle), close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay behind it and high. At night turn your light off (L) to stay hidden.'],
   ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.'],
@@ -1452,7 +1457,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   race: ['계곡 타임 레이스', '계곡을 따라 놓인 링을 순서대로 최단 시간에 통과.', '부스트(BST)로 기체 최고 속도까지. 링을 놓치면 다음 링으로 넘어가며 1개당 +8초 벌점.'],
   recon: ['건물 정찰', '수치지형도에 있는 실제 건물 중 무작위 4곳을 찾아 촬영.', '건물을 화면 가운데나 아래 카메라에 1.5초 담기. 매번 대상이 바뀜.'],
   strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
-  fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 열화상(T)으로 불씨를 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
+  fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 불꽃이 보일 만큼 가까이 가거나 열화상(T)으로 멀리서 불씨를 화면에 담고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
   sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 구조 키트 2개 · 5 m 안에 투하.'],
   track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '운전자 시야(차 앞쪽·낮은 각도)·근접·저고도면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 차 뒤쪽 높이 유지 권장. 밤에는 드론 조명을 끄면(L) 덜 들킴.'],
   ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.'],
@@ -1791,7 +1796,7 @@ function commStart(kind) {
     race: [`${CS}, CONTROL. Range is hot. Rings are set along the valley. Go when ready. ${w}`, '코스 준비 완료. 계곡 링 따라 출발.'],
     recon: (() => { const b = kind === 'recon' && MS.list[0] && MS.list[0].tp ? fromLaunch(MS.list[0].tp) : null; return [`${CS}, CONTROL. Four structures tasked for imagery. ${b ? `First structure bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} ${n}Over.`, `건물 4곳 촬영 임무.${b ? ` 첫 대상: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m` : ''}`]; })(),
     strike: [`${CS}, CONTROL. Five vehicles in the valley, two are decoys. Positive ID by thermal before you commit. Cleared hot.`, '차량 5대 중 2대 기만체. 열화상으로 식별 후 돌입. 공격 허가.'],
-    fire: [`${CS}, CONTROL. Fire watch requested. Smoke reports coming in, locate each fire, confirm with thermal and report. ${w}Over.`, '산불 감시 요청. 연기 신고가 들어옴. 직접 찾아 열화상으로 확인 후 보고.'],
+    fire: [`${CS}, CONTROL. Fire watch requested. Smoke reports coming in, locate each fire, confirm it by eye or thermal and report. ${w}Over.`, '산불 감시 요청. 연기 신고가 들어옴. 직접 찾아 눈이나 열화상으로 확인 후 보고.'],
     sar: (() => { const b = kind === 'sar' && SAR ? fromLaunch(SAR.area) : null; return [`${CS}, CONTROL. Missing hiker, last seen near the trail. ${b ? `Search area bearing ${b.brgW}, about ${b.distW} meters from launch point.` : ''} Sweep the area, look for his pack and signal flashes, use thermal under the trees. ${n}Over.`, `실종자 수색.${b ? ` 수색 구역: 출발점에서 방위 ${b.brg}° · 약 ${b.dist} m.` : ''} 구역을 훑으며 배낭·신호 반짝임, 나무 아래는 열화상.`]; })(),
     track: [`${CS}, CONTROL. Target vehicle on the forest road. Do not get spotted. Stay out of its front, keep high and well back, and keep eyes on for sixty seconds.`, '도로의 표적 차량 추적. 들키지 말 것 · 차 앞쪽 피하고 높게, 멀찍이 뒤에서 60초 관측.'],
     ridge: [`${CS}, CONTROL. Ridge run approved. Expect gusts on the crest. ${w}`, '능선 비행 승인. 능선 위 돌풍 주의.'],
@@ -2055,11 +2060,11 @@ if ($('bPauseOpt')) $('bPauseOpt').onclick = () => openPanel('optPanel');
 if ($('bPauseCtl')) $('bPauseCtl').onclick = () => { openPanel('ctlPanel'); try { kbHelp(); } catch (e) { } };
 setInterval(() => { const w = $('pauseWho'); if (w && S.state === 'pause') { const lk = S.lastKind || S.kind; w.textContent = L2('현재 임무: ', 'Mission: ') + (MS_NAME[lk] || ({ course: L2('장애물 코스', 'Obstacle course'), free: L2('자유 비행', 'Free flight'), tutorial: L2('튜토리얼', 'Tutorial'), demo: L2('기준 비행', 'Reference flight') })[lk] || lk) + ' · ' + AFc().name + ' · ' + pilotName(); } }, 400);
 // ---- 첫 화면 3단계: 1 조종사 이름 → 2 기체 → 3 코스 (각 단계 뒤로 가기) ----
-MENU.step = 0; const HAS_INTRO = !!(window.SIM_VR || window.SIM_VR_URL); MENU.mode = window.SIM_VR ? 'vr' : 'pc';
+MENU.step = 0; MENU.mode = window.SIM_VR ? 'vr' : 'pc';
 try { SET.pilot = localStorage.getItem('fpvsim_pilot') || ''; } catch (e) { SET.pilot = ''; }
 function pilotName() { return SET.pilot || L2('조종사', 'Pilot'); }
 function wizGo(n) {
-  n = Math.max(HAS_INTRO ? 0 : 1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;
+  n = Math.max(1, Math.min(3, n | 0)); const c = $('menuCard'); if (!c) return;   // 컴퓨터·VR 갈림길(0단계)은 쓰지 않음 — 주소가 알아서 나눔
   if (MENU.step === 1 && n > 1) { const v = ($('pilotName').value || '').trim().slice(0, 16), bad = typeof pilotNameBad === 'function' ? pilotNameBad(v) : '';
     if (bad) { const h = document.querySelector('#menuCard .s1 .wzhint'); if (h) { if (!h.dataset.t) h.dataset.t = h.textContent; h.textContent = bad; h.classList.add('bad'); } try { $('pilotName').focus(); } catch (e) { } return; }
     SET.pilot = v; try { localStorage.setItem('fpvsim_pilot', v); } catch (e) { } }
@@ -2068,8 +2073,6 @@ function wizGo(n) {
   if (n === 2) { afUI(); }
   if (n === 3 && typeof isC1 === 'function') { if (SET.af === 'c1' && !isC1(MENU.ms)) MENU.ms = 'class1'; else if (SET.af !== 'c1' && isC1(MENU.ms)) MENU.ms = 'course'; }   // 1종 연습기 → 1종 코스로
   if (n === 3) { menuSel(MENU.ms); const w = $('wzWho'); if (w) w.textContent = `${pilotName()} · ${AFc().name}`; totFlyUI(); const g = $('msGo'); if (g) g.textContent = MENU.mode === 'vr' ? L2('VR로 출격 ▶ (헤드셋 착용)', 'Launch in VR ▶ (put on the headset)') : L2('출격 ▶', 'Launch ▶'); }
-  const md = $('wzMode'); if (md) { md.style.display = HAS_INTRO ? '' : 'none'; md.textContent = MENU.mode === 'vr' ? '🥽 VR' : '🖥 PC'; }
-  if ($('wz1Back')) $('wz1Back').style.visibility = HAS_INTRO ? '' : 'hidden';
   try { window.dispatchEvent(new Event('resize')); } catch (e) { }
   if (ui.menu) ui.menu.scrollTop = 0;
 }
@@ -2125,15 +2128,15 @@ function pilotSetUI() {
   const modeN = { gps: 'GPS', atti: 'ATTI', man: L2('수동', 'Manual'), acro: 'ACRO' }, asN = { 2: L2('보조 전체', 'Full assist'), 1: L2('보조 약하게', 'Light assist'), 0: L2('보조 끔', 'No assist') };
   const vrm = window.SIM_VR, sm = vrm ? (SET.vrMode || 1) : stickMode();
   const devN = { pc: L2('이 기기: 컴퓨터', 'This device: computer'), mobile: L2('이 기기: 휴대폰·태블릿', 'This device: phone/tablet'), vr: L2('이 기기: VR (Quest)', 'This device: VR (Quest)') }[dev];
-  box.innerHTML = `<div class="pslbl">${L2('비행 난이도', 'Flight style')} <small>${L2('고른 값이 기본 설정이 됩니다 · 세부 조정은 ⚙ 옵션', 'Becomes your default · fine-tune in ⚙ Options')}</small></div>` +
+  box.innerHTML = `<div class="psg g-fly"><div class="pslbl">${L2('비행 난이도', 'Flight style')} <small>${L2('고른 값이 기본 설정이 됩니다 · 세부 조정은 ⚙ 옵션', 'Becomes your default · fine-tune in ⚙ Options')}</small></div>` +
     `<div class="pscards fly">${FLY_PRE.map(p => `<button class="pcd${fp === p ? ' on' : ''}" data-f="${p.id}"><i class="ic">${p.ic}</i><b>${nm(p.n)}</b><small>${nm(p.d)}</small><span class="chips"><em>${modeN[p.set.mode]}</em><em>${asN[p.set.assistLv]}</em><em>${navN(p.id)}</em></span></button>`).join('')}</div>` +
-    (fp ? '' : `<p class="psnote">${L2('지금은 옵션에서 직접 맞춘 설정입니다', 'Currently using your own settings from Options')}</p>`) +
-    `<div class="pslbl">${L2('조종기 모드', 'Stick mode')} <small>${vrm ? L2('Quest 컨트롤러 (쿼드)', 'Quest controllers (quad)') : L2('휴대폰 터치 · 게임패드 (RC 조종기는 조종기 설정을 따름)', 'Touch and gamepad (RC transmitters follow their own setup)')}</small></div>` +
-    `<div class="psseg">${[[2, L2('모드 2', 'Mode 2'), L2('왼쪽 스틱: 상승·회전 / 오른쪽: 전진·좌우', 'Left: climb·yaw / right: fwd·strafe')], [1, L2('모드 1', 'Mode 1'), L2('왼쪽 스틱: 전진·회전 / 오른쪽: 상승·좌우', 'Left: fwd·yaw / right: climb·strafe')]].concat(vrm ? [[3, L2('머리 방향', 'Head steer'), L2('보는 쪽으로 비행', 'Fly where you look')]] : []).map(([v, a, b]) => `<button data-s="${v}" class="${sm === v ? 'on' : ''}"><b>${a}</b><small>${b}</small></button>`).join('')}</div>` +
-    `<div class="pslbl">${L2('화면 구성', 'Screen layout')} <small>${devN}</small></div>` +
+    (fp ? '' : `<p class="psnote">${L2('지금은 옵션에서 직접 맞춘 설정입니다', 'Currently using your own settings from Options')}</p>`) + `</div>` +
+    `<div class="psg g-stick"><div class="pslbl">${L2('조종기 모드', 'Stick mode')} <small>${vrm ? L2('Quest 컨트롤러 (쿼드)', 'Quest controllers (quad)') : L2('휴대폰 터치 · 게임패드 (RC 조종기는 조종기 설정을 따름)', 'Touch and gamepad (RC transmitters follow their own setup)')}</small></div>` +
+    `<div class="psseg">${[[2, L2('모드 2', 'Mode 2'), L2('왼쪽 스틱: 상승·회전 / 오른쪽: 전진·좌우', 'Left: climb·yaw / right: fwd·strafe')], [1, L2('모드 1', 'Mode 1'), L2('왼쪽 스틱: 전진·회전 / 오른쪽: 상승·좌우', 'Left: fwd·yaw / right: climb·strafe')]].concat(vrm ? [[3, L2('머리 방향', 'Head steer'), L2('보는 쪽으로 비행', 'Fly where you look')]] : []).map(([v, a, b]) => `<button data-s="${v}" class="${sm === v ? 'on' : ''}"><b>${a}</b><small>${b}</small></button>`).join('')}</div></div>` +
+    `<div class="psg g-ly"><div class="pslbl">${L2('화면 구성', 'Screen layout')} <small>${devN}</small></div>` +
     `<div class="pscards ly">${LY_PRE[dev].map(p => `<button class="pcd${lp === p ? ' on' : ''}" data-l="${p.id}">${pvHTML(p.pv, dev === 'vr')}<b>${nm(p.n)}</b><small>${nm(p.d)}</small></button>`).join('')}` +
-    (dev === 'vr' ? '' : `<button class="pcd ed${lp ? '' : ' on'}" data-l="edit"><span class="pv ed"><i>✎</i></span><b>${L2('직접 배치', 'Arrange')}</b><small>${L2('창·버튼을 끌어서 옮기고 크기 조절', 'Drag panels and buttons, resize or hide')}</small></button>`) + `</div>` +
-    `<div class="psfoot"><button id="psOpt">⚙ ${L2('모든 옵션', 'All options')}</button></div>`;
+    (dev === 'vr' ? '' : `<button class="pcd ed${lp ? '' : ' on'}" data-l="edit"><span class="pv ed"><i>✎</i></span><b>${L2('직접 배치', 'Arrange')}</b><small>${L2('창·버튼을 끌어서 옮기고 크기 조절', 'Drag panels and buttons, resize or hide')}</small></button>`) + `</div></div>` +
+    `<div class="psg g-foot psfoot"><button id="psOpt">⚙ ${L2('모든 옵션', 'All options')}</button></div>`;
   box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { const p = FLY_PRE.find(x => x.id === b.dataset.f); Object.assign(SET, p.set); if (RATE_PRESET[p.set.feel]) SET.rates = SET.ratesY = RATE_PRESET[p.set.feel].slice(); modeChanged(); try { syncExpo(); } catch (e) { } pilotSetUI(); });
   box.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { const v = +b.dataset.s; if (vrm) SET.vrMode = v; else { SET.stick = v; stickApply(); } saveSet(); pilotSetUI(); });
   box.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
@@ -2190,24 +2193,14 @@ function pinStretch(x, from, to) { for (let i = from; i < to; i++) x = sha256hex
   const kd = e => { if (el.classList.contains('hidden')) return; e.stopImmediatePropagation(); e.preventDefault(); if (/^Digit\d$|^Numpad\d$/.test(e.code)) press(e.code.slice(-1)); else if (e.key === 'Backspace') press('del'); };
   window.addEventListener('keydown', kd, true);
 })();
-// 처음 화면: 컴퓨터 / VR 갈림길 (PC 판과 VR 판은 서로 다른 주소)
-function vrUrlAbs() { try { return new URL((window.SIM_VR_URL || '') + (window.SIM_LANG === 'en' ? 'en.html' : ''), location.href).href; } catch (e) { return ''; } }
-if ($('introPC')) $('introPC').onclick = () => { if (window.SIM_VR) location.href = (window.SIM_BASE || '../') + (window.SIM_LANG === 'en' ? 'en.html' : '') + '?pc'; else wizGo(1); };   // ?pc: 헤드셋에서 일부러 PC 판으로 (자동으로 VR 판에 되돌아가지 않게)
-if ($('vrPC') && window.SIM_BASE) $('vrPC').href = window.SIM_BASE + (window.SIM_LANG === 'en' ? 'en.html' : '') + '?pc';
-// 이어서 비행: 지난번 임무·기체가 있으면 첫 화면에서 바로 (컴퓨터 판)
-{ const c = $('introCont'); let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
-  if (c && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) { c.classList.remove('hidden'); $('introContS').textContent = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
-    c.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); };
-    // 1단계에도 같은 단추 (처음 화면을 건너뛰므로)
-    const nx = $('wz1Next'); if (nx && !$('wz1Cont')) { const b = document.createElement('button'); b.id = 'wz1Cont'; b.className = 'wzcont'; b.title = $('introContS').textContent; b.textContent = '↻ ' + L2('이어서: ', 'Continue: ') + (MS_NAME[lastMs] || lastMs); b.onclick = c.onclick; nx.parentNode.insertBefore(b, nx); } } }
-if ($('introVR')) $('introVR').onclick = () => {
-  const n = $('introNote');
-  if (window.SIM_VR) { if (VR_OK.ok) wizGo(1); else if (n) n.textContent = L2('이 기기·브라우저는 VR을 지원하지 않습니다. Meta Quest 헤드셋의 브라우저에서 이 주소를 열어 주세요.', 'This device or browser does not support VR. Open this address in the Meta Quest browser.'); return; }
-  if (VR_OK.ok) { location.href = vrUrlAbs(); return; }
-  if (n) n.innerHTML = L2('VR은 Meta Quest 헤드셋의 브라우저에서 엽니다: ', 'Open VR in the Meta Quest browser: ') + `<b style="color:#4fe3ff;user-select:all">${vrUrlAbs().replace(/^https?:\/\//, '')}</b>`;
-};
-if ($('wz1Back')) $('wz1Back').onclick = () => wizGo(0);
-if ($('wzMode')) $('wzMode').onclick = () => wizGo(0);
+if ($('vrPC') && window.SIM_BASE) $('vrPC').href = window.SIM_BASE + (window.SIM_LANG === 'en' ? 'en.html' : '') + '?pc';   // ?pc: 헤드셋에서 일부러 PC 판으로 (자동으로 VR 판에 되돌아가지 않게)
+// 이어서 비행: 지난번 임무·기체가 있으면 1단계(조종사)에서 바로 출격 (컴퓨터 판 · 컴퓨터/VR 갈림길 화면은 없앰 — 주소가 알아서 나눔)
+{ let lastMs = null; try { lastMs = localStorage.getItem('fpvsim_menu_ms'); } catch (e) { }
+  const nx = $('wz1Next');
+  if (nx && !$('wz1Cont') && !window.SIM_VR && lastMs && lastMs !== 'tutorial' && msTile(lastMs) && MS_NAME[lastMs] !== undefined && msAfOk(lastMs)) {
+    const b = document.createElement('button'); b.id = 'wz1Cont'; b.className = 'wzcont'; b.title = `${MS_NAME[lastMs] || lastMs} · ${AFc().name}${SET.pilot ? ' · ' + SET.pilot : ''}`;
+    b.textContent = '↻ ' + L2('이어서: ', 'Continue: ') + (MS_NAME[lastMs] || lastMs); b.onclick = () => { wizGo(3); menuSel(lastMs); if (msAvail(lastMs).ok) menuGo(); }; nx.parentNode.insertBefore(b, nx); } }
+
 // ---- 임무 현장 미리 보기 (메뉴 뒤 카메라) ----
 function menuShow(k) {
   if (typeof c1Menu === 'function') c1Menu(k);

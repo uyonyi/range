@@ -11,7 +11,9 @@ const CHORDS = [[45, [57, 60, 64]], [41, [57, 60, 65]], [48, [55, 60, 64]], [43,
 const HOOK = [[76, 0, 74, 76, 0, 72, 74, 0], [72, 0, 72, 74, 0, 77, 76, 0], [79, 0, 76, 74, 0, 72, 74, 0], [74, 0, 71, 72, 74, 0, 79, 0]];
 function musicLevel() { return MUS.on ? MUS.vol * 0.42 : 0; }
 function musicStart() {
-  if (window.__bootAudio && !window.__bootDone && !window.__bootAudio.done) return;   // 인트로 음악이 울리는 동안은 기다림 (끝나거나 첫 화면이 걷히면 시작)
+  const B = window.__bootAudio;
+  if (B && !window.__bootDone && !B.done) return;   // 인트로 음악이 울리는 동안은 기다림 (끝나거나 첫 화면이 걷히면 시작)
+  if (B && B.fadeT && performance.now() < B.fadeT) { if (!MUS.waitT) MUS.waitT = setTimeout(() => { MUS.waitT = 0; musicStart(); }, B.fadeT - performance.now() + 30); return; }   // 인트로 곡이 다 줄어든 뒤에 (두 곡이 겹쳐 들리지 않게)
   try { if (AU.ctx && MUS.on && MUS.vol > 0 && !SET.musSynth) smpLoad(); } catch (e) { }   // 음악을 켠 사람만 악기 녹음을 받음 (약 2 MB)
   if (!AU.ctx || MUS.timer) return;
   const ctx = AU.ctx;
@@ -355,6 +357,18 @@ addEventListener('pointerdown', () => { initAudio(); musicStart(); });
 addEventListener('bootsound', () => { const B = window.__bootAudio; if (!B) return; MUS.on = !!B.on; musicSetLevel(); try { syncSeg(); } catch (e) { } });   // 첫 화면의 소리 끄기/켜기 = 음악 켬/끔 설정
 { const bootMusic = () => { initAudio(); musicStart(); }; addEventListener('bootcue', bootMusic); addEventListener('bootend', bootMusic); if (window.__bootDone && window.__bootAudio) setTimeout(bootMusic, 0); }
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+// 휴대폰: 단추·카드를 누를 때 가벼운 진동 (안드로이드는 누르는 순간 · 아이폰은 손을 뗄 때 — 브라우저가 허락하는 때) · 진동 설정이 '끔'이면 없음
+{ const TAPS = 'button,.tb,.pcd,.stc,.afc,[data-ms],label.chk';
+  const tapOK = e => IS_TOUCH && rumbleK() > 0 && e.target && e.target.closest && e.target.closest(TAPS) && !(HAP.el && HAP.el.contains(e.target));
+  addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && navigator.vibrate && tapOK(e)) try { navigator.vibrate(10); } catch (x) { } }, true);
+  addEventListener('click', e => { if (!navigator.vibrate && e.isTrusted && tapOK(e)) hapIOS(); }, true); }
+// 다른 앱·탭으로 가면(화면이 가려지면) 소리를 멈추고, 돌아오면 다시 — 뒤에 남은 창의 음악이 새 창과 겹치지 않게
+document.addEventListener('visibilitychange', () => {
+  const c = AU.ctx || (window.__bootAudio && window.__bootAudio.ctx); if (!c) return;
+  if (document.hidden && XR_ON) return;   // VR 안(헤드셋 화면)에서는 그대로
+  if (document.hidden) { if (c.state === 'running') { AU.hidOff = true; try { c.suspend(); } catch (e) { } } }
+  else if (AU.hidOff) { AU.hidOff = false; try { const p = c.resume(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
+});
 function getPad() {
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
   if (!pads.length) return null;
@@ -409,9 +423,18 @@ const RCUI = { open: false };
 // 진동 피드백: 게임패드(Xbox 등 dual-rumble) · VR 컨트롤러 · 휴대폰. 세기 설정 SET.rumble 0 끔 · 1 보통(이벤트만) · 2 강(모터·바람 상시 진동 포함)
 const RUM = { t: 0, lvl: 0 };
 function rumbleK() { const v = SET.rumble; return v == null ? 1 : +v; }
+// 휴대폰 진동: 안드로이드 = navigator.vibrate · 아이폰 사파리는 진동 기능이 없어서 iOS 17.4+ 스위치(체크박스) 진동으로 — 화면을 누르는 순간에만 울림(브라우저 규칙)
+const HAP = { el: null, n: 0 };
+function hapIOS() {
+  try {
+    if (!HAP.el) { const l = document.createElement('label'); l.setAttribute('aria-hidden', 'true'); l.style.cssText = 'position:fixed;left:-50px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none'; const i = document.createElement('input'); i.type = 'checkbox'; i.setAttribute('switch', ''); i.tabIndex = -1; l.appendChild(i); document.body.appendChild(l); HAP.el = l; }
+    HAP.el.click(); HAP.n++;
+  } catch (e) { }
+}
+function phoneBuzz(ms) { if (!IS_TOUCH || XR_ON) return; try { if (navigator.vibrate) navigator.vibrate(ms); else hapIOS(); } catch (e) { } }
 function rumble(strong, weak, ms) {
   const k = rumbleK(); if (!k) return; const sc = k >= 2 ? 1 : 0.8; strong = Math.min(1, strong * sc); weak = Math.min(1, weak * sc);
-  try { if (TOUCH.on && navigator.vibrate) navigator.vibrate(Math.round((ms || 180) * Math.max(strong, weak) * 0.6)); } catch (e) { }
+  phoneBuzz(Math.round(clamp((ms || 180) * Math.max(strong, weak) * 0.75, 25, 350)));   // 짧은 일도 느껴지게 최소 25 ms
   try { const gp = getPad(); const va = gp && gp.vibrationActuator; if (va && va.playEffect) va.playEffect('dual-rumble', { duration: ms || 180, strongMagnitude: strong, weakMagnitude: weak }); } catch (e) { }
   try { if (typeof XR !== 'undefined' && XR.sess) for (const src of XR.sess.inputSources) { const h = src.gamepad && src.gamepad.hapticActuators && src.gamepad.hapticActuators[0]; if (h && h.pulse) h.pulse(Math.max(strong, weak), ms || 180); } } catch (e) { }
 }

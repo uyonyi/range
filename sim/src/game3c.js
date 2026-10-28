@@ -65,3 +65,5 @@ function toggleFull() {
   } catch (e) { }
 }
 $('bFull').onclick = toggleFull;
+// 휴대폰: 첫 화면에서 고르는 순간(로그인·게스트 등) 전체 화면 + 가로 고정 → 메뉴가 화면을 다 씀 (주소창 없이) · '시작할 때 전체 화면' 설정을 따름 · 아이폰은 브라우저가 지원하지 않음
+addEventListener('bootend', () => { if (IS_TOUCH && !XR_ON) enterFull(); });
