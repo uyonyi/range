@@ -237,7 +237,7 @@ function updateGuide(subj) {
     const en = window.SIM_LANG === 'en';
     if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press Enter/📷' : '불씨 포착 · 화면 가운데에 두고 Enter/📷') : (en ? 'Hiker in view · centre and Enter/📷' : '실종자 포착 · 가운데에 두고 Enter/📷'), 'ok']);
     else {
-      lines.push([fire ? (en ? 'Inside search area · sweep slowly with thermal (T), look for smoke/glow' : '수색 구역 안 · 열화상(T)으로 천천히 훑기 · 연기·불빛 찾기') : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
+      lines.push([fire ? (o.seenVis ? (en ? 'Smoke only · get closer to see the flames, or thermal (T)' : '연기만 보임 · 불꽃이 보일 만큼 가까이, 또는 열화상(T)') : (en ? 'Inside search area · look for smoke/glow, or sweep with thermal (T)' : '수색 구역 안 · 연기·불빛 찾기 · 또는 열화상(T)으로 훑기')) : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
       if (agl > band[1]) lines.push([(en ? 'Descend to ' : '고도 내리기 → ') + band[0] + '–' + band[1] + ' m' + (en ? ' AGL' : ''), 'warn']);
       else if (agl < band[0]) lines.push([(en ? 'Climb to ' : '고도 올리기 → ') + band[0] + '–' + band[1] + ' m', 'warn']);
       const dc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z); if (dc > o.search.r * 0.8) lines.push([en ? 'Near the edge · turn back toward the centre' : '구역 가장자리 · 중심 쪽으로 되돌아가기', 'warn']);
