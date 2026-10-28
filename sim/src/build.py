@@ -205,8 +205,12 @@ def build_pages(outdir, site_ids, vr):
         iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
         t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv).replace('{{PRE}}', json.dumps(PRE))
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
-        t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
-        t = t.replace('</body>', f"<script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('{up}sw.js').catch(()=>{{}}));</script>\n</body>")   # 오프라인·재방문 캐시 (sw.js)
+        # 앱 본체: 미리 받기 작업 스레드가 그림 도구를 차렸다는 알림(warm)을 받은 뒤(최대 0.4초) 붙임 — 받기는 head 의 preload 로 처음부터
+        #   서비스 워커(오프라인·재방문 캐시, sw.js)는 앱이 다 뜨고 3초 뒤 등록 (예전처럼 앱 시작 뒤 · 설치하며 캐시에 수 MB 를 쓰는 일이 앱 시작과 겹치지 않게)
+        app = f'js/app.{lang}.js?v={ver}'
+        t = t.replace('</head>', f'<link rel="preload" as="script" href="{app}">\n</head>', 1)
+        sw = "if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))setTimeout(function(){navigator.serviceWorker.register('%ssw.js').catch(function(){});},3000);" % up
+        t = t.replace('<script>/*GAME*/</script>', "<script>(function(){var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='%s';s.async=false;s.onload=function(){%s};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();})();</script>" % (app, sw))
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
         pre += [f'{"vr/" if vr else ""}{page}', f'{"vr/" if vr else ""}js/app.{lang}.js?v={ver}'] + ([f'sites/{sid}.js?v={sv[sid]}' for sid in site_ids] if not vr else [])
     return pre

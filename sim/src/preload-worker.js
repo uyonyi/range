@@ -6,7 +6,7 @@
 //   ※ rgbaFrom·coverageMips 는 game6t.js 와 같은 계산 (작업 스레드를 못 쓰는 브라우저·한 파일 판은 그쪽에서)
 'use strict';
 const get = (u, how) => fetch(u, { priority: 'low' }).then(r => r.ok ? r[how]() : Promise.reject(new Error('HTTP ' + r.status + ' ' + u)));
-function pixels(bmp, W, H) { const cv = new OffscreenCanvas(W, H), g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0, W, H); return g.getImageData(0, 0, W, H).data; }
+function pixels(bmp, W, H) { const cv = new OffscreenCanvas(W, H), g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data; cv.width = cv.height = 1; return d; }   // 캔버스 메모리는 바로 놓음 (작업 스레드는 끝나도 살아 있음)
 // 색(불투명 RGB)·투명도(A) 그림 두 장을 합쳐 RGBA 배열로 (아래위 뒤집어 three 의 uv 와 맞춤)
 function rgbaFrom(rgb, al) {
   const W = rgb.width, H = rgb.height, c = pixels(rgb, W, H), a = pixels(al, W, H), out = new Uint8Array(W * H * 4);
@@ -63,7 +63,10 @@ function start({ t, g }) {
 }
 // 일감은 작업 스레드 이름(name)으로 받아 바로 시작: 메시지는 앱 스크립트가 화면 스레드를 잡고 있는 동안 전달이 미뤄짐
 //   (주소 # 는 서비스 워커가 캐시에서 줄 때 사라짐) · 메시지는 만일을 위한 예비 (먼저 온 것 하나만)
+// 그림 도구(2D 캔버스)는 작업 스레드에서 처음 만들 때 화면 스레드를 한 번 거침 → 받기를 걸어 둔 뒤 바로 만들어 두고 알림 ('warm')
+//   화면 스레드는 이 알림을 받은 뒤(최대 0.4초) 앱 본체를 불러옴 — 앱이 화면 스레드를 오래 잡아도 이후 계산은 여기서 나란히 진행
+function warm() { try { const g = new OffscreenCanvas(1, 1).getContext('2d', { willReadFrequently: true }); g.fillRect(0, 0, 1, 1); g.getImageData(0, 0, 1, 1); } catch (e) { } postMessage({ k: 'warm' }); }   // 그리고 읽기까지 해야 준비됨
 let started = false;
-function go(job) { if (started || !job || typeof job !== 'object') return; started = true; start(job); }
+function go(job) { if (started || !job || typeof job !== 'object') return; started = true; start(job); warm(); }
 try { go(JSON.parse(self.name)); } catch (e) { }
 self.onmessage = e => go(e.data);
