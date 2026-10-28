@@ -121,9 +121,9 @@ const OUTER = (function outerWorld() {
   B.forEach((b, k) => { const c = Math.sin(k * 12.9898) * 43758.5453, rr = c - Math.floor(c);
     if (b.kind === 'gh') { ghs.push({ x: b.x, y: b.y, z: b.z, sx: b.w / 2, sy: b.h, sz: b.l, yaw: b.yaw }); return; }
     bodies.push({ x: b.x, y: b.y + (b.h + 0.3) / 2, z: b.z, sx: b.w, sy: b.h + 0.3, sz: b.l, yaw: b.yaw, col: b.kind === 'barn' ? 0xa0a4a8 : WALL[(rr * 4) | 0] });
-    if (b.kind === 'shop') signs.push({ x: b.x + Math.sin(b.yaw) * 0, y: b.y + b.h - 0.2, z: b.z, sx: b.w + 0.2, sy: 0.8, sz: b.l + 0.2, yaw: b.yaw, col: SIGN[(rr * 4) | 0] });
+    if (b.kind === 'shop') { b.si = signs.length; signs.push({ x: b.x + Math.sin(b.yaw) * 0, y: b.y + b.h - 0.2, z: b.z, sx: b.w + 0.2, sy: 0.8, sz: b.l + 0.2, yaw: b.yaw, col: SIGN[(rr * 4) | 0] }); }   // b.si: 간판 번호 (game6b 가 벽 높이에 맞춰 옮김)
     else roofs.push({ x: b.x, y: b.y + b.h + 0.3, z: b.z, sx: b.w + 0.8, sy: b.kind === 'barn' ? 2.2 : 2.6, sz: b.l + 0.8, yaw: b.yaw, col: b.kind === 'barn' ? 0x8a8f96 : ROOF[(rr * 5) | 0] }); });
-  const BM = { bodies: inst(UBOX, bodies, it => it.col), roofs: inst(roofGeo, roofs, it => it.col, { roughness: 0.6, side: THREE.DoubleSide }) }; inst(UBOX, signs, it => it.col, { roughness: 0.5 }); inst(ghGeo, ghs, () => 0xe8eef0, { roughness: 0.35, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+  const BM = { bodies: inst(UBOX, bodies, it => it.col), roofs: inst(roofGeo, roofs, it => it.col, { roughness: 0.6, side: THREE.DoubleSide }) }; BM.signs = inst(UBOX, signs, it => it.col, { roughness: 0.5 }); inst(ghGeo, ghs, () => 0xe8eef0, { roughness: 0.35, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
   // ---- 나무: 숲 칸마다 1~2 그루 + 풀밭·마을 가장자리 드문드문 · 활엽(둥근) / 침엽(원뿔) ----
   const T = [];   // [x, y, z, h, r, kind]
   for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++) { const i = iy * nx + ix, t = lu[i]; if (t === 9 || t === 5 || t === 1 || t === 4) continue;

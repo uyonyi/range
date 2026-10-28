@@ -963,7 +963,7 @@ function frame(now, noRender) {
   const focus = S.state === 'menu' ? menuFocus() : subjPos;
   sun.target.position.copy(focus); sun.position.copy(focus).addScaledVector(SUN_DIR, 120);
   sky.position.copy(camera.position);
-  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt); try { TREES3.tick(now / 1000); } catch (e) { } if (window.__POWER) window.__POWER.tick(dt); if (window.__WX2) window.__WX2.tick(dt); if (window.__BLD3) window.__BLD3.tick(dt);
+  updateFX(dt); envTick(dt); scenTick(dt); reloadTick(dt); try { TREES3.tick(now / 1000); } catch (e) { } if (window.__POWER) window.__POWER.tick(dt); if (window.__WX2) window.__WX2.tick(dt); if (window.__BLD3) window.__BLD3.tick(dt); if (window.__LAMPS) window.__LAMPS.tick(dt);
   if (playing || S.state === 'pause' || S.state === 'replay') { updateHUD(dt, subj); drawMap(ghostOn && ghostM.g.visible ? ghostS.p : null); }
   { const thr = demoing ? 0.55 : S.state === 'replay' ? RP.pose.thrust : DR.thrust, act = (S.state === 'run' && !tutHold && DR.alive && (!(DR.landed && IN.thr <= 0.05) || (typeof C1 !== 'undefined' && C1 && C1.on && C1.armed))) || S.state === 'demo' || (S.state === 'replay' && RP.playing);
     let mo = false; try { mo = MOTOR.tick(dt, thr, act, subj, SET.af); } catch (e) { MOTOR.err = String(e); }   // 기체별 모터·프로펠러 소리 (game2m)
