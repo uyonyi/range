@@ -954,8 +954,9 @@ function frame(now, noRender) {
   { eul.set(-visPitch(subj), -subj.h, -subj.roll); const q = new THREE.Quaternion().setFromEuler(eul);
     spot.position.copy(subjPos).add(new V3(0, 0, -0.14).applyQuaternion(q)); spotT.position.copy(subjPos).add(new V3(0, -0.6, -3).applyQuaternion(q)); spotT.updateMatrixWorld(); }
   if (S.state === 'run' && tutHold && S.tut.st === 'intro') tutCamera(dt);
-  else if (S.state === 'menu') menuCam(dt);
+  else if (S.state === 'menu') menuView(dt);   // 메뉴 배경 카메라 (1~2단계·첫 화면은 둘러보기, 3단계는 임무 미리 보기)
   else updateCamera(dt, subj);
+  if (S.state !== 'menu' && FLY.shown) flyFade(0);   // 메뉴에서 바로 출격(이어서 등)해도 어둡게 남지 않게
   camera.updateMatrixWorld();
   updateGuide(subj);
   droneM.g.visible = (DR.alive || S.state !== 'run') && !(CAMS[S.cam] === 'FPV' && S.state !== 'menu' && S.state !== 'result' && !(tutHold && S.tut.st === 'intro'));

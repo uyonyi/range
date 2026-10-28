@@ -2248,6 +2248,56 @@ function menuCam(dt) {
   if (tag && (MENU._tagT = (MENU._tagT || 0) - dt) <= 0) { MENU._tagT = 0.5; let g = ''; if (pv.d !== undefined && !SITE.flat) try { g = grid(pv.d, pv.s); } catch (e) { } tag.innerHTML = `<b>●</b> LIVE · ${stName(SITE)}${g ? ' · ' + g : ''}`; }
 }
 function menuFocus() { return MENU.cf || (CRS_C ? W(BY.pad_start.down, BY.pad_start.side, 0) : W(60, 0, 0)); }
+// ---- 첫 화면(로그인 고르기)·메뉴 1~2단계 배경: 코스·산 정상·마을·계곡을 천천히 비추는 카메라 · 장면이 바뀔 때 살짝 어둡게 (3단계는 고른 임무 미리 보기) ----
+const FLY = { i: 0, t: 0, shots: null, el: null, y: null, lk: null, mode: '' };
+function flyOn() { return S.state === 'menu' && !XR_ON && (MENU.step < 3 || !window.__bootDone); }
+function flyVillage() {   // 건물이 가장 많이 모인 곳 (100 m 칸 기준)
+  const B = window.__BLD3 && window.__BLD3.LIST; if (!B || B.length < 6) return null;
+  const G = new Map(); for (const b of B) { const k = Math.round(b[0] / 100) + ',' + Math.round(b[1] / 100); G.set(k, (G.get(k) || 0) + 1); }
+  let best = null, bn = 0; for (const [k, n] of G) if (n > bn) { bn = n; best = k; }
+  if (bn < 4) return null; const [kx, kz] = best.split(',').map(Number); let sx = 0, sz = 0, c = 0;
+  for (const b of B) if (Math.abs(b[0] / 100 - kx) <= 1 && Math.abs(b[1] / 100 - kz) <= 1) { sx += b[0]; sz += b[1]; c++; }
+  const x = sx / c, z = sz / c; return new V3(x, terrainAt(x, z), z);
+}
+function flyShots() {
+  if (FLY.shots) return FLY.shots;
+  const L = [], pd = CRS_C ? BY.pad_start.down : 60, ps = CRS_C ? BY.pad_start.side : 0;
+  if (SITE.flat) { const c = W(pd, ps, 0); L.push({ k: 'orbit', c, R: 46, h: 16, a0: 0.4, spd: 0.05, dur: 15 }, { k: 'orbit', c, R: 90, h: 38, a0: 2.6, spd: -0.035, dur: 15 }); return (FLY.shots = L); }
+  // 1 출발 패드에서 코스를 따라 낮게
+  if (PATHL && PATHL.total > 150) L.push({ k: 'path', f: u => { const q = PATHL.at(u); return W(q.d, q.s, 0); }, s0: 0, s1: Math.min(PATHL.total - 10, 230), h: 22, side: 10, ahead: 45, dur: 17 });
+  else L.push({ k: 'orbit', c: W(pd, ps, 0), R: 70, h: 26, a0: 0.4, spd: 0.05, dur: 15 });
+  // 2 산 정상: 넓게 돌며 내려다보기
+  if (RIDGE && RIDGE.list.length) { const t = RIDGE.list.reduce((a, b) => (b.c.y > a.c.y ? b : a)); L.push({ k: 'orbit', c: t.c.clone(), R: 230, h: 75, a0: 2.2, spd: 0.03, dur: 17 }); }
+  // 3 마을: 옆으로 지나가며
+  const v = flyVillage(); if (v) L.push({ k: 'pass', c: v, R: 150, h: 45, dir: 0.7, dur: 16 });
+  // 4 계곡 링 코스를 따라
+  if (RACE && RACE.length > 6) { const P = RACE.map(r => r.c); L.push({ k: 'path', f: u => { const i = clamp(Math.floor(u), 0, P.length - 2), w = clamp(u - i, 0, 1), a = P[i], b = P[i + 1], x = a.x + (b.x - a.x) * w, z = a.z + (b.z - a.z) * w; return new V3(x, terrainAt(x, z), z); }, s0: 1, s1: Math.min(P.length - 1, 8), h: 26, side: 0, ahead: 1.2, dur: 16 }); }
+  // 5 넓게 한 바퀴 (출발점 위 높이)
+  L.push({ k: 'orbit', c: W(pd, ps, 0), R: 260, h: 110, a0: 4.0, spd: 0.025, dur: 16 });
+  return (FLY.shots = L);
+}
+function flyFade(v) { if (!FLY.el) { FLY.el = document.createElement('div'); FLY.el.id = 'flyFade'; FLY.el.style.cssText = 'position:fixed;inset:0;background:#000;pointer-events:none;opacity:1'; renderer.domElement.insertAdjacentElement('afterend', FLY.el); } if (Math.abs((FLY.shown ?? -1) - v) > 0.01) { FLY.shown = v; FLY.el.style.opacity = v.toFixed(3); } }
+const _fp = new V3(), _fl = new V3();
+function flyCam(dt) {
+  const L = flyShots(), sh = L[FLY.i % L.length];
+  FLY.t += dt; if (FLY.t >= sh.dur) { FLY.t = 0; FLY.i++; FLY.y = null; return flyCam(0); }
+  const u = FLY.t / sh.dur, e = u * u * (3 - 2 * u);   // 부드럽게 시작·끝
+  if (sh.k === 'orbit') { const a = sh.a0 + sh.spd * FLY.t; _fp.set(sh.c.x + Math.sin(a) * sh.R, sh.c.y + sh.h, sh.c.z + Math.cos(a) * sh.R); _fl.set(sh.c.x, sh.c.y + 4, sh.c.z); }
+  else if (sh.k === 'pass') { const dx = Math.cos(sh.dir), dz = Math.sin(sh.dir), w = (e - 0.5) * 2 * sh.R; _fp.set(sh.c.x - dz * sh.R * 0.55 + dx * w, sh.c.y + sh.h, sh.c.z + dx * sh.R * 0.55 + dz * w); _fl.set(sh.c.x + dx * w * 0.35, sh.c.y + 2, sh.c.z + dz * w * 0.35); }
+  else { const s = sh.s0 + (sh.s1 - sh.s0) * e, p = sh.f(s), q = sh.f(Math.min(sh.s1 + sh.ahead, s + sh.ahead)), dx = q.x - p.x, dz = q.z - p.z, l = Math.hypot(dx, dz) || 1; _fp.set(p.x - dz / l * sh.side, p.y + sh.h, p.z + dx / l * sh.side); _fl.set(q.x, q.y + sh.h * 0.35, q.z); }
+  // 땅·나무·전선 위로 (갑자기 튀지 않게 천천히 따라감)
+  let gy = terrainAt(_fp.x, _fp.z) + 8; if (STREES && STREES.topAt) gy = Math.max(gy, STREES.topAt(_fp.x, _fp.z, 6) + 6);
+  const ty = Math.max(_fp.y, gy); if (FLY.y === null) FLY.y = ty; else FLY.y += (ty - FLY.y) * (1 - Math.exp(-dt * (ty > FLY.y ? 5 : 1.2)));
+  if (!FLY.lk || FLY.t === 0) FLY.lk = _fl.clone(); else FLY.lk.lerp(_fl, 1 - Math.exp(-dt * 3));
+  camera.position.set(_fp.x, FLY.y, _fp.z); camera.up.set(0, 1, 0); camera.lookAt(FLY.lk); camera.fov = 55; camera.updateProjectionMatrix();
+  if (!MENU.cf) { MENU.cf = new V3(); MENU.cR = 48; MENU.cH = 24; } MENU.cf.copy(FLY.lk);   // 그림자·나무 자세히 그리는 범위도 보는 곳 따라
+  const fin = clamp(1 - FLY.t / 0.9, 0, 1), fout = clamp((FLY.t - (sh.dur - 0.9)) / 0.9, 0, 1); flyFade(Math.max(fin, fout) * 0.92);
+}
+function menuView(dt) {
+  if (flyOn()) { if (FLY.mode !== 'fly') { FLY.t = 0; FLY.y = null; } FLY.mode = 'fly'; flyCam(dt); return; }   // 3단계에서 돌아오면 장면 처음부터 (어둠에서 밝아짐)
+  if (FLY.mode === 'fly') { FLY.mode = 'ms'; MENU.cf = null; if (FLY.el) flyFade(0.92); }   // 3단계로: 고른 임무 자리로 바로 옮기고 어둠에서 밝아짐
+  if (FLY.el && FLY.shown > 0) flyFade(Math.max(0, FLY.shown - dt * 2.2)); menuCam(dt);
+}
 // ---- 격납고 회전 무대 (같은 렌더러로 그려 2D 캔버스에 복사) ----
 const HG = (function () {
   const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 4 / 3, 0.05, 100);
