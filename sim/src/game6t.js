@@ -2,13 +2,14 @@
 // =====================================================================
 //  고급 나무 모형 (lib/trees.json · lib/trees_atlas.webp — tools/treegen, ez-tree MIT 기반)
 //  처음에는 기존 단순 나무로 그리고, 파일이 오면 같은 자리·크기 그대로 모형만 바꿈 (충돌·산불·활주로 처리 그대로)
+//  공개판: 첫 화면(입장 번호·인트로) 동안 작업 스레드가 미리 받아 계산까지 끝내 둠 (template.html __preload · preload-worker.js) → 앱이 뜨면 바로 바꿈
 //  종: 0 활엽(참나무류) · 1 소나무 · 2 관목 · 3 조림 침엽 / 세밀도: 0 가까이 · 1 중간 · 2 멀리(임포스터: 세로 판 십자 + 가로 판)
 // =====================================================================
 const TREES3 = (function () {
   const st = { ready: false, mat: null, geo: null, time: { value: 0 }, ir: { value: 0 }, irv: { value: 0.13 }, ire: { value: 0.3 } };
   if (window.SIM_NOTREES3 || location.protocol === 'file:' && !window.SIM_TREES_JSON) return st;
   const base = window.SIM_BASE || '';
-  // 색(불투명 RGB)·투명도(A) 그림 두 장을 합쳐 RGBA 배열로 (아래위 뒤집어 three 의 uv 와 맞춤)
+  // 색(불투명 RGB)·투명도(A) 그림 두 장을 합쳐 RGBA 배열로 (아래위 뒤집어 three 의 uv 와 맞춤) — 작업 스레드를 못 쓸 때만 (preload-worker.js 와 같은 계산)
   function rgbaFrom(rgbImg, aImg) {
     const W = rgbImg.naturalWidth, H = rgbImg.naturalHeight, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true });
     g.drawImage(rgbImg, 0, 0); const c = g.getImageData(0, 0, W, H).data; g.drawImage(aImg, 0, 0, W, H); const a = g.getImageData(0, 0, W, H).data;
@@ -23,9 +24,9 @@ const TREES3 = (function () {
     let P = L0, A = new Float32Array(W0 * L0.height); for (let i = 0; i < A.length; i++) A[i] = L0.data[i * 4 + 3];   // 보정 전 알파 (단계마다 이것을 평균)
     while (P.width > 1 || P.height > 1) {
       const w = Math.max(1, P.width >> 1), h = Math.max(1, P.height >> 1), d = new Uint8Array(w * h * 4), A2 = new Float32Array(w * h), pw = P.width, pd = P.data;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4; let r = 0, g = 0, b = 0, al = 0;
-        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const xx = Math.min(pw - 1, x * 2 + dx), yy = Math.min(P.height - 1, y * 2 + dy), i = yy * pw + xx; r += pd[i * 4]; g += pd[i * 4 + 1]; b += pd[i * 4 + 2]; al += A[i]; }
-        d[o] = r / 4; d[o + 1] = g / 4; d[o + 2] = b / 4; A2[y * w + x] = al / 4; }
+      for (let y = 0; y < h; y++) { const ya = Math.min(P.height - 1, y * 2) * pw, yb = Math.min(P.height - 1, y * 2 + 1) * pw;   // 2×2 평균 (더하는 순서는 예전과 같아 결과도 같음)
+        for (let x = 0; x < w; x++) { const xa = Math.min(pw - 1, x * 2), xb = Math.min(pw - 1, x * 2 + 1), i0 = ya + xa, i1 = ya + xb, i2 = yb + xa, i3 = yb + xb, o = (y * w + x) * 4;
+          d[o] = (pd[i0 * 4] + pd[i1 * 4] + pd[i2 * 4] + pd[i3 * 4]) / 4; d[o + 1] = (pd[i0 * 4 + 1] + pd[i1 * 4 + 1] + pd[i2 * 4 + 1] + pd[i3 * 4 + 1]) / 4; d[o + 2] = (pd[i0 * 4 + 2] + pd[i1 * 4 + 2] + pd[i2 * 4 + 2] + pd[i3 * 4 + 2]) / 4; A2[y * w + x] = (A[i0] + A[i1] + A[i2] + A[i3]) / 4; } }
       const ts = T0 * w / W0;
       for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
         const x0 = Math.floor(tx * ts), y0 = Math.floor(ty * ts), x1 = Math.max(x0 + 1, Math.floor((tx + 1) * ts)), y1 = Math.max(y0 + 1, Math.floor((ty + 1) * ts)), want = cov[ty * nx + tx];
@@ -38,13 +39,13 @@ const TREES3 = (function () {
     }
     return lv;
   }
-  function geoFrom(o) {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(o.P, 3));
-    g.setAttribute('normal', new THREE.BufferAttribute(new Int8Array(o.N), 3, true));
-    g.setAttribute('uv', new THREE.BufferAttribute(new Uint16Array(o.UV), 2, true));
-    g.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(o.C), 3, true));
-    g.setIndex(o.I); return g;
+  function geoFrom(o) {   // JSON 배열 또는 작업 스레드가 만든 형식 배열
+    const g = new THREE.BufferGeometry(), T = (A, a) => a instanceof A ? a : new A(a);
+    g.setAttribute('position', new THREE.BufferAttribute(T(Float32Array, o.P), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(T(Int8Array, o.N), 3, true));
+    g.setAttribute('uv', new THREE.BufferAttribute(T(Uint16Array, o.UV), 2, true));
+    g.setAttribute('color', new THREE.BufferAttribute(T(Uint8Array, o.C), 3, true));
+    g.setIndex(Array.isArray(o.I) ? o.I : new THREE.BufferAttribute(o.I, 1)); return g;
   }
   function makeMat(tex) {
     const m = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0 });
@@ -98,29 +99,39 @@ const TREES3 = (function () {
         }
         ck.grp.children.forEach(o => o.visible = false); meshes.forEach(m => ck.grp.add(m.im)); ck.t3 = meshes;
       }
-      setInterval(() => { const cp = camera.position; for (const ck of OUTER.CK) if (ck.t3) { const near = Math.hypot(cp.x - ck.c.x, cp.z - ck.c.z) < OUTER.CH * 0.75 + 120; for (const m of ck.t3) m.im.geometry = m.geos[near ? 0 : 1]; } }, 500);
+      setInterval(() => { const cp = camera.position; for (const ck of OUTER.CK) if (ck.t3) { const near = Math.hypot(cp.x - ck.c.x, cp.z - ck.c.z) < OUTER.CH * 0.75 + 120; for (const m of ck.t3) m.im.geometry = m.geos[near ? 0 : 1]; } }, 250);
     }
     st.ready = true;
   }
   async function load() {
     try {
-      const im = u => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej('img ' + u); i.src = u; });
-      const v = '?v=' + (window.SIM_TREES_V || '');
-      const [js, rgb, al] = await Promise.all([
-        window.SIM_TREES_JSON ? Promise.resolve(window.SIM_TREES_JSON) : fetch(base + 'lib/trees.json' + v).then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)),
-        im(window.SIM_TREES_RGB || base + 'lib/trees_rgb.webp' + v), im(window.SIM_TREES_A || base + 'lib/trees_a.webp' + v)]);
-      const L0 = rgbaFrom(rgb, al), lv = coverageMips(L0, 0.42 * 255);
+      st.t0 = performance.now();
+      let lv = null, lods = null;
+      const P = !window.SIM_TREES_JSON && window.__preload && window.__preload();   // 작업 스레드가 미리 만든 것 (아직이면 기다림 · 시험 판은 여기서 처음 띄움)
+      if (P && P.trees) {   // 작업 스레드가 1분 안에 못 주면(멈춤 등) 예전 방식으로
+        const r = await Promise.race([P.trees, new Promise(res => setTimeout(() => res(null), 60000))]).catch(e => { st.preErr = String(e && e.message || e); return null; });
+        P.trees = null; if (r) { lv = r.lv; lods = r.lods; st.via = 'worker'; } else if (!st.preErr) st.preErr = 'timeout';
+      }
+      if (!lv) {   // 작업 스레드를 못 쓰면 예전처럼 화면 스레드에서 (그림 풀기는 decode 로 미리)
+        const im = u => new Promise((res, rej) => { const i = new Image(); i.onload = () => i.decode ? i.decode().then(() => res(i), () => res(i)) : res(i); i.onerror = () => rej('img ' + u); i.src = u; });
+        const v = '?v=' + (window.SIM_TREES_V || '');
+        const [js, rgb, al] = await Promise.all([
+          window.SIM_TREES_JSON ? Promise.resolve(window.SIM_TREES_JSON) : fetch(base + 'lib/trees.json' + v).then(r => r.ok ? r.json() : Promise.reject('json ' + r.status)),
+          im(window.SIM_TREES_RGB || base + 'lib/trees_rgb.webp' + v), im(window.SIM_TREES_A || base + 'lib/trees_a.webp' + v)]);
+        lv = coverageMips(rgbaFrom(rgb, al), 0.42 * 255); lods = js.lods; st.via = 'main';
+      }
+      const L0 = lv[0];
       const tex = new THREE.DataTexture(L0.data, L0.width, L0.height, THREE.RGBAFormat); tex.mipmaps = lv; tex.generateMipmaps = false; tex.flipY = false;
       tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); tex.needsUpdate = true;
-      st.geo = js.lods.map(L => L.map(geoFrom));
+      st.geo = lods.map(L => L.map(geoFrom));
       st.mat = makeMat(tex);
       st.dmat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.42 });
-      apply();
+      apply(); st.ms = Math.round(performance.now() - st.t0);
     } catch (e) { st.err = String(e); }
   }
   st.setIR = (on, night) => { st.ir.value = on ? 1 : 0; st.irv.value = night ? 0.02 : 0.07; st.ire.value = night ? 0.11 : 0.065; };
   st.tick = t => { st.time.value = t; };
-  setTimeout(load, window.SIM_VR ? 400 : 600);
+  setTimeout(load, 0);   // 미리 만들어 둔 게 있으면 첫 장면부터 고급 나무 (무거운 계산은 작업 스레드)
   return st;
 })();
 if (window.__sim) Object.assign(window.__sim, { TREES3, STREES, OUTER });

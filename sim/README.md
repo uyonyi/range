@@ -9,7 +9,7 @@ GitHub Pages 주소: `https://uyonyi.github.io/range/sim/` (영문: `en.html`)
 |---|---|
 | `index.html`, `en.html` | 한국어 / 영어 화면 |
 | `js/app.ko.js`, `js/app.en.js` | 시뮬레이터 본체 (빌드 결과) |
-| `lib/` | three.js r149, geotiff.js, proj4 |
+| `lib/` | three.js r149, geotiff.js, proj4 · `preload-worker.js`: 첫 화면(입장 번호·인트로) 동안 고급 나무 모형·잎 그림과 고해상 바닥 사진을 미리 받아 풀고 계산해 두는 작업 스레드 |
 | `sites/<현장>.js` | 현장 데이터: 지형 격자(코스 주변 5 m + 원경 60 m), 코스, 지형지물 |
 | `src/` | 소스와 빌드 스크립트 (`python3 build.py public ..`) |
 | `tools/` | GIS 처리 스크립트 |

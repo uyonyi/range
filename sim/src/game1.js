@@ -1095,7 +1095,7 @@ const STREES = (function siteTrees() {
     for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < LODD.near ? 0 : d < LODD.mid ? 1 : 2;
       k.im.visible = d < far; if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
-  setInterval(() => lod(camera.position), 300);
+  setInterval(() => lod(camera.position), 150);   // 가까워지면 바로 세밀한 모형으로 (조각 수십 개라 가벼움)
   // 산불: 불난 자리 나무를 그을린 앙상한 줄기로 (숲에 구멍이 나서 위에서 불길이 보이게) · 임무가 바뀌면 되돌림
   const BURNT = [], _m = new THREE.Matrix4(), _p = new V3(), _q = new THREE.Quaternion(), _s = new V3(), _c = new THREE.Color();
   function scorch(p, R) {
