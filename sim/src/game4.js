@@ -13,24 +13,37 @@ const IDB = {
   async del(k) { try { const db = await this.open(); await new Promise(res => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = res; tx.onerror = res; }); } catch (e) { } }
 };
 function setOrthoStatus(t, col) { const el = $('orthoStatus'); if (el) { el.textContent = t; el.style.color = col || ''; } }
-function applyGroundCanvas(cv) {
-  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(16, MAXANI);
+function dropGroundMap() { const m = groundMat.map; if (m && m !== groundMacro) m.dispose(); }
+function applyGroundTex(t) {
+  t.encoding = THREE.sRGBEncoding; t.anisotropy = Math.min(16, MAXANI);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
-  if (groundMat.map && groundMat.map !== groundMacro) groundMat.map.dispose();
-  groundMat.map = t; groundMat.needsUpdate = true; detailK.value = 0.45;
+  dropGroundMap(); groundMat.map = t; groundMat.needsUpdate = true; detailK.value = 0.45;
 }
-function resetGround() { if (groundMat.map !== groundMacro) groundMat.map.dispose(); groundMat.map = groundMacro; groundMat.needsUpdate = true; detailK.value = 1; }
+function applyGroundCanvas(cv) { applyGroundTex(new THREE.CanvasTexture(cv)); }
+function applyGroundData(d) { const t = new THREE.DataTexture(d.data, d.w, d.h, THREE.RGBAFormat); t.magFilter = THREE.LinearFilter; t.needsUpdate = true; applyGroundTex(t); }   // 작업 스레드가 풀어 위아래까지 뒤집어 둔 픽셀 (preload-worker.js)
+function resetGround() { dropGroundMap(); groundMat.map = groundMacro; groundMat.needsUpdate = true; detailK.value = 1; }
 // GeoTIFF 해석기는 사진·DEM 파일을 직접 올릴 때만 필요 → 그때 불러옴 (공개판: lib/geotiff.js)
 const _scriptP = {};
 function loadScriptOnce(url) { return _scriptP[url] || (_scriptP[url] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = url; s.onload = () => res(); s.onerror = () => { delete _scriptP[url]; rej(new Error('load ' + url)); }; document.head.appendChild(s); })); }
 async function ensureGeoTIFF() { if (window.GeoTIFF) return true; if (!window.SIM_GEOTIFF_URL) return false; try { await loadScriptOnce(window.SIM_GEOTIFF_URL); } catch (e) { } return !!window.GeoTIFF; }
 window.ensureGeoTIFF = ensureGeoTIFF;
 // 미리 만들어 둔 바닥 사진 (sites/*_ground.webp · tools/mk_ground.js): 저해상을 먼저 입히고 고해상으로 바꿈 — GeoTIFF 해석·재투영 없이 바로
-function loadImg(url) { return new Promise((res, rej) => { const im = new Image(); im.decoding = 'async'; im.onload = () => res(im); im.onerror = () => rej(new Error('img ' + url)); im.src = url; }); }
+function loadImg(url) { return new Promise((res, rej) => { const im = new Image(); im.decoding = 'async'; im.onload = () => im.decode ? im.decode().then(() => res(im), () => res(im)) : res(im); im.onerror = () => rej(new Error('img ' + url)); im.src = url; }); }   // decode: 그림 풀기를 화면 스레드 밖에서
 async function autoGroundImg() {
-  if (!SITE.ground) return false;
+  if (!SITE.ground || /[?&]noground/.test(location.search)) return false;   // ?noground: 정사영상에서 다시 만들 때 (tools/mk_ground.js)
   const base = (/^(https?:|\/)/.test(SITE.ground) ? '' : (window.SIM_BASE || ''));
   const put = im => { const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.getContext('2d').drawImage(im, 0, 0); applyGroundCanvas(cv); };
+  const P = window.__preload && window.__preload(), G = P && P.ground;   // 첫 화면 동안 작업 스레드가 받아 풀어 둔 저해상·고해상 (화면 스레드는 텍스처만)
+  if (P) P.ground = null;   // 한 번만 씀 (안 쓰면 큰 배열을 놓아 줌)
+  if (G && G.src === SITE.ground) {
+    try {
+      let hiOn = false; const fits = d => d.w <= renderer.capabilities.maxTextureSize;   // 너무 큰 텍스처를 못 받는 기기는 예전 방식(캔버스가 줄여 줌)
+      if (G.lo && SITE.groundLo) G.lo.then(d => { if (!hiOn && fits(d)) { applyGroundData(d); setOrthoStatus('정사영상 (저해상) · 고해상 받는 중…', '#ffc828'); } }, () => { });
+      const d = await Promise.race([G.hi, new Promise(res => setTimeout(() => res(null), 60000))]);   // 1분 안에 못 받으면(멈춤 등) 예전 방식
+      if (!d || !fits(d)) throw new Error('no preload'); hiOn = true; applyGroundData(d);
+      setOrthoStatus('위성사진 적용됨 · ' + ((window.SIM_LANG === 'en' && SITE.orthoSrc_en) || SITE.orthoSrc || ''), '#5dff9a'); return true;
+    } catch (e) { }   // 안 되면 아래 예전 방식으로
+  }
   try {
     if (SITE.groundLo) { try { put(await loadImg(base + SITE.groundLo)); setOrthoStatus('정사영상 (저해상) · 고해상 받는 중…', '#ffc828'); } catch (e) { } }
     put(await loadImg(base + SITE.ground));
@@ -125,6 +138,7 @@ async function autoOrtho() {
 function setOrthoStatusTxt() { const el = $('orthoStatus'); return el ? el.textContent : ''; }
 async function restoreOrtho() {
   const bl = await IDB.get('ortho' + SITE_KEY0); if (!bl) { autoOrtho(); return; }
+  const P = window.__preload && window.__preload(); if (P) P.ground = null;   // 직접 올린 사진을 쓰면 미리 받은 바닥 사진은 놓아 줌
   try {
     const im = await createImageBitmap(bl); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; cv.getContext('2d').drawImage(im, 0, 0);
     applyGroundCanvas(cv); setOrthoStatus('저장된 위성사진 사용 중', '#5dff9a');

@@ -430,6 +430,7 @@ EN.update({
 '수치표고모델을 코스 좌표계로 변환해 지형으로 입힙니다': 'Reprojects a digital elevation model into the course frame and applies it as terrain',
 '시설물 터 정지 토공량 — 절토 ': 'Site grading for facilities — cut ', '완료 — 다시 불러옵니다': 'Done — reloading',
 '위성사진 불러오기 (GeoTIFF)': 'Load orthophoto (GeoTIFF)', '위성사진 적용됨 (': 'Orthophoto applied (',
+'위성사진 적용됨 · ': 'Orthophoto applied · ', '정사영상 (저해상) · 고해상 받는 중…': 'Orthophoto (low-res) · loading high-res…',
 '이 위치로 지형 만들기': 'Build terrain here', '좌표 범위로 추정': 'guessed from coordinate range',
 '좌표계 자동 인식 · 재투영 · 리샘플 · 시설물 터 정지': 'auto CRS · reprojection · resampling · site grading',
 '지도를 누르면 그 자리가 코스 중심이 됩니다. 노란 사각형 = 고해상도 구역(1.2 km), 주황 = 비행 코스, 화살표 = 진행 방향.': 'Click the map to put the course centre there. Yellow square = high-res area (1.2 km), orange = flight course, arrow = downrange direction.',

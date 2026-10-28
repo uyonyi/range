@@ -48,6 +48,7 @@ def sources(lang, mode, c1=None):
         if left: print('LEFTOVER', list(left)[:30])
     T = PRIV['titles'] if mode == 'private' else TITLES[mode]
     t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang]).replace('{{STUDIO}}', STUDIO)
+    if mode != 'public': t = t.replace('{{PRE}}', 'null')   # 미리 받기(작업 스레드)는 공개판만
     if mode != 'public': t = re.sub(r' data-music="[^"]*"', '', t); t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
     return t, game
 
@@ -93,6 +94,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     os.makedirs(outdir + '/lib', exist_ok=True); os.makedirs(outdir + '/js', exist_ok=True); os.makedirs(outdir + '/sites', exist_ok=True)
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
+    shutil.copy('preload-worker.js', outdir + '/lib/preload-worker.js')   # 첫 화면 동안 고급 나무·바닥 사진을 미리 받아 계산해 두는 작업 스레드
     for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
@@ -138,7 +140,8 @@ def write_sw(outdir, pre):
     ver = hashlib.md5(''.join(core).encode()).hexdigest()[:10]
     sw = """// FPV Terrain Trainer · service worker (자동 생성: src/build.py)
 const VER = '%s', CACHE = 'fpvsim-' + VER, CORE = %s;
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
+// 설치: 핵심 파일을 받아 둠 · 주소에 버전(?v=)이 붙은 파일은 옛 캐시에 같은 것이 있으면 옮기기만 (나무·바닥 사진 같은 큰 파일을 판이 바뀔 때마다 다시 받지 않게)
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => Promise.all(CORE.map(u => (/[?&]v=/.test(u) ? caches.match(u) : Promise.resolve(null)).then(m => m ? c.put(u, m) : c.add(u))))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fpvsim-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET' || r.headers.has('range')) return; const u = new URL(r.url); if (u.origin !== location.origin) return;   // 영상(부분 요청)은 브라우저에 맡김
@@ -169,6 +172,15 @@ def build_pages(outdir, site_ids, vr):
     up = '../' if vr else ''
     import hashlib
     pre = []   # 서비스 워커가 미리 받아 둘 파일
+    tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
+    pw = hashlib.md5(open('preload-worker.js', 'rb').read()).hexdigest()[:8]
+    # 미리 받기 목록 (template.html __preload): 작업 스레드 · 고급 나무 3개 · 첫 현장 바닥 사진(저해상·고해상, 현장 데이터와 같은 ?v= 주소)
+    site0 = open(f"{outdir if not vr else outdir[:-3]}/sites/{site_ids[0]}.js", encoding='utf-8').read()
+    gr = {k: (re.search(r'"%s": "([^"]+)"' % k, site0) or [None, None])[1] for k in ('groundLo', 'ground')}
+    trees = [f'lib/{f}?v={tv}' for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp')] if os.path.exists('trees.json') else None
+    PRE = {'w': f'{up}lib/preload-worker.js?v={pw}', 't': [up + u for u in trees] if trees else None,
+           'g': [up + gr['groundLo'] if gr['groundLo'] else None, up + gr['ground']] if gr['ground'] else None, 'gs': gr['ground']}
+    if not vr: pre += [f'lib/preload-worker.js?v={pw}'] + (trees or [])   # 다시 올 때 캐시에서 바로
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
         t, game = sources(lang, 'public', c1=True)
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(minify_js(game, f'{outdir}/js/app.{lang}.js'))
@@ -186,16 +198,19 @@ def build_pages(outdir, site_ids, vr):
         if vr: br = "<script>try{if(!/[?&](vr|test)\\b/.test(location.search)){var go=function(){location.replace('../%s?pc')};if(!navigator.xr||!navigator.xr.isSessionSupported)go();else navigator.xr.isSessionSupported('immersive-vr').then(function(ok){if(!ok)go()},go)}}catch(e){}</script>" % pg
         else: br = "<script>try{if(/[?&]pc\\b/.test(location.search))sessionStorage.setItem('fpvsim_pc','1');if(/OculusBrowser|Quest|PicoBrowser|Wolvic/i.test(navigator.userAgent)&&!/[?&]test/.test(location.search)&&!sessionStorage.getItem('fpvsim_pc'))location.replace('vr/%s')}catch(e){}</script>" % pg
         t = t.replace('</title>', '</title>\n' + br, 1)
-        tv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('trees.json', 'trees_rgb.webp', 'trees_a.webp') if os.path.exists(f))).hexdigest()[:8]   # 나무 모형 버전 (캐시 갱신용)
         mv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('music.json', 'music.mp3') if os.path.exists(f))).hexdigest()[:8]   # 배경음악 악기 묶음 버전
         rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
         flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';" + (f"window.SIM_API='{RANK_API}';" if RANK_API else '')
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
         iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
-        t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv)
+        t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv).replace('{{PRE}}', json.dumps(PRE))
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
-        t = t.replace('<script>/*GAME*/</script>', f'<script src="js/app.{lang}.js?v={ver}"></script>')
-        t = t.replace('</body>', f"<script>if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))addEventListener('load',()=>navigator.serviceWorker.register('{up}sw.js').catch(()=>{{}}));</script>\n</body>")   # 오프라인·재방문 캐시 (sw.js)
+        # 앱 본체: 미리 받기 작업 스레드가 그림 도구를 차렸다는 알림(warm)을 받은 뒤(최대 0.4초) 붙임 — 받기는 head 의 preload 로 처음부터
+        #   서비스 워커(오프라인·재방문 캐시, sw.js)는 앱이 다 뜨고 3초 뒤 등록 (예전처럼 앱 시작 뒤 · 설치하며 캐시에 수 MB 를 쓰는 일이 앱 시작과 겹치지 않게)
+        app = f'js/app.{lang}.js?v={ver}'
+        t = t.replace('</head>', f'<link rel="preload" as="script" href="{app}">\n</head>', 1)
+        sw = "if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))setTimeout(function(){navigator.serviceWorker.register('%ssw.js').catch(function(){});},3000);" % up
+        t = t.replace('<script>/*GAME*/</script>', "<script>(function(){var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='%s';s.async=false;s.onload=function(){%s};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();})();</script>" % (app, sw))
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
         pre += [f'{"vr/" if vr else ""}{page}', f'{"vr/" if vr else ""}js/app.{lang}.js?v={ver}'] + ([f'sites/{sid}.js?v={sv[sid]}' for sid in site_ids] if not vr else [])
     return pre

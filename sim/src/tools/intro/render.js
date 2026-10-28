@@ -6,7 +6,7 @@ const ONLY = process.env.SHOT ? process.env.SHOT.split(',') : null;
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: 960, height: 540 } }); p.setDefaultTimeout(300000); const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('http://localhost:8768/index.html?test', { timeout: 120000 }); await p.waitForTimeout(8000);
+  await p.goto('http://localhost:8768/index.html?test', { timeout: 120000 }); await p.waitForFunction(() => window.__sim && window.__sim.advance, null, { timeout: 300000 }); await p.waitForTimeout(8000);
   await p.evaluate(() => {
     const s = __sim; document.querySelector('#segMusic button[data-v="0"]').click(); s.SET.voice = false;
     s.setAirframe('x2d'); s.setTod('day'); s.setWx('clear'); s.SET.wind = 0;
