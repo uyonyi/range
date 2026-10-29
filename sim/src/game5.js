@@ -730,7 +730,7 @@ function orderTick() {   // 휴대폰: 📻 버튼(눌러 펼치기) · PC·VR: 
   el.style.display = on ? '' : 'none'; if (!on) return; const t = (window.SIM_LANG !== 'en' && ORDER.m.ko) ? ORDER.m.ko : ORDER.m.en; if (el.dataset.t !== t) { el.dataset.t = t; el.innerHTML = `<b>${L2('📻 명령', '📻 ORDER')}<i>▾</i></b><span>${t}</span>`; if (!el.classList.contains('open')) el.classList.add('new'); }
 }
 function actionUI() { const b = $('tbDrop'); if (!b) return; const k = S.state === 'run' ? actionKind() : 'drop', t = k === 'report' ? '📷 REPORT' : k === 'none' ? '—' : 'DROP'; if (b.dataset.k !== k) { b.dataset.k = k; b.textContent = t; b.style.borderColor = k === 'report' ? '#5dff9a' : ''; b.style.color = k === 'report' ? '#5dff9a' : ''; b.style.fontSize = k === 'report' ? '13px' : ''; } }
-function photoTick(dt) { { const lb = $('tbLight'); if (lb) lb.classList.toggle('off', !lightOn()); } wxTick(dt); orderTick(); actionUI(); dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.add('hidden'); }   // 투하 버튼이 사진 보고를 겸함
+function photoTick(dt) { { const lb = $('tbLight'); if (lb) lb.classList.toggle('off', !lightOn()); } wxTick(dt); orderTick(); actionUI(); try { tbAuto(); } catch (e) { } dbfTick(dt); try { uasPC(S.state === 'demo' ? ghostS : S.state === 'replay' ? RP.pose : DR, isMission() ? msObj() : curObj()); } catch (e) { } if (PH.lastT > 0) PH.lastT -= dt; const b = $('tbPhoto'); if (b) b.classList.add('hidden'); }   // 투하 버튼이 사진 보고를 겸함
 function flashPhoto() { ui.flash.style.background = '#fff'; ui.flash.style.opacity = 0.55; setTimeout(() => { ui.flash.style.opacity = 0; ui.flash.style.background = ''; }, 140); }
 // 자폭: 가까운 표적에 맞았는지
 function strikeDetonate() {
@@ -787,9 +787,9 @@ function msOsd() {
   if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
   else if (isMission()) h += `<div class="x"><b>HIT</b>${S.impacts}</div>`;
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
-  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${L2('불씨 포착 · Enter/📷 촬영', 'HOTSPOT · Enter/📷 to photo')}</div>` : o.seenVis ? `<div style="color:#ffb070">${L2('연기만 보임 · 더 가까이 또는 열화상(T)', 'Smoke only · closer or thermal (T)')}</div>` : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : L2('연기·불꽃 찾기 · 열화상 T', 'Look for smoke/flames · thermal T')}</div>`;
+  if (o && o.t === 'fire') h += o.inView ? `<div style="color:#5dff9a">● ${IS_TOUCH ? L2('불씨 포착', 'HOTSPOT') : L2('불씨 포착 · ', 'HOTSPOT · ') + repKey()}</div>` : o.seenVis ? `<div style="color:#ffb070">${L2('연기만 보임 · 더 가까이 또는 열화상(T)', 'Smoke only · closer or thermal (T)')}</div>` : `<div style="color:#9aa6ad">${ENV.ir ? 'IR 수색 중' : L2('연기·불꽃 찾기 · 열화상 T', 'Look for smoke/flames · thermal T')}</div>`;
   h += scenOsd(o);
-  if (o && o.t === 'recon') h += `<div${o.inView ? '' : ' class="x"'} style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('건물 포착 · SPACE/📷 보고', 'TARGET · SPACE/📷 to report') : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
+  if (o && o.t === 'recon') h += `<div${o.inView ? '' : ' class="x"'} style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + (IS_TOUCH ? L2('건물 포착', 'TARGET') : L2('건물 포착 · ', 'TARGET · ') + repKey()) : L2('화면 가운데나 아래 카메라에 담기', 'Center it or use the lower camera')}</div>`;
   return h;
 }
 function msListHTML() {
@@ -1246,7 +1246,8 @@ function scenStart(kind, a) {
     MSG.track.visible = true; TRACK.go = false; S.trT = 0; S.trWin = 0; trackRandom();
     const p0 = trackPose(TRACK.s); TRACK.g.position.copy(p0.p); TRACK.g.rotation.y = -p0.h;
     TRACK.sus = 0; TRACK.susMax = 0; TRACK.warn = false; TRACK.burn = false; TRACK.lt.vPrev = 0; trackLights(0, false);
-    const L = [{ kind: 'ms', t: 'track', label: L2('차량 추적 · 들키지 말고 60초 관측', 'Vehicle track · 60 s unseen'), mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
+    const L = [{ kind: 'ms', t: 'track', label: L2('차량 추적 · 들키지 말고 60초 관측', 'Vehicle track · 60 s unseen'), mk: p0.p.clone().add(new V3(0, 12, 0)), need: 60,
+      pts(p) { const T = TRACK, vp = trackPose(T.s), st = vp.p.clone().add(new V3(-Math.sin(vp.h) * 70, 45, Math.cos(vp.h) * 70)); st.y = Math.max(st.y, terrainAt(st.x, st.z) + 30); return [p.clone(), st]; } }];   // 안내 경로: 차 뒤 70 m · 위 45 m 관측 자리 (운전자 시야 밖)
     L.push(rtbObj(a));
     return L;
   }
@@ -1354,7 +1355,7 @@ function sarKit(pos) {
 }
 function scenOsd(o) {
   if (!o) return '';
-  if (o.t === 'sarfind') return `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + L2('실종자 포착 · Enter/📷 촬영', 'SUBJECT · Enter/📷 to photo') : ENV.ir ? 'IR 수색 중' : '숲 아래는 열화상(T)'}</div>`;
+  if (o.t === 'sarfind') return `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + (IS_TOUCH ? L2('실종자 포착', 'SUBJECT') : L2('실종자 포착 · ', 'SUBJECT · ') + repKey()) : ENV.ir ? 'IR 수색 중' : '숲 아래는 열화상(T)'}</div>`;
   if (o.t === 'track') { const su = Math.round(TRACK.sus || 0), sc = su >= 70 ? '#ff6060' : su >= 40 ? '#ff9a40' : '#5dff9a';
     return `<div style="color:${o.inView ? '#5dff9a' : o.close ? '#ff9a40' : '#9aa6ad'}">TRACK ${S.trT.toFixed(0)}/${o.need}s${o.close ? ' · 너무 가까움' : o.inView ? ' ●' : TRACK.go ? ' · 시야 밖' : ' · 접근하면 출발'}</div>`
       + `<div style="color:${sc}">${L2('노출', 'EXPOSURE')}${o.seen ? L2(' · 운전자 시야', ' · in view') : ''} <span style="display:inline-block;width:70px;height:7px;background:rgba(255,255,255,.15);vertical-align:middle"><i style="display:block;height:100%;width:${su}%;background:${sc}"></i></span> ${su}%</div>`; }
@@ -1842,9 +1843,41 @@ LY.def = IS_TOUCH ? {
   tbDrop: { r: 12, t: 122 }, tbBoost: { r: 102, t: 132 }, tbReset: { r: 172, t: 138, h: true }
 } : {};
 function lySave() { try { localStorage.setItem(LY.key, JSON.stringify(LY.d)); } catch (e) { } }
+// ---- 쓸모없는 버튼은 숨김 (휴대폰): 지금 모드·설정에서 기능이 없는 단추는 빼고, 기본 자리는 남은 단추로 오른쪽부터 다시 채움 (직접 옮긴 단추는 그 자리 그대로) ----
+const TB_ROWS = [['tbHud', 'tbGuide', 'tbAssist', 'tbFull', 'tbPause'], ['tbLight', 'tbIR', 'tbCam', 'tbBelly', 'tbZoom']];
+const TB = { off: new Set(), key: '' };
+function tbUseful(id) {
+  const k = S.kind, run = S.state === 'run' || S.state === 'pause', c1 = typeof isC1 === 'function' && isC1(), md = MODES[SET.diff] || {};
+  const thermalMs = k === 'fire' || k === 'sar' || k === 'strike' || k === 'track' || k === 'recon' || k === 'free', dark = ENV.night || ENV.dusk;
+  switch (id) {
+    case 'tbDrop': return !run || actionKind() !== 'none';                              // 투하·사진 보고가 없는 임무(레이스·숲길·능선·착륙장·타격)
+    case 'tbBoost': return !md.atti && !c1;                                             // ATTI·1종은 부스트 없음
+    case 'tbIR': return (thermalMs || dark) && !c1;                                     // 열화상이 쓰이는 임무 · 어두울 때
+    case 'tbLight': return dark || (ENV.wx && ENV.wx !== 'clear');                      // 낮·맑음엔 조명이 보이지 않음
+    case 'tbBelly': return !(k === 'race' || k === 'forest' || k === 'ridge' || c1);    // 링·숲길·능선은 아래 카메라 쓸 일 없음
+    case 'tbZoom': return CAMS[S.cam] !== 'FPV';                                        // 추적 카메라 거리 (FPV 시점엔 없음)
+    case 'tbAssist': return (md.assist || 0) > 0 && !c1;                                // 보조가 있는 난이도만
+    case 'tbGuide': return !(k === 'free' || k === 'demo' || c1);
+    default: return true;
+  }
+}
+function tbAuto() {   // 매 프레임 (photoTick) · 바뀐 때만 다시 배치
+  if (!IS_TOUCH || XR_ON) return; let key = '';
+  for (const row of TB_ROWS) for (const id of row) if (!tbUseful(id)) key += id + ',';
+  if (!tbUseful('tbDrop')) key += 'tbDrop,'; if (!tbUseful('tbBoost')) key += 'tbBoost,';
+  if (key === TB.key) return; TB.key = key; TB.off = new Set(key.split(',').filter(Boolean));
+  for (const [id] of LY_ITEMS) if (/^tb/.test(id)) { const el = $(id); if (el) el.classList.toggle('tbOff', TB.off.has(id)); }
+  lyApply();
+}
+function tbDef(id) {   // 기본 자리: 두 줄을 보이는 단추만으로 오른쪽 끝부터 54 px 간격
+  const d = LY.def[id]; if (!d || !IS_TOUCH || !/^tb/.test(id)) return d;
+  for (const row of TB_ROWS) { const i = row.indexOf(id); if (i < 0) continue; const vis = row.filter(x => !TB.off.has(x) && LY.d[x] === undefined), j = vis.indexOf(id); if (j < 0) return d; return { r: 12 + 54 * (vis.length - 1 - j), t: d.t }; }
+  if (id === 'tbBoost' && TB.off.has('tbDrop')) return { r: 12, t: 132 };   // 투하 단추가 없으면 부스트가 그 자리로
+  return d;
+}
 function lyApply() {
   for (const [id] of LY_ITEMS) {
-    const el = $(id); if (!el) continue; const c = LY.d[id] || LY.def[id];
+    const el = $(id); if (!el) continue; const c = LY.d[id] || tbDef(id);
     if (!c) { el.style.left = el.style.top = el.style.right = el.style.bottom = el.style.transform = el.style.transformOrigin = ''; el.classList.remove('lyHide'); continue; }
     const cs = getComputedStyle(el), s = c.s || 1, W = innerWidth, H = innerHeight, w = (el.offsetWidth || parseFloat(cs.width) || 46) * s, h = (el.offsetHeight || parseFloat(cs.height) || 46) * s;   // 숨겨진 동안엔 CSS 크기로
     if (id === 'obj') el.style.textAlign = 'left';   // 옮긴 경우 왼쪽 정렬 (가운데 정렬이면 상자가 밀림)
