@@ -166,8 +166,9 @@ function guideChevrons(curve, L, col, sp, wing) {
   }
   m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
 }
+function repKey() { return XR_ON ? (window.SIM_LANG === 'en' ? 'R trigger' : 'R트리거') : IS_TOUCH ? '📷 REPORT' : 'Enter/📷'; }   // 사진 보고 단추 이름 (기기별)
 function hideNav() { const na = $('navArrow'); if (na) na.classList.add('hidden'); }
-function hideFly() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); }
+function hideFly() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); GUIDE.html = ''; if (GUIDE.hy) GUIDE.hy = {}; }
 function hideGuide() { BEACON.g.visible = false; hideFly(); hideNav(); }
 // ---- 지상 목표 찾기 (정찰·산불·수색·활주로·패드): 목표에 하늘로 솟은 빛기둥 + 바닥 고리 · 멀리서도 보임 ----
 const TGT_STYLE = { recon: [0x4fe3ff, 'RECON', '정찰'], fire: [0xff8a2a, 'FIRE', '산불'], sarfind: [0x5dff9a, 'SAR', '수색'], sarkit: [0x5dff9a, 'DROP', '투하'], rwyland: [0xffd23a, 'RWY', '활주로'], land: [0xffd23a, 'PAD', '패드'], padland: [0xffd23a, 'PAD', '패드'] };   // 타격·차량 추적은 빛기둥 없음 (기만체·은밀 추적이 쉬워지지 않게)
@@ -206,7 +207,7 @@ function navArrow(tgt, subj, o) {
   const em = el.lastChild, lab = (st ? (en ? st[1] : st[2]) + ' · ' : '') + tt; if (em.textContent !== lab) em.textContent = lab;
   _nv.copy(tgt).project(camera); const behind = _nv.z > 1;
   let x = _nv.x, y = _nv.y; if (behind) { x = -x; y = -y; }
-  const W = innerWidth, H = innerHeight, mx = 0.80, my = 0.74;   // 가장자리 여백 (계기·목록 피함)
+  const W = innerWidth, H = innerHeight, mx = IS_TOUCH ? 0.5 : 0.80, my = IS_TOUCH ? 0.55 : 0.74;   // 가장자리 여백 (계기·목록 피함 · 휴대폰은 단추·아래 안내 글도)
   const inside = !behind && Math.abs(x) < mx && Math.abs(y) < my;
   if (inside && dist < 35 && o && (o.kind === 'ms' ? o.t === 'pass' : !!openingOf(o))) { el.classList.add('hidden'); return; }   // 게이트·링이 눈앞에 보이면 ◇ 는 빼고 문 자체(강조·조준 틀)로
   let sx, sy, rot;
@@ -226,23 +227,25 @@ function updateGuide(subj) {
   if (tgtOn) beaconUpdate(o, subj); else BEACON.g.visible = false;
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
     hideFly(); hideNav(); if (!flyOn) return;
-    const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = '<div class="ok">정찰 중 · 안에서 잠시 머무르기</div>'; return;
+    const el = $('guide'), html = `<div class="ok">${L2x('정찰 중 · 안에서 잠시 머무르기', 'Scanning · hold inside for a moment')}</div>`; el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; } return;
   }
   // 수색 구역(산불·실종자) 안: 쉐브론은 끄고 (눈·열화상으로 찾기) 구역 중심 ◇ + 할 일·고도 안내
   if (o.kind === 'ms' && searchIn(o, subj.p)) {
     hideFly();
-    if (tgtOn) navArrow(o.mk, subj, o); else hideNav();
+    const dcc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z);
+    if (tgtOn && dcc > o.search.r * 0.8) navArrow(o.mk, subj, o); else hideNav();   // 구역 안에서는 중심 표시를 치움 (가장자리에 가까우면 중심 쪽 화살표)
     if (!flyOn) return;
     const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
     const en = window.SIM_LANG === 'en';
-    if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press Enter/📷' : '불씨 포착 · 화면 가운데에 두고 Enter/📷') : (en ? 'Hiker in view · centre and Enter/📷' : '실종자 포착 · 가운데에 두고 Enter/📷'), 'ok']);
+    const rk = repKey();
+    if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press ' + rk : '불씨 포착 · 화면 가운데에 두고 ' + rk) : (en ? 'Hiker in view · centre and ' + rk : '실종자 포착 · 가운데에 두고 ' + rk), 'ok']);
     else {
       lines.push([fire ? (o.seenVis ? (en ? 'Smoke only · get closer to see the flames, or thermal (T)' : '연기만 보임 · 불꽃이 보일 만큼 가까이, 또는 열화상(T)') : (en ? 'Inside search area · look for smoke/glow, or sweep with thermal (T)' : '수색 구역 안 · 연기·불빛 찾기 · 또는 열화상(T)으로 훑기')) : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
       if (agl > band[1]) lines.push([(en ? 'Descend to ' : '고도 내리기 → ') + band[0] + '–' + band[1] + ' m' + (en ? ' AGL' : ''), 'warn']);
       else if (agl < band[0]) lines.push([(en ? 'Climb to ' : '고도 올리기 → ') + band[0] + '–' + band[1] + ' m', 'warn']);
       const dc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z); if (dc > o.search.r * 0.8) lines.push([en ? 'Near the edge · turn back toward the centre' : '구역 가장자리 · 중심 쪽으로 되돌아가기', 'warn']);
     }
-    const el = $('guide'); el.classList.remove('hidden'); el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join(''); return;
+    const el = $('guide'), html = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join(''); el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; } return;
   }
   let pts = guidePoints(o, subj.p);
   if (!pts) { hideGuide(); return; }
@@ -283,38 +286,43 @@ function updateGuide(subj) {
   const tgtC = curve.getPointAt(Math.min(1, lookD / Math.max(cL, 0.1)));
   const tgt = (o.kind === 'drop' || o.kind === 'land') ? tgt0 : wingF ? tgtC : (GUIDE.wp && GUIDE.wp.distanceTo(subj.p) > 2.5 ? GUIDE.wp : tgtC);
   const d = tgt.clone().sub(subj.p), fwd = new V3(Math.sin(DR.h), 0, -Math.cos(DR.h)), rgt = new V3(Math.cos(DR.h), 0, Math.sin(DR.h));
-  const df = d.dot(fwd), dr = d.dot(rgt), dy = d.y, hd = Math.hypot(df, dr), ang = Math.atan2(dr, df) / DEG;
-  const lines = [];
+  const df = d.dot(fwd), dr = d.dot(rgt), dy = d.y, hd = Math.hypot(df, dr), ang = Math.atan2(dr, df) / DEG, en = window.SIM_LANG === 'en';
+  // 안내 문구: 할 일(큰 글씨) + 스틱·키(작은 글씨) 두 줄 · 떨림 방지 — 켜질 때와 꺼질 때 문턱을 다르게(히스테리시스), 수치는 0.5 m 단위, 글자는 바뀔 때만 다시 그림
+  const HY = GUIDE.hy || (GUIDE.hy = {}), on = (k, v, lo, hi) => (HY[k] = v > (HY[k] ? lo : hi)), mR = v => v >= 10 ? Math.round(v) + ' m' : v >= 1 ? (Math.round(v * 2) / 2).toFixed(v % 1 ? 1 : 0) + ' m' : (en ? 'a little' : '조금');
+  const acts = [], keys = [], A = (t, k) => { acts.push(t); if (k) keys.push(((t.match(/^[↑↓↶↷←→▲]/) || [''])[0] + ' ' + k).trim()); };   // 아래 줄: 화살표 + 스틱·키 (예 "↓ 왼쪽 스틱 ↓ · ↶ A")
   const steer = () => {
-    if (DR.landed && !wingF && o.kind !== 'land') { lines.push([`먼저 이륙 · 올라가기 (${K('up')})`, '']); return; }
+    if (DR.landed && !wingF && o.kind !== 'land') { A(en ? 'Take off first · climb' : '먼저 이륙 · 올라가기', K('up')); return; }
     if (wingF) {
-      if (Math.abs(dy) > 2) lines.push([`${dy > 0 ? '고도 올리기' : '고도 내리기'} ${Math.abs(dy).toFixed(0)} m (${K(dy > 0 ? 'pu' : 'pd')})`, '']);
-      if (Math.abs(ang) > 6) lines.push([`${ang > 0 ? '오른쪽으로 기울여 선회' : '왼쪽으로 기울여 선회'} (${K(ang > 0 ? 'br' : 'bl')})`, '']);
+      if (on('alt', Math.abs(dy), 1.5, 3)) A((dy > 0 ? (en ? '↑ climb ' : '↑ 올리기 ') : (en ? '↓ descend ' : '↓ 내리기 ')) + mR(Math.abs(dy)), K(dy > 0 ? 'pu' : 'pd'));
+      if (on('turn', Math.abs(ang), 4, 8)) A(ang > 0 ? (en ? '↷ bank right' : '↷ 오른쪽으로 기울여 선회') : (en ? '↶ bank left' : '↶ 왼쪽으로 기울여 선회'), K(ang > 0 ? 'br' : 'bl'));
       return;
     }
-    if (Math.abs(dy) > 0.3) lines.push([`${dy > 0 ? '고도 올리기' : '고도 내리기'} ${Math.abs(dy).toFixed(1)} m (${K(dy > 0 ? 'up' : 'down')})`, '']);
-    if (hd > 2.5 && Math.abs(ang) > 12) lines.push([`${ang > 0 ? '오른쪽으로 돌기' : '왼쪽으로 돌기'} (${K(ang > 0 ? 'yawR' : 'yawL')})`, '']);
-    else if (hd <= 12 && Math.abs(dr) > 0.3) lines.push([`${dr > 0 ? '오른쪽으로 이동' : '왼쪽으로 이동'} ${Math.abs(dr).toFixed(1)} m (${K(dr > 0 ? 'right' : 'left')})`, '']);
+    if (on('alt', Math.abs(dy), 0.25, 0.6)) A((dy > 0 ? (en ? '↑ climb ' : '↑ 올리기 ') : (en ? '↓ descend ' : '↓ 내리기 ')) + mR(Math.abs(dy)), K(dy > 0 ? 'up' : 'down'));
+    if (hd > 2.5 && on('turn', Math.abs(ang), 7, 14)) A(ang > 0 ? (en ? '↷ turn right' : '↷ 오른쪽으로 돌기') : (en ? '↶ turn left' : '↶ 왼쪽으로 돌기'), K(ang > 0 ? 'yawR' : 'yawL'));
+    else if (hd <= 12 && on('str', Math.abs(dr), 0.25, 0.6)) A((dr > 0 ? (en ? '→ slide right ' : '→ 오른쪽으로 ') : (en ? '← slide left ' : '← 왼쪽으로 ')) + mR(Math.abs(dr)), K(dr > 0 ? 'right' : 'left'));
+    else HY.turn = HY.str = false;
   };
+  let cls = '';
   if (o.kind === 'drop') {
-    if (hd > 4) lines.push([`${Math.abs(ang) > 15 ? (ang > 0 ? '오른쪽으로 돌기 (' + K('yawR') + ') · ' : '왼쪽으로 돌기 (' + K('yawL') + ') · ') : ''}표적 쪽으로 전진 (${K('fwd')}) ${hd.toFixed(0)} m`, '']);
-    else lines.push([`표적 위 · DROP SCOPE가 초록이 되면 투하 (${K('drop')}) · 기회는 한 번`, 'ok']);
+    if (hd > 4) { if (on('turn', Math.abs(ang), 8, 16)) A(ang > 0 ? (en ? '↷ turn right' : '↷ 오른쪽으로 돌기') : (en ? '↶ turn left' : '↶ 왼쪽으로 돌기'), K(ang > 0 ? 'yawR' : 'yawL')); A((en ? '▲ forward to the target · ' : '▲ 표적 쪽으로 전진 · ') + Math.round(hd) + ' m', K('fwd')); }
+    else { A(en ? 'Over the target · drop when the scope turns green (one chance)' : '표적 위 · 조준경이 초록이면 투하 (기회는 한 번)', K('drop')); cls = 'ok'; }
   } else if (o.kind === 'land') {
-    if (hd > 0.5) lines.push([`패드 쪽으로 이동 ${hd.toFixed(1)} m`, '']);
-    else lines.push([`패드 위 · 천천히 내려가기 (${K('down')})`, 'ok']);
-  } else if (o.kind === 'takeoff') lines.push([`올라가기 (${K('up')})`, '']);
+    if (hd > 0.5) A((en ? '→ over the pad · ' : '→ 패드 위로 · ') + mR(hd)); else { A(en ? 'Over the pad · descend slowly' : '패드 위 · 천천히 내려가기', K('down')); cls = 'ok'; }
+  } else if (o.kind === 'takeoff') A(en ? '↑ climb' : '↑ 올라가기', K('up'));
   else if (o.kind === 'orbit') {
-    lines.push([`탱크 주위 한 바퀴 선회 · ${Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0)}% · 초록 틀을 따라 계속 전진 (${K('fwd')})`, 'ok']);
+    A((en ? 'Orbit the tank · ' : '탱크 주위 한 바퀴 · ') + Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0) + '% · ' + (en ? 'follow the green path' : '초록 길 따라 전진'), K('fwd')); cls = 'ok';
     steer();
+  } else if (o.t === 'track' && hd < 18 && Math.abs(dy) < 12) {   // 차량 추적: 관측 자리에 왔으면 더 다가가지 말고 유지
+    A(en ? 'Observation spot · hold back here, keep the vehicle in view' : '관측 자리 · 여기서 거리 유지 · 차량을 시야에'); cls = 'ok';
   } else {
-    if (GUIDE.detour) lines.push(['벙커 옆으로 돌아 정면 창 앞에서 U턴 → 창으로 진입', 'warn']);
-    if (o.kind === 'bunker' && S.scanned) lines.push(['SCAN 완료 · 창으로 나가기 (왼쪽 창 또는 들어온 창)', 'ok']);
+    if (GUIDE.detour) { A(en ? 'Around the bunker · U-turn in front of the window' : '벙커 옆으로 돌아 정면 창 앞에서 U턴'); cls = 'warn'; }
+    if (o.kind === 'bunker' && S.scanned) { A(en ? 'SCAN done · exit through a window' : 'SCAN 완료 · 창으로 나가기'); cls = 'ok'; }
     steer();
-    if (!lines.length) lines.push([`정렬 OK · 전진 (${K('fwd')})`, 'ok']);
+    if (!acts.length) { A(en ? 'Lined up · forward' : '정렬 OK · 전진', K('fwd')); cls = 'ok'; }
   }
-  if (S.boosting) lines.unshift(['BOOST ▲▲', 'warn']);
-  const el = $('guide'); el.classList.remove('hidden');
-  el.innerHTML = lines.map(l => `<div class="${l[1]}">${l[0]}</div>`).join('');
+  if (S.boosting) { acts.unshift('BOOST ▲▲'); cls = cls || 'warn'; }
+  const el = $('guide'), html = `<div class="${cls}">${acts.join(' · ')}</div>` + (keys.length ? `<div class="k">${[...new Set(keys)].join(' · ')}</div>` : '');
+  el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; }
 }
 
 // ---- 아래 카메라 (투하·선회 때 화면 한쪽에 드론 바로 아래를 보여줌) ----
