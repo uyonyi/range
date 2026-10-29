@@ -223,17 +223,29 @@ $('demApply').onclick = async () => {
 //  조종기 설정 (RC 송신기 / 게임패드)
 // =====================================================================
 const FN = { thr: '스로틀 (상승·하강)', yaw: '요 (좌우 회전)', pitch: '피치 (전진·후진)', roll: '롤 (좌우 이동)' };
-const BFN = { drop: '투하', cam: '카메라 전환', reset: '다시' };
+const BFN = (function () { const e = window.SIM_LANG === 'en', P = { drop: ['투하 · 사진 보고', 'Drop / photo report'], cam: ['카메라 전환', 'Camera'], reset: ['다시 시작', 'Restart'], boost: ['부스트 (누르는 동안)', 'Boost (hold)'], pause: ['일시정지', 'Pause'], assist: ['보조 켜기/끄기', 'Assist on/off'], guide: ['안내 단계', 'Nav level'], zoom: ['추적 카메라 거리', 'Chase camera distance'], belly: ['아래 카메라', 'Belly camera'], light: ['조명', 'Light'], ir: ['열화상', 'Thermal'], hud: ['UI 숨기기', 'Hide UI'], photo: ['사진 보고 (Enter)', 'Photo report (Enter)'] }; const o = {}; for (const k in P) o[k] = P[k][e ? 1 : 0]; return o; })();
+// VR 컨트롤러: 기능 → 입력 (L/R + 단추 번호: 0 트리거 · 1 그립 · 3 스틱 누르기 · 4 X/A · 5 Y/B) · SET.vrBtn 에 저장
+const VR_IN = { L0: ['L 트리거', 'L trigger'], L1: ['L 그립', 'L grip'], L3: ['L 스틱 누르기', 'L stick click'], L4: ['X', 'X'], L5: ['Y', 'Y'], R0: ['R 트리거', 'R trigger'], R1: ['R 그립', 'R grip'], R3: ['R 스틱 누르기', 'R stick click'], R4: ['A', 'A'], R5: ['B', 'B'] };
+const VR_FN = { drop: ['투하 · 사진 보고', 'Drop / photo report'], photo: ['사진 보고 (Enter)', 'Photo report (Enter)'], menu: ['메뉴', 'Menu'], boost: ['부스트 (누르는 동안)', 'Boost (hold)'], cam: ['시점 (FPV · 추적)', 'View (FPV / chase)'], pip: ['하부 카메라 각도', 'Lower camera angle'], ir: ['열화상', 'Thermal'], light: ['조명', 'Light'], guide: ['안내 단계', 'Nav level'], assist: ['보조 켜기/끄기', 'Assist on/off'], reset: ['다시 시작', 'Restart'], hud: ['UI 숨기기', 'Hide UI'] };
+const VR_FN_DEF = { drop: 'R0', photo: 'R4', menu: 'R5', boost: 'L0', cam: 'L3', pip: 'L5', ir: 'R3', light: 'L4' };
+function vrBtnMap() { return Object.assign({}, VR_FN_DEF, SET.vrBtn || {}); }
 let detect = null, calRun = null;
-function rcOpen() { RCUI.open = true; $('rcPanel').classList.remove('hidden'); rcBuild(); }
+function rcOpen() { if (typeof closePanels === 'function') closePanels(); RCUI.open = true; $('rcPanel').classList.remove('hidden'); rcBuild(); }   // 옵션 창 위가 아니라 그 자리에
 function rcClose() { RCUI.open = false; detect = null; calRun = null; $('rcPanel').classList.add('hidden'); saveRC(); }
 function axName(a) { return `축 ${a.i}${a.inv ? ' (반전)' : ''}`; }
 function bName(b) { return !b ? '없음' : b.type === 'btn' ? `버튼 ${b.i}` : `축 ${b.i} ${b.sign > 0 ? '+' : '−'}`; }
 function rcBuild() {
   let h = '';
   for (const k in FN) h += `<tr><td>${FN[k]}</td><td class="mono" id="rcA_${k}">${axName(RC.axes[k])}</td><td><div class="bar"><i id="rcV_${k}"></i></div></td><td><button data-det="${k}">감지</button> <button data-inv="${k}">반전</button></td></tr>`;
-  for (const k in BFN) h += `<tr><td>${BFN[k]}</td><td class="mono" id="rcB_${k}">${bName(RC.btn[k])}</td><td></td><td><button data-detb="${k}">감지</button></td></tr>`;
+  for (const k in BFN) h += `<tr><td>${BFN[k]}</td><td class="mono" id="rcB_${k}">${bName(RC.btn[k])}</td><td></td><td><button data-detb="${k}">감지</button>${RC.btn[k] ? ` <button data-clr="${k}" class="mini">${L2x('지움', 'Clear')}</button>` : ''}</td></tr>`;
   $('rcTable').innerHTML = h;
+  $('rcTable').querySelectorAll('[data-clr]').forEach(b => b.onclick = () => { delete RC.btn[b.dataset.clr]; rcBuild(); });
+  // VR 판: 컨트롤러 단추 기능 표 (고르기) — 헤드셋을 쓰기 전 2D 메뉴에서
+  const vt = $('rcVr'); if (vt) { const m = vrBtnMap(), en = window.SIM_LANG === 'en', opt = (cur) => `<option value=""${cur ? '' : ' selected'}>${en ? 'none' : '없음'}</option>` + Object.keys(VR_IN).map(i => `<option value="${i}"${m && cur === i ? ' selected' : ''}>${VR_IN[i][en ? 1 : 0]}</option>`).join('');
+    vt.innerHTML = Object.keys(VR_FN).map(f => `<tr><td>${VR_FN[f][en ? 1 : 0]}</td><td><select data-vrfn="${f}">${opt(m[f])}</select></td></tr>`).join('');
+    vt.querySelectorAll('select').forEach(sl => sl.onchange = () => { SET.vrBtn = SET.vrBtn || {}; SET.vrBtn[sl.dataset.vrfn] = sl.value || null; saveSet(); rcBuild(); });
+    const dup = {}; Object.keys(VR_FN).forEach(f => { if (m[f]) (dup[m[f]] = dup[m[f]] || []).push(f); }); const dd = Object.values(dup).filter(a => a.length > 1);
+    $('rcVrHint').textContent = dd.length ? (en ? 'Same button used twice: ' : '같은 단추에 둘 이상: ') + dd.map(a => a.map(f => VR_FN[f][en ? 1 : 0]).join(' = ')).join(' · ') : ''; }
   $('rcTable').querySelectorAll('[data-det]').forEach(b => b.onclick = () => { detect = { kind: 'axis', fn: b.dataset.det, base: null }; $('rcHint').textContent = `${FN[b.dataset.det]}: 해당 스틱을 위(또는 오른쪽) 끝까지 밀었다가 놓으세요.`; });
   $('rcTable').querySelectorAll('[data-inv]').forEach(b => b.onclick = () => { RC.axes[b.dataset.inv].inv = !RC.axes[b.dataset.inv].inv; rcBuild(); });
   $('rcTable').querySelectorAll('[data-detb]').forEach(b => b.onclick = () => { detect = { kind: 'btn', fn: b.dataset.detb, base: null }; $('rcHint').textContent = `${BFN[b.dataset.detb]}: 쓸 버튼이나 스위치를 누르세요(켜세요).`; });
@@ -285,6 +297,7 @@ function rcWire() {
     else { for (const i in calRun) { const c = RC.cal[i] || {}; c.min = calRun[i].min; c.max = calRun[i].max; if (c.c === undefined) c.c = (c.min + c.max) / 2; RC.cal[i] = c; } calRun = null; $('rcRange').textContent = '범위 보정 시작'; $('rcHint').textContent = '범위를 저장했습니다.'; }
   };
   $('rcReset').onclick = () => { RC = JSON.parse(JSON.stringify(RC_DEFAULT)); rcBuild(); $('rcHint').textContent = '기본값(게임패드 모드 2)으로 되돌렸습니다.'; };
+  if ($('rcVrReset')) $('rcVrReset').onclick = () => { SET.vrBtn = {}; saveSet(); rcBuild(); };
   document.querySelectorAll('#rcThr button').forEach(b => b.onclick = () => { RC.thrType = b.dataset.v; rcBuild(); });
 }
 

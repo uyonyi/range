@@ -184,6 +184,7 @@ def build_pages(outdir, site_ids, vr):
     for lang, page in (('ko', 'index.html'), ('en', 'en.html')):
         t, game = sources(lang, 'public', c1=True)
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(minify_js(game, f'{outdir}/js/app.{lang}.js'))
+        if not vr: t = re.sub(r'<!--VRBTN-->.*?<!--/VRBTN-->', '', t, flags=re.S)   # VR 컨트롤러 단추 표는 VR 판에만
         tags = {'THREE': up + 'lib/three.min.js', 'PROJ4': up + 'lib/proj4.js'}
         for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
         t = t.replace('<script>/*GEOTIFF*/</script>', f"<script>window.SIM_GEOTIFF_URL='{up}lib/geotiff.js';</script>")   # 사진·DEM 파일을 올릴 때만 불러옴

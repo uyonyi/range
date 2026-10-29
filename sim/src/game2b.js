@@ -314,6 +314,8 @@ const RC_DEFAULT = {
   btn: { drop: { type: 'btn', i: 0 }, cam: { type: 'btn', i: 1 }, reset: { type: 'btn', i: 3 } },
   thrType: 'center', cal: {}, pad: -1
 };
+// 버튼에 둘 수 있는 기능 → 키 (boost 는 누르는 동안) · 조종기 설정 창에서 지정
+const PAD_FN = { drop: 'Space', cam: 'KeyC', reset: 'KeyR', boost: 'hold', pause: 'Escape', assist: 'KeyH', guide: 'KeyV', zoom: 'KeyZ', belly: 'KeyX', light: 'KeyL', ir: 'KeyT', hud: 'Digit0', photo: 'Enter' };
 let RC = JSON.parse(JSON.stringify(RC_DEFAULT)); const RC_DEF_AX = JSON.stringify(RC_DEFAULT.axes);
 try { const r = JSON.parse(localStorage.getItem('fpvsim_fpv_rc') || 'null'); if (r && r.axes) RC = Object.assign(RC, r); } catch (e) { }
 function saveRC() { try { localStorage.setItem('fpvsim_fpv_rc', JSON.stringify(RC)); } catch (e) { } }
@@ -408,13 +410,15 @@ function readInput(dt) {
     }
     const any = Math.abs(st.thr) + Math.abs(st.yaw) + Math.abs(st.roll) + Math.abs(st.pitch) > 0.02;
     if (any) { for (const k in st) if (Math.abs(st[k]) > Math.abs(IN[k])) IN[k] = st[k]; IN.src = 'PAD'; }
-    const map = { drop: 'Space', cam: 'KeyC', reset: 'KeyR' };
-    for (const k in map) { const s = btnState(gp, RC.btn[k]); if (s && !padPrevBtn[k]) pressed.push(map[k]); padPrevBtn[k] = s; }
-    const sb = gp.buttons[9] && gp.buttons[9].pressed; if (sb && !padPrevBtn.start) pressed.push('Escape'); padPrevBtn.start = sb;
-    if (gp.buttons[6] && gp.buttons[6].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
-    if (gp.mapping === 'standard') {   // Xbox / 표준 배치 추가 버튼
-      const ex = { rt: [7, 'Space'], lb: [4, 'PadLB'], rb: [5, 'PadRB'], x: [2, 'KeyH'], back: [8, 'KeyG'], rs: [11, 'KeyL'], ls: [10, 'Digit0'], up: [12, 'PadUp'], down: [13, 'PadDown'], left: [14, 'PadLeft'], right: [15, 'PadRight'], a: [0, 'PadA'] };
-      for (const k in ex) { const bt = gp.buttons[ex[k][0]]; const s = !!(bt && (bt.pressed || bt.value > 0.5)); if (s && !padPrevBtn['x' + k]) pressed.push(ex[k][1]); padPrevBtn['x' + k] = s; }
+    // 버튼: 조종기 설정에서 지정한 기능 (PAD_FN) · 지정한 버튼은 표준 배치의 같은 버튼보다 우선 · 지정한 기능은 표준 배치의 기본 버튼을 끔
+    const used = new Set(), has = new Set();
+    for (const k in PAD_FN) { const b = RC.btn[k]; if (!b) continue; has.add(k); if (b.type === 'btn') used.add(b.i); const s = btnState(gp, b);
+      if (k === 'boost') { if (s && SET.diff !== 'atti') IN.boost = true; continue; } if (s && !padPrevBtn[k]) pressed.push(PAD_FN[k]); padPrevBtn[k] = s; }
+    if (!has.has('pause') && !used.has(9)) { const sb = gp.buttons[9] && gp.buttons[9].pressed; if (sb && !padPrevBtn.start) pressed.push('Escape'); padPrevBtn.start = sb; }
+    if (!has.has('boost') && !used.has(6) && gp.buttons[6] && gp.buttons[6].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
+    if (gp.mapping === 'standard') {   // Xbox / 표준 배치 추가 버튼 (fn: 같은 기능을 직접 지정했으면 건너뜀)
+      const ex = { rt: [7, 'Space', 'drop'], lb: [4, 'PadLB'], rb: [5, 'PadRB'], x: [2, 'KeyH', 'assist'], back: [8, 'KeyG'], rs: [11, 'KeyL', 'light'], ls: [10, 'Digit0', 'hud'], up: [12, 'PadUp'], down: [13, 'PadDown'], left: [14, 'PadLeft'], right: [15, 'PadRight'], a: [0, 'PadA'] };
+      for (const k in ex) { if (used.has(ex[k][0]) || (ex[k][2] && has.has(ex[k][2]))) continue; const bt = gp.buttons[ex[k][0]]; const s = !!(bt && (bt.pressed || bt.value > 0.5)); if (s && !padPrevBtn['x' + k]) pressed.push(ex[k][1]); padPrevBtn['x' + k] = s; }
     }
   }
   if (XR_ON) xrInput(dt);   // VR 컨트롤러 스틱

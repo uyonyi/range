@@ -2507,6 +2507,9 @@ function xrInput(dt) {
   const ax = (g, i) => (g && g.axes && g.axes.length > i ? g.axes[i] || 0 : 0), bt = (g, i) => !!(g && g.buttons && g.buttons[i] && (g.buttons[i].pressed || g.buttons[i].value > 0.5));
   const edge = (k, on) => { const e = on && !XR.prev[k]; XR.prev[k] = on; return e; };
   const rt = edge('rt', bt(Rg, 0)), lt = edge('lt', bt(Lg, 0)), A = edge('a', bt(Rg, 4)), B = edge('b', bt(Rg, 5)), X = edge('x', bt(Lg, 4)), Y = edge('y', bt(Lg, 5)), LS = edge('ls', bt(Lg, 3)), RS = edge('rs', bt(Rg, 3));
+  // 지정한 단추 기능 (조종기 설정 · 기본: R트리거 투하 · A 사진 · B 메뉴 · L트리거 부스트 · L스틱 시점 · Y 하부 카메라 · R스틱 열화상 · X 조명)
+  const VM = vrBtnMap(), held = id => id ? bt(id[0] === 'L' ? Lg : Rg, +id.slice(1)) : false, hit = f => edge('f_' + f, held(VM[f]));
+  const F = {}; for (const f in VR_FN) F[f] = hit(f); F.boostHeld = held(VM.boost);
   if ((rt || lt || A || B) && AU.ctx && AU.ctx.state !== 'running') try { AU.ctx.resume(); } catch (e) { }
   if (XR.menu) { if (rt || A) vrMenuClick('right'); if (lt) vrMenuClick('left'); if (B && S.state === 'pause') vrResume(); return; }
   if (S.state === 'replay') {   // 리플레이: A 재생·멈춤 · 오른쪽 스틱 좌우 5초 · Y 속도 · 왼쪽 스틱 누르기 카메라 · B 메뉴
@@ -2523,14 +2526,15 @@ function xrInput(dt) {
   for (const k in st) { const v = vm === 3 ? st[k] : stickCurve(st[k], 0.1, true); if (Math.abs(v) > Math.abs(IN[k])) { IN[k] = v; any = true; } }
   if (any) IN.src = 'VR';
   if (typeof isC1 === 'function' && isC1() && S.state !== 'result') { if (A) pressed.push('Enter'); if (B) vrMenuOpen(); if (Y) pressed.push('KeyY'); if (X) pressed.push('KeyE'); if (rt) pressed.push('KeyQ'); return; }   // 1종 연습 버튼
-  if (Lg && Lg.buttons[0] && Lg.buttons[0].value > 0.4 && SET.diff !== 'atti') IN.boost = true;
-  if (rt) pressed.push('Space');
-  if (A) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 A = 사진
-  if (B) vrMenuOpen();
-  if (Y) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 카메라 ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 카메라 끔', 'Lower camera off'), '#ffc828', 1); }
-  if (LS) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
-  if (RS) irCycle();
-  if (X) pressed.push('KeyL');   // 조명 켜기/끄기
+  if (F.boostHeld && SET.diff !== 'atti') IN.boost = true;
+  if (F.drop) pressed.push('Space');
+  if (F.photo) { if (S.state === 'result') startRun(S.kind); else pressed.push('Enter'); }   // 산불·수색 중에는 사진
+  if (F.menu || (!VM.menu && B)) vrMenuOpen();   // 메뉴는 늘 열 수 있게 (지정을 지웠으면 B)
+  if (F.pip) { const L = [0, 90, 60, 45]; SET.vrPip = L[(L.indexOf(SET.vrPip | 0) + 1) % L.length]; saveSet(); showMsg(SET.vrPip ? L2('하부 카메라 ', 'Lower camera ') + SET.vrPip + '°' : L2('하부 카메라 끔', 'Lower camera off'), '#ffc828', 1); }
+  if (F.cam) { SET.vrCam = SET.vrCam === 'chase' ? 'fpv' : 'chase'; saveSet(); vrApplyCam(); showMsg(SET.vrCam === 'chase' ? L2('뒤에서 추적', 'Chase view') : 'FPV', '#4fe3ff', 1); }
+  if (F.ir) irCycle();
+  if (F.light) pressed.push('KeyL');   // 조명 켜기/끄기
+  if (F.guide) pressed.push('KeyV'); if (F.assist) pressed.push('KeyH'); if (F.reset) pressed.push('KeyR'); if (F.hud) pressed.push('Digit0');
 }
 // 머리 방향 모드: 고개를 돌린 쪽으로 기체가 돌고, 왼쪽 스틱 앞뒤 = 속도, 고개를 들거나 숙이면 그쪽으로 오르내림
 // 오른쪽 스틱: 좌우 = 옆으로, 위아래 = 고도 (직접), 왼쪽 스틱 좌우 = 몸을 돌리지 않고 회전

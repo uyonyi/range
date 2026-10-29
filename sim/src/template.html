@@ -71,6 +71,7 @@ body.nohud #hud>:not(#tc):not(#vig):not(#flash):not(#cross):not(#irTag),body.noh
 #demWrap{background:#0b0e11;border:1px solid var(--line);min-height:200px;display:flex;align-items:center;justify-content:center}
 #demCv{max-width:100%;cursor:crosshair;display:block}
 #demPanel select,#demPanel input[type=number],#demPanel input[type=text]{background:#11161b;color:var(--text);border:1px solid var(--line);padding:6px 8px;font:13px "SF Mono",Menlo,monospace}
+.rcvr td{padding:3px 10px 3px 0}.rcvr select{background:#11161b;color:var(--text);border:1px solid var(--line);padding:5px 8px;font-size:13px;border-radius:6px}
 #segSite button{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:760px){.demGrid{grid-template-columns:1fr}}
 .card{margin:auto;background:rgba(14,18,22,.94);border:1px solid var(--line);border-top:3px solid var(--amber);max-width:880px;width:100%;padding:26px 28px}
@@ -992,8 +993,14 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
     <h3>스로틀 스틱 형태</h3>
     <div class="seg" id="rcThr"><button data-v="center">가운데로 돌아옴 (게임패드)</button><button data-v="bottom">고정형 (RC 송신기)</button></div>
     <div class="note" style="margin-top:6px">고정형 스로틀은 가운데가 '고도 유지', 위로 올리면 상승, 아래로 내리면 하강입니다 (입문·쉬움 모드). 가운데 부근은 넓게 무시합니다.</div>
+    <div class="note" style="margin-top:6px">버튼 기능은 [감지]를 누른 뒤 조종기의 버튼이나 스위치를 움직여 지정합니다. 지정한 버튼은 게임패드 기본 배치보다 우선합니다.</div>
     <h3>보정</h3>
     <div class="btns small"><button id="rcCenter">가운데 저장</button><button id="rcRange">범위 보정 시작</button><button id="rcReset">기본값</button></div>
+    <!--VRBTN--><h3>VR 컨트롤러 버튼 (Quest)</h3>
+    <table id="rcVr" class="rcvr"></table>
+    <div id="rcVrHint" class="wzhint bad" style="margin:4px 0 0"></div>
+    <div class="note" style="margin-top:6px">스틱은 조종기 모드(1·2·머리 방향)를 따릅니다. 메뉴 안에서는 트리거·A·B 가 그대로 선택·뒤로 입니다.</div>
+    <div class="btns small" style="margin-top:6px"><button id="rcVrReset">VR 기본값</button></div><!--/VRBTN-->
     <div id="rcHint"></div>
     <div class="btns" style="margin-top:16px"><button class="primary" id="rcClose">저장하고 닫기</button></div>
   </div>
