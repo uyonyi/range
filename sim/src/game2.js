@@ -54,12 +54,20 @@ function makeDrone(ghost) {
   const mot = m(mat(0x8d9297, { roughness: 0.3, metalness: 0.8 })), glass = m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 }));
   const lensRing = m(mat(0x101215, { roughness: 0.3, metalness: 0.4 })), accent = m(mat(0xc8ccd0, { roughness: 0.4, metalness: 0.3 }));
   const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(paintGeo(geo, mt, sx, sy, sz), mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
-  // 몸통: 길쭉한 유선형 (캡슐을 납작하게) + 아래 판
-  const body = add(UCAP, shell, 0, 0, 0, 0.056, 0.105, 0.034); body.rotation.x = Math.PI / 2;
-  add(UBOX, shellD, 0, -0.022, 0.01, 0.1, 0.022, 0.25);
-  // 배터리 (뒤 위쪽, 밝은 회색) + 걸쇠
-  add(UBOX, batt, 0, 0.03, 0.065, 0.085, 0.03, 0.13);
-  add(UBOX, accent, 0, 0.046, 0.12, 0.05, 0.006, 0.014);
+  // 몸통: 각진 납작한 판 세 장 (실물처럼 모서리가 깎인 육각 평면형 · 앞이 좁고 뒤가 넓음) — 아래 판(어두움) · 가운데 몸통 · 위 등마루
+  //   plate(): (x, 앞+) 평면 다각형을 위로 두께만큼 뽑고 모서리를 둥글림. y0 = 바닥 높이
+  const plate = (pts, th, bev, mt, y0, mirror) => { const sh = new THREE.Shape(); const P = mirror ? pts.concat(pts.slice().reverse().map(([x, y]) => [-x, y])) : pts; sh.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) sh.lineTo(P[i][0], P[i][1]); sh.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: th - bev * 2, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3 }); geo.rotateX(-Math.PI / 2); geo.translate(0, y0 + bev, 0); if (typeof uvScale === 'function') uvScale(geo, mt);
+    const me = new THREE.Mesh(geo, mt); me.castShadow = !ghost; g.add(me); return me; };
+  plate([[0.02, 0.165], [0.046, 0.095], [0.06, -0.02], [0.056, -0.12], [0.036, -0.165], [0.018, -0.172]], 0.022, 0.004, shellD, -0.03, true);             // 아래 판
+  plate([[0.022, 0.175], [0.05, 0.1], [0.064, -0.02], [0.06, -0.12], [0.04, -0.17], [0.02, -0.18]], 0.045, 0.008, shell, -0.012, true);                     // 몸통 (앞 좁고 뒤 넓음)
+  plate([[0.01, 0.13], [0.026, 0.07], [0.034, -0.03], [0.03, -0.12], [0.012, -0.15]], 0.018, 0.006, shell, 0.03, true);                                   // 등마루
+  // 배터리 (뒤에서 밀어 넣는 팩 · 밝은 회색 끝면) + 걸쇠 · 옆 배기구
+  add(UBOX, batt, 0, 0.01, 0.14, 0.08, 0.034, 0.07);
+  add(UBOX, accent, 0, 0.03, 0.165, 0.044, 0.005, 0.012);
+  for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) add(UBOX, shellD, sx * 0.058, 0.004 + k * 0.009, 0.06, 0.004, 0.003, 0.05);
+  // 발 (앞 둘 · 뒤 둘, 고무)
+  for (const [x, z] of [[-0.03, -0.11], [0.03, -0.11], [-0.04, 0.12], [0.04, 0.12]]) add(UCYL, carbon, x, -0.04, z, 0.006, 0.018, 0.006);
   // 기수 짐벌: 둥근 하우징 + 두 렌즈 (컬러 · 열상)
   const gim = new THREE.Group(); gim.position.set(0, -0.03, -0.165); g.add(gim);
   add(USPH, shellD, 0, 0, 0, 0.034, 0.03, 0.03, gim);
@@ -68,7 +76,7 @@ function makeDrone(ghost) {
   add(UCYL, lensRing, 0.013, 0, -0.025, 0.008, 0.012, 0.008, gim).rotation.x = Math.PI / 2;
   add(UCYL, m(mat(0x1a1408, { roughness: 0.1, metalness: 0.7 })), 0.013, 0, -0.031, 0.006, 0.004, 0.006, gim).rotation.x = Math.PI / 2;
   // 내비게이션 어안 카메라 6개 (위 3 · 아래 3)
-  for (const [x, y, z] of [[0, 0.034, -0.12], [-0.035, 0.05, 0.12], [0.035, 0.05, 0.12], [0, -0.036, -0.1], [-0.04, -0.036, 0.1], [0.04, -0.036, 0.1]]) {
+  for (const [x, y, z] of [[0, 0.036, -0.1], [-0.045, 0.036, 0.1], [0.045, 0.036, 0.1], [0, -0.033, -0.09], [-0.045, -0.033, 0.1], [0.045, -0.033, 0.1]]) {
     add(UCYL, lensRing, x, y, z, 0.011, 0.008, 0.011);
     add(USPH, glass, x, y + Math.sign(y) * 0.004, z, 0.008, 0.005, 0.008);
   }
@@ -78,15 +86,18 @@ function makeDrone(ghost) {
   const ARMS = [[0.24, -0.17, -0.04, 1], [-0.24, -0.17, -0.04, 1], [0.235, 0.19, -0.02, -1], [-0.235, 0.19, -0.02, -1]];
   for (const [x, z, root, up] of ARMS) {
     const rx = Math.sign(x) * 0.045, rz = Math.sign(z) * 0.07, dx = x - rx, dz = z - rz, L = Math.hypot(dx, dz);
-    const arm = add(UBOX, carbon, (x + rx) / 2, root, (z + rz) / 2, 0.026, 0.016, L); arm.rotation.y = Math.atan2(dx, dz);
-    add(UCYL, carbon, rx, root, rz, 0.018, 0.02, 0.018);                       // 접힘 힌지
+    { const sh = new THREE.Shape(); sh.moveTo(-0.022, 0); sh.lineTo(0.022, 0); sh.lineTo(0.014, L); sh.lineTo(-0.014, L); sh.closePath();   // 팔: 뿌리가 넓고 끝이 좁은 납작한 날개꼴 (실물의 접이식 탄소 팔)
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2 }); geo.rotateX(-Math.PI / 2); geo.translate(0, -0.008, 0); if (typeof uvScale === 'function') uvScale(geo, carbon);
+      const arm = new THREE.Mesh(geo, carbon); arm.position.set(rx, root, rz); arm.rotation.y = Math.atan2(dx, dz) + Math.PI; arm.castShadow = !ghost; g.add(arm); }
+    add(UCYL, carbon, rx, root, rz, 0.02, 0.022, 0.02);                        // 접힘 힌지
     const my = root + up * 0.017;
     add(UCYL, mot, x, my, z, 0.021, 0.026, 0.021);
+    add(USPH, carbon, x, root - up * 0.004, z, 0.027, 0.014, 0.027);           // 모터 받침 (둥근 포드)
     add(UCYL, carbon, x, root, z, 0.026, 0.012, 0.026);
     const py = my + up * 0.016;
     const disc = new THREE.Mesh(new THREE.CircleGeometry(PR, 28), blur); disc.rotation.x = -Math.PI / 2; disc.position.set(x, py, z); g.add(disc);
     const hub = new THREE.Group(); hub.position.set(x, py, z); g.add(hub);
-    for (const s of [1, -1]) { const b = add(UBOX, bladeM, s * PR * 0.5, 0, 0, PR, 0.003, 0.019, hub); b.rotation.x = s * 0.18; }
+    for (const s of [1, -1]) { const b = add(UBOX, bladeM, s * PR * 0.5, 0, 0, PR, 0.003, 0.023, hub); b.rotation.x = s * 0.2; }
     add(UCYL, accent, 0, up * 0.004, 0, 0.007, 0.008, 0.007, hub);
     props.push(hub);
   }
