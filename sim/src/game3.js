@@ -271,7 +271,12 @@ function stepDrone(dt) {
 const _qd = new THREE.Quaternion(), _bu = new V3(), _ar = new V3(), _ve = new THREE.Euler(0, 0, 0, 'YXZ');
 function actualRate(x, c, m, e) { const a = Math.abs(x); return x * c + Math.max(0, m - c) * a * (Math.pow(x, 5) * e + x * (1 - e)); }   // Betaflight rc.c applyActualRates
 const RATE_PRESET = { train: [55, 320, 0.4], std: [70, 670, 0.54], real: [70, 670, 0.54], racer: [200, 620, 0] };
-function feelRates(ax) { const r = ax === 'y' ? (SET.ratesY || SET.rates) : SET.rates; return (r && r.length === 3) ? r : RATE_PRESET.std; }
+// 요(기수 회전)는 따로 완만하게 (풀 스틱에 670°/s 면 밖에서 볼 때 기체가 팽이처럼 돎) · 'real' 만 피치·롤과 같은 값
+const RATE_PRESET_Y = { train: [50, 220, 0.4], std: [60, 380, 0.54], racer: [160, 500, 0] };
+function ratePreset(k, ax) { return ((ax === 'y' && RATE_PRESET_Y[k]) || RATE_PRESET[k] || RATE_PRESET.std).slice(); }
+function feelRates(ax) { const r = ax === 'y' ? (SET.ratesY || SET.rates) : SET.rates; return (r && r.length === 3) ? r : ratePreset('std', ax); }
+// 예전 저장값: 요가 피치·롤과 같은 'std' 값이면 새 요 기본값으로 (직접 바꾼 값은 그대로)
+(function () { const y = SET.ratesY, P = RATE_PRESET.std; if (SET.feel !== 'real' && y && y.length === 3 && y[0] === P[0] && y[1] === P[1] && y[2] === P[2]) SET.ratesY = ratePreset(SET.feel || 'std', 'y'); })();
 function hoverThr(twr, idle) { return (Math.sqrt(1 / twr) - idle) / (1 - idle); }   // 정지 비행 스틱 위치 (0..1)
 function thrHoverCenter() { const v = SET.thrHover || 'auto'; return v === 'auto' ? IN.src !== 'PAD' : v === '1'; }   // 키보드·터치는 중앙 = 정지 비행
 function stepAcro(dt) {
@@ -700,7 +705,7 @@ function drawMap(gpos) {
   if (o && o.mk && o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s), q = mxy(d + o.search.r, s), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.9)'; g.fillStyle = 'rgba(255,200,40,.14)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill(); g.stroke(); g.setLineDash([]); }
   // 산불: 다른 신고 구역(번호)과 보고 끝난 불씨(✓) 도 지도에
   if (S.kind === 'fire' && isMission() && MS.list) { g.font = '700 10px monospace'; MS.list.forEach((x, i) => { if (!x.mk) return;
-    if (x.done) { const q = mxy(...toDS(x.tp)); g.fillStyle = '#9aa6ad'; g.fillText('✓' + (i + 1), q[0] + 3, q[1] - 2); g.beginPath(); g.arc(q[0], q[1], 2, 0, 7); g.fill(); return; }
+    if (x.done) { if (!x.tp) return; /* 마지막 활주로 복귀 항목(고정익)은 불씨가 아니라 tp 없음 */ const q = mxy(...toDS(x.tp)); g.fillStyle = '#9aa6ad'; g.fillText('✓' + (i + 1), q[0] + 3, q[1] - 2); g.beginPath(); g.arc(q[0], q[1], 2, 0, 7); g.fill(); return; }
     if (!x.active || !o) return; const p = mxy(...toDS(x.mk)); if (x !== o) { const q = mxy(...toDS(x.mk.clone().add(new V3(0, 0, -x.search.r)))), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.5)'; g.setLineDash([3, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke(); g.setLineDash([]); }
     g.fillStyle = '#ffc828'; g.fillText(String(i + 1), p[0] - 3, p[1] + 4); }); }
   if (o && o.mk && o.search && S.kind === 'sar') { const p = mxy(...toDS(o.mk)); g.font = '700 10px monospace'; g.fillStyle = '#ffc828'; g.fillText('SAR', p[0] - 9, p[1] + 4); }

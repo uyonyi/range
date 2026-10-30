@@ -337,8 +337,8 @@ document.querySelectorAll('#segDiff button').forEach(b => b.addEventListener('cl
 const modeChanged = () => { modeSync(); saveSet(); syncSeg(); refreshBest(); if (typeof afUI === 'function') afUI(); if (typeof updateTags === 'function') updateTags(); };
 document.querySelectorAll('#segMode button').forEach(b => b.addEventListener('click', () => { SET.mode = b.dataset.v; modeChanged(); }));
 document.querySelectorAll('#segAssistLv button').forEach(b => b.addEventListener('click', () => { SET.assistLv = +b.dataset.v; modeChanged(); }));
-document.querySelectorAll('#segFeel button').forEach(b => b.addEventListener('click', () => { SET.feel = b.dataset.v; if (SET.feel !== 'std') SET.rates = SET.ratesY = RATE_PRESET[SET.feel].slice(); else SET.rates = SET.ratesY = RATE_PRESET.std.slice(); modeChanged(); }));
-document.querySelectorAll('#segRatePre button').forEach(b => b.addEventListener('click', () => { SET.rates = RATE_PRESET[b.dataset.v].slice(); SET.ratesY = RATE_PRESET[b.dataset.v].slice(); saveSet(); syncSeg(); }));
+document.querySelectorAll('#segFeel button').forEach(b => b.addEventListener('click', () => { SET.feel = b.dataset.v; SET.rates = ratePreset(SET.feel, 'p'); SET.ratesY = ratePreset(SET.feel, 'y'); modeChanged(); }));
+document.querySelectorAll('#segRatePre button').forEach(b => b.addEventListener('click', () => { SET.rates = ratePreset(b.dataset.v, 'p'); SET.ratesY = ratePreset(b.dataset.v, 'y'); saveSet(); syncSeg(); }));
 const rateIn = (ids, key) => ids.forEach((id, i) => { const e = $(id); if (!e) return; e.addEventListener('change', () => { const r = feelRates(key === 'rates' ? 'p' : 'y').slice(); r[i] = Math.max(+e.min, Math.min(+e.max, +e.value || 0)); SET[key] = r; saveSet(); syncSeg(); }); });
 rateIn(['rc0', 'rc1', 'rc2'], 'rates'); rateIn(['ry0', 'ry1', 'ry2'], 'ratesY');
 document.querySelectorAll('#segThrHover button').forEach(b => b.addEventListener('click', () => { SET.thrHover = b.dataset.v; saveSet(); syncSeg(); }));
