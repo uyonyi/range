@@ -245,7 +245,7 @@ function replayKey(k) {
   else if (k === 'ArrowRight' || k === 'PadRB' || k === 'PadRight') replaySeek(RP.t + 5);
   else if (k === 'Digit1') RP.speed = 0.5; else if (k === 'Digit2') RP.speed = 1; else if (k === 'Digit3') RP.speed = 2; else if (k === 'Digit4') RP.speed = 4;
   else if (k === 'PadUp') RP.speed = Math.min(4, RP.speed * 2); else if (k === 'PadDown') RP.speed = Math.max(0.25, RP.speed / 2);
-  else if (k === 'KeyC' || k === 'KeyB2') { S.cam = (S.cam + 1) % 3; updateTags(); }
+  else if (k === 'KeyC' || k === 'KeyB2') { S.cam = (S.cam + 1) % CAMS.length; updateTags(); }
   else if (k === 'Escape') replayEnd();
   replayUI();
 }
