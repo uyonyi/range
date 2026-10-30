@@ -238,8 +238,9 @@ const AU = { ctx: null, on: true };
 function initAudio() {
   if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
   try {
-    const ctx = (window.__bootAudio && window.__bootAudio.ctx) || new (window.AudioContext || window.webkitAudioContext)(); AU.ctx = ctx;   // 첫 화면(인트로)이 만든 소리 장치를 이어 씀 — 이미 허락받았으면 메뉴 음악도 바로
-    AU.master = ctx.createGain(); AU.master.gain.value = 0.55; AU.master.connect(ctx.destination);
+    const ctx = (window.__bootAudio && window.__bootAudio.ctx) || (() => { const A = window.AudioContext || window.webkitAudioContext; try { return new A({ latencyHint: 'playback' }); } catch (e) { return new A(); } })(); AU.ctx = ctx;   // 재생용 지연: 버퍼를 넉넉히 잡아 끊김·딱 소리 적게   // 첫 화면(인트로)이 만든 소리 장치를 이어 씀 — 이미 허락받았으면 메뉴 음악도 바로
+    AU.master = ctx.createGain(); AU.master.gain.value = 0.55;
+    { const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -4; lim.knee.value = 2; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.12; AU.master.connect(lim); lim.connect(ctx.destination); AU.lim = lim; }   // 마지막 리미터: 음악·모터·무전이 겹쳐도 깨지지(클리핑) 않게
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.connect(AU.master);
     AU.mg = ctx.createGain(); AU.mg.gain.value = 0; AU.mg.connect(lp);
     AU.o1 = ctx.createOscillator(); AU.o1.type = 'sawtooth'; AU.o2 = ctx.createOscillator(); AU.o2.type = 'square';

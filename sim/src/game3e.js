@@ -4,7 +4,7 @@
 //  D패드/스틱 = 초점 이동 · A = 선택 · B = 뒤로 · LB/RB = 탭 전환 · 슬라이더는 좌우로 값 조절
 // =====================================================================
 const GPN = { el: null, t: 0, rep: 0, pA: false, pB: false, pL: false, pR: false, seen: false };
-function gpnActive() { return !XR_ON && !RCUI.open && (S.state === 'menu' || S.state === 'pause' || S.state === 'result' || (S.state === 'run' && S.brief)); }
+function gpnActive() { return !XR_ON && !RCUI.open && (window.__bootDone || !document.getElementById('boot')) && (S.state === 'menu' || S.state === 'pause' || S.state === 'result' || (S.state === 'run' && S.brief)); }
 function gpnContainer() {
   for (const id of ['kbPanel', 'rcPanel', 'optPanel', 'setPanel', 'recPanel', 'helpPanel', 'ctlPanel', 'tutMenu']) { const e = $(id); if (e && !e.classList.contains('hidden')) return e; }
   if (S.state === 'pause') return ui.pause; if (S.state === 'result') return ui.result; if (S.brief) return $('brief'); return ui.menu;

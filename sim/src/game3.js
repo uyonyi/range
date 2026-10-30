@@ -30,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn'];
+const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -146,7 +146,12 @@ function respawn() {
   if (S.respawn) { p = S.respawn.p.clone(); h = S.respawn.h; p.y = Math.max(p.y, groundAt(p.x, p.z) + 1.2); }
   else { p = startPos(); h = startHead(); }
   const o = curObj();
-  if (o && o.mk && S.respawn) { const d = o.mk.clone().sub(p); h = Math.atan2(d.x, -d.z); }
+  if (o && o.mk && S.respawn) {
+    // 다음 장애물과 너무 가까우면(18 m 안) 그 장애물의 진입 방향 뒤쪽으로 물러나 시작 (코앞에서 다시 시작하지 않게)
+    const op = o.kind !== 'ms' ? openingOf(o) : null;
+    if (op && op.b) { const b = op.b, C = b.world(op.lx, op.ly, op.lz), A = (op.side ? b.world(-1, 0, 0) : b.world(0, 1, 0)).sub(b.world(0, 0, 0)).normalize();
+      const along = p.clone().sub(C).dot(A); if (along > -18 && along < 2) { p.copy(C).addScaledVector(A, -22); p.y = Math.max(C.y, groundAt(p.x, p.z) + 1.5); } }
+    const d = o.mk.clone().sub(p); h = Math.atan2(d.x, -d.z); }
   resetDrone(p, h);
   if (S.kind !== 'course') droneM.cans.forEach(c => c.visible = true);
 }
@@ -834,6 +839,7 @@ function placeModel(mdl, st) { mdl.g.position.copy(st.p); if (st.q) mdl.g.quater
 let last = performance.now(), acc = 0;
 const STEP = 1 / 120;
 function handleKeys() {
+  if (!window.__bootDone && document.getElementById('boot')) { pressed.length = 0; return; }   // 첫 화면(입장 번호·인트로·고르기)이 떠 있는 동안은 첫 화면이 조종기를 받음
   while (pressed.length) {
     const k = pressed.shift();
     if (RCUI.open) continue;
@@ -970,6 +976,6 @@ function frame(now, noRender) {
     let mo = false; try { mo = MOTOR.tick(dt, thr, act, subj, SET.af); } catch (e) { MOTOR.err = String(e); }   // 기체별 모터·프로펠러 소리 (game2m)
     audioUpdate(thr, subj.v ? subj.v.length() : 0, act, mo); }
   if (XR_ON) xrTick(dt);   // VR: 드론 카메라 영상을 화면 텍스처로 먼저 그림
-  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) renderBelly(); if (mn) menuRenderPost(); }
+  if (!noRender) { const mn = S.state === 'menu' && !XR_ON; if (mn) menuRenderPre(dt); (typeof c1VRon === 'function' && c1VRon() && C1XR.cam) ? renderer.render(scene, C1XR.cam) : renderer.render(XR_ON ? VRS : scene, camera); if (!XR_ON) { renderBelly(); renderAttCam(); } if (mn) menuRenderPost(); }
   if (!noRender && !frame.boot) { frame.boot = 1; setTimeout(() => { try { if (window.__bootReady) window.__bootReady(); } catch (e) { } }, 60); }   // 첫 화면이 그려지면 인트로(불러오는 화면)를 걷음
 }

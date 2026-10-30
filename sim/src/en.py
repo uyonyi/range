@@ -406,6 +406,7 @@ EN.update({
 EN.update({
 'DROP 투하 · BST 부스트(고속 복귀 구간) · CAM 카메라 · ⟲ 다시 · ↓CAM 아래 카메라 · GD 가이드 · ZM 카메라 거리 · ⛶ 전체 화면 · ❚❚ 일시정지': 'DROP payload · BST boost (fast return) · CAM camera · ⟲ restart · ↓CAM belly camera · GD guide · ZM camera distance · ⛶ full screen · ❚❚ pause',
 '시작할 때 전체 화면': 'Start in full screen',
+'자세 카메라 (FPV 시점일 때 기체를 밖에서 보는 작은 창)': 'Attitude camera (small outside view of the aircraft in FPV)',
 '아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기)': 'Belly camera (automatic for drops and orbit; X toggles it any time)',
 '아래 카메라 켜기/끄기 (투하·선회 때는 자동으로 크게)': 'Belly camera on/off (shown large automatically for drops and orbit)',
 '십자키 ↑/↓ · ← · View': 'D-pad ↑/↓ · ← · View',
