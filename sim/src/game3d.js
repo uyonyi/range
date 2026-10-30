@@ -238,6 +238,7 @@ function updateGuide(subj) {
     const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
     const en = window.SIM_LANG === 'en';
     const rk = repKey();
+    if (!o.inView && o.t === 'sarfind' && typeof SMK !== 'undefined' && SMK && SMK.on && !SMK.ok) lines.push(SMK.seen ? [en ? 'Smoke in view · centre it and press ' + rk + ' to call its colour' : '연기 포착 · 가운데 두고 ' + rk + ' = 색 부르기', 'ok'] : [en ? 'Smoke out · find his signal smoke' : '연막 신호 · 실종자의 연기를 찾기', 'warn']);   // 연막 이벤트: 색은 조종자가 먼저
     if (o.inView) lines.push([fire ? (en ? 'HOTSPOT in view · centre it and press ' + rk : '불씨 포착 · 화면 가운데에 두고 ' + rk) : (en ? 'Hiker in view · centre and ' + rk : '실종자 포착 · 가운데에 두고 ' + rk), 'ok']);
     else {
       lines.push([fire ? (o.seenVis ? (en ? 'Smoke only · get closer to see the flames, or thermal (T)' : '연기만 보임 · 불꽃이 보일 만큼 가까이, 또는 열화상(T)') : (en ? 'Inside search area · look for smoke/glow, or sweep with thermal (T)' : '수색 구역 안 · 연기·불빛 찾기 · 또는 열화상(T)으로 훑기')) : (en ? 'Inside search area · fly low and slow, look along paths and clearings' : '수색 구역 안 · 낮고 천천히 · 길가·공터 위주로 살피기'), '']);
