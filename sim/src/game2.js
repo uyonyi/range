@@ -7,12 +7,44 @@
 // 기체 색 (어두운 숲·밤 배경에서 잘 보이게): setAirframe·격납고가 PAINT 를 정해 두고 모델을 새로 만듦 · null = 원래 색
 //  pm(원래 색, 재질, 1 = 큰 면 · 2 = 어두운 면) — 칠한 색은 살짝 스스로 빛나게 (그늘·해질녘에도 보이게)
 var PAINT = null;
-const PAINTS = { white: 0xeef1f4, orange: 0xff7a1a, yellow: 0xffd23a, red: 0xe8322b, cyan: 0x3fc8ff, lime: 0x9ae63a };
+// 단색은 숫자, 위장색은 ['camo'|'pix', 바탕, 무늬1, 무늬2, 무늬3] (camo = 얼룩 · pix = 픽셀)
+const PAINTS = { white: 0xeef1f4, orange: 0xff7a1a, yellow: 0xffd23a, red: 0xe8322b, cyan: 0x3fc8ff, lime: 0x9ae63a,
+  wood: ['camo', 0x4f5c3c, 0x2e3a26, 0x6b5a3a, 0x1c2118], desert: ['camo', 0xc4aa7c, 0xa58b5e, 0x8a6d44, 0xdcc79e], digital: ['pix', 0x8a9484, 0x66745f, 0xa8b0a1, 0x4b564a], snow: ['camo', 0xe9edf0, 0xbcc5cb, 0x89939a, 0xf5f7f9],
+  ocp: ['camo', 0x8b8566, 0x5e6a46, 0x6d5a3e, 0xb3a98a], rok: ['pix', 0x6f7a5a, 0x3d4a35, 0x8a7d5c, 0x242a22], urban: ['pix', 0x8c9196, 0x5a6066, 0xb9bec3, 0x33373b], navy: ['camo', 0x5d6b7a, 0x3e4a57, 0x7d8b99, 0x2b333c] };   // 멀티캠 · 화강암(국군 디지털) · 도시 · 해상
+const CAMO_TX = {}, CAMO_M = 0.3;   // 위장 무늬 한 장 = 0.3 m (상자 면은 실제 크기대로 펴서 무늬 크기가 어디서나 같게)
+function camoTex(key) {
+  if (CAMO_TX[key]) return CAMO_TX[key];
+  const P = PAINTS[key], pix = P[0] === 'pix', cols = P.slice(1).map(c => '#' + c.toString(16).padStart(6, '0'));
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const g = cv.getContext('2d');
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = cols[0]; g.fillRect(0, 0, N, N);
+  if (pix) {   // 거친 값 잡음 → 4색 양자화 → 8px 블록
+    const G = 6, V = []; for (let i = 0; i < (G + 1) * (G + 1); i++) V.push(rnd());
+    const at = (u, v) => { const x = u * G, y = v * G, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, q = (a, b) => V[((b % G) + G) % G * (G + 1) + ((a % G) + G) % G]; return (q(i, j) * (1 - fx) + q(i + 1, j) * fx) * (1 - fy) + (q(i, j + 1) * (1 - fx) + q(i + 1, j + 1) * fx) * fy; };
+    const B = 8; for (let y = 0; y < N; y += B) for (let x = 0; x < N; x += B) { const v = at(x / N, y / N) + (rnd() - 0.5) * 0.22; g.fillStyle = cols[v < 0.36 ? 1 : v < 0.52 ? 0 : v < 0.68 ? 2 : 3]; g.fillRect(x, y, B, B); }
+  } else {   // 얼룩: 타원 몇 개를 겹쳐 한 덩이 · 가장자리로 넘어가면 반대쪽에도 그려 이어지게
+    for (let i = 0; i < 64; i++) { g.fillStyle = cols[1 + Math.floor(rnd() * 3)]; const x = rnd() * N, y = rnd() * N, r = 16 + rnd() * 26, a = rnd() * Math.PI;
+      for (let k = 0; k < 3; k++) { const dx = (rnd() - 0.5) * r, dy = (rnd() - 0.5) * r, rr = r * (0.6 + rnd() * 0.5);
+        for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N]]) { g.beginPath(); g.ellipse(x + dx + ox, y + dy + oy, rr, rr * (0.45 + rnd() * 0.4), a + k * 0.7, 0, 7); g.fill(); } } }
+  }
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; CAMO_TX[key] = t; return t;
+}
 function pm(def, o, role) {
   if (!PAINT) return mat(def, o);
+  if (Array.isArray(PAINT)) {   // 위장: 무늬 지도 · 어두운 면은 조금 어둡게 · 아주 살짝 자체 발광 (해질녘에 검은 덩어리로만 보이지 않게)
+    const t = camoTex(PAINT.key), m = mat(role === 2 ? 0x9a9a9a : 0xffffff, Object.assign({}, o, { map: t, metalness: 0, roughness: Math.max(0.6, (o && o.roughness) || 0.6) }));
+    m.emissive = new THREE.Color(0xffffff); m.emissiveMap = t; m.emissiveIntensity = 0.05; m.userData.paint = true; return m;
+  }
   const c = new THREE.Color(PAINT); if (role === 2) c.multiplyScalar(0.6);
-  const m = mat(c.getHex(), Object.assign({}, o, { metalness: Math.min(0.2, (o && o.metalness) || 0) })); m.emissive = c.clone(); m.emissiveIntensity = role === 2 ? 0.08 : 0.16; return m;
+  const m = mat(c.getHex(), Object.assign({}, o, { metalness: Math.min(0.2, (o && o.metalness) || 0) })); m.emissive = c.clone(); m.emissiveIntensity = role === 2 ? 0.08 : 0.16; m.userData.paint = true; return m;
 }
+// 상자 면을 실제 크기(m)대로 편 UV: 위장 무늬가 긴 날개에서도 늘어나지 않게 (칠한 상자에만)
+function boxUV(sx, sy, sz) {
+  const g = UBOX.clone(), uv = g.attributes.uv, F = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];   // BoxGeometry 면 순서: +x −x +y −y +z −z
+  for (let f = 0; f < 6; f++) for (let v = 0; v < 4; v++) { const i = f * 4 + v; uv.setXY(i, uv.getX(i) * F[f][0] / CAMO_M, uv.getY(i) * F[f][1] / CAMO_M); }
+  return g;
+}
+function paintGeo(geo, mt, sx, sy, sz) { return (geo === UBOX && sx && mt && mt.userData && mt.userData.paint && mt.map) ? boxUV(sx, sy, sz) : geo; }
 function makeDrone(ghost) {
   const g = new THREE.Group();
   const gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
@@ -21,7 +53,7 @@ function makeDrone(ghost) {
   const carbon = m(pm(0x1b1d20, { roughness: 0.42, metalness: 0.25 }, 2)), batt = m(pm(0x55595f, { roughness: 0.5 }, 1));   // 팔(탄소)도 칠하면 어두운 숲에서 모양이 보임
   const mot = m(mat(0x8d9297, { roughness: 0.3, metalness: 0.8 })), glass = m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 }));
   const lensRing = m(mat(0x101215, { roughness: 0.3, metalness: 0.4 })), accent = m(mat(0xc8ccd0, { roughness: 0.4, metalness: 0.3 }));
-  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
+  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(paintGeo(geo, mt, sx, sy, sz), mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
   // 몸통: 길쭉한 유선형 (캡슐을 납작하게) + 아래 판
   const body = add(UCAP, shell, 0, 0, 0, 0.056, 0.105, 0.034); body.rotation.x = Math.PI / 2;
   add(UBOX, shellD, 0, -0.022, 0.01, 0.1, 0.022, 0.25);

@@ -40,62 +40,133 @@ function effMode() {
 function partsKit(ghost) {
   const g = new THREE.Group(), gm = ghost ? new THREE.MeshBasicMaterial({ color: 0x55e6ff, transparent: true, opacity: 0.38, depthWrite: false }) : null;
   const m = c => gm || c;
-  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(geo, mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
+  const add = (geo, mt, x, y, z, sx, sy, sz, par) => { const me = new THREE.Mesh(paintGeo(geo, mt, sx, sy, sz), mt); me.position.set(x, y, z); if (sx) me.scale.set(sx, sy, sz); me.castShadow = !ghost; (par || g).add(me); return me; };
   const LM = c => gm || new THREE.MeshBasicMaterial({ color: c });
   return { g, m, add, LM, gm };
 }
 function propHub(K, x, y, z, r, blades, up, col) {
   const hub = new THREE.Group(); hub.position.set(x, y, z); K.g.add(hub);
   const bm = K.m(mat(col || 0x222428, { roughness: 0.45 }));
-  for (let i = 0; i < blades; i++) { const a = i / blades * Math.PI * 2, b = K.add(UBOX, bm, Math.cos(a) * r * 0.5, 0, Math.sin(a) * r * 0.5, r, 0.003, r * 0.2, hub); b.rotation.y = -a; b.rotation.x = 0.2; }
+  const sh = new THREE.Shape(); sh.moveTo(0.08 * r, -0.07 * r); sh.lineTo(0.45 * r, -0.12 * r); sh.lineTo(0.85 * r, -0.07 * r); sh.lineTo(r, 0); sh.lineTo(0.85 * r, 0.07 * r); sh.lineTo(0.45 * r, 0.12 * r); sh.lineTo(0.08 * r, 0.07 * r); sh.closePath();   // 날: 가운데 넓고 끝이 둥근 평면형
+  const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.0015, bevelEnabled: false }); bg.rotateX(-Math.PI / 2);   // 모양의 y → -z (지름 방향 x)
+  for (let i = 0; i < blades; i++) { const a = i / blades * Math.PI * 2, b = new THREE.Mesh(bg, bm); b.rotation.y = -a; b.rotation.x = 0.22; b.castShadow = !K.gm; hub.add(b); }
+  K.add(UCYL, K.m(mat(0x3a3e44, { roughness: 0.4, metalness: 0.5 })), 0, 0.001, 0, r * 0.11, 0.006, r * 0.11, hub);   // 허브
   const disc = new THREE.Mesh(new THREE.CircleGeometry(r, 24), K.gm || new THREE.MeshBasicMaterial({ color: 0x1a1a1a, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide }));
   disc.rotation.x = -Math.PI / 2; hub.add(disc);
   return hub;
 }
+const UCONE = new THREE.ConeGeometry(1, 1, 16);
+// 칠한 재질(위장)이면 돌출 형상의 UV 를 0.3 m 한 장 기준으로
+function uvScale(geo, mt) { if (mt && mt.userData && mt.userData.paint && mt.map) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / CAMO_M, uv.getY(i) / CAMO_M); } return geo; }
+// 날개 평면형(뿌리 시위 cr → 끝 시위 ct, 앞전 후퇴 sweep, 두께 th, 상반각 dih) — 좌우 두 쪽, 앞 = -z
+function wingPlan(K, mt, span, cr, ct, sweep, th, dih, y, z) {
+  const grp = new THREE.Group(); grp.position.set(0, y, z); K.g.add(grp); const h = span / 2, le = cr * 0.3;
+  for (const sg of [1, -1]) {
+    const sh = new THREE.Shape(); sh.moveTo(0, le); sh.lineTo(sg * h, le - sweep); sh.lineTo(sg * h, le - sweep - ct); sh.lineTo(0, le - cr); sh.closePath();
+    const g = uvScale(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), mt); g.translate(0, 0, -th / 2);
+    const m = new THREE.Mesh(g, mt); m.rotation.x = -Math.PI / 2; m.castShadow = !K.gm; const piv = new THREE.Group(); piv.rotation.z = sg * dih; piv.add(m); grp.add(piv);
+  }
+  return grp;
+}
+// 수직면(꼬리 지느러미): 시위 cr → ct, 높이 hgt (위 +), 앞전 후퇴 sweep, 두께 th
+function finPlan(K, mt, cr, ct, hgt, sweep, th, x, y, z) {
+  const P = hgt > 0 ? [[0, 0], [cr, 0], [sweep + ct, hgt], [sweep, hgt]] : [[0, 0], [sweep, hgt], [sweep + ct, hgt], [cr, 0]];   // 아래로 난 지느러미도 같은 방향으로 돌게
+  const sh = new THREE.Shape(); sh.moveTo(P[0][0], P[0][1]); for (let k = 1; k < 4; k++) sh.lineTo(P[k][0], P[k][1]); sh.closePath();
+  const g = uvScale(new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false }), mt); g.translate(-cr * 0.3, 0, -th / 2);
+  const m = new THREE.Mesh(g, mt); m.rotation.y = -Math.PI / 2; m.position.set(x, y, z); m.castShadow = !K.gm; K.g.add(m); return m;   // 모양의 +x(시위) → 세계 +z(뒤)
+}
 function makeQuadFPV(ghost, kam) {
   const K = partsKit(ghost), S7 = kam ? 1.45 : 1;
-  const carbon = K.m(pm(0x161718, { roughness: 0.4, metalness: 0.3 }, 1)), mot = K.m(mat(kam ? 0x55606a : 0xc0392b, { roughness: 0.35, metalness: 0.7 }));
-  K.add(UBOX, carbon, 0, 0, 0, 0.05 * S7, 0.006, 0.16 * S7);
+  const carbon = K.m(pm(0x161718, { roughness: 0.4, metalness: 0.3 }, 1)), dark = K.m(mat(0x1e2023, { roughness: 0.5, metalness: 0.2 }));
+  const mot = K.m(mat(kam ? 0x55606a : 0x8e3a30, { roughness: 0.32, metalness: 0.8 })), alu = K.m(mat(0x9aa0a6, { roughness: 0.35, metalness: 0.8 }));
+  const PL = 0.05 * S7, PW = 0.16 * S7;
+  K.add(UBOX, carbon, 0, 0, 0, PL, 0.005, PW);                                           // 아래 판
+  K.add(UBOX, carbon, 0, 0.03, 0, PL * 0.9, 0.004, PW * 0.72);                           // 위 판
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) K.add(UCYL, alu, sx * PL * 0.36, 0.015, sz * PW * 0.3, 0.003, 0.026, 0.003);   // 기둥 4개
   const props = [];
   for (const [x, z] of [[0.085, -0.075], [-0.085, -0.075], [0.085, 0.075], [-0.085, 0.075]]) {
     const X = x * S7, Z = z * S7, a = K.add(UBOX, carbon, X / 2, 0, Z / 2, 0.018, 0.005, Math.hypot(X, Z)); a.rotation.y = Math.atan2(X, Z);
-    K.add(UCYL, mot, X, 0.012, Z, 0.014 * S7, 0.018, 0.014 * S7);
-    props.push(propHub(K, X, 0.024, Z, 0.064 * S7, 3, 1, kam ? 0x30343a : 0x1d6fd8));
+    K.add(UCYL, dark, X, 0.006, Z, 0.015 * S7, 0.006, 0.015 * S7);                      // 모터 받침
+    K.add(UCYL, mot, X, 0.016, Z, 0.0135 * S7, 0.014, 0.0135 * S7);                      // 모터 벨
+    K.add(UCYL, alu, X, 0.025, Z, 0.006, 0.006, 0.006);                                  // 축 너트
+    for (let k = 0; k < 3; k++) { const b = K.add(UBOX, dark, X + Math.cos(k * 2.1) * 0.0125 * S7, 0.013, Z + Math.sin(k * 2.1) * 0.0125 * S7, 0.0025, 0.012, 0.0025); b.rotation.y = -k * 2.1; }   // 벨 홈
+    props.push(propHub(K, X, 0.03, Z, 0.064 * S7, 3, 1, kam ? 0x30343a : 0x1e2a3c));
   }
-  K.add(UBOX, K.m(pm(0x2b2e33, { roughness: 0.6 }, 2)), 0, 0.022, 0.01, 0.034 * S7, 0.03, 0.07 * S7);       // 배터리
-  K.add(UBOX, K.m(mat(0x111111, { roughness: 0.3 })), 0, 0.02, -0.06 * S7, 0.03, 0.03, 0.025);             // 카메라
-  K.add(UCYL, K.m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 })), 0, 0.02, -0.074 * S7, 0.008, 0.006, 0.008).rotation.x = Math.PI / 2;
-  if (!kam) K.add(UBOX, K.m(mat(0x1a1a1a, { roughness: 0.3 })), 0, 0.05, -0.02, 0.04, 0.03, 0.03);         // 액션캠
-  else {   // 탄두 모형 (아래 원통) + 안테나
-    const w = K.add(UCYL, K.m(mat(0x5a6646, { roughness: 0.7 })), 0, -0.04, -0.02, 0.032, 0.2, 0.032); w.rotation.x = Math.PI / 2;
-    const n = K.add(USPH, K.m(mat(0x5a6646, { roughness: 0.7 })), 0, -0.04, -0.12, 0.032, 0.032, 0.03);
+  K.add(UBOX, K.m(pm(0x23262b, { roughness: 0.6 }, 2)), 0, 0.045, 0.012, 0.034 * S7, 0.024, 0.068 * S7);              // 배터리
+  K.add(UBOX, K.m(mat(0x2a5aa8, { roughness: 0.6 })), 0, 0.045, 0.012, 0.0345 * S7, 0.0245, 0.03 * S7);                // 배터리 라벨 띠
+  K.add(UBOX, K.m(mat(0x101214, { roughness: 0.8 })), 0, 0.045, -0.012 * S7, 0.037 * S7, 0.027, 0.01);                // 배터리 고정 띠
+  K.add(UBOX, K.m(mat(0xf1c21b, { roughness: 0.5 })), 0.01, 0.038, 0.05 * S7, 0.01, 0.008, 0.012);                     // XT60
+  K.add(UBOX, K.m(mat(0x1b1d20, { roughness: 0.35 })), 0, 0.018, -0.06 * S7, 0.02, 0.02, 0.02);                        // FPV 카메라
+  for (const sx of [-1, 1]) K.add(UBOX, carbon, sx * 0.0125, 0.018, -0.058 * S7, 0.0025, 0.026, 0.026);                 // 카메라 옆판
+  K.add(UCYL, alu, 0, 0.018, -0.071 * S7, 0.008, 0.004, 0.008).rotation.x = Math.PI / 2;
+  K.add(UCYL, K.m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 })), 0, 0.018, -0.0735 * S7, 0.0065, 0.004, 0.0065).rotation.x = Math.PI / 2;
+  const ant = K.add(UCYL6, dark, 0, 0.06, 0.065 * S7, 0.0018, 0.055, 0.0018); ant.rotation.x = -0.6;                    // 영상 송신 안테나 (뒤로 비스듬히)
+  K.add(USPH, K.m(mat(0x202326, { roughness: 0.6 })), 0, 0.082, 0.083 * S7, 0.0055, 0.0055, 0.0055);
+  for (const sx of [-1, 1]) { const w = K.add(UCYL6, dark, sx * 0.02, 0.045, 0.075 * S7, 0.0012, 0.05, 0.0012); w.rotation.x = -1.0; w.rotation.z = sx * 0.5; }   // 수신 안테나 2
+  if (!kam) { K.add(UBOX, K.m(mat(0x26292d, { roughness: 0.35 })), 0, 0.066, -0.014, 0.03, 0.02, 0.024); K.add(UCYL, alu, -0.007, 0.066, -0.027, 0.006, 0.004, 0.006).rotation.x = Math.PI / 2; K.add(UBOX, K.m(mat(0x0a1420, { roughness: 0.1 })), 0.006, 0.07, -0.0265, 0.008, 0.006, 0.001); }   // 액션캠 (렌즈·작은 화면)
+  else {   // 탄두 모형 (아래 원통) + 지느러미
+    const olive = K.m(mat(0x5a6646, { roughness: 0.7 })), w = K.add(UCYL, olive, 0, -0.04, -0.02, 0.032, 0.2, 0.032); w.rotation.x = Math.PI / 2;
+    K.add(USPH, olive, 0, -0.04, -0.12, 0.032, 0.032, 0.03);
+    for (let k = 0; k < 4; k++) { const f = K.add(UBOX, olive, 0, -0.04, 0.07, 0.003, 0.03, 0.03); f.rotation.z = k * Math.PI / 2; f.translateY(0.04); }
     K.add(UCYL6, carbon, 0.02, 0.06, 0.09, 0.003, 0.08, 0.003).rotation.x = -0.4;
   }
-  const ledG = K.add(USPH, K.LM(0x30ff60), 0.03, -0.01, 0.09 * S7, 0.006, 0.006, 0.006), ledR = K.add(USPH, K.LM(0xff3030), -0.03, -0.01, 0.09 * S7, 0.006, 0.006, 0.006);
+  K.add(UBOX, K.LM(0xff2a2a), 0, 0.004, 0.082 * S7, 0.03, 0.004, 0.003);                                                // 뒤 LED 띠
+  const ledG = K.add(USPH, K.LM(0x30ff60), 0.03, -0.01, 0.09 * S7, 0.0035, 0.0035, 0.0035), ledR = K.add(USPH, K.LM(0xff3030), -0.03, -0.01, 0.09 * S7, 0.0035, 0.0035, 0.0035);
   return { g: K.g, props, cans: [], leds: [ledG, ledR] };
 }
 function makeWing(ghost, kam) {
-  const K = partsKit(ghost), L = kam ? 0.62 : 1.0, span = kam ? 0.7 : 1.4;
-  const body = K.m(pm(kam ? 0x59624a : 0xc9ced3, { roughness: 0.55 }, 1)), dark = K.m(mat(0x2a2d31, { roughness: 0.5 })), wingM = K.m(pm(kam ? 0x4d5640 : 0xe1e4e7, { roughness: 0.5 }, 1));
-  const f = K.add(UCAP, body, 0, 0, 0, kam ? 0.045 : 0.055, L * 0.62, kam ? 0.045 : 0.06); f.rotation.x = Math.PI / 2;
-  if (kam) {   // 앞·뒤 두 쌍 날개 (튜브 발사형)
-    K.add(UBOX, wingM, 0, 0.03, -0.12, span, 0.008, 0.07); K.add(UBOX, wingM, 0, -0.02, 0.2, span * 0.85, 0.008, 0.06);
-    K.add(UBOX, wingM, 0, 0.06, 0.26, 0.006, 0.09, 0.05);
-    K.add(USPH, K.m(mat(0x1b1d1f, { roughness: 0.2 })), 0, -0.035, -0.3, 0.03, 0.025, 0.03);   // 아래 카메라
+  const K = partsKit(ghost), span = kam ? 0.7 : 1.4, BL = kam ? 0.6 : 1.0, BZ = kam ? 0 : -0.1;   // 동체 길이(실물 비율: Raven 0.9~1 m · 배회형 0.6 m) · 동체 중심
+  const body = K.m(pm(kam ? 0x59624a : 0xb4bac2, { roughness: 0.6 }, 1)), dark = K.m(mat(0x2a2d31, { roughness: 0.5 })), wingM = K.m(pm(kam ? 0x4d5640 : 0xc8cdd3, { roughness: 0.58 }, 1));
+  const ctl = K.m(pm(kam ? 0x3f4734 : 0xb9bec4, { roughness: 0.55 }, 2)), alu = K.m(mat(0x9aa0a6, { roughness: 0.35, metalness: 0.8 })), glass = K.m(mat(0x1b1d1f, { roughness: 0.2 }));
+  const f = K.add(UCAP, body, 0, 0, BZ, kam ? 0.045 : 0.055, BL / 3, kam ? 0.045 : 0.06); f.rotation.x = Math.PI / 2;   // 캡슐(반지름 1·길이 1)은 높이 3
+  if (kam) {   // 앞·뒤 두 쌍 날개 (튜브 발사형) + 십자 꼬리
+    wingPlan(K, wingM, span, 0.075, 0.055, 0.01, 0.007, 0.03, 0.03, -0.12); wingPlan(K, wingM, span * 0.85, 0.065, 0.045, 0.008, 0.007, 0.03, -0.02, 0.2);
+    finPlan(K, wingM, 0.06, 0.04, 0.09, 0.015, 0.005, 0, 0.03, 0.26); finPlan(K, wingM, 0.05, 0.035, -0.07, 0.012, 0.005, 0, -0.03, 0.26);
+    K.add(USPH, glass, 0, -0.035, -0.3, 0.03, 0.025, 0.03);   // 아래 카메라
+    for (const sx of [-1, 1]) K.add(UBOX, dark, sx * 0.03, -0.01, 0.1, 0.006, 0.004, 0.08);   // 발사관 걸림쇠
   } else {
-    K.add(UBOX, wingM, 0, 0.05, -0.08, span, 0.012, 0.18);
-    for (const sx of [-1, 1]) K.add(UBOX, wingM, sx * span * 0.5, 0.075, -0.06, 0.012, 0.05, 0.14);   // 날개 끝
-    K.add(UBOX, dark, 0, 0.02, 0.45, 0.012, 0.012, 0.42);                                          // 꼬리 붐
-    K.add(UBOX, wingM, 0, 0.03, 0.66, 0.42, 0.008, 0.1);                                          // 수평 꼬리
-    K.add(UBOX, wingM, 0, 0.1, 0.67, 0.008, 0.15, 0.1);                                           // 수직 꼬리
-    K.add(USPH, K.m(mat(0x1b1d1f, { roughness: 0.2 })), 0, -0.05, -0.3, 0.04, 0.035, 0.04);
+    wingPlan(K, wingM, span, 0.2, 0.13, 0.03, 0.012, 0.05, 0.05, -0.08);                       // 주익 (끝으로 가늘어지고 3° 상반각)
+    for (const sx of [-1, 1]) {
+      const a = K.add(UBOX, ctl, sx * span * 0.36, 0.046, 0.025, span * 0.26, 0.006, 0.03);   // 에일러론 (뒷전 바깥쪽)
+      a.rotation.z = sx * 0.05;
+      const wt = K.add(UBOX, wingM, sx * span * 0.5, 0.085, -0.06, 0.01, 0.06, 0.12); wt.rotation.x = -0.2;   // 윙릿
+      K.add(USPH, K.LM(sx > 0 ? 0x30ff60 : 0xff3030), sx * span * 0.5, 0.05, -0.1, 0.01, 0.01, 0.01);           // 항법등 (날개 끝)
+    }
+    K.add(UCYL6, alu, span * 0.22, 0.05, -0.2, 0.003, 0.07, 0.003).rotation.x = Math.PI / 2;   // 피토관
+    K.add(UCYL, dark, 0, 0.065, -0.02, 0.028, 0.008, 0.028);                                   // GPS 안테나 (등 위 원반)
+    K.add(UBOX, ctl, 0, 0.03, 0.08, 0.05, 0.03, 0.12);                                         // 배터리 덮개 (등)
+    K.add(UBOX, dark, 0, -0.045, -0.12, 0.05, 0.02, 0.14);                                     // 배 탑재 칸
+    K.add(UBOX, dark, 0, 0.02, 0.45, 0.012, 0.012, 0.42);                                      // 꼬리 붐
+    wingPlan(K, wingM, 0.46, 0.11, 0.07, 0.02, 0.008, 0, 0.03, 0.66);                          // 수평 꼬리
+    K.add(UBOX, ctl, 0, 0.03, 0.72, 0.4, 0.004, 0.025);                                        // 승강타
+    finPlan(K, wingM, 0.12, 0.06, 0.16, 0.05, 0.008, 0, 0.03, 0.62);                           // 수직 꼬리
+    finPlan(K, wingM, 0.07, 0.04, -0.05, 0.02, 0.006, 0, 0.012, 0.6);                          // 배 지느러미
+    K.add(UCYL6, dark, 0.015, 0.1, 0.5, 0.0015, 0.08, 0.0015).rotation.x = 0.3;                // 안테나
+    K.add(USPH, glass, 0, -0.05, -0.3, 0.04, 0.035, 0.04);                                     // 짐벌 카메라 (기수 아래)
+    K.add(UCYL, alu, 0, -0.05, -0.335, 0.012, 0.006, 0.012).rotation.x = Math.PI / 2;
   }
-  const props = [propHub(K, 0, 0, L * 0.34 + 0.02, kam ? 0.07 : 0.1, 2, 1)];
+  const PZ = kam ? BZ + BL / 2 + 0.02 : BZ - BL / 2 - 0.02, props = [propHub(K, 0, 0, PZ, kam ? 0.07 : 0.1, 2, 1)];   // 정찰 고정익은 기수 프로펠러(트랙터) · 배회형은 뒤(푸셔)
   props[0].rotation.x = Math.PI / 2;
+  const sp = K.add(UCONE, alu, 0, 0, PZ + (kam ? 0.025 : -0.025), 0.018, 0.045, 0.018); sp.rotation.x = kam ? Math.PI / 2 : -Math.PI / 2;   // 스피너
   const ledG = K.add(USPH, K.LM(0x30ff60), span / 2, 0.05, -0.08, 0.01, 0.01, 0.01), ledR = K.add(USPH, K.LM(0xff3030), -span / 2, 0.05, -0.08, 0.01, 0.01, 0.01);
   return { g: K.g, props, cans: [], leds: [ledG, ledR], wing: true };
 }
-function makeModel(id, ghost) {
+// 기체 재질용 스튜디오 환경 (PMREM): 금속·광택이 하늘·바닥을 비춰 보이게 — 격납고와 비행 중 둘 다 (장면 전체가 아니라 기체 재질에만)
+let MODEL_ENV = null;
+function modelEnv() {
+  if (MODEL_ENV) return MODEL_ENV;
+  try {
+    const sc = new THREE.Scene(), em = (c, i) => new THREE.MeshBasicMaterial({ color: c }), box = (c, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(UBOX, em(c)); m.position.set(x, y, z); m.scale.set(sx, sy, sz); sc.add(m); return m; };
+    sc.add(new THREE.Mesh(new THREE.SphereGeometry(20, 24, 16), new THREE.MeshBasicMaterial({ color: 0x8fb4d8, side: THREE.BackSide })));   // 하늘빛 방
+    box(0xffffff, 0, 8, 0, 6, 0.2, 6); box(0xfff2d8, 6, 5, -4, 0.2, 4, 3); box(0xdfe9f2, -6, 4, 3, 0.2, 3, 4); box(0xaab8c4, 0, 3, -9, 5, 2, 0.2);   // 천장 큰 등 · 옆 창 두 개 · 뒤 밝은 벽
+    box(0x3a4a3a, 0, -6, 0, 30, 0.2, 30);   // 바닥은 어두운 풀빛 (아래쪽 반사)
+    const pg = new THREE.PMREMGenerator(renderer); MODEL_ENV = pg.fromScene(sc, 0.04).texture; pg.dispose();
+  } catch (e) { MODEL_ENV = null; }
+  return MODEL_ENV;
+}
+function envApply(g, k) { const env = modelEnv(); if (!env) return; g.traverse(o => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !o.material.userData.noEnv) { o.material.envMap = env; o.material.envMapIntensity = k; o.material.needsUpdate = true; } }); }
+function makeModel(id, ghost) { const m = makeModel0(id, ghost); if (!ghost) envApply(m.g, 0.45); return m; }
+function makeModel0(id, ghost) {
   if (id === 'fpv') return makeQuadFPV(ghost, false);
   if (id === 'kfpv') return makeQuadFPV(ghost, true);
   if (id === 'fw') return makeWing(ghost, false);
@@ -109,11 +180,12 @@ function makeModel(id, ghost) {
 }
 let MODEL_ID = 'x2d', MODEL_PAINT = '';
 function paintKey(id) { const k = (SET.paint || {})[id || SET.af]; return PAINTS[k] ? k : ''; }   // 기체별로 고른 색 (없으면 원래 색)
+function paintVal(k) { if (!k) return null; const v = PAINTS[k]; if (Array.isArray(v)) { const a = v.slice(); a.key = k; return a; } return v; }   // 모델에 넘길 값: 단색 숫자 / 위장 배열(+key)
 function setAirframe(id) {
   if (!AF[id]) id = 'x2d'; SET.af = id; saveSet();
   const pk = paintKey(id);
   if (MODEL_ID !== id || MODEL_PAINT !== pk) {
-    PAINT = pk ? PAINTS[pk] : null; scene.remove(droneM.g); droneM = makeModel(id, false); scene.add(droneM.g); PAINT = null;
+    PAINT = paintVal(pk); scene.remove(droneM.g); droneM = makeModel(id, false); scene.add(droneM.g); PAINT = null;
     scene.remove(ghostM.g); ghostM = makeModel(id, true); ghostM.g.visible = false; scene.add(ghostM.g);
     MODEL_ID = id; MODEL_PAINT = pk;
   }
@@ -838,9 +910,10 @@ function afUI() {
     box.appendChild(b);
   }
   { const pb = $('afPaint');   // 기체 색 (기체마다 따로 기억)
-    if (pb) { const cur = paintKey(), hex = k => '#' + PAINTS[k].toString(16).padStart(6, '0');
-      pb.innerHTML = `<span class="lb">${L2('기체 색', 'Colour')}</span>` + [['', L2('기본', 'Stock')], ['white', L2('흰색', 'White')], ['orange', L2('주황', 'Orange')], ['yellow', L2('노랑', 'Yellow')], ['red', L2('빨강', 'Red')], ['cyan', L2('하늘', 'Sky')], ['lime', L2('연두', 'Lime')]]
-        .map(([k, n]) => `<button data-p="${k}" class="${k === cur ? 'on' : ''}" title="${n}" style="--pc:${k ? hex(k) : 'linear-gradient(135deg,#4a4f56,#16181b)'};--pc0:${k ? hex(k) : 'transparent'}"><i></i><small>${n}</small></button>`).join('') +
+    if (pb) { const cur = paintKey(), hx = c => '#' + c.toString(16).padStart(6, '0'), hex = k => Array.isArray(PAINTS[k]) ? hx(PAINTS[k][1]) : hx(PAINTS[k]);
+      const sw = k => !k ? 'linear-gradient(135deg,#4a4f56,#16181b)' : Array.isArray(PAINTS[k]) ? `conic-gradient(${hx(PAINTS[k][1])} 0 25%,${hx(PAINTS[k][2])} 0 50%,${hx(PAINTS[k][3])} 0 75%,${hx(PAINTS[k][4])} 0)` : hex(k);   // 위장은 네 색 조각
+      pb.innerHTML = `<span class="lb">${L2('기체 색', 'Colour')}</span>` + [['', L2('기본', 'Stock')], ['white', L2('흰색', 'White')], ['orange', L2('주황', 'Orange')], ['yellow', L2('노랑', 'Yellow')], ['red', L2('빨강', 'Red')], ['cyan', L2('하늘', 'Sky')], ['lime', L2('연두', 'Lime')], ['wood', L2('수풀 위장', 'Woodland')], ['desert', L2('사막 위장', 'Desert')], ['digital', L2('디지털 위장', 'Digital')], ['snow', L2('설상 위장', 'Snow')], ['ocp', L2('멀티캠', 'Multicam')], ['rok', L2('화강암 위장', 'Granite digital')], ['urban', L2('도시 위장', 'Urban')], ['navy', L2('해상 위장', 'Naval')]]
+        .map(([k, n]) => `<button data-p="${k}" class="${k === cur ? 'on' : ''}" title="${n}" style="--pc:${sw(k)};--pc0:${k ? hex(k) : 'transparent'}"><i></i><small>${n}</small></button>`).join('') +
         `<span class="tip">${L2('어두운 숲·해질녘엔 밝은 색이 잘 보입니다', 'Bright colours stand out against dark forest and at dusk')}</span>`;
       pb.querySelectorAll('button').forEach(b => b.onclick = () => { const P = Object.assign({}, SET.paint); if (b.dataset.p) P[SET.af] = b.dataset.p; else delete P[SET.af]; SET.paint = P; saveSet(); setAirframe(SET.af); afUI(); }); } }
   const HAS = { forest: !!FLANE, race: RACE.length > 0, recon: RECON.length > 0, strike: STRIKE.length > 0, fire: FIRE.length > 0, sar: !!SAR, track: !!TRACK, ridge: !!RIDGE, field: !!RWY };
@@ -2356,23 +2429,25 @@ function menuView(dt) {
 // ---- 격납고 회전 무대 (같은 렌더러로 그려 2D 캔버스에 복사) ----
 const HG = (function () {
   const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 4 / 3, 0.05, 100);
-  sc.add(new THREE.HemisphereLight(0xcfe3ff, 0x1a1e22, 0.9));
-  const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 4); sc.add(key);
-  const rim = new THREE.DirectionalLight(0x7fc8ff, 1.1); rim.position.set(-4, 2, -5); sc.add(rim);
-  const pad = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0x0f161b, transparent: true, opacity: 0.85 })); pad.rotation.x = -Math.PI / 2; sc.add(pad);
+  sc.add(new THREE.HemisphereLight(0xcfe3ff, 0x1a1e22, 0.7));
+  const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(3, 5, 4); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.01; sc.add(key); sc.add(key.target);   // 그림자 범위는 hgModel 에서 기체 크기에 맞춤
+  const rim = new THREE.DirectionalLight(0x7fc8ff, 1.2); rim.position.set(-4, 2, -5); sc.add(rim);
+  const fill = new THREE.DirectionalLight(0xffe2c0, 0.45); fill.position.set(-2, 1.5, 4); sc.add(fill);
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshStandardMaterial({ color: 0x141b21, roughness: 0.55, metalness: 0.15, transparent: true, opacity: 0.92 })); pad.rotation.x = -Math.PI / 2; pad.receiveShadow = true; sc.add(pad);
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.7 })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.002; sc.add(ring);
   const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.61, 64), new THREE.MeshBasicMaterial({ color: 0x5aa9ff, transparent: true, opacity: 0.35 })); ring2.rotation.x = -Math.PI / 2; ring2.position.y = 0.002; sc.add(ring2);
-  return { sc, cam, pad, ring, ring2, cur: null, id: null, sz: 1, a: 0.6 };
+  return { sc, cam, pad, ring, ring2, key, cur: null, id: null, sz: 1, a: 0.6 };
 })();
 function hgModel() {
   const pk = paintKey(SET.af), id = SET.af + (pk ? ':' + pk : ''); if (HG.id === id) return;   // 격납고 모형도 고른 색으로
   if (HG.cur) HG.sc.remove(HG.cur);
-  if (!MENU.models[id]) { PAINT = pk ? PAINTS[pk] : null; const m = makeModel(SET.af, false), g = m.g; PAINT = null; g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); MENU.models[id] = g; }
+  if (!MENU.models[id]) { PAINT = paintVal(pk); const m = makeModel(SET.af, false), g = m.g; PAINT = null; g.traverse(o => { if (o.isMesh) { o.castShadow = !(o.material && o.material.transparent); o.receiveShadow = false; } }); MENU.models[id] = g; }
   const g = MENU.models[id]; g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(g), s = bb.getSize(new V3()), c = bb.getCenter(new V3());
   const r = Math.max(s.x, s.z, s.y * 1.6) * 0.5;
   HG.sz = r; HG.lift = -bb.min.y + r * 0.12; HG.cx = c.x; HG.cz = c.z;
   HG.pad.scale.setScalar(r * 1.05); HG.ring.scale.setScalar(r * 1.05); HG.ring2.scale.setScalar(r * 1.05);
+  { const sc = HG.key.shadow.camera; sc.left = sc.bottom = -r * 1.3; sc.right = sc.top = r * 1.3; sc.near = 0.1; sc.far = 30; sc.updateProjectionMatrix(); HG.key.position.set(r * 2.2, r * 3.6, r * 2.8); HG.key.target.position.set(0, 0, 0); HG.key.target.updateMatrixWorld(); if (!HG.sc.environment) HG.sc.environment = modelEnv(); }
   const col = new THREE.Color(AF_C[afCat(AFc())]); HG.ring.material.color.copy(col); HG.ring2.material.color.copy(col);
   HG.sc.add(g); HG.cur = g; HG.id = id;
 }
@@ -2821,7 +2896,7 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { sky, startPos, startHead, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { HG, sky, startPos, startHead, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 설정 ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
