@@ -140,23 +140,33 @@ function makeWing(ghost, kam) {
   const K = partsKit(ghost), span = kam ? 0.7 : 1.4, BL = kam ? 0.6 : 1.0, BZ = kam ? 0 : -0.1;   // 동체 길이(실물 비율: Raven 0.9~1 m · 배회형 0.6 m) · 동체 중심
   const body = K.m(pm(kam ? 0x59624a : 0xb4bac2, { roughness: 0.6 }, 1)), dark = K.m(mat(0x2a2d31, { roughness: 0.5 })), wingM = K.m(pm(kam ? 0x4d5640 : 0xc8cdd3, { roughness: 0.58 }, 1));
   const ctl = K.m(pm(kam ? 0x3f4734 : 0xb9bec4, { roughness: 0.55 }, 2)), alu = K.m(mat(0x9aa0a6, { roughness: 0.35, metalness: 0.8 })), glass = K.m(mat(0x1b1d1f, { roughness: 0.2 }));
-  const f = K.add(UCAP, body, 0, 0, BZ, kam ? 0.045 : 0.055, BL / 3, kam ? 0.045 : 0.06); f.rotation.x = Math.PI / 2;   // 캡슐(반지름 1·길이 1)은 높이 3
+  let f;
+  if (kam) { f = K.add(UCAP, body, 0, 0, BZ, 0.045, BL / 3, 0.045); f.rotation.x = Math.PI / 2; }   // 캡슐(반지름 1·길이 1)은 높이 3
+  else {   // 동체: 둥근 기수 → 굵은 몸통 → 꼬리 쪽으로 가늘어짐 (회전체 · 위아래로 조금 높게)
+    const P = [[0, -0.6], [0.022, -0.592], [0.04, -0.565], [0.052, -0.52], [0.058, -0.44], [0.06, -0.2], [0.056, -0.05], [0.045, 0.12], [0.03, 0.28], [0.016, 0.38], [0, 0.4]].map(([r, z]) => new THREE.Vector2(r, z - BZ));
+    const geo = new THREE.LatheGeometry(P, 20); geo.rotateX(Math.PI / 2); geo.scale(1, 1.12, 1); uvScale(geo, body);
+    f = new THREE.Mesh(geo, body); f.position.set(0, 0, BZ); f.castShadow = !K.gm; K.g.add(f);
+  }
   if (kam) {   // 앞·뒤 두 쌍 날개 (튜브 발사형) + 십자 꼬리
     wingPlan(K, wingM, span, 0.075, 0.055, 0.01, 0.007, 0.03, 0.03, -0.12); wingPlan(K, wingM, span * 0.85, 0.065, 0.045, 0.008, 0.007, 0.03, -0.02, 0.2);
     finPlan(K, wingM, 0.06, 0.04, 0.09, 0.015, 0.005, 0, 0.03, 0.26); finPlan(K, wingM, 0.05, 0.035, -0.07, 0.012, 0.005, 0, -0.03, 0.26);
     K.add(USPH, glass, 0, -0.035, -0.3, 0.03, 0.025, 0.03);   // 아래 카메라
     for (const sx of [-1, 1]) K.add(UBOX, dark, sx * 0.03, -0.01, 0.1, 0.006, 0.004, 0.08);   // 발사관 걸림쇠
   } else {
-    wingPlan(K, wingM, span, 0.2, 0.13, 0.03, 0.012, 0.05, 0.05, -0.08);                       // 주익 (끝으로 가늘어지고 3° 상반각)
+    const WY = 0.09;   // 주익은 동체 위 받침(파일론) 위에 얹힘 (고익)
+    { const pyl = K.add(UBOX, body, 0, 0.068, -0.08, 0.05, 0.04, 0.2); }                      // 날개 받침
+    wingPlan(K, wingM, span, 0.2, 0.13, 0.03, 0.012, 0.05, WY, -0.08);                         // 주익 (끝으로 가늘어지고 3° 상반각)
     for (const sx of [-1, 1]) {
-      const a = K.add(UBOX, ctl, sx * span * 0.36, 0.046, 0.025, span * 0.26, 0.006, 0.03);   // 에일러론 (뒷전 바깥쪽)
+      const a = K.add(UBOX, ctl, sx * span * 0.36, WY - 0.004 + span * 0.36 * 0.05, 0.025, span * 0.26, 0.006, 0.03);   // 에일러론 (뒷전 바깥쪽)
       a.rotation.z = sx * 0.05;
-      const wt = K.add(UBOX, wingM, sx * span * 0.5, 0.085, -0.06, 0.01, 0.06, 0.12); wt.rotation.x = -0.2;   // 윙릿
-      K.add(USPH, K.LM(sx > 0 ? 0x30ff60 : 0xff3030), sx * span * 0.5, 0.05, -0.1, 0.01, 0.01, 0.01);           // 항법등 (날개 끝)
+      const jn = K.add(UBOX, dark, sx * span * 0.19, WY + 0.0005 + span * 0.19 * 0.05, -0.08, 0.004, 0.014, 0.19); jn.rotation.z = sx * 0.05;   // 날개 이음매 (3조각 날개)
+      const wt = K.add(UBOX, wingM, sx * span * 0.5, WY + 0.035 + span * 0.5 * 0.05, -0.06, 0.01, 0.06, 0.12); wt.rotation.x = -0.2;   // 윙릿
+      K.add(USPH, K.LM(sx > 0 ? 0x30ff60 : 0xff3030), sx * span * 0.5, WY + span * 0.5 * 0.05, -0.1, 0.008, 0.008, 0.008);           // 항법등 (날개 끝)
     }
-    K.add(UCYL6, alu, span * 0.22, 0.05, -0.2, 0.003, 0.07, 0.003).rotation.x = Math.PI / 2;   // 피토관
-    K.add(UCYL, dark, 0, 0.065, -0.02, 0.028, 0.008, 0.028);                                   // GPS 안테나 (등 위 원반)
-    K.add(UBOX, ctl, 0, 0.03, 0.08, 0.05, 0.03, 0.12);                                         // 배터리 덮개 (등)
+    K.add(UCYL6, alu, span * 0.22, WY + 0.01, -0.2, 0.003, 0.07, 0.003).rotation.x = Math.PI / 2;   // 피토관
+    K.add(UCYL, dark, 0, WY + 0.012, 0.0, 0.026, 0.006, 0.026);                                   // GPS 안테나 (날개 위 원반)
+    for (const sx of [-1, 1]) K.add(UBOX, dark, sx * 0.061, 0.0, -0.3, 0.003, 0.012, 0.05);       // 옆 냉각 구멍
+    K.add(UBOX, ctl, 0, 0.05, 0.1, 0.05, 0.008, 0.12);                                          // 배터리 덮개 (등)
     K.add(UBOX, dark, 0, -0.045, -0.12, 0.05, 0.02, 0.14);                                     // 배 탑재 칸
     K.add(UBOX, dark, 0, 0.02, 0.45, 0.012, 0.012, 0.42);                                      // 꼬리 붐
     wingPlan(K, wingM, 0.46, 0.11, 0.07, 0.02, 0.008, 0, 0.03, 0.66);                          // 수평 꼬리
@@ -164,13 +174,15 @@ function makeWing(ghost, kam) {
     finPlan(K, wingM, 0.12, 0.06, 0.16, 0.05, 0.008, 0, 0.03, 0.62);                           // 수직 꼬리
     finPlan(K, wingM, 0.07, 0.04, -0.05, 0.02, 0.006, 0, 0.012, 0.6);                          // 배 지느러미
     K.add(UCYL6, dark, 0.015, 0.1, 0.5, 0.0015, 0.08, 0.0015).rotation.x = 0.3;                // 안테나
-    K.add(USPH, glass, 0, -0.05, -0.3, 0.04, 0.035, 0.04);                                     // 짐벌 카메라 (기수 아래)
-    K.add(UCYL, alu, 0, -0.05, -0.335, 0.012, 0.006, 0.012).rotation.x = Math.PI / 2;
+    K.add(UCYL, dark, 0, -0.06, -0.3, 0.022, 0.02, 0.022);                                     // 짐벌 목
+    const gb = K.add(USPH, K.m(mat(0x2c3035, { roughness: 0.45, metalness: 0.3 })), 0, -0.085, -0.3, 0.036, 0.034, 0.036);   // 짐벌 공 (기수 아래)
+    K.add(UCYL, glass, -0.012, -0.088, -0.333, 0.011, 0.006, 0.011).rotation.x = Math.PI / 2;  // 주간 렌즈
+    K.add(UCYL, K.m(mat(0x1a1408, { roughness: 0.1, metalness: 0.7 })), 0.013, -0.088, -0.332, 0.009, 0.006, 0.009).rotation.x = Math.PI / 2;   // 열상 렌즈
   }
   const PZ = kam ? BZ + BL / 2 + 0.02 : BZ - BL / 2 - 0.02, props = [propHub(K, 0, 0, PZ, kam ? 0.07 : 0.1, 2, 1)];   // 정찰 고정익은 기수 프로펠러(트랙터) · 배회형은 뒤(푸셔)
   props[0].rotation.x = Math.PI / 2;
   const sp = K.add(UCONE, alu, 0, 0, PZ + (kam ? 0.025 : -0.025), 0.018, 0.045, 0.018); sp.rotation.x = kam ? Math.PI / 2 : -Math.PI / 2;   // 스피너
-  const ledG = K.add(USPH, K.LM(0x30ff60), span / 2, 0.05, -0.08, 0.01, 0.01, 0.01), ledR = K.add(USPH, K.LM(0xff3030), -span / 2, 0.05, -0.08, 0.01, 0.01, 0.01);
+  const LY = kam ? 0.05 : 0.09 + span * 0.025, ledG = K.add(USPH, K.LM(0x30ff60), span / 2, LY, -0.08, 0.006, 0.006, 0.006), ledR = K.add(USPH, K.LM(0xff3030), -span / 2, LY, -0.08, 0.006, 0.006, 0.006);
   return { g: K.g, props, cans: [], leds: [ledG, ledR], wing: true };
 }
 // 기체 재질용 스튜디오 환경 (PMREM): 금속·광택이 하늘·바닥을 비춰 보이게 — 격납고와 비행 중 둘 다 (장면 전체가 아니라 기체 재질에만)
