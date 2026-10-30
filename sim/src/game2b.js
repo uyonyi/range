@@ -26,7 +26,7 @@ function musicStart() {
   MUS.dly.connect(fb); fb.connect(MUS.dly); MUS.dly.connect(wet); wet.connect(MUS.bus);
   smpRoute(ctx);
   MUS.next = ctx.currentTime + 0.12; MUS.step = 0;
-  MUS.timer = setInterval(musicSchedule, 25);
+  MUS.timer = setInterval(musicSchedule, 40);
 }
 // ---- 실제 악기 녹음 (VSCO 2 CE · VCSL — Versilian Studios, CC0): lib/music.mp3 한 개에 악기 조각을 이어 붙임 (tools/music/mk_music.py)
 //  다 받기 전·못 받으면 합성음 그대로. 받으면 다음 마디부터 녹음 악기로 연주
@@ -209,7 +209,7 @@ function orchStep(st, sec, bar, step, ch, e, last, t, s16) {
 function beatStepS(st, sec, bar, step, ch, e, last, t, s16) {
   const I = SI[SONG.style], k = st.kick, KP = SONG.kick || KICKS.four[0];
   const kickOn = e >= 2 && (k === 'sparse' ? step === 0 && bar % 2 === 0 : SONG.half ? step === 0 || step === 8 : KP.includes(step));
-  if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) { sp('bd', null, t, 0, (e === 1 ? 0.6 : 1) * I.kg); MUS.duck.gain.setValueAtTime(0.5, t); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3); }
+  if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) { sp('bd', null, t, 0, (e === 1 ? 0.6 : 1) * I.kg); MUS.duck.gain.cancelScheduledValues(t); MUS.duck.gain.setValueAtTime(1, t); MUS.duck.gain.linearRampToValueAtTime(0.5, t + 0.008); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3); }
   if (I.sn && e >= 2 && k !== 'sparse' && (SONG.half ? step === 8 : (step === 4 || step === 12))) { if (I.sn === 'conga') sp('conga', null, t, 0, 0.8); else { sp('sn', null, t, 0, I.sn === 'snSoft' ? 0.45 : 0.85); if (I.clap && e >= 3) sp('clap', null, t, 0, 0.5); } }
   if (e >= 3 && last && step >= 12 && k !== 'sparse') { if (I.fill === 'tom') sp(step < 14 ? 'tomH' : 'tomL', null, t, 0, 0.55 + (step - 12) * 0.12); else if (I.fill === 'conga') sp('conga', null, t, 0, 0.5 + (step - 12) * 0.1); else sp('sn', null, t, 0, 0.25 + (step - 12) * 0.08); }
   if (I.fill === 'timpR' && last && step === 8 && e >= 2) sp('timpR', null, t, s16 * 8 + 0.3, 0.6, { rel: 0.3 });
@@ -245,7 +245,7 @@ function beatStepS(st, sec, bar, step, ch, e, last, t, s16) {
 }
 function musicSchedule() {
   const ctx = AU.ctx; if (!ctx) return;
-  while (MUS.next < ctx.currentTime + 0.15) {
+  while (MUS.next < ctx.currentTime + 0.6) {   // 0.6초 앞까지 미리 (화면 스레드가 잠깐 멈춰도 음이 끊기지 않게)
     let st = STYLES[SONG.style]; const s16 = 60 / st.bpm / 4, t = MUS.next, step = MUS.step % 16;
     if (step === 0) {   // 마디 시작
       if (!SONG.prog) songSection();
@@ -268,7 +268,7 @@ function musicSchedule() {
       if (kickOn || (e === 1 && step === 0 && k !== 'sparse')) {
         const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
         g.gain.setValueAtTime(e === 1 ? 0.5 : 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); o.connect(g); g.connect(MUS.bus); o.start(t); o.stop(t + 0.3);
-        MUS.duck.gain.setValueAtTime(0.3, t); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3);
+        MUS.duck.gain.cancelScheduledValues(t); MUS.duck.gain.setValueAtTime(1, t); MUS.duck.gain.linearRampToValueAtTime(0.3, t + 0.008); MUS.duck.gain.linearRampToValueAtTime(1, t + s16 * 3);
       }
       if (e >= 2 && (SONG.half ? step === 8 : (step === 4 || step === 12)) && k !== 'sparse') { noiseHit(t, 'bandpass', 1800, 0.8, 0.32, 0.17); noiseHit(t, 'highpass', 3000, 0, 0.1, 0.09); }
       if (e >= 3 && last && step >= 12 && k !== 'sparse') noiseHit(t, 'bandpass', 1600, 0.9, 0.18, 0.08);   // 구간 끝 스네어 필인

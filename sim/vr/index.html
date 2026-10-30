@@ -34,6 +34,7 @@ window.addEventListener('error',function(e){show((e.message||'error')+(e.filenam
 @keyframes blIn{from{opacity:0;transform:scale(.94);letter-spacing:.5em}to{opacity:1;transform:none;letter-spacing:.34em}}@keyframes blLine{to{width:min(200px,36vw)}}
 .boot .bpick{display:none;position:absolute;left:50%;top:58%;transform:translateX(-50%);gap:10px;flex-wrap:wrap;justify-content:center;width:min(780px,94vw)}.boot.picking .bpick{display:flex;animation:bpIn .5s ease both}
 .boot .bpick button{margin:0;min-width:190px;padding:12px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(8,12,16,.62);color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}.boot .bpick button:hover,.boot .bpick button:focus-visible{border-color:#ffc828;outline:none}
+.boot button.gpf{outline:3px solid #ffc828!important;outline-offset:2px}
 .boot .bpick button.primary{background:#ffc828;color:#111;border-color:#ffc828}.boot .bpick button small{display:block;margin-top:2px;font-size:11.5px;font-weight:600;opacity:.75}
 @keyframes bpIn{from{opacity:0;margin-top:12px}to{opacity:1;margin-top:0}}
 @media (max-height:520px){.boot.picking .btitle{top:27%}.boot .bpick{top:52%}.boot .bpick button{min-width:150px;padding:9px 14px;font-size:14px}.boot .bgate{padding:10px 14px 8px}.boot .bgate b{font-size:18px}.boot .bgate .pindots{margin:8px 0 10px}.boot .bgate .pinpad{gap:6px}.boot .bgate .pinpad button{padding:7px 0;font-size:18px}}
@@ -187,6 +188,9 @@ body.kmB .kmA,body:not(.kmB) .kmB{display:none!important}
 #belly:after{content:"+";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.7);font:300 22px monospace}
 #belly.big{border-color:var(--green)}
 #belly.alt{left:auto;right:14px}
+#attcam{position:absolute;right:16px;bottom:230px;width:max(180px,min(22vw,300px));aspect-ratio:16/10;border:1.5px solid rgba(79,227,255,.7);border-radius:11px;overflow:hidden;box-shadow:0 0 0 1px #000;pointer-events:none}
+#attcam span{position:absolute;left:6px;top:4px;font:700 11px "SF Mono",Menlo,monospace;color:#4fe3ff;text-shadow:0 1px 2px #000}
+body.touch #attcam{right:auto;left:calc(102px + env(safe-area-inset-left));bottom:auto;top:118px;width:min(24vw,230px)}body.touch.bellyon #attcam{display:none}   /* 휴대폰: 아래 카메라 자리 (아래 카메라가 켜지면 자세 창은 숨김) */
 body.touch #belly{top:118px;right:auto;left:calc(102px + env(safe-area-inset-left));width:min(24vw,230px);animation:none}
 body.touch #hud.bellyon #scope{display:none}
 body.touch #objMsg{margin-top:36px}
@@ -632,7 +636,7 @@ body.touch #map{border-radius:9px}
   #result #resTable{font-size:12px}#result #resTable td{padding:2px 6px 2px 0}#result #resTable td:first-child{width:auto}
 }
 </style>
-<link rel="preload" as="script" href="js/app.ko.js?v=d406abe1">
+<link rel="preload" as="script" href="js/app.ko.js?v=dc88c357">
 </head>
 <body>
 <div id="boot" class="boot" data-music="../lib/intro.mp3?v=aaa5df9e"><video id="bootVid" muted playsinline preload="none" poster="../lib/intro.jpg?v=aaa5df9e" data-end="../lib/intro_end.jpg?v=aaa5df9e"><source src="../lib/intro.mp4?v=aaa5df9e" type='video/mp4; codecs="avc1.64001F"'><source src="../lib/intro.webm?v=aaa5df9e" type='video/webm; codecs="vp9"'></video><div class="bstill"></div><div class="bshade"></div>
@@ -679,10 +683,11 @@ $('bootGateT').textContent=L('입장 번호 4자리','Enter the 4-digit code');
 var M={on:false,done:false};
 (function(){var mu=BT.getAttribute('data-music'),AC=window.AudioContext||window.webkitAudioContext,s={};if(!hasVid||!mu||!AC||!window.fetch)return;
 try{s=JSON.parse(localStorage.getItem('fpvsim_fpv_music')||'{}')}catch(e){}
-try{M.ctx=new AC()}catch(e){return}M.on=true;M.vol=s.vol>0?+s.vol:0.5;M.mu=mu;window.__bootAudio=M;
+try{M.ctx=new AC({latencyHint:'playback'})}catch(e){try{M.ctx=new AC()}catch(e2){return}}M.on=true;M.vol=s.vol>0?+s.vol:0.5;M.mu=mu;window.__bootAudio=M;
 M.ctx.onstatechange=msync;if(!seen&&M.on)mload();})();
 function mload(){if(M.ld||!M.ctx)return;M.ld=1;fetch(M.mu).then(function(r){return r.arrayBuffer()}).then(function(ab){return new Promise(function(ok,no){M.ctx.decodeAudioData(ab,ok,no)})}).then(function(b){M.buf=b;msync();}).catch(function(){});}
-function unlock(cb){if(M.ctx&&M.ctx.state!=='running'){try{var p=M.ctx.resume();if(p&&p.then)p.then(function(){if(cb)cb()},function(){});}catch(e){}}else if(cb)cb();}
+function silent(){if(M.sil)return;try{var a=new Audio('data:audio/wav;base64,UklGRvQHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YdAHAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==');a.loop=true;a.setAttribute('playsinline','');a.volume=1;var p=a.play();if(p&&p.then)p.then(function(){M.sil=a;},function(){});}catch(e){}}   // 아이폰: 무음 스위치가 켜져 있어도 소리가 나게 (미디어 재생 상태) · 다른 브라우저엔 영향 없음
+function unlock(cb){silent();if(M.ctx&&M.ctx.state!=='running'){try{var p=M.ctx.resume();if(p&&p.then)p.then(function(){if(cb)cb()},function(){});}catch(e){}}else if(cb)cb();}
 function mstart(off){if(!M.buf||M.src||gone)return;var c=M.ctx,s=c.createBufferSource(),g=c.createGain();s.buffer=M.buf;g.gain.value=Math.min(1,M.vol*1.1);s.connect(g);g.connect(c.destination);s.start(0,Math.max(0,Math.min(off,M.buf.duration-0.1)));M.src=s;M.g=g;M.started=true;
 s.onended=function(){if(M.src!==s)return;M.src=null;M.done=true;try{window.dispatchEvent(new Event('bootcue'))}catch(e){}};}
 function mstop(sec){var s=M.src,g=M.g;if(!s)return;M.src=null;M.fadeT=performance.now()+sec*1000;try{g.gain.setTargetAtTime(0,M.ctx.currentTime,sec/3);s.stop(M.ctx.currentTime+sec+0.1)}catch(e){}}
@@ -693,7 +698,7 @@ g.gain.setValueAtTime(0.0001,a);g.gain.exponentialRampToValueAtTime(n[3]*p[1]*0.
 function msync(){if(!M.ctx||!M.on||gone||M.ctx.state!=='running')return;if(st==='splash'&&!M.chimed)chime();if(!M.buf||M.src||M.done)return;
 if(st==='intro'&&/playing/.test(BT.className))mstart(v.currentTime+0.04);else if(st==='logo'&&!M.started)mstart(HIT-0.04);}   // 지금 화면에 맞는 소리: 로고 또롱 · 인트로 곡(영상 시점에 맞춰) · 로고 화면은 제목 화음부터
 function first(){var was=M.down;M.down=null;if(!M.ctx||!M.on||M.tap)return false;if(M.ctx.state!=='running'||was===false){M.tap=1;unlock(msync);return true;}return false;}   // 브라우저가 소리를 막고 있던 때 시작한 첫 누름은 소리 켜기로 (건너뛰지 않음)
-['pointerdown','keydown'].forEach(function(ev){window.addEventListener(ev,function(){if(M.ctx&&!gone)M.down=M.ctx.state==='running';},true);});   // 누르기 시작할 때 소리 상태 (앱도 같은 누름으로 소리를 켜서, click 때는 이미 켜져 있음)
+['pointerdown','keydown'].forEach(function(ev){window.addEventListener(ev,function(){if(M.ctx&&!gone){M.down=M.ctx.state==='running';if(!M.down)unlock(msync);}},true);});   // 누르기 시작할 때 소리 상태를 적고, 막혀 있으면 바로 켬   // 누르기 시작할 때 소리 상태 (앱도 같은 누름으로 소리를 켜서, click 때는 이미 켜져 있음)
 // ---- 흐름: 입장 번호 → 인트로 → 로고(고르기) → 끝
 // ---- 영상 미리 받기: 페이지를 열자마자 영상 파일 전체를 받아 두고(입장 번호·로고 동안) 다 받은 뒤 재생 → 재생 중 끊김(버퍼링) 없음
 //  휴대폰 브라우저는 preload 를 무시하기도 해서 직접 받음(fetch → blob) · 못 받으면 예전처럼 브라우저가 스트리밍 · 서비스 워커가 캐시해 두 번째부터는 바로
@@ -729,7 +734,22 @@ if(st==='gate'){if(/^\d$/.test(k))gpress(k);else if(k==='Backspace')gpress('del'
 if(st==='intro'||st==='splash'){if(!first())toLogo();e.preventDefault();}else{first();if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();}
 if(st==='logo'&&/^Arrow/.test(k)){var bs=pk.getElementsByTagName('button'),c=[].indexOf.call(bs,document.activeElement),d=/Right|Down/.test(k)?1:-1;if(bs.length)try{bs[(c+d+bs.length)%bs.length].focus()}catch(x){}}
 e.stopImmediatePropagation();},true);
-if(needGate){st='gate';BT.classList.add('gating');}else splash();   // 입장 번호를 이미 넣은 기기는 인트로가 바로 (소리는 허락된 창이면 같이, 아니면 '소리 켜기')
+if(needGate){st='gate';BT.classList.add('gating');}else splash();
+(function(){if(!navigator.getGamepads)return;var pv={},mvT=0,rep=0,foc=null;
+function vis(b){return b.offsetParent!==null&&b.getBoundingClientRect().width>4;}
+function setF(b){if(foc&&foc!==b)foc.classList.remove('gpf');foc=b;if(b){b.classList.add('gpf');try{b.focus({preventScroll:true})}catch(e){}}}
+function tick(){if(gone){clearInterval(iv);return;}var gps=navigator.getGamepads(),gp=null;for(var i=0;i<gps.length;i++)if(gps[i]&&gps[i].connected){gp=gps[i];break;}if(!gp)return;
+var b=function(i){var x=gp.buttons[i];return !!(x&&(x.pressed||x.value>0.5));},ax=gp.axes[0]||0,ay=gp.axes[1]||0;
+var dx=(b(15)?1:0)-(b(14)?1:0),dy=(b(13)?1:0)-(b(12)?1:0);if(!dx&&!dy){if(Math.abs(ax)>0.6&&Math.abs(ax)>=Math.abs(ay))dx=ax>0?1:-1;else if(Math.abs(ay)>0.6)dy=ay>0?1:-1;}
+var A=b(0),B=b(1),S9=b(9),eA=A&&!pv.A,eB=B&&!pv.B,eS=S9&&!pv.S;pv.A=A;pv.B=B;pv.S=S9;
+var cont=st==='gate'?$('bootPad'):st==='logo'&&picked?pk:null;
+if(cont){var bs=[].slice.call(cont.getElementsByTagName('button')).filter(vis),cols=st==='gate'?3:bs.length,now=Date.now();
+if(dx||dy){if(!rep||now>mvT){mvT=now+(rep?170:420);rep++;var i=bs.indexOf(foc);if(i<0)setF(bs[0]);else{var j=i+dx+dy*cols;if(st==='gate'&&dy&&(j<0||j>=bs.length))j=i;if(j>=0&&j<bs.length)setF(bs[j]);}}}else rep=0;
+if(eA){if(foc&&bs.indexOf(foc)>=0)foc.click();else setF(bs[0]);}
+if(eB&&st==='gate')gpress('del');}
+else if(foc)setF(null);
+if((eA||eS)&&(st==='intro'||st==='splash'))toLogo();}
+var iv=setInterval(tick,16);})();   // 그림 프레임과 상관없이 16 ms 마다 (느린 기기에서도 누름을 놓치지 않게)   // 입장 번호를 이미 넣은 기기는 인트로가 바로 (소리는 허락된 창이면 같이, 아니면 '소리 켜기')
 if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
@@ -748,6 +768,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
   <div id="flash"></div>
   <div id="guide" class="hidden"></div>
   <div id="belly" class="hidden"><span>BELLY CAM ↓</span></div>
+  <div id="attcam" class="hidden"><span>ATTITUDE</span></div>
   <div id="tc">
     <div class="tz" id="tzL"><div class="base"><div class="knob"></div></div><span class="lbl">↕ 상승·하강 ↔ 회전</span></div>
     <div class="tz" id="tzR"><div class="base"><div class="knob"></div></div><span class="lbl">↕ 전진·후진 ↔ 좌우</span></div>
@@ -861,6 +882,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
     <div class="otab" data-t="view"><div class="opt col">
       <div>계기 표시 <span class="seg" id="segHud"><button data-v="auto" class="on">자동</button><button data-v="fpv">간단 (FPV)</button><button data-v="uas">항공 (UAS)</button></span></div>
       <div>아래 카메라 (투하·선회 때 자동, X 키로 언제든 켜기/끄기) <span class="seg" id="segBelly"><button data-v="1" class="on">켬</button><button data-v="0">끔</button></span></div>
+      <div>자세 카메라 (FPV 시점일 때 기체를 밖에서 보는 작은 창) <span class="seg" id="segAttCam"><button data-v="1">켬</button><button data-v="0" class="on">끔</button></span></div>
       <div>FPV 카메라 기울기 <span class="seg"><input id="tilt" type="range" min="0" max="40" value="15" style="vertical-align:middle"> <span id="tiltV" class="mono">15°</span></span></div>
       <div>추적 카메라 거리 (Z 키로 프리셋 순환) <span class="seg"><input id="camDist" type="range" min="1.5" max="8" step="0.1" value="2.6" style="vertical-align:middle"> <span id="camDistV" class="mono">3.2 m</span> <span class="seg small" id="zoomPre"><button data-v="2">가까이 1.8</button><button data-v="1">보통 2.6</button><button data-v="0">멀리 4.5</button></span></span></div>
       <div>FPV 시야각 (FOV) <span class="seg"><input id="fov" type="range" min="70" max="120" value="82" style="vertical-align:middle"> <span id="fovV" class="mono">82°</span> <span class="seg small" id="camPre"><button data-v="novice">초보 (12° · 90°)</button><button data-v="std">기본 (15° · 82°)</button><button data-v="racer">레이서 (25° · 110°)</button></span></span></div>
@@ -1083,6 +1105,6 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
 <script>window.SIM_GEOTIFF_URL='../lib/geotiff.js';</script>
 <script src="../lib/proj4.js"></script><script>window.__boot&&__boot(44,'TERRAIN DATA')</script>
 <script src="../sites/yeongin.js?v=7804484e"></script><script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';window.SIM_RV_V='60de2668';window.SIM_API='https://fpv-rank.unsokyi1.workers.dev';</script>
-<script>window.__boot&&__boot(62,'SIMULATOR')</script><script>(function(){var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='js/app.ko.js?v=d406abe1';s.async=false;s.onload=function(){if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))setTimeout(function(){navigator.serviceWorker.register('../sw.js').catch(function(){});},3000);};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();})();</script>
+<script>window.__boot&&__boot(62,'SIMULATOR')</script><script>(function(){var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='js/app.ko.js?v=dc88c357';s.async=false;s.onload=function(){if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))setTimeout(function(){navigator.serviceWorker.register('../sw.js').catch(function(){});},3000);};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();})();</script>
 </body>
 </html>

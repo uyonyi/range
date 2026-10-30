@@ -271,6 +271,9 @@ function updateGuide(subj) {
   const gcol = GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff;
   GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;   // 예전 틀·띠·점선은 쓰지 않음 (쉐브론으로 바꿈)
   if (L > 1.5) guideChevrons(curve, L, gcol, Math.hypot(DR.v.x, DR.v.z), AFc().cls === 'wing'); else GCHEV.m.visible = false;
+  if (o.t === 'rwyland' && typeof rwyGlide === 'function' && RWY) {   // 활주로 착륙: 접지점에서 뒤로 올라가는 3° 진입선 (점선)
+    const td = RWY.at(-RWY.L / 2 + 20, 0); td.y = groundAt(td.x, td.z); const u = new V3(RWY.ux, 0, RWY.uz), A = u.clone().multiplyScalar(Math.cos(3 * DEG)).add(new V3(0, -Math.sin(3 * DEG), 0)).normalize();
+    guideAxis(td, A, 600, 0, 0xffd23a); }
   // ---- 조작 안내 문구 ----
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
     : (XR_ON ? vrStickMode() === 1 : IS_TOUCH && stickMode() === 1) ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' }
@@ -312,6 +315,10 @@ function updateGuide(subj) {
   else if (o.kind === 'orbit') {
     A((en ? 'Orbit the tank · ' : '탱크 주위 한 바퀴 · ') + Math.min(100, Math.abs(S.orbSum) / (Math.PI * 2) * 100).toFixed(0) + '% · ' + (en ? 'follow the green path' : '초록 길 따라 전진'), K('fwd')); cls = 'ok';
     steer();
+  } else if (o.t === 'rwyland' && typeof rwyGlide === 'function' && rwyGlide(subj.p)) {   // 활주로 접근: 접근각 맞추기 (3°) · 좌우는 조종 안내
+    const g = rwyGlide(subj.p), dd = g.ang - 3;
+    A((en ? 'Approach ' : '접근각 ') + g.ang.toFixed(1) + '° · ' + (Math.abs(dd) < 0.3 ? (en ? 'on the 3° slope · hold it' : '3° 경로 · 그대로') : dd > 0 ? (en ? 'high · ease down' : '높음 · 살짝 내리기') : (en ? 'low · ease up' : '낮음 · 살짝 올리기')), Math.abs(dd) < 0.3 ? null : K(dd > 0 ? 'pd' : 'pu')); cls = Math.abs(dd) < 0.3 ? 'ok' : '';
+    if (on('turn', Math.abs(ang), 4, 8)) A(ang > 0 ? (en ? '↷ bank right' : '↷ 오른쪽으로 기울여 선회') : (en ? '↶ bank left' : '↶ 왼쪽으로 기울여 선회'), K(ang > 0 ? 'br' : 'bl'));
   } else if (o.t === 'track' && hd < 18 && Math.abs(dy) < 12) {   // 차량 추적: 관측 자리에 왔으면 더 다가가지 말고 유지
     A(en ? 'Observation spot · hold back here, keep the vehicle in view' : '관측 자리 · 여기서 거리 유지 · 차량을 시야에'); cls = 'ok';
   } else {
@@ -325,6 +332,24 @@ function updateGuide(subj) {
   el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; }
 }
 
+// ---- 자세 카메라 (옵션): FPV 시점일 때 기체 뒤 비스듬히 위에서 기체를 보는 작은 창 — 기울기·자세를 밖에서 확인 ----
+const attCam = new THREE.PerspectiveCamera(40, 16 / 10, 0.1, 300), _acP = new V3(), _acT = new V3();
+function renderAttCam() {
+  const el = $('attcam'); if (!el) return;
+  const on = !!SET.attCam && CAMS[S.cam] === 'FPV' && (S.state === 'run' || S.state === 'replay') && DR.alive && !(S.tut && S.tut.st !== 'fly') && !document.body.classList.contains('nohud');
+  el.classList.toggle('hidden', !on); if (!on) return;
+  const r = el.getBoundingClientRect(); if (r.width < 10) return;
+  const subj = S.state === 'replay' ? RP.pose : DR, h = subj.h, R = Math.max(2.2, (AFc().R || 0.3) * 7);
+  _acP.set(subj.p.x - Math.sin(h) * R * 0.75 - Math.cos(h) * R * 0.65, subj.p.y + R * 0.45, subj.p.z + Math.cos(h) * R * 0.75 - Math.sin(h) * R * 0.65);   // 뒤 왼쪽 비스듬히 위
+  const gy = terrainAt(_acP.x, _acP.z) + 0.4; if (_acP.y < gy) _acP.y = gy;
+  attCam.position.copy(_acP); attCam.up.set(0, 1, 0); _acT.copy(subj.p); attCam.lookAt(_acT); attCam.aspect = r.width / r.height; attCam.updateProjectionMatrix(); attCam.updateMatrixWorld();
+  const vis = droneM.g.visible; droneM.g.visible = true; const au = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false;
+  const y = innerHeight - r.bottom;
+  renderer.setScissorTest(true); renderer.setScissor(r.left, y, r.width, r.height); renderer.setViewport(r.left, y, r.width, r.height);
+  renderer.render(scene, attCam);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight);
+  renderer.shadowMap.autoUpdate = au; droneM.g.visible = vis;
+}
 // ---- 아래 카메라 (투하·선회 때 화면 한쪽에 드론 바로 아래를 보여줌) ----
 const bellyCam = new THREE.PerspectiveCamera(72, 4 / 3, 0.1, 400);
 // 'big' = 투하·선회 때 자동으로 크게 / 'small' = 직접 켠 경우 / null = 안 보임

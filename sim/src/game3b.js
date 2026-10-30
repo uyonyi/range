@@ -5,6 +5,7 @@
 function startFacing(idx, back, altOverride, sideOff) {
   const o = OBJS[idx], op = openingOf(o);
   const b = o.b; const lz = altOverride !== undefined ? altOverride : op.lz;
+  back = Math.max(back * 1.7, 18);   // 장애물 바로 코앞이 아니라 줄을 맞출 거리를 두고 (최소 18 m)
   const p = b.world(op.lx + (sideOff || 0), op.ly - back, lz), c = b.world(op.lx, op.ly, lz);
   const d = c.clone().sub(p); return { p, h: Math.atan2(d.x, -d.z), focus: b.world(op.lx, op.ly, lz) };
 }

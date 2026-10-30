@@ -270,7 +270,12 @@ const RWY = (function () {
     const pads = [-13, 0, 13].map((t, i) => { const q = at(t, sg * (aw0 + AW / 2)); q.y = groundAt(q.x, q.z); let top = q.y; for (const [dx, dz] of [[2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6], [1.8, 1.8], [-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8]]) top = Math.max(top, groundAt(q.x + dx, q.z + dz)); const m = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshStandardMaterial({ map: padTex(i + 1), roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -4 }));
       m.rotation.x = -Math.PI / 2; m.rotation.z = -h; m.position.set(q.x, top + 0.16, q.z); /* 패드는 바닥면보다 위로 */ m.receiveShadow = true; g.add(m); return q; });
     window.__RWY = { a: at(-L / 2, 0), b: at(L / 2, 0), apron: [at(-AL / 2, sg * aw0), at(AL / 2, sg * aw0), at(AL / 2, sg * (aw0 + AW)), at(-AL / 2, sg * (aw0 + AW))], pads };
-    return { cx, cz, h, ux, uz, L, Wd, at, g, sock, pads, sg };
+    // PAPI (진입각 지시등): 시단에서 20 m 안쪽, 접근 방향 기준 왼쪽 14 m 에 4등 · 3° 경로면 하양 2 · 빨강 2 (높으면 하양이 늘고 낮으면 빨강이 늚)
+    const papi = [-1, 1].map(end => { const t0 = end * (L / 2 - 20), side = -end * sg * 14, lights = [], box = new THREE.MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.9 });
+      for (let i = 0; i < 4; i++) { const q = at(t0, side + end * sg * (i - 1.5) * 2.4); const gy = groundAt(q.x, q.z); const bm = new THREE.Mesh(UBOX, box); bm.scale.set(0.5, 0.35, 0.5); bm.position.set(q.x, gy + 0.3, q.z); bm.rotation.y = -h; g.add(bm);
+        const lm = new THREE.Mesh(UBOX, new THREE.MeshBasicMaterial({ color: 0xff2a2a })); lm.scale.set(0.42, 0.16, 0.12); lm.position.set(q.x - ux * end * 0.26, gy + 0.36, q.z - uz * end * 0.26); lm.rotation.y = -h; g.add(lm); lights.push(lm); }
+      const th = at(end * L / 2, 0); th.y = groundAt(th.x, th.z); return { end, th, lights, dir: end }; });
+    return { cx, cz, h, ux, uz, L, Wd, at, g, sock, pads, sg, papi };
   } catch (e) { console.warn('runway', e); return null; }
 })();
 // 활주로가 생기기 전에 그려 둔 코스 지도에 다시 그려 넣음
@@ -278,6 +283,20 @@ if (RWY && typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const k
 // 고정익 자유 비행: 코스 지도에 활주로까지 들어오게
 function rwyMapView() { if (!RWY) return; const V = MAP_CACHE.course && MAP_CACHE.course.V || MAPV, A = RWY.at(-RWY.L / 2 - 60, 0), B = RWY.at(RWY.L / 2, 0); mapView('free_wing', [[V.d0 + 40, V.s0 + 40], [V.d1 - 40, V.s1 - 40], [-A.z, A.x, 10], [-B.z, B.x, 10]]); }
 function rwyLocal(p) { const dx = p.x - RWY.cx, dz = p.z - RWY.cz; return { t: dx * RWY.ux + dz * RWY.uz, w: -dx * RWY.uz + dz * RWY.ux }; }
+// 접근각: 다가가는 쪽 시단(접지점 = 시단 안쪽 20 m) 기준 올려다본 각 · 기준 3° · 활주로 연장선 ±25° 안, 800 m 안에서만
+function rwyGlide(p) {
+  if (!RWY || !RWY.papi) return null; const l = rwyLocal(p), end = l.t < 0 ? -1 : 1, out = Math.abs(l.t) - RWY.L / 2; if (out < -RWY.L / 2 + 25) return null;
+  const P = RWY.papi[end < 0 ? 0 : 1], td = RWY.at(end * (RWY.L / 2 - 20), 0); td.y = groundAt(td.x, td.z);
+  const hd = Math.hypot(p.x - td.x, p.z - td.z), ang = Math.atan2(p.y - td.y, Math.max(1, hd)) / DEG, off = Math.atan2(Math.abs(l.w), Math.max(1, Math.abs(l.t) - RWY.L / 2 + 20)) / DEG;
+  if (hd > 800 || out < -30 || off > 25) return null;
+  return { ang, hd, td, end, P, white: ang > 3.5 ? 4 : ang > 3.17 ? 3 : ang > 2.83 ? 2 : ang > 2.5 ? 1 : 0 };
+}
+function papiTick(p) {
+  if (!RWY || !RWY.papi) return; const g = rwyGlide(p);
+  for (const P of RWY.papi) { const n = g && g.P === P ? g.white : 0; P.lights.forEach((m, i) => { const w = i < n; const c = w ? 0xf4f6ff : 0xff2a2a; if (m.material.color.getHex() !== c) m.material.color.setHex(c); }); }
+}
+function glideText(g) { if (!g) return ''; const en = window.SIM_LANG === 'en', d = g.ang - 3, tag = Math.abs(d) < 0.3 ? (en ? 'on slope' : '정상') : d > 0 ? (en ? 'high ▼' : '높음 ▼') : (en ? 'low ▲' : '낮음 ▲');
+  return `${en ? 'APP' : '접근각'} ${g.ang.toFixed(1)}° · <span style="letter-spacing:2px">${'●'.repeat(g.white)}<span style="color:#ff4d4d">${'●'.repeat(4 - g.white)}</span></span> ${tag}`; }
 function wingRwyOK(a) { return !!RWY && a && a.cls === 'wing' && !a.kam; }
 function wingGround() {   // 활주로 시단에서 정지 상태로 시작
   const a = AFc(), p = RWY.at(-RWY.L / 2 + 8, 0); p.y = groundAt(p.x, p.z) + 0.25;
@@ -784,6 +803,7 @@ function msFinish() {
 function msOsd() {
   const o = msObj(), a = AFc(); let h = '';
   if (a.cls === 'wing') h += `<div class="x"><b>AS</b>${((DR.as || 0) * 3.6).toFixed(0)} km/h</div>` + (S.stallW ? '<div style="color:#ff5050">STALL ▼ · ' + L2('기수 내리고 스로틀', 'nose down, power') + '</div>' : S.stallWarn ? '<div style="color:#ffb030">' + L2('실속 주의 · 속도', 'STALL WARNING · speed') + '</div>' : '');
+  if (a.cls === 'wing' && RWY) { const g = rwyGlide(DR.p); if (g) h += `<div style="color:${Math.abs(g.ang - 3) < 0.3 ? '#5dff9a' : '#ffc828'}">${glideText(g)}</div>`; }   // 활주로 접근각 (PAPI)
   if (S.kind === 'strike') h += `<div><b>HIT</b>${S.hitsS || 0}/${STRIKE.filter(t => !t.decoy).length}</div><div><b>LOST</b>${S.lost || 0}</div>`;
   else if (isMission()) h += `<div class="x"><b>HIT</b>${S.impacts}</div>`;
   if (S.kind === 'fire') { const n = FIRE.filter(f => f.on && f.active && !f.done).length, w = FIRE.filter(f => f.on && !f.active).length; h += `<div style="color:#ffb070">FIRE ${n}${w ? ' +' + w : ''}</div>`; }
@@ -1316,6 +1336,7 @@ function scenStep(o, cur, dt) {
 }
 function scenTick(dt) {
   if (typeof c1Tick === 'function') c1Tick(dt);
+  if (RWY && RWY.papi && (S.state === 'run' || S.state === 'demo')) papiTick(S.state === 'demo' ? ghostS.p : DR.p);
   photoTick(dt); WIND.t += dt; msEvents(dt); commTick(dt); if (S.kind === 'sar') sarClues(dt, DR.p);
   if (TRACK && MSG.track && MSG.track.visible && TRACK.go && S.state === 'run') {
     TRACK.s = Math.min(TRACK.endS || TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
