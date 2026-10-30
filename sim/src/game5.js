@@ -1416,7 +1416,7 @@ function firePick() {
 function fireReport(f, xy) {   // 사진으로 보고한 불씨 처리 · 다음 신고는 몇 초 뒤 새로 피어오름
   f.done = true; dbfObj(f.label, true); S.fireRep.push(xy); sfx('good'); commAck(f, 'fire');
   showMsg(xy ? `불씨 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '불씨 사진 보고 ✓', '#ffb070', 1.8);
-  const nx = MS.list.find(x => !x.active && !x.done); if (nx) nx.ignT = MS.t0 + 5 + Math.random() * 6;
+  const nx = MS.list.find(x => x.t === 'fire' && !x.active && !x.done); if (nx) nx.ignT = MS.t0 + 5 + Math.random() * 6;   // 불씨만 (마지막 활주로 복귀 항목 제외)
   MS.idx = MS.list.findIndex(x => !x.done); if (MS.idx < 0) { MS.idx = MS.list.length; msFinish(); } renderList();
 }
 // 불꽃이 눈(주간 카메라)으로 보이는 거리: 밤엔 불빛이라 더 멀리 · 줌 카메라 기체는 더 멀리 (열화상은 센서 거리의 0.8 — 늘 더 멂)
@@ -1502,6 +1502,7 @@ function msEvents(dt) {
   MS.t0 += dt; const t = MS.t0; navRadio(dt);
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
+      if (f.t !== 'fire') continue;
       if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; if (STREES.scorch) STREES.scorch(f.g.position, 9); const bd = fromLaunch(f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from launch point.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 방위 ${bd.brg}° · 출발점에서 약 ${bd.dist} m (지도 구역)`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
       if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; comm(`${CS}, hotspot ${i + 1} is spreading. Expedite your report.`, `불씨 ${i + 1} 번짐 · +15초`); f.g.scale.setScalar(1.8); }
     }
@@ -2191,7 +2192,7 @@ function pilotSetUI() {
     `<div class="pscards ly">${LY_PRE[dev].map(p => `<button class="pcd${lp === p ? ' on' : ''}" data-l="${p.id}">${pvHTML(p.pv, dev === 'vr')}<b>${nm(p.n)}</b><small>${nm(p.d)}</small></button>`).join('')}` +
     (dev === 'vr' ? '' : `<button class="pcd ed${lp ? '' : ' on'}" data-l="edit"><span class="pv ed"><i>✎</i></span><b>${L2('직접 배치', 'Arrange')}</b><small>${L2('창·버튼을 끌어서 옮기고 크기 조절', 'Drag panels and buttons, resize or hide')}</small></button>`) + `</div></div>` +
     `<div class="psg g-foot psfoot"><button id="psOpt">⚙ ${L2('모든 옵션', 'All options')}</button></div>`;
-  box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { const p = FLY_PRE.find(x => x.id === b.dataset.f); Object.assign(SET, p.set); if (RATE_PRESET[p.set.feel]) SET.rates = SET.ratesY = RATE_PRESET[p.set.feel].slice(); modeChanged(); try { syncExpo(); } catch (e) { } pilotSetUI(); });
+  box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { const p = FLY_PRE.find(x => x.id === b.dataset.f); Object.assign(SET, p.set); if (RATE_PRESET[p.set.feel]) { SET.rates = ratePreset(p.set.feel, 'p'); SET.ratesY = ratePreset(p.set.feel, 'y'); } modeChanged(); try { syncExpo(); } catch (e) { } pilotSetUI(); });
   box.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { const v = +b.dataset.s; if (vrm) SET.vrMode = v; else { SET.stick = v; stickApply(); } saveSet(); pilotSetUI(); });
   box.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
     const id = b.dataset.l; if (id === 'edit') { lyEditMenu(); return; }

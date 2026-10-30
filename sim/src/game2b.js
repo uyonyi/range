@@ -307,7 +307,7 @@ const IN = { thr: 0, yaw: 0, pitch: 0, roll: 0, src: 'KEY' };
 // 조종기 모드 (휴대폰 터치·게임패드): 2 = 왼쪽 스틱 상승·회전 / 오른쪽 전진·좌우 (기본) · 1 = 왼쪽 전진·회전 / 오른쪽 상승·좌우
 //  RC 조종기를 축 지정으로 쓰면 조종기 자체 모드를 따르므로 여기서 바꾸지 않음 (게임패드 기본 축일 때만 스로틀↔피치 맞바꿈) · VR 은 vrStickMode
 function stickMode() { try { return SET.stick === 1 ? 1 : 2; } catch (e) { return 2; } }
-const ks = { thr: 0, yaw: 0, pitch: 0, roll: 0 };
+const ks = { thr: 0, yaw: 0, pitch: 0, roll: 0 }, ksHold = {};   // ksHold: 키를 누르고 있는 시간 (ACRO 키보드 완충)
 const pressed = [];
 const RC_DEFAULT = {
   axes: { thr: { i: 1, inv: true }, yaw: { i: 0, inv: false }, pitch: { i: 3, inv: true }, roll: { i: 2, inv: false } },
@@ -397,7 +397,11 @@ function readInput(dt) {
     thr: (keys[KB.up] ? 1 : 0) - (keys[KB.down] ? 1 : 0), yaw: (keys[KB.yawR] ? 1 : 0) - (keys[KB.yawL] ? 1 : 0),
     pitch: (keys[KB.fwd] ? 1 : 0) - (keys[KB.back] ? 1 : 0), roll: (keys[KB.right] ? 1 : 0) - (keys[KB.left] ? 1 : 0)
   };
-  for (const k in tgt) { const r = tgt[k] === 0 ? 7 : 3.2; ks[k] += clamp(tgt[k] - ks[k], -r * dt, r * dt); }
+  // 키보드는 누르면 풀 스틱이라 ACRO 에서는 기체가 마구 돎 → 처음 1초는 절반쯤(피치·롤 0.6 · 요 0.45)에서 멈추고, 계속 누르고 있으면 그때부터 풀 스틱까지 (플립은 길게)
+  const acro = typeof effMode === 'function' && effMode().acro;
+  for (const k in tgt) { const r = tgt[k] === 0 ? 7 : 3.2; let t = tgt[k];
+    if (acro && k !== 'thr' && t) { ksHold[k] = (ksHold[k] || 0) + dt; const cap = k === 'yaw' ? 0.45 : 0.6; t *= cap + (1 - cap) * clamp((ksHold[k] - 1) / 0.8, 0, 1); } else if (!t) ksHold[k] = 0;
+    ks[k] += clamp(t - ks[k], -r * dt, r * dt); }
   IN.thr = ks.thr; IN.yaw = ks.yaw; IN.pitch = ks.pitch; IN.roll = ks.roll; IN.src = 'KEY';
   IN.boost = !!BOOST.on;
   if (TOUCH.on) { for (const k of ['thr', 'yaw', 'pitch', 'roll']) if (Math.abs(TOUCH[k]) > Math.abs(IN[k])) { IN[k] = TOUCH[k]; IN.src = 'TOUCH'; } }
