@@ -49,7 +49,7 @@ def sources(lang, mode, c1=None):
     T = PRIV['titles'] if mode == 'private' else TITLES[mode]
     t = t.replace('{{TITLE}}', T['TITLE']).replace('{{H1}}', T['H1']).replace('{{H2}}', T['H2'][lang]).replace('{{STUDIO}}', STUDIO)
     if mode != 'public': t = t.replace('{{PRE}}', 'null')   # 미리 받기(작업 스레드)는 공개판만
-    if mode != 'public': t = re.sub(r' data-music="[^"]*"', '', t); t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
+    if mode != 'public': t = re.sub(r' data-(music|kb)="[^"]*"', '', t); t = re.sub(r'<video id="bootVid".*?</video>', '<video id="bootVid"></video>', t, flags=re.S).replace('{{BOOT}}', '').replace('{{INTRO_V}}', '')   # 한 파일 판: 영상 없이 제목만
     return t, game
 
 
@@ -95,7 +95,7 @@ def build_public(outdir, site_ids=('yeongin',)):
     for k, v in LIBS.items(): shutil.copy(v, outdir + '/lib/' + os.path.basename(v))
     if os.path.exists('tts-worker.js'): shutil.copy('tts-worker.js', outdir + '/lib/tts-worker.js')
     shutil.copy('preload-worker.js', outdir + '/lib/preload-worker.js')   # 첫 화면 동안 고급 나무·바닥 사진을 미리 받아 계산해 두는 작업 스레드
-    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3', 'intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg'):   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
+    for f in ('radio_voice.bin', 'radio_voice.json', 'c1_voice.bin', 'c1_voice.json', 'trees.json', 'trees_rgb.webp', 'trees_a.webp', 'music.json', 'music.mp3') + INTRO_FILES:   # intro: 첫 화면 영상 (tools/intro/ · 시뮬레이터 장면을 렌더해 만듦)   # music: 배경음악 악기 녹음 (VSCO 2 CE·VCSL, CC0 · tools/music/)   # 무전 음성 조각 (Kokoro-82M, Apache-2.0 · tools/voice/)
         if os.path.exists(f): shutil.copy(f, outdir + '/lib/' + f)   # 무전 음성 대체 (GPL, 영어 음성 없는 기기에서만 불러옴)
     all_sites = {s['id']: s for s in json.load(open('sites.json', encoding='utf-8'))}
     for sid in site_ids:
@@ -129,10 +129,16 @@ def build_public(outdir, site_ids=('yeongin',)):
     print('public build ->', outdir, tot // 1024, 'KB')
 
 
+# 첫 화면 영상 묶음 (tools/intro/ 에서 만듦): 720p · 480p 가벼운 판 · 장면 사진 2~5 · 포스터 · 끝 장면 · 곡
+INTRO_FILES = ('intro.mp4', 'intro.webm', 'intro_lo.mp4', 'intro_lo.webm', 'intro_k2.webp', 'intro_k3.webp', 'intro_k4.webp', 'intro_k5.webp', 'intro.jpg', 'intro.mp3', 'intro_end.jpg')
+
+
 def write_sw(outdir, pre):
     """서비스 워커: 핵심 파일은 설치 때 받아 두고(오프라인 실행), 음성·해석기 같은 큰 파일은 처음 쓸 때 받아 캐시. 버전(VER)이 바뀌면 옛 캐시는 지움"""
     import hashlib, glob
-    core = ['lib/three.min.js', 'lib/proj4.js', 'manifest.webmanifest', 'manifest.en.webmanifest', 'icons/icon-192.png', 'icons/favicon-32.png'] + pre
+    #   설치 때 받는 것은 모든 페이지가 같이 쓰는 파일만 (예전엔 한국어·영어·VR 페이지와 앱 코드까지 6.5 MB — 첫 방문 때 인트로 영상과 망을 나눠 씀)
+    #   페이지·앱 코드는 그 페이지가 등록하며 알려 준 자기 것만 (message: add) · 나머지는 처음 쓸 때 캐시
+    core = ['lib/three.min.js', 'lib/proj4.js', 'manifest.webmanifest', 'manifest.en.webmanifest', 'icons/icon-192.png', 'icons/favicon-32.png'] + [u for u in pre if not (u.endswith('.html') or '/app.' in u)]
     for s in glob.glob(outdir + '/sites/*.js'):   # 현장 데이터 안의 ?v= 포함 바닥 사진 주소
         txt = open(s, encoding='utf-8').read()
         core += re.findall(r'"(sites/[^"]+\.webp\?v=[0-9a-f]+)"', txt)
@@ -142,9 +148,12 @@ def write_sw(outdir, pre):
 const VER = '%s', CACHE = 'fpvsim-' + VER, CORE = %s;
 // 설치: 핵심 파일을 받아 둠 · 주소에 버전(?v=)이 붙은 파일은 옛 캐시에 같은 것이 있으면 옮기기만 (나무·바닥 사진 같은 큰 파일을 판이 바뀔 때마다 다시 받지 않게)
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => Promise.all(CORE.map(u => (/[?&]v=/.test(u) ? caches.match(u) : Promise.resolve(null)).then(m => m ? c.put(u, m) : c.add(u))))).then(() => self.skipWaiting())); });
+// 페이지가 알려 준 자기 파일(페이지·앱 코드)을 캐시에 담음 (이미 받은 직후라 대개 브라우저 캐시에서 바로)
+self.addEventListener('message', e => { const L = e.data && e.data.add; if (!Array.isArray(L)) return; e.waitUntil(caches.open(CACHE).then(c => Promise.all(L.slice(0, 8).map(u => { let x; try { x = new URL(u, self.location.href); } catch (er) { return null; } if (x.origin !== location.origin) return null; return c.match(x.href).then(m => m || c.add(x.href).catch(() => {})); })))); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fpvsim-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET' || r.headers.has('range')) return; const u = new URL(r.url); if (u.origin !== location.origin) return;   // 영상(부분 요청)은 브라우저에 맡김
+  if (/\/lib\/intro(_lo)?\.(mp4|webm)$/.test(u.pathname)) return;   // 첫 화면 영상은 페이지가 직접 담아 둠 (Cache API 'fpv-boot') — 같은 3 MB 를 두 번 담지 않게
   if (r.mode === 'navigate') {   // 페이지: 네트워크 먼저 (새 버전 바로 반영), 안 되면 캐시
     e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)); return res; }).catch(() => caches.match(r, { ignoreSearch: true }).then(m => m || caches.match(u.pathname.endsWith('/') ? u.pathname + 'index.html' : r))));
     return;
@@ -185,13 +194,16 @@ def build_pages(outdir, site_ids, vr):
         t, game = sources(lang, 'public', c1=True)
         open(f'{outdir}/js/app.{lang}.js', 'w', encoding='utf-8').write(minify_js(game, f'{outdir}/js/app.{lang}.js'))
         if not vr: t = re.sub(r'<!--VRBTN-->.*?<!--/VRBTN-->', '', t, flags=re.S)   # VR 컨트롤러 단추 표는 VR 판에만
-        tags = {'THREE': up + 'lib/three.min.js', 'PROJ4': up + 'lib/proj4.js'}
-        for k, v in tags.items(): t = t.replace(f'<script>/*{k}*/</script>', f'<script src="{v}"></script>')
+        #   라이브러리·현장 데이터·앱: 문서에 박지 않고 차례로 붙임 (async=false 라 실행 순서는 그대로) — 첫 화면 영상을 먼저 받은 뒤 (window.__appWait, 최대 6초)
+        #   예전: 페이지를 열자마자 앱 코드·three·현장 데이터 ~2.5 MB 가 인트로와 동시에 받아져, 느린 망에서 인트로 사진·곡·영상이 늦게 옴
+        libs = [[up + 'lib/three.min.js', 34, '3D ENGINE'], [up + 'lib/proj4.js', 44, 'TERRAIN DATA']]
+        for k in ('THREE', 'PROJ4'): t = t.replace(f'<script>/*{k}*/</script>', '')
         t = t.replace('<script>/*GEOTIFF*/</script>', f"<script>window.SIM_GEOTIFF_URL='{up}lib/geotiff.js';</script>")   # 사진·DEM 파일을 올릴 때만 불러옴
         import hashlib
         ver = hashlib.md5(game.encode()).hexdigest()[:8]
         sv = {sid: hashlib.md5(open(f"{outdir if not vr else outdir[:-3]}/sites/{sid}.js", 'rb').read()).hexdigest()[:8] for sid in site_ids}   # 현장 데이터는 그 파일 내용으로 버전
-        sites = ''.join(f'<script src="{up}sites/{sid}.js?v={sv[sid]}"></script>' for sid in site_ids)
+        libs += [[f'{up}sites/{sid}.js?v={sv[sid]}', 62, 'SIMULATOR'] for sid in site_ids]
+        sites = ''
         other = 'index.html' if lang == 'en' else 'en.html'
         t = t.replace('</title>', f'</title>\n<link rel="manifest" href="{up}manifest{"" if lang == "ko" else ".en"}.webmanifest"><link rel="icon" type="image/png" sizes="32x32" href="{up}icons/favicon-32.png"><link rel="apple-touch-icon" href="{up}icons/apple-touch-icon.png"><meta name="theme-color" content="#0e1216"><meta name="apple-mobile-web-app-title" content="FPV Trainer">', 1)
         t = t.replace('</title>', '</title>\n<script>try{var L=localStorage.getItem("fpvsim_lang");if(L&&L!=="%s")location.replace("%s")}catch(e){}</script>' % (lang, other), 1)
@@ -203,15 +215,16 @@ def build_pages(outdir, site_ids, vr):
         rv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('radio_voice.json', 'radio_voice.bin') if os.path.exists(f))).hexdigest()[:8]   # 무전 음성 묶음 버전
         flags = ("window.SIM_VR=true;window.SIM_BASE='../';" if vr else "window.SIM_VR_URL='vr/';") + f"window.SIM_TREES_V='{tv}';window.SIM_MUSIC_V='{mv}';window.SIM_RV_V='{rv}';" + (f"window.SIM_API='{RANK_API}';" if RANK_API else '')
         if vr: t = t.replace('<title>FPV Terrain Trainer</title>', '<title>FPV Terrain Trainer VR</title>')
-        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in ('intro.mp4', 'intro.webm', 'intro.jpg', 'intro.mp3', 'intro_end.jpg') if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
+        iv = hashlib.md5(b''.join(open(f, 'rb').read() for f in INTRO_FILES if os.path.exists(f))).hexdigest()[:8]   # 첫 화면 영상 버전
         t = t.replace('{{BOOT}}', up).replace('{{INTRO_V}}', iv).replace('{{PRE}}', json.dumps(PRE))
         t = t.replace('<script>/*DATA*/</script>', sites + f"<script>window.SIM_LANG='{lang}';{flags}</script>")
         # 앱 본체: 미리 받기 작업 스레드가 그림 도구를 차렸다는 알림(warm)을 받은 뒤(최대 0.4초) 붙임 — 받기는 head 의 preload 로 처음부터
         #   서비스 워커(오프라인·재방문 캐시, sw.js)는 앱이 다 뜨고 3초 뒤 등록 (예전처럼 앱 시작 뒤 · 설치하며 캐시에 수 MB 를 쓰는 일이 앱 시작과 겹치지 않게)
         app = f'js/app.{lang}.js?v={ver}'
-        t = t.replace('</head>', f'<link rel="preload" as="script" href="{app}">\n</head>', 1)
-        sw = "if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))setTimeout(function(){navigator.serviceWorker.register('%ssw.js').catch(function(){});},3000);" % up
-        t = t.replace('<script>/*GAME*/</script>', "<script>(function(){var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='%s';s.async=false;s.onload=function(){%s};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();})();</script>" % (app, sw))
+        t = t.replace("<script>window.__boot&&__boot(34,'3D ENGINE')</script>", '').replace("<script>window.__boot&&__boot(44,'TERRAIN DATA')</script>", '').replace("<script>window.__boot&&__boot(62,'SIMULATOR')</script>", '')   # 불러오기 막대는 각 파일을 다 받았을 때
+        #   등록은 첫 화면 영상을 다 받은 뒤 (최대 40초 기다림) — 설치하며 받는 파일이 인트로 영상과 망을 나눠 쓰지 않게 · 등록 뒤 이 페이지와 앱 코드를 캐시에 담아 달라고 알림
+        sw = "if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))(function(){var n=0,go=function(){var V=window.__bootVideo;if(V&&V.busy&&n++<37){setTimeout(go,1000);return;}navigator.serviceWorker.register('%ssw.js').then(function(){return navigator.serviceWorker.ready}).then(function(r){if(r&&r.active)r.active.postMessage({add:[location.href.split('#')[0].split('?')[0],s.src]})}).catch(function(){});};setTimeout(go,3000);})();" % up
+        t = t.replace('<script>/*GAME*/</script>', "<script>(function(){var L=%s,run=function(){L.forEach(function(x){var e=document.createElement('script');e.src=x[0];e.async=false;e.onload=function(){window.__boot&&__boot(x[1],x[2])};document.body.appendChild(e);});var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='%s';s.async=false;s.onload=function(){%s};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();};if(window.__appWait)__appWait(run);else run();})();</script>" % (json.dumps(libs), app, sw))
         open(f'{outdir}/{page}', 'w', encoding='utf-8').write(t)
         pre += [f'{"vr/" if vr else ""}{page}', f'{"vr/" if vr else ""}js/app.{lang}.js?v={ver}'] + ([f'sites/{sid}.js?v={sv[sid]}' for sid in site_ids] if not vr else [])
     return pre

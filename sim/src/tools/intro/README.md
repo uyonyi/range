@@ -1,11 +1,19 @@
-# 첫 화면 인트로 영상·음악 (intro.mp4 · intro.webm · intro.jpg · intro_end.jpg · intro.mp3)
+# 첫 화면 인트로 영상·음악 (intro.mp4 · intro.webm · intro_lo.mp4 · intro_lo.webm · intro_k2~k5.webp · intro.jpg · intro_end.jpg · intro.mp3)
 
 앱을 열면 불러오는 동안 보이는 약 12초 영상(1280×720 · 24fps)입니다. 시뮬레이터 장면을 그대로 렌더해 만듭니다. 장면 길이는 126 BPM 박자에 맞춤.
 
 1. 계곡 전경 (4박) → 2. 마을 옆 지나기 (3박) → 3. 코스 통과 (기준 비행을 뒤에서, 검은 기체 · 4박) → 4. 숲길 1인칭 (3박) → 5. 능선 1인칭 (3박) → 6. 산 정상 전경 (9박 · 17박 = 8.1초에 제목이 뜸, `template.html` 의 `HIT`)
 
 - 첫 화면 순서 (`template.html` 의 `#boot`): **입장 번호 → 회사 로고(검은 화면 1초 · 또롱, `build.py` 의 `STUDIO`) → 인트로 영상(+음악) → 로고 화면에서 고르기**
-- 영상은 페이지를 열자마자 파일 전체를 받아 두고(입장 번호·회사 로고 동안) 다 받은 뒤 재생 → 재생 중 끊김 없음. 느린 망이면 회사 로고에 불러오기 막대를 보이며 최대 20초 기다림 (🔑 기존 계정 — 이 기기에 저장된 아이디면 바로 · 👤 게스트 · ✚ 새로 가입, `game6r.js` 의 `__bootPick`)
+- 로고 화면에서 고르기: 🔑 기존 계정 — 이 기기에 저장된 아이디면 바로 · 👤 게스트 · ✚ 새로 가입 (`game6r.js` 의 `__bootPick`)
+- **받기 (느린 망에서도 바로 시작)** — `template.html` 의 `#boot` 스크립트
+  - 영상은 페이지를 열자마자 파일 전체를 받아(입장 번호·회사 로고 동안) 다 받은 파일로 재생 → 재생 중 끊김 없음.
+  - 이 기기에 받아 둔 영상·곡이 있으면 바로 씀 (Cache API `fpv-boot` · 두 번째 방문부터 즉시 · 서비스 워커 판이 바뀌어도 그대로 · 같은 파일의 옛 판은 지움).
+  - 처음이면 720p(~3 MB)를 받기 시작해 처음 0.8초 동안의 속도를 봄 → 3초 안에 다 못 받을 속도면 끊고 480p 가벼운 판(~0.65 MB)으로. 연결 정보(`navigator.connection`)가 느린 망·데이터 절약이면 처음부터 가벼운 판.
+  - 회사 로고(1.3초)가 끝났는데 영상이 아직이면 기다리지 않음: **장면 사진 + 천천히 움직임(켄 번스) + 음악**으로 바로 시작하고, 영상이 도착하면 그 시점으로 맞춰 이어 받음(사진은 걷힘). 1·6 장면은 포스터·끝 장면 그림을 그대로 씀.
+  - 받는 차례: 인트로 파일을 먼저, 앱 코드·라이브러리·나무/바닥 미리 받기는 영상을 다 받은 뒤 (`window.__appWait` · 늦어도 6초 · 건너뛰거나 인트로가 필요 없으면 바로).
+  - 서비스 워커는 영상을 다 받은 뒤 등록하고, 설치 때는 모든 페이지가 같이 쓰는 파일만 받음 (예전: 한국어·영어·VR 페이지와 앱 코드까지 6.5 MB 를 인트로와 동시에).
+  - 1.6 Mbps 첫 방문 시험: 예전엔 불러오기 막대 20초 → 영상 1초 남짓 / 지금은 로고 1.3초 뒤 사진으로 시작 → 3.6초 지점에서 영상으로 넘어가 끝까지
 - 영상 위의 제목·불러오기 막대·건너뛰기·소리 켜기는 페이지가 그립니다. 영상에는 글자가 없습니다. 로고 화면 바탕은 마지막 장면 사진(intro_end.jpg) — 건너뛰어도 같은 그림.
 - 음악(intro.mp3)은 영상과 박을 맞춘 약 13초 곡입니다. 브라우저는 사람이 누르기 전에는 소리를 못 내므로: 입장 번호를 누른 뒤면 영상과 같이 바로, 소리는 기본으로 켜져 있음: 입장 번호를 이미 넣은 기기는 브라우저가 막고 있으면 '🔈 누르면 소리'가 깜박이고 화면 아무 데나 처음 누르면 소리가 켜짐(건너뛰지 않음 · 두 번째부터 건너뛰기) · 설치한 앱처럼 허락된 창은 누르지 않아도 바로 · '🔊 소리 끄기'로 끄면 게임 음악 설정도 같이 꺼짐. 같은 소리 장치를 게임이 이어 받아 메뉴 음악이 이어집니다.
 - 같은 창에서 다시 열면(언어 바꿈 등) 인트로·고르기 없이 준비되는 대로 바로 넘어갑니다.
@@ -16,11 +24,12 @@
 cd sim/src && python3 build.py public /tmp/pub && (cd /tmp/pub && python3 -m http.server 8768 &)
 node tools/intro/render.js                        # → tools/intro/fr/s1~s6/*.jpg (1280×720, 24fps · 소프트웨어 렌더라 수십 분 · 나무·바닥 사진이 다 붙은 뒤 시작)
 node tools/intro/music.js                         # → tools/intro/music.wav (게임 배경음악 악기 녹음으로 그린 인트로 곡)
-sh tools/intro/compose.sh tools/intro tools/intro # → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro.jpg
-cp tools/intro/intro.{mp4,webm,jpg,mp3} tools/intro/intro_end.jpg .   # sim/src 에 두면 build.py 가 lib/ 로 복사
+sh tools/intro/compose.sh tools/intro tools/intro # → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro_lo.mp4/webm (480p) · intro_k2~k5.webp · intro.jpg · intro_end.jpg · intro.mp3
+cp tools/intro/intro.{mp4,webm,jpg,mp3} tools/intro/intro_lo.{mp4,webm} tools/intro/intro_k?.webp tools/intro/intro_end.jpg .   # sim/src 에 두면 build.py 가 lib/ 로 복사 (목록: build.py 의 INTRO_FILES)
 ```
 
 - 장면만 다시: `SHOT=s2,s4 node tools/intro/render.js` · 코스 장면 시작 시각: `T0=6.1` (기준 비행 초) · 숲길 장면의 숲길 위치: `S4=0.5` (숲길 전체 길이의 비율) · 미리 보기(장면당 4장): `SPARSE=1` · 숲길 후보 여럿: `S4LIST=0.1,0.35,0.5 SHOT=s4_0.1,s4_0.35,s4_0.5`
-- 영상 크기: H.264 는 2패스 1.9 Mbps(약 3 MB) · VP9 1.8 Mbps. 숲이 많아 crf 로 하면 10 MB 가 넘습니다.
+- 영상 크기: 720p H.264 2패스 1.9 Mbps(약 3 MB) · VP9 1.8 Mbps — 숲이 많아 crf 로 하면 10 MB 가 넘습니다. 480p H.264 0.42 Mbps · VP9 0.38 Mbps (각 0.6~0.7 MB). 모두 2초마다 키프레임(`-g 48`) — 사진으로 시작한 뒤 중간 시점으로 바로 이어 붙이게.
+- 장면 사진(intro_k2~k5.webp, 960×540)은 각 장면 시작 0.35초 뒤 그림. 장면 시각표가 바뀌면 `template.html` 의 `SH`(시작·끝 초)와 `compose.sh` 의 사진 시각을 같이 고칠 것.
 - 프레임 폴더(fr/)·music.wav 는 저장소에 올리지 않습니다.
 - 곡: 126 BPM · 4박 마을(가볍게) · 7박 코스 · 11박 숲길 · 14박 능선 · 17박(8.1초) 제목과 함께 큰 화음 → 여운(13초). 악기 녹음은 VSCO 2 CE · VCSL (CC0).
