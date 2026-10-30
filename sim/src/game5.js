@@ -448,9 +448,9 @@ function rwyApproach() {
 // 활주로 착륙 목표 (고정익 임무 마지막)
 function rtbObj(a) {
   if (wingRwyOK(a)) { const td = RWY.at(-RWY.L / 2 + 20, 0), ap = RWY.at(-RWY.L / 2 - 300, 0); td.y = groundAt(td.x, td.z) + 1; ap.y = groundAt(ap.x, ap.z) + 35;
-    return { kind: 'ms', t: 'rwyland', label: L2('복귀 · 활주로 착륙', 'Return · land on the runway'), mk: td.clone().setY(td.y + 4), pts(p) { return [p.clone(), ap.clone(), td.clone()]; } }; }
-  if (a.cls === 'wing') return passCP('복귀 · 출발점 상공 통과', { d: BY.pad_start.down, s: BY.pad_start.side, td: 1, ts: 0 }, 0, 35, 35, 14);
-  return { kind: 'ms', t: 'land', label: '출발 패드로 복귀 · 착륙', mk: startPos().add(new V3(0, 1.5, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } };
+    return { kind: 'ms', t: 'rwyland', rtb: true, label: L2('복귀 · 활주로 착륙', 'Return · land on the runway'), mk: td.clone().setY(td.y + 4), pts(p) { return [p.clone(), ap.clone(), td.clone()]; } }; }
+  if (a.cls === 'wing') return Object.assign(passCP('복귀 · 출발점 상공 통과', { d: BY.pad_start.down, s: BY.pad_start.side, td: 1, ts: 0 }, 0, 35, 35, 14), { rtb: true });
+  return { kind: 'ms', t: 'land', rtb: true, label: '출발 패드로 복귀 · 착륙', mk: startPos().add(new V3(0, 1.5, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } };
 }
 // 기체 잃음: 추락 / 자폭 기폭
 function lostDrone(why) {
@@ -856,6 +856,7 @@ function missionPhoto() {
     if (ok) { comm('Control, Eagle One. Imagery sent.', '이글 원: 사진 전송', OP); showMsg(L2('차량 사진 보고 ✓', 'Vehicle photo reported ✓'), '#5dff9a', 1.4); } else showMsg(L2('사진에 차량 없음', 'Vehicle not in frame'), '#ff9a40', 1.4); return;
   }
   if (S.kind === 'sar' && o && o.t === 'sarfind') {
+    if (!(o.inView || S.simT - (o.seenT ?? -9) < 1.5) && SMK && SMK.on && !SMK.ok && SMK.seen && smkCall()) return;   // 연막이 가운데 있으면 색 부르기
     if (o.inView || S.simT - (o.seenT ?? -9) < 1.5) { comm('Control, Eagle One. Subject located. Photo and grid sent.', '이글 원: 실종자 발견 · 사진과 좌표 전송', OP); const xy = to5186(SAR.d, SAR.s); S.sarXY = xy; photoAdd(snapPhoto([L2('실종자 발견', 'SUBJECT FOUND') + '  ' + hm, xyS(SAR.d, SAR.s)], SAR.tp), o.label, xy, true); msNext(xy ? `실종자 발견 · 사진 보고 ✓ X ${xy[0].toFixed(0)} · Y ${xy[1].toFixed(0)}` : '실종자 발견 · 사진 보고 ✓', '#5dff9a'); return; }
     photoAdd(snapPhoto([L2('사진 · 확인 불가', 'PHOTO · UNCONFIRMED') + '  ' + hm, '']), '', null, false);
     showMsg(L2('사진에 실종자 없음 · 가까이(열화상은 멀리서도) 화면 가운데에', 'No subject in frame · get closer (or use thermal) and center it'), '#ff9a40', 1.8); return;
@@ -1375,7 +1376,7 @@ const RIDGE = (function () {
 function scenStart(kind, a) {
   ['sar', 'track', 'ridge', 'field'].forEach(k => MSG[k] && (MSG[k].visible = false)); if (STREES.unscorch) STREES.unscorch();
   if (kind === 'sar' && SAR) {
-    MSG.sar.visible = true; SAR.kit = null; sarRandom();
+    MSG.sar.visible = true; SAR.kit = null; sarRandom(); smkReset();
     S.kits = 2; SAR.pkFound = false;
     const sr = sarR();
     const L = [{ kind: 'ms', t: 'sarfind', label: L2(`실종자 수색 · 구역 반경 ${sr} m`, `Find the hiker · area radius ${sr} m`), tp: SAR.tp, mk: SAR.area, search: { r: sr }, need: 1.5, pts(p) { return [p.clone(), this.mk.clone().setY(Math.max(p.y, this.mk.y))]; } }];
@@ -1458,7 +1459,7 @@ function scenStep(o, cur, dt) {
 function scenTick(dt) {
   if (typeof c1Tick === 'function') c1Tick(dt);
   if (RWY && RWY.papi && (S.state === 'run' || S.state === 'demo')) papiTick(S.state === 'demo' ? ghostS.p : DR.p);
-  photoTick(dt); WIND.t += dt; msEvents(dt); commTick(dt); if (S.kind === 'sar') sarClues(dt, DR.p);
+  photoTick(dt); WIND.t += dt; msEvents(dt); commTick(dt); if (S.kind === 'sar') { sarClues(dt, DR.p); smkTick(dt, DR.p); }
   if (TRACK && MSG.track && MSG.track.visible && TRACK.go && S.state === 'run') {
     TRACK.s = Math.min(TRACK.endS || TRACK.total, TRACK.s + TRACK.v * dt); const vp = trackPose(TRACK.s), ah = trackPose(Math.min(TRACK.total, TRACK.s + 3));
     TRACK.g.position.copy(vp.p); TRACK.g.rotation.y = -vp.h; TRACK.g.rotation.x = Math.atan2(ah.p.y - vp.p.y, 3) * 1;
@@ -1497,6 +1498,7 @@ function sarKit(pos) {
 }
 function scenOsd(o) {
   if (!o) return '';
+  if (o.t === 'sarfind' && !o.inView && SMK && SMK.on && !SMK.ok && SMK.seen) return `<div style="color:#ffc828">● ${IS_TOUCH ? L2('연기 · 색 부르기', 'SMOKE · CALL') : L2('연기 · 색 부르기 ', 'SMOKE · CALL COLOUR ') + repKey()}</div>`;
   if (o.t === 'sarfind') return `<div style="color:${o.inView ? '#5dff9a' : '#9aa6ad'}">${o.inView ? '● ' + (IS_TOUCH ? L2('실종자 포착', 'SUBJECT') : L2('실종자 포착 · ', 'SUBJECT · ') + repKey()) : ENV.ir ? 'IR 수색 중' : '숲 아래는 열화상(T)'}</div>`;
   if (o.t === 'track') { const su = Math.round(TRACK.sus || 0), sc = su >= 70 ? '#ff6060' : su >= 40 ? '#ff9a40' : '#5dff9a';
     return `<div style="color:${o.inView ? '#5dff9a' : o.close ? '#ff9a40' : '#9aa6ad'}">TRACK ${S.trT.toFixed(0)}/${o.need}s${o.close ? ' · 너무 가까움' : o.inView ? ' ●' : TRACK.go ? ' · 시야 밖' : ' · 접근하면 출발'}</div>`
@@ -1591,7 +1593,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   recon: ['Building recon', 'Find and photograph 4 random real buildings from the topo map.', 'Hold each building centered on screen or in the belly cam for 1.5 s. Targets change every run.'],
   strike: ['Vehicle strike', '5 vehicles: 3 real, 2 decoys. Hit only the real ones.', 'They look identical in daylight. In thermal (T) the real ones show engine heat. Hitting a decoy costs +20 s.'],
   fire: ['Wildfire watch', 'Smoke reports come in by radio with a bearing and a rough distance. Only a wide search area is marked, not the fire itself.', 'One report at a time: find the smoke column (it leans with the wind; at night look for the glow). Get close enough to see the flames, or use thermal (T) from farther away, keep the fire on screen and press Enter / 📷 / A to photograph it. Report it and the next one comes in. After 150 s a fire spreads (+15 s).'],
-  sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. 2 rescue kits: drop one within 5 m.'],
+  sar: ['Search & rescue', 'A hiker is missing near the trails. Only a wide search area is marked; the location changes every run.', 'Clues: his yellow pack near where he went missing, signal-mirror flashes (a flashlight at night), and body heat in thermal under the canopy. Center him and press Enter / 📷 / A to photograph and report. He may pop a signal smoke (a red flare at night): CONTROL never says the colour, so center the smoke and report to call its colour first; a wrong call (e.g. a white field burn) costs +10 s. 2 rescue kits: drop one within 5 m.'],
   track: ['Vehicle tracking', 'Keep a car on a real road in view for 60 s without being spotted.', 'Being in the driver\'s view (ahead, low angle), close or low fills the exposure gauge; when it is full you are spotted (fail, -30, RTB). Stay behind it and high. At night turn your light off (L) to stay hidden.'],
   ridge: ['Ridge run', 'Climb to the summit along a DEM-derived ridge and come down another ridge.', 'Ridges are windy. Pass the rings in order.'],
   field: ['Field airstrip', 'Runway, taxiway and three H pads. Quads hop between the pads with precise landings; fixed wings fly a traffic pattern and land.', 'Land within 1.5 m of the pad centre, gently. Wings: take off, fly the pattern rings, land on the runway.']
@@ -1601,7 +1603,7 @@ const BRIEF = window.SIM_LANG === 'en' ? {
   recon: ['건물 정찰', '수치지형도에 있는 실제 건물 중 무작위 4곳을 찾아 촬영.', '건물을 화면 가운데나 아래 카메라에 1.5초 담기. 매번 대상이 바뀜.'],
   strike: ['차량 표적 타격', '차량 5대 중 실물은 3대, 나머지 2대는 기만체. 실물만 골라 돌입.', '가시광으로는 똑같음. 열화상(T)에서 엔진 열이 있는 차량이 실물. 기만체를 치면 +20초.'],
   fire: ['산불 감시', '무전으로 연기 신고가 방위·대략 거리로 들어옴. 지도에는 넓은 수색 구역만 표시되고 불 위치는 안 나옴.', '한 번에 한 곳씩: 바람에 기우는 연기 기둥(밤에는 불빛)을 찾아가 불꽃이 보일 만큼 가까이 가거나 열화상(T)으로 멀리서 불씨를 화면에 담고 Enter·📷·A 버튼으로 사진 보고. 보고하면 다음 신고가 들어옴. 150초가 지나면 번져서 +15초.'],
-  sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 구조 키트 2개 · 5 m 안에 투하.'],
+  sar: ['실종자 수색·구조', '등산로 근처 실종자 신고. 지도에는 넓은 수색 구역만 표시, 위치는 매번 다름.', '단서: 근처에 떨어진 노란 배낭, 신호 거울 반짝임(밤에는 손전등), 숲 아래 체온(열화상). 찾으면 화면 가운데에 두고 Enter·📷·A 버튼으로 사진 보고. 실종자가 연막(밤엔 붉은 신호탄)을 터뜨리기도 함: 관제는 색을 먼저 말하지 않으니, 연기를 가운데 두고 보고 키로 본 색을 먼저 부를 것 · 다른 연기(흰 소각 연기 등)를 부르면 +10초. 구조 키트 2개 · 5 m 안에 투하.'],
   track: ['차량 추적', '실제 도로를 달리는 차량을 들키지 않고 60초 동안 시야에 유지.', '운전자 시야(차 앞쪽·낮은 각도)·근접·저고도면 노출 게이지가 차고, 가득 차면 발각(실패·-30·복귀). 차 뒤쪽 높이 유지 권장. 밤에는 드론 조명을 끄면(L) 덜 들킴.'],
   ridge: ['능선 종주', 'DEM 분석으로 뽑은 능선을 따라 정상까지 올라갔다가 다른 능선으로 내려옴.', '능선은 바람이 셈. 링을 순서대로 통과.'],
   field: ['야전 착륙장', '활주로·유도로·H 패드 3개. 쿼드는 패드 사이를 옮겨 다니며 정밀 착륙, 고정익은 장주(트래픽 패턴)를 돌고 활주로 착륙.', '패드 가운데 1.5 m 안에 살살 내려앉기. 고정익: 이륙 → 장주 링 → 활주로 착륙.']
@@ -1699,6 +1701,61 @@ function sarClues(dt, cur) {
     if (S.pkT > 0.8) { SAR.pkFound = true; flashPhoto(); showMsg(L2('단서 발견 · 실종자 배낭', 'Clue found · the hiker’s pack'), '#ffc828', 1.6); sfx('good');
       if (o.search.r > 35) sarNarrow(o, 35, 10 + Math.random() * 8); comm(`Copy, that's his pack. He can't be far, search within three zero meters.`, '배낭 확인 · 반경 30 m 안을 수색'); }
   } else S.pkT = 0;
+}
+// ---- 수색·구조 이벤트: 연막 신호 (색 부르기) ----
+//  실종자가 드론 소리를 듣고 연막(밤엔 붉은 신호탄)을 터뜨림. 관제는 색을 말하지 않음 — 조종자가 본 색을 먼저 부르고(보고 키), 관제가 맞는지 확인
+//  · 지상·관제가 색을 먼저 말하면 근처의 다른 연기(적의 기만·농가 소각 등)와 헷갈리거나 속을 수 있어서 (군 착륙 지점 표시·의무 후송 절차: 'smoke out' → 항공기가 색 판독 → 지상 확인)
+//  · 조난 연막은 빨강·주황 (해상 조난 신호 COLREG 부속서 IV: 주황 연기 · 조난 신호탄: 낮엔 주황 연기, 밤엔 붉은 불꽃)
+//  · 근처에 흰 연기(농가 소각) 하나: 잘못 부르면 +10초
+const SMK = (function () {
+  if (!SAR) return null;
+  const mk = (col, n) => { const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: col, transparent: true, opacity: 0.6, depthWrite: false, fog: false }), puffs = [];
+    for (let k = 0; k < n; k++) { const p = new THREE.Mesh(USPH, m.clone()); p.userData.ph = k / n; p.userData.j = Math.random(); g.add(p); puffs.push(p); } g.visible = false; MSG.sar.add(g); return { g, puffs }; };
+  const sig = mk(0xd8352a, 16), dec = mk(0xe9e6df, 14);
+  const fl = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff3020, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false })); fl.scale.set(6, 6, 1); fl.renderOrder = 5; fl.visible = false; MSG.sar.add(fl);   // 밤: 붉은 신호탄 불빛
+  return { sig, dec, fl, arm: false, on: false, ok: false, t: 0, col: 'red', night: false };
+})();
+const SMK_C = { red: [0xd8352a, '빨강', 'red'], orange: [0xff7a1c, '주황', 'orange'], white: [0xe9e6df, '흰색', 'white'] };
+function smkReset() {   // 임무 시작 때: 이번 판에 이벤트가 있을지 · 색 · 흰 연기 자리
+  if (!SMK) return; SMK.on = false; SMK.ok = false; SMK.t = 0; SMK.calls = 0; SMK.seen = null; SMK.sig.g.visible = SMK.dec.g.visible = SMK.fl.visible = false;
+  SMK.arm = SET.diff === 'train' || Math.random() < 0.7; SMK.night = !!ENV.night; SMK.col = SMK.night ? 'red' : Math.random() < 0.6 ? 'red' : 'orange';
+  SMK.sig.puffs.forEach(p => p.material.color.setHex(SMK_C[SMK.col][0]));
+  SMK.sig.g.position.copy(SAR.c).add(new V3(1.2, 0, 0.6)); SMK.fl.position.copy(SAR.c).add(new V3(1.2, 1.4, 0.6)); if (STREES && STREES.topAt) SMK.fl.position.y = Math.max(SMK.fl.position.y, STREES.topAt(SAR.c.x, SAR.c.z, 3) + 1);   // 신호탄 불빛은 수관 위로 번져 보이게
+  SMK.dec.g.position.copy(SAR.c);
+  if (SMK.arm && !SMK.night) for (let t = 0; t < 30; t++) { const a = Math.random() * 6.283, dd = 220 + Math.random() * 120, q = W(SAR.d + Math.cos(a) * dd, SAR.s + Math.sin(a) * dd, 0);
+    if (flyL(q) <= FLY_R_SAFE - 40) { SMK.dec.g.position.copy(q); SMK.dec.g.visible = true; break; } }   // 흰 연기(농가 소각)는 처음부터 피어오름
+}
+function smkPop() {   // 실종자가 연막을 터뜨림 (관제는 색을 말하지 않음)
+  SMK.on = true; SMK.t = 0; if (SMK.night) SMK.fl.visible = true; else SMK.sig.g.visible = true;
+  comm(`${CS}, CONTROL. We have the subject on the phone. He hears your drone and is ${SMK.night ? 'lighting a flare' : 'popping smoke'} now. Smoke out. Call the colour when you see it.`,
+    SMK.night ? '실종자와 통화됨 · 드론 소리 들림 · 신호탄 점화. 보이면 색을 먼저 부를 것.' : '실종자와 통화됨 · 드론 소리 들림 · 연막 터뜨림. 보이면 색을 먼저 부를 것 (관제는 색을 말하지 않음).');
+}
+function smkTick(dt, cur) {
+  if (!SMK || !MSG.sar || !MSG.sar.visible) return;
+  const o = msObj(), searching = o && o.t === 'sarfind' && S.state === 'run';
+  if (SMK.arm && !SMK.on && searching && MS.t0 > 20 && cur.distanceTo(SAR.c) < 320) smkPop();   // 드론 소리가 들릴 만큼 오면
+  if (SMK.on) { SMK.t += dt; if (SMK.t > 90 && !SMK.ok) { SMK.sig.g.visible = SMK.fl.visible = false; } }   // 손 연막은 1분 남짓
+  if (SMK.on && SMK.ok && SMK.t > 30) { SMK.sig.g.visible = SMK.fl.visible = false; }
+  const anim = (P, h, size) => { const g = P.g; if (!g.visible) return; const wv = windAt(g.position.clone().setY(g.position.y + 15)), wl = Math.hypot(wv.x, wv.z), wx = wl > 0.1 ? wv.x / wl : 0.6, wz = wl > 0.1 ? wv.z / wl : 0.3, lean = 6 + wl * 4;
+    for (const p of P.puffs) { const u = (envT * 0.11 + p.userData.ph) % 1, j = p.userData.j; p.position.set(wx * lean * Math.pow(u, 1.3) * 2 + Math.sin(u * 7 + j * 6) * 1.2 * u, 0.6 + u * h, wz * lean * Math.pow(u, 1.3) * 2 + Math.cos(u * 5 + j * 6) * 1.2 * u);
+      const k = (0.8 + u * size); p.scale.set(k, k * 0.85, k); p.material.opacity = 0.85 * Math.min(1, u * 6) * Math.pow(1 - u, 0.9) + 0.04; p.visible = !ENV.ir; } };
+  anim(SMK.sig, 38, 9); anim(SMK.dec, 40, 9);
+  if (SMK.fl.visible) { const f = 0.75 + 0.25 * Math.sin(envT * 23) * Math.sin(envT * 9.1); SMK.fl.material.opacity = f; SMK.fl.scale.setScalar(10 + 6 * f); }
+  // 지금 화면 가운데 쪽에 있는 연기 (보고 키로 색을 부를 대상)
+  SMK.seen = null; if (!searching || SMK.ok) return; let best = 0.45;
+  for (const [P, key] of [[SMK.sig, SMK.col], [SMK.dec, 'white']]) { const vis = SMK.night && P === SMK.sig ? SMK.fl.visible : P.g.visible; if (!vis) continue;
+    const c = (SMK.night && P === SMK.sig ? SMK.fl.position : P.g.position).clone().add(new V3(0, SMK.night ? 0 : 10, 0)); if (!sensorSees(c, cur, 900)) continue;
+    const sp = toScreen(c), x = Math.abs(sp.x / innerWidth * 2 - 1), y = Math.abs(1 - sp.y / innerHeight * 2), r = Math.hypot(x, y * 0.8); if (r < best) { best = r; SMK.seen = { key, real: P === SMK.sig }; } }
+}
+function smkCall() {   // 보고 키: 가운데 연기 색을 부름 → 관제 확인
+  const c = SMK.seen; if (!c) return false; const C = SMK_C[c.key], o = msObj(); SMK.calls++;
+  comm(`Control, Eagle One. I see ${C[2]} ${SMK.night && c.real ? 'flare' : 'smoke'}.`, `이글 원: ${C[1]} ${SMK.night && c.real ? '신호탄' : '연기'} 보임`, OP);
+  if (c.real) { SMK.ok = true; SMK.t = Math.min(SMK.t, 5); dbfObj(L2('연막 색 부르기', 'Smoke colour call'), SMK.calls === 1); sfx('good'); showMsg(L2(`${C[1]} 연막 확인 ✓ · 연기 아래를 수색`, `${C[2].toUpperCase()} smoke confirmed ✓ · search under it`), '#5dff9a', 1.8);
+    setTimeout(() => comm(`Roger ${C[2]}, that's your subject. Search directly under the smoke.`, `${C[1]} 확인 · 실종자 위치. 연기 바로 아래를 수색할 것.`), 1400);
+    if (o && o.t === 'sarfind' && o.search.r > 15) sarNarrow(o, 15, 3 + Math.random() * 3);
+  } else { S.pen += 10; sfx('bad'); showMsg(L2(`${C[1]} 연기는 아님 (+10초)`, `Not the ${C[2]} smoke (+10 s)`), '#ff9a40', 1.8);
+    setTimeout(() => comm(`Negative, that is not your subject. Keep looking for his signal.`, `아님 · 실종자 신호가 아님. 계속 찾을 것.`), 1400); }
+  return true;
 }
 function trackRandom() { const T = TRACK; T.s = Math.random() * T.total * 0.25;
   { const endAt = s0 => { for (let s = s0; s <= T.total; s += 10) if (flyL(trackPose(s).p) > FLY_R_SAFE) return s; return T.total; }; let e = endAt(T.s), tries = 0; while (e - T.s < 800 && tries++ < 20) { T.s = Math.random() * T.total * 0.5; if (flyL(trackPose(T.s).p) > FLY_R_SAFE) continue; e = endAt(T.s); } T.endS = e; /* 비행 구역 밖으로 나가는 곳에서 끝 */ }
@@ -1950,10 +2007,12 @@ function commStart(kind) {
 }
 let COMM_LAST = 0;
 function commAck(o, kind) {   // 목표 하나 끝났을 때
-  const left = MS.list.filter(x => !x.done).length;
-  if (kind === 'recon') { const x = MS.list.find(y => !y.done), b = x ? brgFrom(DR.p, x.tp) : null; return comm(`Copy imagery. ${b ? `Next structure bearing ${b.brgW}, about ${b.distW} meters from your position.` : 'All imagery received.'}`, b ? `촬영 확인. 다음 대상: 현 위치에서 방위 ${b.brg}° · 약 ${b.dist} m` : '촬영 모두 수신.'); }
+  if (o && o.rtb) return;   // 복귀·착륙은 표적이 아님 (임무 완료 무전이 따로 나옴) — 예전엔 착륙하면 '촬영 확인'·'불씨 확인'이라고 답했음
+  const rest = MS.list.filter(x => !x.done && !x.rtb), left = rest.length, rtb = MS.list.find(x => !x.done && x.rtb);
+  const home = rtb ? (rtb.t === 'rwyland' ? [' RTB and land on the runway.', ' 복귀 · 활주로 착륙.'] : rtb.t === 'land' ? [' RTB to the launch pad.', ' 출발 패드로 복귀.'] : [' RTB.', ' 복귀.']) : ['', ''];
+  if (kind === 'recon') { const x = rest.find(y => y.tp), b = x ? brgFrom(DR.p, x.tp) : null; return comm(`Copy imagery. ${b ? `Next structure bearing ${b.brgW}, about ${b.distW} meters from your position.` : 'All imagery received.' + home[0]}`, b ? `촬영 확인. 다음 대상: 현 위치에서 방위 ${b.brg}° · 약 ${b.dist} m` : '촬영 모두 수신.' + home[1]); }
   if (kind === 'recon-old') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
-  if (kind === 'fire') return comm(`Copy imagery, hotspot confirmed at grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? ' Stand by for the next report.' : ' All reported.'}`, `사진 접수 · 불씨 확인, 진화대 출동.${left ? ' 다음 신고 대기.' : ' 모두 보고됨.'}`);
+  if (kind === 'fire') return comm(`Copy imagery, hotspot confirmed at grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? ' Stand by for the next report.' : ' All reported.' + home[0]}`, `사진 접수 · 불씨 확인, 진화대 출동.${left ? ' 다음 신고 대기.' : ' 모두 보고됨.' + home[1]}`);
   if (kind === 'sar' && o.t === 'sarfind') return comm(`Copy imagery, subject located at grid ${grid(SAR.d, SAR.s)}. ${AFc().drop ? 'Drop the rescue kit within five meters.' : 'Return to base.'}`, `실종자 위치 확인. ${AFc().drop ? '구조 키트 5 m 이내 투하.' : '복귀.'}`);
   if (kind === 'sar' && o.t === 'sarkit') return comm('Good drop, kit on the ground. Ground team is en route. RTB.', '키트 전달 확인. 구조대 이동 중. 복귀.');
   if (kind === 'forest' || kind === 'race' || kind === 'ridge') {
@@ -2944,7 +3003,7 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { HG, sky, startPos, startHead, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, sky, startPos, startHead, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 설정 ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
