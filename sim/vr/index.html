@@ -32,6 +32,7 @@ window.addEventListener('error',function(e){var st='';try{st=(e.error&&e.error.s
 .boot .bgate b{display:block;font:700 22px "SF Mono",Menlo,monospace;letter-spacing:.08em;color:#fff}.boot .bgate small{display:block;margin-top:4px;font-size:13px;color:#9aa6ad}.boot .bgate .pindots{margin:14px 0 16px}.boot .bgate .bmsg{min-height:17px;margin:8px 0 0;font-size:12.5px;color:#ff6a5a}
 .boot .blogo{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000;opacity:0;pointer-events:none;transition:opacity .45s ease}.boot.splash .blogo{opacity:1;transition:none}.boot.splash .bskip,.boot.splash .bfoot{opacity:0}.boot.splash.slow .bfoot{opacity:1;z-index:5}
 .boot .blogo b{padding-left:.34em;font:700 clamp(22px,5.2vw,48px)/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.34em;color:#fff;opacity:0;animation:blIn 1s ease .1s forwards paused}.boot.splash .blogo b,.boot.splash .blogo i{animation-play-state:running}
+.boot .blogo .btap{position:absolute;bottom:22%;left:0;right:0;text-align:center;font:600 14px/1.4 system-ui,sans-serif;letter-spacing:.12em;color:rgba(255,255,255,.8);opacity:0;transition:opacity .4s}.boot.tapgo .blogo .btap{opacity:1;animation:btapP 1.6s ease-in-out infinite}@keyframes btapP{50%{opacity:.45}}
 .boot .blogo i{display:block;width:0;height:2px;margin-top:18px;background:#ffc828;border-radius:1px;animation:blLine .8s ease .35s forwards paused}
 @keyframes blIn{from{opacity:0;transform:scale(.94);letter-spacing:.5em}to{opacity:1;transform:none;letter-spacing:.34em}}@keyframes blLine{to{width:min(200px,36vw)}}
 .boot .bpick{display:none;position:absolute;left:50%;top:58%;transform:translateX(-50%);gap:10px;flex-wrap:wrap;justify-content:center;width:min(780px,94vw)}.boot.picking .bpick{display:flex;animation:bpIn .5s ease both}
@@ -644,7 +645,7 @@ body.touch #map{border-radius:9px}
   <div class="btitle"><b>FPV TERRAIN TRAINER</b><span>실제 지형 드론 훈련 시뮬레이터</span></div>
   <div id="bootGate" class="bgate"><b>FPV</b><small id="bootGateT"></small><div id="bootDots" class="pindots"><i></i><i></i><i></i><i></i></div><div id="bootPad" class="pinpad"><button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button><button>8</button><button>9</button><span></span><button>0</button><button data-k="del">⌫</button></div><p id="bootMsg" class="bmsg"></p></div>
   <div id="bootPick" class="bpick"></div>
-  <div id="bootLogo" class="blogo"><b>HOVERWORKS</b><i></i></div>
+  <div id="bootLogo" class="blogo"><b>HOVERWORKS</b><i></i><small class="btap"></small></div>
   <div class="bfoot"><div class="bbar"><i id="bootBar"></i></div><div id="bootTxt" class="btxt">LOADING</div></div>
   <button id="bootSkip" class="bskip">건너뛰기 ▸</button><div class="battr">지형 © 국토지리정보원 · Copernicus DEM</div></div>
 <script>/* 받는 차례: 첫 화면 영상(인트로)을 먼저 받고, 앱 코드·라이브러리·미리 받기(나무·바닥 사진)는 그 뒤에 (느린 망에서 인트로가 늦지 않게)
@@ -754,7 +755,12 @@ function kbGc(i){if(KB.gc===i)return;KB.gc=i;setTimeout(function(){for(var j=0;j
 function kbJoin(){if(KB.vid||KB.jn)return;KB.jn=1;try{v.preload='auto'}catch(e){}if(!VB.set){VB.set=1;v.src=VB.url;}   // 영상 도착: 지금 사진 시계 시점으로 맞춰 틀고, 나오기 시작하면 사진을 걷어냄
 var dn=0,go=function(){if(dn)return;dn=1;v.removeEventListener('loadedmetadata',go);if(st!=='intro'||KB.vid)return;try{v.currentTime=Math.min(DUR-0.6,ktime()+0.1)}catch(e){}var p;try{p=v.play()}catch(e){}if(p&&p.catch)p.catch(function(){VB.nojoin=1;KB.jn=0;});};
 if(v.readyState>=1)go();else{v.addEventListener('loadedmetadata',go);setTimeout(go,1000);}}   // preload=none 이면 (사파리) 메타데이터를 안 읽음 → auto 로 · 1초 안에 안 오면 그냥 틀고 'playing' 때 시점을 맞춤
-function splash(){if(seen||!hasVid){startIntro();return;}st='splash';BT.classList.add('splash');chime();var s0=Date.now();
+function splash(){if(seen||!hasVid){startIntro();return;}st='splash';BT.classList.add('splash');
+if(M.on&&M.ctx&&M.ctx.state!=='running'){try{M.ctx.resume()}catch(e){}setTimeout(function(){if(st!=='splash'||gone)return;if(M.ctx.state==='running'){splashGo();return;}   // 소리가 막혀 있으면(입장 번호를 이미 넣은 기기 등 · 누른 적이 없음): 로고에서 한 번 눌러 시작 → 그 누름으로 소리를 켜고 로고 소리·인트로 음악
+st='tap';BT.classList.add('tapgo');var tp=BT.querySelector('.btap');if(tp)tp.textContent=L(touch?'화면을 눌러 시작 · 소리 켜짐':'아무 키나 눌러 시작 · 소리 켜짐',touch?'Tap to start · sound on':'Press any key to start · sound on');},250);return;}
+splashGo();}
+function tapGo(){if(st!=='tap')return;st='splash';BT.classList.remove('tapgo');unlock(function(){splashGo();});setTimeout(function(){if(st==='splash'&&!M.sg)splashGo();},600);}   // 소리 켜기를 기다리되 늦으면 그냥
+function splashGo(){if(M.sg)return;M.sg=1;st='splash';chime();var s0=Date.now();
 setTimeout(function go(){if(st!=='splash')return;var w=Date.now()-s0;if(!VB.ok&&VB.busy&&VB.eta!=null&&VB.eta<1.3&&w<2800){setTimeout(go,100);return;}   // 영상을 거의 다 받았으면 잠깐 더 (최대 1.5초)
 if(!VB.ok&&!VB.legacy&&!(VB.po&&(!M.on||M.got))&&w<7000){if(w>2500)BT.classList.add('slow');setTimeout(go,100);return;}   // 사진으로 시작할 때: 첫 그림과 곡이 올 때까지 로고 (아주 느린 망 · 최대 7초) — 빈 화면·소리 없이 시작하지 않게
 BT.classList.remove('splash');startIntro();},1300);}
@@ -778,10 +784,10 @@ v.addEventListener('ended',toLogo);var ss=v.getElementsByTagName('source');if(ss
 v.addEventListener('error',function(){if(VB.set){VB.nojoin=1;KB.jn=0;if(st==='intro'&&!KB.on)kbStart(0);return;}toLogo();});   // 받아 둔 파일을 못 틀면 사진으로 (같은 파일을 또 받지 않음)
 v.addEventListener('playing',function(){BT.classList.add('playing');if(KB.on&&!KB.vid){var dd=v.currentTime-ktime();if(Math.abs(dd)>0.25){try{v.currentTime=ktime()+0.05}catch(e){}}KB.vid=true;clearInterval(KB.iv);setTimeout(function(){if(st==='intro')BT.classList.add('kbv')},120);}msync();if(!v.__cap){v.__cap=1;setTimeout(function(){if(st==='intro')toLogo();},14000);}});
 setTimeout(function(){rd=true;chk();},45000);window.addEventListener('error',function(){rd=true;chk();});
-BT.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#bootPick button,#bootPad'))return;if(first())return;if(st==='intro'||st==='splash')toLogo();});
+BT.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#bootPick button,#bootPad'))return;if(st==='tap'){M.tap=1;tapGo();return;}if(first())return;if(st==='intro'||st==='splash')toLogo();});
 window.addEventListener('keydown',function(e){if(gone)return;var k=e.key;
 if(st==='gate'){if(/^\d$/.test(k))gpress(k);else if(k==='Backspace')gpress('del');e.preventDefault();e.stopImmediatePropagation();return;}
-if(st==='intro'||st==='splash'){if(!first())toLogo();e.preventDefault();}else{first();if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();}
+if(st==='tap'){M.tap=1;tapGo();e.preventDefault();}else if(st==='intro'||st==='splash'){if(!first())toLogo();e.preventDefault();}else{first();if(!(k==='Enter'||k===' '||k==='Tab'||/^Arrow/.test(k)))e.preventDefault();}
 if(st==='logo'&&/^Arrow/.test(k)){var bs=pk.getElementsByTagName('button'),c=[].indexOf.call(bs,document.activeElement),d=/Right|Down/.test(k)?1:-1;if(bs.length)try{bs[(c+d+bs.length)%bs.length].focus()}catch(x){}}
 e.stopImmediatePropagation();},true);
 if(needGate){st='gate';BT.classList.add('gating');}else splash();
@@ -798,7 +804,7 @@ if(dx||dy){if(!rep||now>mvT){mvT=now+(rep?170:420);rep++;var i=bs.indexOf(foc);i
 if(eA){if(foc&&bs.indexOf(foc)>=0)foc.click();else setF(bs[0]);}
 if(eB&&st==='gate')gpress('del');}
 else if(foc)setF(null);
-if((eA||eS)&&(st==='intro'||st==='splash'))toLogo();}
+if((eA||eS)&&st==='tap')tapGo();else if((eA||eS)&&(st==='intro'||st==='splash'))toLogo();}
 var iv=setInterval(tick,16);})();   // 그림 프레임과 상관없이 16 ms 마다 (느린 기기에서도 누름을 놓치지 않게)   // 입장 번호를 이미 넣은 기기는 인트로가 바로 (소리는 허락된 창이면 같이, 아니면 '소리 켜기')
 if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
 <canvas id="c"></canvas>
