@@ -80,26 +80,48 @@ function makeQuadFPV(ghost, kam) {
   const carbon = K.m(pm(0x161718, { roughness: 0.4, metalness: 0.3 }, 1)), dark = K.m(mat(0x1e2023, { roughness: 0.5, metalness: 0.2 }));
   const mot = K.m(mat(kam ? 0x55606a : 0x8e3a30, { roughness: 0.32, metalness: 0.8 })), alu = K.m(mat(0x9aa0a6, { roughness: 0.35, metalness: 0.8 }));
   const PL = 0.05 * S7, PW = 0.16 * S7;
-  K.add(UBOX, carbon, 0, 0, 0, PL, 0.005, PW);                                           // 아래 판
-  K.add(UBOX, carbon, 0, 0.03, 0, PL * 0.9, 0.004, PW * 0.72);                           // 위 판
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) K.add(UCYL, alu, sx * PL * 0.36, 0.015, sz * PW * 0.3, 0.003, 0.026, 0.003);   // 기둥 4개
+  // 판 하나: (x, 앞+) 평면 다각형을 두께 th 로 뽑고 모서리 둥글림 · y0 = 바닥
+  const slab = (pts, th, bev, mt, y0, x0, z0, ry) => { const sh = new THREE.Shape(); sh.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], pts[i][1]); sh.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.0005, th - bev * 2), bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: 2 }); geo.rotateX(-Math.PI / 2); geo.translate(0, y0 + bev, 0); uvScale(geo, mt);
+    const me = new THREE.Mesh(geo, mt); me.position.set(x0 || 0, 0, z0 || 0); me.rotation.y = ry || 0; me.castShadow = !K.gm; K.g.add(me); return me; };
+  const rr = (w, l, c) => [[-w + c, -l], [w - c, -l], [w, -l + c], [w, l - c], [w - c, l], [-w + c, l], [-w, l - c], [-w, -l + c]];   // 모서리 깎은 직사각형 (반폭 w · 반길이 l)
+  const tpu = K.m(mat(kam ? 0x3b4232 : 0xb8461f, { roughness: 0.75 }));   // 3D 프린트 TPU 부품 (주황 · 자폭형은 국방색)
+  slab(rr(PL * 0.62, PW * 0.42, 0.008), 0.005, 0.0012, carbon, -0.0025);                     // 아래 판 (가운데)
+  slab(rr(PL * 0.5, PW * 0.36, 0.007), 0.003, 0.001, carbon, 0.028);                          // 위 판
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) K.add(UCYL, alu, sx * PL * 0.4, 0.0145, sz * PW * 0.3, 0.0028, 0.026, 0.0028);   // 기둥 4개
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) K.add(UCYL, alu, sx * PL * 0.4, 0.031, sz * PW * 0.3, 0.004, 0.0018, 0.004);     // 기둥 나사
+  // 비행 제어기·ESC 스택 (판 사이): 녹색 기판 두 장 + 커패시터
+  const pcb = K.m(mat(0x1d3b2a, { roughness: 0.55, metalness: 0.1 }));
+  K.add(UBOX, pcb, 0, 0.008, 0.004, 0.03, 0.0016, 0.03); K.add(UBOX, pcb, 0, 0.017, 0.004, 0.03, 0.0016, 0.03);
+  K.add(UCYL, K.m(mat(0x1a1c1e, { roughness: 0.4, metalness: 0.4 })), 0, 0.01, 0.04 * S7, 0.005, 0.016, 0.005).rotation.x = Math.PI / 2;
   const props = [];
   for (const [x, z] of [[0.085, -0.075], [-0.085, -0.075], [0.085, 0.075], [-0.085, 0.075]]) {
-    const X = x * S7, Z = z * S7, a = K.add(UBOX, carbon, X / 2, 0, Z / 2, 0.018, 0.005, Math.hypot(X, Z)); a.rotation.y = Math.atan2(X, Z);
-    K.add(UCYL, dark, X, 0.006, Z, 0.015 * S7, 0.006, 0.015 * S7);                      // 모터 받침
-    K.add(UCYL, mot, X, 0.016, Z, 0.0135 * S7, 0.014, 0.0135 * S7);                      // 모터 벨
-    K.add(UCYL, alu, X, 0.025, Z, 0.006, 0.006, 0.006);                                  // 축 너트
-    for (let k = 0; k < 3; k++) { const b = K.add(UBOX, dark, X + Math.cos(k * 2.1) * 0.0125 * S7, 0.013, Z + Math.sin(k * 2.1) * 0.0125 * S7, 0.0025, 0.012, 0.0025); b.rotation.y = -k * 2.1; }   // 벨 홈
-    props.push(propHub(K, X, 0.03, Z, 0.064 * S7, 3, 1, kam ? 0x30343a : 0x1e2a3c));
+    const X = x * S7, Z = z * S7, L = Math.hypot(X, Z), r0 = 0.012 * S7, r1 = 0.0085 * S7, pr = 0.0155 * S7;
+    // 팔: 뿌리가 넓고 모터 쪽이 좁은 한 장짜리 탄소 판 + 둥근 모터 자리 + 가운데 가벼움 구멍 자리(어두운 띠)
+    slab([[-r0, 0.02], [r0, 0.02], [r1, L - pr * 0.6], [-r1, L - pr * 0.6]], 0.005, 0.0012, carbon, -0.0025, 0, 0, Math.atan2(X, Z) + Math.PI);
+    K.add(UCYL, carbon, X, 0, Z, pr, 0.005, pr);                                        // 모터 자리
+    { const hb = K.add(UBOX, dark, X * 0.55, 0.0028, Z * 0.55, 0.005, 0.0006, L * 0.32); hb.rotation.y = Math.atan2(X, Z); }
+    // 모터: 아래 고정부 · 코일이 보이는 틈 · 벨(종) · 위 덮개 · 축
+    K.add(UCYL, dark, X, 0.005, Z, 0.0125 * S7, 0.005, 0.0125 * S7);
+    K.add(UCYL, K.m(mat(0xb87333, { roughness: 0.35, metalness: 0.9 })), X, 0.009, Z, 0.0112 * S7, 0.004, 0.0112 * S7);   // 구리 코일 틈
+    K.add(UCYL, mot, X, 0.017, Z, 0.0135 * S7, 0.012, 0.0135 * S7);                      // 모터 벨
+    K.add(UCYL, dark, X, 0.0235, Z, 0.0115 * S7, 0.0015, 0.0115 * S7);                   // 벨 윗면
+    K.add(UCYL, alu, X, 0.027, Z, 0.0055, 0.006, 0.0055);                                // 축 너트
+    for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3, b = K.add(UBOX, dark, X + Math.cos(a) * 0.0128 * S7, 0.017, Z + Math.sin(a) * 0.0128 * S7, 0.002, 0.009, 0.004); b.rotation.y = -a; }   // 벨 구멍
+    K.add(UBOX, tpu, X * 0.82, -0.004, Z * 0.82, 0.008, 0.004, 0.012).rotation.y = Math.atan2(X, Z);   // 팔 아래 TPU 범퍼
+    props.push(propHub(K, X, 0.031, Z, 0.064 * S7, 3, 1, kam ? 0x30343a : 0x1e2a3c));
   }
   K.add(UBOX, K.m(pm(0x23262b, { roughness: 0.6 }, 2)), 0, 0.045, 0.012, 0.034 * S7, 0.024, 0.068 * S7);              // 배터리
-  K.add(UBOX, K.m(mat(0x2a5aa8, { roughness: 0.6 })), 0, 0.045, 0.012, 0.0345 * S7, 0.0245, 0.03 * S7);                // 배터리 라벨 띠
+  K.add(UBOX, K.m(mat(0x34404e, { roughness: 0.6 })), 0, 0.045, 0.012, 0.0345 * S7, 0.0245, 0.03 * S7);                // 배터리 라벨 띠
   K.add(UBOX, K.m(mat(0x101214, { roughness: 0.8 })), 0, 0.045, -0.012 * S7, 0.037 * S7, 0.027, 0.01);                // 배터리 고정 띠
   K.add(UBOX, K.m(mat(0xf1c21b, { roughness: 0.5 })), 0.01, 0.038, 0.05 * S7, 0.01, 0.008, 0.012);                     // XT60
-  K.add(UBOX, K.m(mat(0x1b1d20, { roughness: 0.35 })), 0, 0.018, -0.06 * S7, 0.02, 0.02, 0.02);                        // FPV 카메라
-  for (const sx of [-1, 1]) K.add(UBOX, carbon, sx * 0.0125, 0.018, -0.058 * S7, 0.0025, 0.026, 0.026);                 // 카메라 옆판
-  K.add(UCYL, alu, 0, 0.018, -0.071 * S7, 0.008, 0.004, 0.008).rotation.x = Math.PI / 2;
-  K.add(UCYL, K.m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 })), 0, 0.018, -0.0735 * S7, 0.0065, 0.004, 0.0065).rotation.x = Math.PI / 2;
+  { const cam = new THREE.Group(); cam.position.set(0, 0.016, -0.062 * S7); cam.rotation.x = 0.45; K.g.add(cam);        // FPV 카메라 (위로 25° 기울임)
+    K.add(UBOX, K.m(mat(0x1b1d20, { roughness: 0.35 })), 0, 0, 0.002, 0.019, 0.019, 0.018, cam);
+    K.add(UCYL, alu, 0, 0, -0.009, 0.0085, 0.006, 0.0085, cam).rotation.x = Math.PI / 2;
+    K.add(UCYL, K.m(mat(0x0a1420, { roughness: 0.05, metalness: 0.6 })), 0, 0, -0.0125, 0.0068, 0.002, 0.0068, cam).rotation.x = Math.PI / 2; }
+  for (const sx of [-1, 1]) { K.add(UBOX, tpu, sx * 0.0122, 0.017, -0.058 * S7, 0.003, 0.03, 0.03); K.add(UCYL, alu, sx * 0.0142, 0.016, -0.062 * S7, 0.003, 0.002, 0.003).rotation.z = Math.PI / 2; }   // TPU 카메라 옆판 + 각도 나사
+  K.add(UBOX, tpu, 0, 0.034, 0.068 * S7, 0.016, 0.01, 0.014);                                                          // 뒤 TPU 안테나 받침
+  K.add(UBOX, K.m(mat(0x101214, { roughness: 0.9 })), 0, 0.0315, 0.012, 0.036 * S7, 0.003, 0.07 * S7);                  // 배터리 미끄럼 방지 패드
   const ant = K.add(UCYL6, dark, 0, 0.06, 0.065 * S7, 0.0018, 0.055, 0.0018); ant.rotation.x = -0.6;                    // 영상 송신 안테나 (뒤로 비스듬히)
   K.add(USPH, K.m(mat(0x202326, { roughness: 0.6 })), 0, 0.082, 0.083 * S7, 0.0055, 0.0055, 0.0055);
   for (const sx of [-1, 1]) { const w = K.add(UCYL6, dark, sx * 0.02, 0.045, 0.075 * S7, 0.0012, 0.05, 0.0012); w.rotation.x = -1.0; w.rotation.z = sx * 0.5; }   // 수신 안테나 2
@@ -110,8 +132,8 @@ function makeQuadFPV(ghost, kam) {
     for (let k = 0; k < 4; k++) { const f = K.add(UBOX, olive, 0, -0.04, 0.07, 0.003, 0.03, 0.03); f.rotation.z = k * Math.PI / 2; f.translateY(0.04); }
     K.add(UCYL6, carbon, 0.02, 0.06, 0.09, 0.003, 0.08, 0.003).rotation.x = -0.4;
   }
-  K.add(UBOX, K.LM(0xff2a2a), 0, 0.004, 0.082 * S7, 0.03, 0.004, 0.003);                                                // 뒤 LED 띠
-  const ledG = K.add(USPH, K.LM(0x30ff60), 0.03, -0.01, 0.09 * S7, 0.0035, 0.0035, 0.0035), ledR = K.add(USPH, K.LM(0xff3030), -0.03, -0.01, 0.09 * S7, 0.0035, 0.0035, 0.0035);
+  K.add(UBOX, K.LM(0xff2a2a), 0, 0.0, 0.068 * S7, 0.026, 0.003, 0.002);                                                // 뒤 LED 띠
+  const ledG = K.add(USPH, K.LM(0x30ff60), 0.085 * S7, -0.004, 0.075 * S7, 0.003, 0.003, 0.003), ledR = K.add(USPH, K.LM(0xff3030), -0.085 * S7, -0.004, 0.075 * S7, 0.003, 0.003, 0.003);   // 뒤 팔 끝 아래
   return { g: K.g, props, cans: [], leds: [ledG, ledR] };
 }
 function makeWing(ghost, kam) {
