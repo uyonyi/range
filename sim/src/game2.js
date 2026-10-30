@@ -8,7 +8,7 @@
 //  pm(원래 색, 재질, 1 = 큰 면 · 2 = 어두운 면) — 칠한 색은 살짝 스스로 빛나게 (그늘·해질녘에도 보이게)
 var PAINT = null;
 // 단색은 숫자, 위장색은 ['camo'|'pix', 바탕, 무늬1, 무늬2, 무늬3] (camo = 얼룩 · pix = 픽셀)
-const PAINTS = { white: 0xeef1f4, orange: 0xff7a1a, yellow: 0xffd23a, red: 0xe8322b, cyan: 0x3fc8ff, lime: 0x9ae63a,
+const PAINTS = { white: 0xeef1f4, orange: 0xff7a1a, yellow: 0xffd23a, red: 0xe8322b, cyan: 0x3fc8ff, lime: 0x9ae63a, black: 0x1d1f22,
   wood: ['camo', 0x4f5c3c, 0x2e3a26, 0x6b5a3a, 0x1c2118], desert: ['camo', 0xc4aa7c, 0xa58b5e, 0x8a6d44, 0xdcc79e], digital: ['pix', 0x8a9484, 0x66745f, 0xa8b0a1, 0x4b564a], snow: ['camo', 0xe9edf0, 0xbcc5cb, 0x89939a, 0xf5f7f9],
   ocp: ['camo', 0x8b8566, 0x5e6a46, 0x6d5a3e, 0xb3a98a], rok: ['pix', 0x6f7a5a, 0x3d4a35, 0x8a7d5c, 0x242a22], urban: ['pix', 0x8c9196, 0x5a6066, 0xb9bec3, 0x33373b], navy: ['camo', 0x5d6b7a, 0x3e4a57, 0x7d8b99, 0x2b333c] };   // 멀티캠 · 화강암(국군 디지털) · 도시 · 해상
 const CAMO_TX = {}, CAMO_M = 0.3;   // 위장 무늬 한 장 = 0.3 m (상자 면은 실제 크기대로 펴서 무늬 크기가 어디서나 같게)

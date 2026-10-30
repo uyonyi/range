@@ -227,7 +227,7 @@ function makeModel0(id, ghost) {
   return makeDrone(ghost);
 }
 let MODEL_ID = 'x2d', MODEL_PAINT = '';
-function paintKey(id) { const k = (SET.paint || {})[id || SET.af]; return PAINTS[k] ? k : ''; }   // 기체별로 고른 색 (없으면 원래 색)
+function paintKey(id) { const k = (SET.paint || {})[id || SET.af]; return PAINTS[k] && !/^(yellow|red|cyan)$/.test(k) ? k : ''; }   // 기체별로 고른 색 (없으면 원래 색 · 목록에서 뺀 노랑·빨강·하늘은 기본으로)
 function paintVal(k) { if (!k) return null; const v = PAINTS[k]; if (Array.isArray(v)) { const a = v.slice(); a.key = k; return a; } return v; }   // 모델에 넘길 값: 단색 숫자 / 위장 배열(+key)
 function setAirframe(id) {
   if (!AF[id]) id = 'x2d'; SET.af = id; saveSet();
@@ -961,7 +961,7 @@ function afUI() {
   { const pb = $('afPaint');   // 기체 색 (기체마다 따로 기억)
     if (pb) { const cur = paintKey(), hx = c => '#' + c.toString(16).padStart(6, '0'), hex = k => Array.isArray(PAINTS[k]) ? hx(PAINTS[k][1]) : hx(PAINTS[k]);
       const sw = k => !k ? 'linear-gradient(135deg,#4a4f56,#16181b)' : Array.isArray(PAINTS[k]) ? `conic-gradient(${hx(PAINTS[k][1])} 0 25%,${hx(PAINTS[k][2])} 0 50%,${hx(PAINTS[k][3])} 0 75%,${hx(PAINTS[k][4])} 0)` : hex(k);   // 위장은 네 색 조각
-      pb.innerHTML = `<span class="lb">${L2('기체 색', 'Colour')}</span>` + [['', L2('기본', 'Stock')], ['white', L2('흰색', 'White')], ['orange', L2('주황', 'Orange')], ['yellow', L2('노랑', 'Yellow')], ['red', L2('빨강', 'Red')], ['cyan', L2('하늘', 'Sky')], ['lime', L2('연두', 'Lime')], ['wood', L2('수풀 위장', 'Woodland')], ['desert', L2('사막 위장', 'Desert')], ['digital', L2('디지털 위장', 'Digital')], ['snow', L2('설상 위장', 'Snow')], ['ocp', L2('멀티캠', 'Multicam')], ['rok', L2('화강암 위장', 'Granite digital')], ['urban', L2('도시 위장', 'Urban')], ['navy', L2('해상 위장', 'Naval')]]
+      pb.innerHTML = `<span class="lb">${L2('기체 색', 'Colour')}</span>` + [['wood', L2('수풀 위장', 'Woodland')], ['rok', L2('화강암 위장', 'Granite digital')], ['ocp', L2('멀티캠', 'Multicam')], ['digital', L2('디지털 위장', 'Digital')], ['desert', L2('사막 위장', 'Desert')], ['urban', L2('도시 위장', 'Urban')], ['snow', L2('설상 위장', 'Snow')], ['navy', L2('해상 위장', 'Naval')], ['', L2('진회색 (기본)', 'Dark grey (stock)')], ['orange', L2('주황', 'Orange')], ['lime', L2('연두', 'Lime')], ['white', L2('흰색', 'White')], ['black', L2('검정', 'Black')]]
         .map(([k, n]) => `<button data-p="${k}" class="${k === cur ? 'on' : ''}" title="${n}" style="--pc:${sw(k)};--pc0:${k ? hex(k) : 'transparent'}"><i></i><small>${n}</small></button>`).join('') +
         `<span class="tip">${L2('어두운 숲·해질녘엔 밝은 색이 잘 보입니다', 'Bright colours stand out against dark forest and at dusk')}</span>`;
       pb.querySelectorAll('button').forEach(b => b.onclick = () => { const P = Object.assign({}, SET.paint); if (b.dataset.p) P[SET.af] = b.dataset.p; else delete P[SET.af]; SET.paint = P; saveSet(); setAirframe(SET.af); afUI(); }); } }
