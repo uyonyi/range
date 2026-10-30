@@ -43,7 +43,8 @@ const S = {
   hitCD: 0, stun: 0, bumpT: 0, flyT: 0, scanned: false
 };
 const PAY = [];
-const CAMS = ['FPV', 'CHASE', 'TOP'];
+const CAMS = ['FPV', 'CHASE', 'TOP', 'LOS'];   // LOS: 조종자 자리(출발점)에서 눈으로 좇는 카메라 — 멀어지면 줌
+const LOS = { p: new V3(), look: new V3(), fov: 50, ok: false }, _lt = new V3();   // 조종자 자리 (startRun 때 정함)
 
 function resetDrone(pos, heading) {
   DR.p.copy(pos); DR.v.set(0, 0, 0); DR.h = heading; DR.pitch = 0; DR.roll = 0; DR.alive = true; DR.q = null; DR.w = null; DR.om = 0;
@@ -62,7 +63,7 @@ function startRun(kind) {
   S.ghostT = 0; S.demoEvents = 0; S.hits = 0; S.misses = 0; S.scanned = false; S.flyT = 0; S.hitCD = 0; S.orbSum = 0; S.orbA = null; S.boosting = false; S.bellyOv = null; BOOST.on = false; { const b = $('tbBoost'); if (b) b.classList.remove('on'); }
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   droneM.cans.forEach(c => c.visible = true); ghostM.cans.forEach(c => c.visible = true);
-  resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true;
+  resetDrone(startPos(), startHead()); DR.R = AFc().R; droneM.g.visible = true; LOS.ok = false; chaseH = null;
   if (!isMission(kind)) { if (kind === 'free' && AFc().cls === 'wing' && typeof rwyMapView === 'function') rwyMapView(); else mapView('course'); }
   dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset(); try { if (typeof c1VoiceStop === 'function') c1VoiceStop(); } catch (e) { }   // 이전 비행 기록·명령·무전이 섞이지 않게
   if (isMission(kind)) msStart(kind);
@@ -532,11 +533,18 @@ function insideBunker(p) {
 // =====================================================================
 const camPos = new V3(), camLook = new V3(), qBody = new THREE.Quaternion(), qTilt = new THREE.Quaternion(), eul = new THREE.Euler(0, 0, 0, 'YXZ');
 let shake = 0, topH = 0;
+let chaseH = null;   // ACRO 추적 카메라가 보는 방향 (가는 방향을 천천히 따라감)
+function losHome() {   // 조종자 자리: 출발점(고정익은 발사 지점)에서 출발 방향 반대로 4 m, 눈높이 1.7 m
+  const p = (MS.launch ? MS.launch.p : startPos()).clone(), h = MS.launch ? MS.launch.h : startHead();
+  p.x -= Math.sin(h) * 4; p.z += Math.cos(h) * 4; p.y = groundAt(p.x, p.z) + 1.7;
+  if (STREES && STREES.topAt) p.y = Math.max(p.y, STREES.topAt(p.x, p.z, 12) + 2.5);   // 숲 속 출발점이면 수관 위 (나무에 가려 못 보지 않게 — 망루에 선 셈)
+  LOS.p.copy(p); LOS.look.copy(DR.p); LOS.fov = 50; LOS.ok = true;
+}
 function updateCamera(dt, subj) {
   if (typeof c1Camera === 'function' && c1Camera(dt, subj)) { if (shake > 0) { camera.position.add(new V3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0)); shake *= Math.exp(-dt * 8); } camera.updateProjectionMatrix(); return; }
   const mode = CAMS[S.cam];
   if (subj.q) qBody.copy(subj.q); else { eul.set(-visPitch(subj), -subj.h, -subj.roll); qBody.setFromEuler(eul); }
-  const fwd = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h));
+  let fwd = new V3(Math.sin(subj.h), 0, -Math.cos(subj.h));
   camera.up.set(0, 1, 0);
   if (mode === 'FPV') {
     qTilt.setFromAxisAngle(new V3(1, 0, 0), (AFc().cls === 'wing' ? 0 : SET.tilt) * DEG);
@@ -551,13 +559,29 @@ function updateCamera(dt, subj) {
       want = b.world(clamp(lw.lx, -n.x + 0.18, n.x - 0.18), clamp(lw.ly, n.y0 + 0.18, n.y1 - 0.18), clamp(lw.lz, 0.4, n.z - 0.2));
       camPos.lerp(want, 1 - Math.exp(-dt * 12));
     } else {
-      const Z = zoomCfg(); want = subj.p.clone().addScaledVector(fwd, -Z.d * camK()).add(new V3(0, Z.h * camK(), 0));
+      const Z = zoomCfg(); let cf = fwd, k = 9;
+      if (subj.q || (S.state !== 'replay' && effMode().acro)) {   // ACRO: 요·롤이 제멋대로라 기수 대신 '가는 방향' 뒤에 붙고, 방향은 천천히만 바꿈 → 기체가 돌아도 카메라는 차분히
+        const vx = subj.v ? subj.v.x : 0, vz = subj.v ? subj.v.z : 0, sp = Math.hypot(vx, vz), ha = sp > 2.5 ? Math.atan2(vx, -vz) : (chaseH == null ? subj.h : chaseH);
+        chaseH = chaseH == null ? ha : chaseH + wrapA(ha - chaseH) * (1 - Math.exp(-dt * (sp > 2.5 ? 2.2 : 0.8)));
+        cf = new V3(Math.sin(chaseH), 0, -Math.cos(chaseH)); k = 6;
+      } else chaseH = null;
+      want = subj.p.clone().addScaledVector(cf, -Z.d * camK()).add(new V3(0, Z.h * camK(), 0));
       want.y = Math.max(want.y, groundAt(want.x, want.z) + 0.35);
-      camPos.lerp(want, 1 - Math.exp(-dt * 9));   // 가속할 때 카메라가 처져서 멀어 보이지 않게
+      camPos.lerp(want, 1 - Math.exp(-dt * k));   // 가속할 때 카메라가 처져서 멀어 보이지 않게
+      fwd = cf;
     }
     camera.position.copy(camPos);
     camLook.lerp(subj.p.clone().addScaledVector(fwd, 1.5).add(new V3(0, 0.2, 0)), 1 - Math.exp(-dt * 9));
     camera.lookAt(camLook); camera.fov = zoomCfg().fov + (innerHeight > innerWidth ? 10 : 0) + (S.boosting && SET.boostFov !== 0 ? 9 : 0); camera.near = 0.05;
+  } else if (mode === 'LOS') {
+    // 조종자 시점(눈으로 좇기): 출발점 옆에 서서 기체를 따라 고개를 돌리고, 멀어질수록 망원 — ACRO 처럼 자세가 제멋대로여도 카메라가 흔들리지 않음
+    if (!LOS.ok) losHome();
+    camera.position.copy(LOS.p); camera.near = 0.1;
+    const d = Math.max(2, LOS.p.distanceTo(subj.p)), tf = clamp(2 * Math.atan(Math.max(0.3, subj.R || 0.3) * 13 / d) / DEG, 7, 50);   // 기체가 화면 높이의 1/13 쯤
+    LOS.fov += (tf - LOS.fov) * (1 - Math.exp(-dt * 2.5));
+    _lt.copy(subj.p); if (subj.v) _lt.addScaledVector(subj.v, 0.1);   // 가는 쪽을 조금 앞서 봄 (망원일 때 빠른 기체를 놓치지 않게)
+    LOS.look.lerp(_lt, 1 - Math.exp(-dt * 12));
+    camera.lookAt(LOS.look); camera.fov = LOS.fov;
   } else {
     // TOP: 드론 뒤쪽 위에서 비스듬히 내려다봄 (방향은 천천히 따라감)
     topH += wrapA(subj.h - topH) * (1 - Math.exp(-dt * 1.8));
@@ -870,8 +894,8 @@ function handleKeys() {
       if (S.tut.st === 'intro' && (k === 'Enter' || k === 'Space' || k === 'X_Space' || k === 'PadA')) { tutFly(); continue; }
       if (S.tut.st === 'done') { if (k === 'Enter' || k === 'Space' || k === 'X_Space' || k === 'PadA') { tutNext(); continue; } if (k === 'KeyR') { tutRetry(); continue; } }
     }
-    if (k === 'KeyC' || k === 'PadRB') { S.cam = [2, 0, 1][S.cam]; updateTags(); }
-    else if (k === 'PadLB') { S.cam = (S.cam + 2) % 3; updateTags(); }
+    if (k === 'KeyC' || k === 'PadRB') { S.cam = (S.cam + 1) % CAMS.length; updateTags(); }   // FPV → 추적 → 위 → 조종자 → FPV
+    else if (k === 'PadLB') { S.cam = (S.cam + CAMS.length - 1) % CAMS.length; updateTags(); }
     else if (k === 'KeyX' || k === 'PadLeft') { const vis = bellyMode() !== null; S.bellyOv = { val: !vis, idx: S.objIdx }; showMsg(!vis ? 'BELLY CAM ON' : 'BELLY CAM OFF', '#fff', 0.8); }
     else if (k === 'KeyV') { if (!(typeof isC1 === 'function' && isC1())) glCycle(); }   // 안내 단계: 가이드 → 목표 → 지도 → 무전
     else if (k === 'Slash' || k === 'F1') { S.keysShow = !S.keysShow; if (S.keysShow) S.keysT = 0; }
