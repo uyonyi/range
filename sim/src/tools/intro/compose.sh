@@ -1,30 +1,44 @@
 #!/bin/sh
-# 인트로 영상 합치기: render.js 가 만든 장면 프레임(fr/s1~s4, 24fps) → 짧은 교차 전환 → intro.mp4 (H.264) · intro.webm (VP9, H.264 를 못 트는 브라우저용) · intro.jpg (첫 프레임 = 영상 시작 화면과 같게) · music.wav 가 있으면 intro.mp3
+# 인트로 영상 합치기: render.js 가 만든 장면 프레임(fr/s1~s6, 24fps · 1280x720) → 0.25초 교차 전환 → intro.mp4 (H.264) · intro.webm (VP9) · intro.jpg (첫 장면) · intro_end.jpg (마지막 장면) · music.wav 가 있으면 intro.mp3
 # 사용: sh compose.sh <프레임 폴더(fr 의 부모)> <출력 폴더>
 set -e
 D=${1:-.}; O=${2:-.}
 X=0.25   # 장면 사이 교차 시간 (초)
 G="eq=contrast=1.04:saturation=1.1:brightness=0.015,vignette=PI/9"   # 색 보정 (영상·포스터 같게)
-len() { echo "scale=4; $(ls "$D/fr/$1" | wc -l) / 24" | bc; }
-L1=$(len s1); L2=$(len s2); L3=$(len s3)
-o1=$(echo "$L1 - $X" | bc); o2=$(echo "$o1 + $L2 - $X" | bc); o3=$(echo "$o2 + $L3 - $X" | bc)
+SHOTS=$(ls -d "$D"/fr/s* | xargs -n1 basename | sort)
+N=$(echo "$SHOTS" | wc -l)
+IN=""; FC=""; i=0; off=0; prev=""
+for s in $SHOTS; do
+  IN="$IN -framerate 24 -i $D/fr/$s/%04d.jpg"
+  L=$(echo "scale=4; $(ls "$D/fr/$s" | wc -l) / 24" | bc)
+  if [ $i -gt 0 ]; then
+    cur="x$i"; [ $i -eq $((N-1)) ] && cur="v0"
+    FC="$FC[$prev][$i]xfade=transition=fade:duration=$X:offset=$off[$cur];"
+    prev=$cur
+  else prev=0; fi
+  off=$(echo "$off + $L - $X" | bc)
+  i=$((i+1))
+done
 M="$O/_master.mkv"
-ffmpeg -y -hide_banner -loglevel error \
-  -framerate 24 -i "$D/fr/s1/%04d.jpg" -framerate 24 -i "$D/fr/s2/%04d.jpg" -framerate 24 -i "$D/fr/s3/%04d.jpg" -framerate 24 -i "$D/fr/s4/%04d.jpg" \
-  -filter_complex "[0][1]xfade=transition=fade:duration=$X:offset=$o1[a];[a][2]xfade=transition=fade:duration=$X:offset=$o2[b];[b][3]xfade=transition=fade:duration=$X:offset=$o3,$G,format=yuv420p[v]" \
-  -map "[v]" -an -c:v libx264 -preset veryfast -crf 12 "$M"
-ffmpeg -y -hide_banner -loglevel error -i "$M" -an -c:v libx264 -preset veryfast -crf 32 -profile:v high -pix_fmt yuv420p -movflags +faststart "$O/intro.mp4"
-V="-an -c:v libvpx-vp9 -b:v 950k -deadline good -cpu-used 2 -row-mt 1 -pix_fmt yuv420p"   # 2패스 · MP4 와 비슷한 크기
+ffmpeg -y -hide_banner -loglevel error $IN -filter_complex "${FC}[v0]$G,format=yuv420p[v]" -map "[v]" -an -c:v libx264 -preset veryfast -crf 10 "$M"
+# H.264: High 3.1 (720p24) · 2패스 1.9 Mbps (숲이 많아 crf 로는 10 MB 가 넘음) · 모든 브라우저(사파리 포함)가 트는 형식
+H="-an -c:v libx264 -preset slow -b:v 1900k -maxrate 2800k -bufsize 4500k -profile:v high -level 3.1 -pix_fmt yuv420p"
+ffmpeg -y -hide_banner -loglevel error -i "$M" $H -pass 1 -passlogfile "$O/_h264" -f mp4 /dev/null
+ffmpeg -y -hide_banner -loglevel error -i "$M" $H -pass 2 -passlogfile "$O/_h264" -movflags +faststart "$O/intro.mp4"
+rm -f "$O"/_h264*
+V="-an -c:v libvpx-vp9 -b:v 1800k -deadline good -cpu-used 2 -row-mt 1 -pix_fmt yuv420p"   # 2패스
 ffmpeg -y -hide_banner -loglevel error -i "$M" $V -pass 1 -passlogfile "$O/_vp9" -f webm /dev/null
 ffmpeg -y -hide_banner -loglevel error -i "$M" $V -pass 2 -passlogfile "$O/_vp9" "$O/intro.webm"
 rm -f "$O"/_vp9*
-ffmpeg -y -hide_banner -loglevel error -i "$D/fr/s1/0000.jpg" -vf "$G" -q:v 7 "$O/intro.jpg"
+ffmpeg -y -hide_banner -loglevel error -i "$D/fr/s1/0000.jpg" -vf "$G" -q:v 6 "$O/intro.jpg"
+ffmpeg -y -hide_banner -loglevel error -sseof -0.08 -i "$M" -frames:v 1 -q:v 5 "$O/intro_end.jpg"   # 마지막 장면 (로고 화면 바탕 · 건너뛰어도 같은 그림)
+DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$M")
 rm -f "$M"
-ffmpeg -y -hide_banner -loglevel error -sseof -0.08 -i "$O/intro.webm" -frames:v 1 -q:v 6 "$O/intro_end.jpg"   # 마지막 장면 (로고 화면 바탕 · 건너뛰어도 같은 그림)
-# 음악 (music.js 가 그린 music.wav): 최고 크기를 −1.5 dBFS 로 맞추고 8.6초에서 자름 → intro.mp3 (페이지가 영상과 맞춰 틂)
+# 음악 (music.js 가 그린 music.wav): 최고 크기를 −1.5 dBFS 로 맞추고 영상 길이 + 0.4초에서 자름 → intro.mp3
 if [ -f "$D/music.wav" ]; then
   PK=$(ffmpeg -hide_banner -i "$D/music.wav" -af volumedetect -f null - 2>&1 | sed -n 's/.*max_volume: \(-*[0-9.]*\) dB.*/\1/p')
-  ffmpeg -y -hide_banner -loglevel error -i "$D/music.wav" -af "volume=$(echo "-1.5 - ($PK)" | bc)dB,afade=t=in:d=0.02,afade=t=out:st=8.3:d=0.3" -t 8.6 -c:a libmp3lame -b:a 112k -ar 44100 "$O/intro.mp3"
+  T=$(echo "$DUR + 0.4" | bc); FO=$(echo "$T - 0.5" | bc)
+  ffmpeg -y -hide_banner -loglevel error -i "$D/music.wav" -af "volume=$(echo "-1.5 - ($PK)" | bc)dB,afade=t=in:d=0.02,afade=t=out:st=$FO:d=0.5" -t "$T" -c:a libmp3lame -b:a 128k -ar 44100 "$O/intro.mp3"
   ls -l "$O/intro.mp3"
 fi
-ls -l "$O/intro.mp4" "$O/intro.webm" "$O/intro.jpg"
+echo "video ${DUR}s"; ls -l "$O/intro.mp4" "$O/intro.webm" "$O/intro.jpg" "$O/intro_end.jpg"
