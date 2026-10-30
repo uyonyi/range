@@ -819,7 +819,7 @@ function updateHUD(dt, subj) {
   msgTimer -= dt; if (msgTimer <= 0) ui.objMsg.classList.remove('show');
   const spd = subj.v ? subj.v.length() * 3.6 : 0;
   const o = curObj();
-  const nm = glMap(), sIn = nm && searchIn(o, subj.p), dist = nm && o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : o.mk.distanceTo(subj.p)) : null;   // 목표 거리·수색 구역 = 지도·항법 정보 (안내 0 = 무전만이면 숨김)
+  const nm = glMap(), sIn = nm && searchIn(o, subj.p), dist = nm && o && o.mk && !sIn ? (o.search ? Math.max(0, Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z) - o.search.r) : Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z)) : null;   // 목표 거리·수색 구역 = 지도·항법 정보 (안내 0 = 무전만이면 숨김)
   const tm = S.state === 'replay' ? RP.t - RP.rec.s[0][0] : (S.kind === 'course' || isMission()) ? S.t : S.kind === 'demo' ? S.ghostT : S.flyT;
   ui.osd.innerHTML = `<div class="big">${fmt(tm)}${(S.kind === 'course' || isMission()) && S.pen ? ` <span style="color:#ff7070;font-size:16px">+${S.pen}s</span>` : ''}</div>` +
     `<div><b>ALT</b>${Math.max(0, agl(subj.p) - 0.06).toFixed(1)} m${TER.h ? ` <span class="x" style="color:#8fa0a9;font-size:.75em">MSL ${(subj.p.y + SITE.base).toFixed(0)}</span>` : ''}</div>` + `<div><b>SPD</b>${spd.toFixed(0)} km/h</div>` +
@@ -905,6 +905,7 @@ function handleKeys() {
     else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('조명 켬', 'LIGHT ON') : L2x('조명 끔', 'LIGHT OFF'), '#ffe9a0', 0.9); }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
     else if (k === 'KeyH') { SET.assistLv = SET.assist ? 0 : 2; modeSync(); saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }
+    else if (k === 'KeyG') { if (typeof vecCall === 'function') vecCall(false); }   // 무전 위치 요청
     else if (k === 'PadUp') { SET.tilt = Math.min(40, SET.tilt + 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
     else if (k === 'PadDown') { SET.tilt = Math.max(0, SET.tilt - 5); saveSet(); syncSeg(); showMsg('CAM TILT ' + SET.tilt + '°', '#fff', 0.7); }
     if (S.state !== 'run') continue;

@@ -11,7 +11,7 @@ const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
 //  기본값은 난이도: 입문 3 · 쉬움·ATTI 2 · 스포츠 1 (튜토리얼 3) · 바꾸면 그 판에만 (같은 임무 다시 포함) · 메뉴로 나가면 기본값
 var GL = { lv: 3, kind: null, user: false, live: false, pre: null, preDiff: null };
 const GL_NM = [['무전', 'Radio'], ['지도', 'Map'], ['목표', 'Target'], ['가이드', 'Guide']];
-const GL_DESC = [['지도에도 없음', 'bearings by radio'], ['화면 표시 없음', 'no screen markers'], ['경로 없이', 'no flight path'], ['목표 + 경로·조작', 'markers + path']];   // 바꿀 때 잠깐 뜨는 한 줄
+const GL_DESC = [['지도에도 없음 · 방위 띠와 무전 위치 요청(G)', 'radio only · heading tape + vector request (G)'], ['화면 표시 없음 · 지도·방위·무전(G)', 'no screen markers · map, heading, vectors (G)'], ['초보 · 목표 표시', 'beginner · target markers'], ['초보 · 목표 + 경로·조작', 'beginner · markers + path']];   // 바꿀 때 잠깐 뜨는 한 줄
 function glDefFor(d) { const v = { train: 3, easy: 2, atti: 2, sport: 1 }[d]; return v == null ? 2 : v; }   // 난이도별 기본 안내 단계
 function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; return glDefFor(SET.diff); }
 function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : (GL.pre != null && GL.preDiff === SET.diff) ? GL.pre : glDef('menu'); }
@@ -216,7 +216,8 @@ function navArrow(tgt, subj, o) {
   el.classList.remove('hidden'); el.classList.toggle('edge', !inside);
   el.style.transform = `translate(${sx.toFixed(0)}px, ${sy.toFixed(0)}px) translate(-50%,-50%)`;
   el.firstChild.style.transform = inside ? '' : `rotate(${rot.toFixed(0)}deg)`; const ic = inside ? '◇' : '➤'; if (el.firstChild.textContent !== ic) el.firstChild.textContent = ic;
-  const txt = dist >= 1000 ? (dist / 1000).toFixed(1) + ' km' : dist.toFixed(0) + ' m', bd = el.children[1]; if (bd.textContent !== txt) bd.textContent = txt;
+  const hz = Math.hypot(tgt.x - subj.p.x, tgt.z - subj.p.z), dyy = tgt.y - subj.p.y;   // 거리는 수평 거리 · 높이 차는 따로 (↑ 위로 · ↓ 아래로) — 예전엔 둘을 합친 직선 거리라 헷갈림
+  const txt = (hz >= 1000 ? (hz / 1000).toFixed(1) + ' km' : hz.toFixed(0) + ' m') + (Math.abs(dyy) >= 8 ? (dyy > 0 ? ' ↑' : ' ↓') + Math.abs(dyy).toFixed(0) : ''), bd = el.children[1]; if (bd.textContent !== txt) bd.textContent = txt;
 }
 function updateGuide(subj) {
   const active = S.state === 'run' && DR.alive && !(S.tut && S.tut.st !== 'fly');
