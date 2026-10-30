@@ -127,8 +127,12 @@ function makeQuadFPV(ghost, kam) {
   for (const sx of [-1, 1]) { const w = K.add(UCYL6, dark, sx * 0.02, 0.045, 0.075 * S7, 0.0012, 0.05, 0.0012); w.rotation.x = -1.0; w.rotation.z = sx * 0.5; }   // 수신 안테나 2
   if (!kam) { K.add(UBOX, K.m(mat(0x26292d, { roughness: 0.35 })), 0, 0.066, -0.014, 0.03, 0.02, 0.024); K.add(UCYL, alu, -0.007, 0.066, -0.027, 0.006, 0.004, 0.006).rotation.x = Math.PI / 2; K.add(UBOX, K.m(mat(0x0a1420, { roughness: 0.1 })), 0.006, 0.07, -0.0265, 0.008, 0.006, 0.001); }   // 액션캠 (렌즈·작은 화면)
   else {   // 탄두 모형 (아래 원통) + 지느러미
-    const olive = K.m(mat(0x5a6646, { roughness: 0.7 })), w = K.add(UCYL, olive, 0, -0.04, -0.02, 0.032, 0.2, 0.032); w.rotation.x = Math.PI / 2;
-    K.add(USPH, olive, 0, -0.04, -0.12, 0.032, 0.032, 0.03);
+    const olive = K.m(mat(0x5a6646, { roughness: 0.7 }));
+    { const P = [[0, -0.13], [0.012, -0.125], [0.024, -0.11], [0.031, -0.09], [0.032, -0.07], [0.032, 0.08], [0.026, 0.1], [0, 0.105]].map(([r, z]) => new THREE.Vector2(r, z));   // 탄두: 둥근 앞머리 원통
+      const geo = new THREE.LatheGeometry(P, 18); geo.rotateX(Math.PI / 2); const w = new THREE.Mesh(geo, olive); w.position.set(0, -0.04, 0); w.castShadow = !K.gm; K.g.add(w); }
+    K.add(UCYL, K.m(mat(0xc9a227, { roughness: 0.6 })), 0, -0.04, -0.06, 0.0338, 0.006, 0.0338).rotation.x = Math.PI / 2;   // 노란 띠
+    K.add(USPH, K.m(mat(0x8a8f93, { roughness: 0.3, metalness: 0.8 })), 0, -0.04, -0.128, 0.006, 0.006, 0.006);            // 신관 끝
+    for (const sx of [-1, 1]) K.add(UBOX, K.m(mat(0x1a1c1e, { roughness: 0.8 })), sx * 0.02, -0.012, 0, 0.004, 0.02, 0.012);   // 탄두 묶는 띠
     for (let k = 0; k < 4; k++) { const f = K.add(UBOX, olive, 0, -0.04, 0.07, 0.003, 0.03, 0.03); f.rotation.z = k * Math.PI / 2; f.translateY(0.04); }
     K.add(UCYL6, carbon, 0.02, 0.06, 0.09, 0.003, 0.08, 0.003).rotation.x = -0.4;
   }
@@ -141,7 +145,17 @@ function makeWing(ghost, kam) {
   const body = K.m(pm(kam ? 0x59624a : 0xb4bac2, { roughness: 0.6 }, 1)), dark = K.m(mat(0x2a2d31, { roughness: 0.5 })), wingM = K.m(pm(kam ? 0x4d5640 : 0xc8cdd3, { roughness: 0.58 }, 1));
   const ctl = K.m(pm(kam ? 0x3f4734 : 0xb9bec4, { roughness: 0.55 }, 2)), alu = K.m(mat(0x9aa0a6, { roughness: 0.35, metalness: 0.8 })), glass = K.m(mat(0x1b1d1f, { roughness: 0.2 }));
   let f;
-  if (kam) { f = K.add(UCAP, body, 0, 0, BZ, 0.045, BL / 3, 0.045); f.rotation.x = Math.PI / 2; }   // 캡슐(반지름 1·길이 1)은 높이 3
+  if (kam) {   // 튜브 발사형 동체: 탄두 앞머리(오지브) → 곧은 원통 → 뒤 모터 쪽으로 살짝 가늘어짐
+    const P = [[0, -0.3], [0.014, -0.295], [0.027, -0.275], [0.037, -0.245], [0.043, -0.21], [0.045, -0.17], [0.045, 0.2], [0.04, 0.26], [0.03, 0.29], [0, 0.3]].map(([r, z]) => new THREE.Vector2(r, z));
+    const geo = new THREE.LatheGeometry(P, 20); geo.rotateX(Math.PI / 2); uvScale(geo, body);
+    f = new THREE.Mesh(geo, body); f.position.set(0, 0, BZ); f.castShadow = !K.gm; K.g.add(f);
+    const band = K.m(mat(0x2a2e26, { roughness: 0.6 }));
+    for (const z of [-0.17, -0.05, 0.16]) K.add(UCYL, band, 0, 0, z, 0.0475, 0.006, 0.0475).rotation.x = Math.PI / 2;   // 이음 띠 (탄두 · 전자부 · 모터부)
+    K.add(USPH, K.m(mat(0x101418, { roughness: 0.05, metalness: 0.5 })), 0, 0, -0.293, 0.012, 0.012, 0.01);             // 탐색기 창 (앞 끝)
+    K.add(UCYL, K.m(mat(0xc9a227, { roughness: 0.6 })), 0, 0, -0.13, 0.0478, 0.008, 0.0478).rotation.x = Math.PI / 2;    // 노란 탄두 표지 띠
+    for (const sx of [-1, 1]) K.add(UBOX, band, sx * 0.04, 0.02, -0.12, 0.012, 0.01, 0.03);                              // 앞 날개 접힘 경첩
+    for (const sx of [-1, 1]) K.add(UBOX, band, sx * 0.04, -0.015, 0.2, 0.012, 0.01, 0.03);                              // 뒤 날개 접힘 경첩
+  }
   else {   // 동체: 둥근 기수 → 굵은 몸통 → 꼬리 쪽으로 가늘어짐 (회전체 · 위아래로 조금 높게)
     const P = [[0, -0.6], [0.022, -0.592], [0.04, -0.565], [0.052, -0.52], [0.058, -0.44], [0.06, -0.2], [0.056, -0.05], [0.045, 0.12], [0.03, 0.28], [0.016, 0.38], [0, 0.4]].map(([r, z]) => new THREE.Vector2(r, z - BZ));
     const geo = new THREE.LatheGeometry(P, 20); geo.rotateX(Math.PI / 2); geo.scale(1, 1.12, 1); uvScale(geo, body);
@@ -150,7 +164,7 @@ function makeWing(ghost, kam) {
   if (kam) {   // 앞·뒤 두 쌍 날개 (튜브 발사형) + 십자 꼬리
     wingPlan(K, wingM, span, 0.075, 0.055, 0.01, 0.007, 0.03, 0.03, -0.12); wingPlan(K, wingM, span * 0.85, 0.065, 0.045, 0.008, 0.007, 0.03, -0.02, 0.2);
     finPlan(K, wingM, 0.06, 0.04, 0.09, 0.015, 0.005, 0, 0.03, 0.26); finPlan(K, wingM, 0.05, 0.035, -0.07, 0.012, 0.005, 0, -0.03, 0.26);
-    K.add(USPH, glass, 0, -0.035, -0.3, 0.03, 0.025, 0.03);   // 아래 카메라
+    K.add(UBOX, K.m(mat(0x0c1218, { roughness: 0.08, metalness: 0.5 })), 0, -0.043, -0.2, 0.02, 0.006, 0.03);   // 아래 카메라 창
     for (const sx of [-1, 1]) K.add(UBOX, dark, sx * 0.03, -0.01, 0.1, 0.006, 0.004, 0.08);   // 발사관 걸림쇠
   } else {
     const WY = 0.09;   // 주익은 동체 위 받침(파일론) 위에 얹힘 (고익)
