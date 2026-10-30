@@ -315,7 +315,7 @@ const RC_DEFAULT = {
   thrType: 'center', cal: {}, pad: -1
 };
 // 버튼에 둘 수 있는 기능 → 키 (boost 는 누르는 동안) · 조종기 설정 창에서 지정
-const PAD_FN = { drop: 'Space', cam: 'KeyC', reset: 'KeyR', boost: 'hold', pause: 'Escape', assist: 'KeyH', guide: 'KeyV', zoom: 'KeyZ', belly: 'KeyX', light: 'KeyL', ir: 'KeyT', hud: 'Digit0', photo: 'Enter' };
+const PAD_FN = { drop: 'Space', cam: 'KeyC', reset: 'KeyR', boost: 'hold', pause: 'Escape', assist: 'KeyH', guide: 'KeyV', zoom: 'KeyZ', belly: 'KeyX', light: 'KeyL', ir: 'KeyT', hud: 'Digit0', photo: 'Enter', vec: 'KeyG' };
 let RC = JSON.parse(JSON.stringify(RC_DEFAULT)); const RC_DEF_AX = JSON.stringify(RC_DEFAULT.axes);
 try { const r = JSON.parse(localStorage.getItem('fpvsim_fpv_rc') || 'null'); if (r && r.axes) RC = Object.assign(RC, r); } catch (e) { }
 function saveRC() { try { localStorage.setItem('fpvsim_fpv_rc', JSON.stringify(RC)); } catch (e) { } }
