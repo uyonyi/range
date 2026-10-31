@@ -30,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['glUser', 'gCus', 'fold', 'mapZ', 'camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'season', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
+const SET_KEYS = ['glUser', 'gCus', 'fold', 'mapZ', 'camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'season', 'treeQ', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -838,9 +838,24 @@ function musicSetLevelPaused(p) { if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetA
 let flagT = 0, REC_T0_SET = false;
 const TEST = /[?&]test/.test(location.search);
 let XR_ON = false;   // VR(WebXR) 중: 화면 갱신은 XR 세션이 돌림
+// 나무 세밀도 (SET.treeQ): 자세한 나무 모형을 그리는 거리 배율 (STREES.LODD.q) · '자동'이면 비행 중 화면이 넉넉히 빠를 때(약 56 fps 넘음) 조금씩 더 멀리까지,
+//  느려지면(48 fps 아래) 바로 줄이고 25초 쉼 · 휴대폰은 1.25배까지 · VR·시험 판은 기본 거리
+const TQ = { ema: 16.7, t: 0, hold: 0 };
+function treeQTick(dt) {
+  const L = STREES && STREES.LODD; if (!L) return;
+  const m = SET.treeQ || 'auto';
+  if (m !== 'auto') { L.q = +m || 1; return; }
+  if (TEST || XR_ON) { L.q = 1; return; }
+  if (S.state !== 'run' || document.hidden || dt <= 0) return;
+  TQ.ema += (Math.min(dt * 1000, 100) - TQ.ema) * 0.05; TQ.t += dt; TQ.hold -= dt; if (TQ.t < 2) return; TQ.t = 0;
+  const qMax = LOWQ ? 1.25 : 1.9, qMin = LOWQ ? 0.8 : 0.9;
+  if (TQ.ema > 21 && L.q > qMin) { L.q = Math.max(qMin, L.q - 0.15); TQ.hold = 25; }
+  else if (TQ.ema < 17.9 && TQ.hold <= 0 && L.q < qMax) L.q = Math.min(qMax, L.q + 0.05);
+}
 function frame(now, noRender) {
   if (!TEST && !XR_ON) requestAnimationFrame(frame);
   let dt = Math.max(0, Math.min((now - last) / 1000, 0.1)); last = now;
+  treeQTick(dt);
   readInput(dt);
   rumbleTick(dt); gpnTick(dt); handleKeys();
   if (RCUI.open) rcPanelUpdate();

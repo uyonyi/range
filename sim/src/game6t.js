@@ -135,7 +135,7 @@ const TREES3 = (function () {
         }
         ck.grp.children.forEach(o => o.visible = false); meshes.forEach(m => ck.grp.add(m.im)); ck.t3 = meshes;
       }
-      setInterval(() => { const cp = camera.position; for (const ck of OUTER.CK) if (ck.t3) { const near = Math.hypot(cp.x - ck.c.x, cp.z - ck.c.z) < OUTER.CH * 0.75 + 120; for (const m of ck.t3) m.im.geometry = m.geos[near ? 0 : 1]; } }, 250);
+      setInterval(() => { const cp = camera.position; for (const ck of OUTER.CK) if (ck.t3) { const near = Math.hypot(cp.x - ck.c.x, cp.z - ck.c.z) < OUTER.CH * 0.75 + 120 * (STREES.LODD.q || 1); for (const m of ck.t3) m.im.geometry = m.geos[near ? 0 : 1]; } }, 250);
     }
     st.ready = true;
   }
@@ -160,6 +160,14 @@ const TREES3 = (function () {
       const tex = new THREE.DataTexture(L0.data, L0.width, L0.height, THREE.RGBAFormat); tex.mipmaps = lv; tex.generateMipmaps = false; tex.flipY = false;
       tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); tex.needsUpdate = true;
       st.geo = lods.map(L => L.map(geoFrom));
+      // 먼 나무(임포스터: 세로 판 십자 + 가로 판)에 입체감: 판마다 위를 향한 법선 하나뿐이라 해가 어느 쪽이든 똑같이 밝아 납작해 보였음
+      //  → 세로 판은 가장자리로 갈수록 바깥을 향하는 둥근 법선(햇빛 쪽 반은 밝고 반대쪽은 그늘) · 아래쪽은 조금 어둡게 · 가로 판은 가운데가 솟은 돔
+      for (const L of st.geo) { const g = L[2], P = g.attributes.position, n = P.count, N = new Float32Array(n * 3), C = new Uint8Array(n * 3); let ym = 0.01;
+        for (let i = 0; i < n; i++) ym = Math.max(ym, P.getY(i));
+        for (let i = 0; i < n; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), r = Math.hypot(x, z) || 1, top = i >= 8, k = Math.min(1, y / ym);   // 꼭짓점 순서: 세로 판 2장(8) · 가로 판(4)
+          let nx, ny, nz; if (top) { nx = x * 0.4; ny = 1; nz = z * 0.4; } else { nx = x / r * 0.85; nz = z / r * 0.85; ny = 0.3 + 0.5 * k; }
+          const l = Math.hypot(nx, ny, nz); N[i * 3] = nx / l; N[i * 3 + 1] = ny / l; N[i * 3 + 2] = nz / l; C.fill(Math.round(255 * (top ? 1 : 0.72 + 0.28 * k)), i * 3, i * 3 + 3); }
+        g.setAttribute('normal', new THREE.BufferAttribute(N, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3, true)); }
       st.mat = makeMat(tex, true); st.matC = makeMat(tex, false);   // 활엽(참나무·관목) · 침엽(소나무·조림)
       st.dmat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.42 });
       apply(); st.ms = Math.round(performance.now() - st.t0);

@@ -1181,10 +1181,12 @@ const STREES = (function siteTrees() {
     return best;
   }
   // 카메라 거리로 세밀도 바꿈 (0.3 초마다)
-  const LODD = { near: LOWQ ? 50 : 90, mid: LOWQ ? 170 : 300 };   // 세밀도 경계 (고급 나무 모형이 오면 바꿈 · game6t.js)
+  const LODD = { near: LOWQ ? 50 : 90, mid: LOWQ ? 170 : 300, q: 1 };   // 세밀도 경계 (고급 나무 모형이 오면 바꿈 · game6t.js) · q: 거리 배율 (나무 세밀도 설정 · 자동이면 기기 여유에 맞춰, game3 treeQTick)
   function lod(cam) {
     const far = (typeof c1VRon === 'function' && c1VRon()) ? 420 : 1e9;   // 1종 VR: 조종자가 제자리 → 먼 숲은 생략
-    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7), l = d < LODD.near ? 0 : d < LODD.mid ? 1 : 2;
+    const q = LODD.q || 1, n0 = LODD.near * q, m0 = LODD.mid * q;
+    for (const k of CHUNKS) { const d = Math.max(0, cam.distanceTo(k.c) - k.r * 0.7); let l = d < n0 ? 0 : d < m0 ? 1 : 2;
+      if (l > k.lod && d < (k.lod === 0 ? n0 : m0) * 1.08) l = k.lod;   // 멀어질 때는 조금 더 가서 바꿈 (경계에서 깜빡이지 않게)
       k.im.visible = d < far; if (l !== k.lod) { k.lod = l; k.im.geometry = k.geos[l]; } }
   }
   setInterval(() => lod(camera.position), 150);   // 가까워지면 바로 세밀한 모형으로 (조각 수십 개라 가벼움)
