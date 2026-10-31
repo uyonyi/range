@@ -137,7 +137,7 @@ function kbFill(t) {
   return t.replace(/\{(UP|DOWN|YAWL|YAWR|FWD|BACK|LEFT|RIGHT|DROP)\}/g, (m, k) => '<b>' + (T ? T[k] : keyName(KB[{ UP: 'up', DOWN: 'down', YAWL: 'yawL', YAWR: 'yawR', FWD: 'fwd', BACK: 'back', LEFT: 'left', RIGHT: 'right', DROP: 'drop' }[k]])) + '</b>');
 }
 function tutRender() {
-  const el = $('tut'); if (!S.tut || S.kind !== 'tutorial') { el.classList.add('hidden'); return; }
+  const el = $('tut'); if (!S.tut || S.kind !== 'tutorial') { el.classList.add('hidden'); document.body.classList.remove('tutBig'); return; }
   const L = LESSONS[S.tut.i], spec = typeof L.spec === 'function' ? L.spec() : L.spec;
   let steps = '';
   if (L.custom) steps = '<ol>' + L.steps.map((s, i) => `<li class="${i < S.tut.step ? 'done' : i === S.tut.step ? 'cur' : ''}">${s.label}</li>`).join('') + '</ol>';
@@ -145,10 +145,19 @@ function tutRender() {
     : S.tut.st === 'intro' ? '<div class="go">준비되면 <b>Enter</b> 또는 <b>Space</b> (게임패드 <b>A</b>) — 비행 시작</div>'
     : S.tut.st === 'done' ? `<div class="go ok">완료! <b>Enter</b>(A) ${S.tut.i + 1 < LESSONS.length ? '다음 단계' : '메뉴로'} · <b>R</b>(Y) 다시</div>`
       : '<div class="go dim"><b>R</b>(Y) 처음 위치에서 다시 · <b>Esc</b> 일시정지</div>';
-  el.classList.remove('hidden'); el.classList.toggle('mini', S.tut.st === 'fly');
-  el.innerHTML = `<div class="k">LESSON ${S.tut.i + 1} / ${LESSONS.length}</div><h4>${L.title}</h4><div class="s">${L.sub}</div>` +
+  // 비행 중에는 한 줄로 접음 (예전: 단계 목록·안내까지 커서 휴대폰에서 기체·앞이 가려짐) · 눌러서 펼치고 다시 눌러 접기
+  const fly = S.tut.st === 'fly', open = !fly || !!S.tut.open, en = window.SIM_LANG === 'en';
+  el.classList.remove('hidden'); el.classList.toggle('mini', fly && !open); el.classList.toggle('flyopen', fly && open);
+  document.body.classList.toggle('tutBig', !fly || open);
+  if (fly && !open) {
+    const cur = L.custom && L.steps[S.tut.step] ? `<span class="cur">${S.tut.step + 1}/${L.steps.length} · ${L.steps[S.tut.step].label}</span>` : '';
+    el.innerHTML = `<div class="tline"><span class="k">${S.tut.i + 1}/${LESSONS.length}</span><b>${L.title}</b>${cur}<span class="tg">${en ? '▾ more' : '▾ 설명'}</span></div>`; return;
+  }
+  el.innerHTML = `<div class="k">LESSON ${S.tut.i + 1} / ${LESSONS.length}${fly ? `<span class="tg">${en ? '▴ hide' : '▴ 접기'}</span>` : ''}</div><h4>${L.title}</h4><div class="s">${L.sub}</div>` +
     `<div class="body">${L.text.map(t => `<p>${kbFill(t)}</p>`).join('')}<div class="spec">${spec}</div></div>${steps}${foot}`;
 }
+// 튜토리얼 안내 상자 누르기: 비행 전·끝 = 시작·다음 (Enter) · 비행 중 = 설명 펼치기/접기
+$('tut').addEventListener('pointerdown', e => { if (!S.tut || S.kind !== 'tutorial') return; e.stopPropagation(); e.preventDefault(); if (S.tut.st !== 'fly') pressed.push('Enter'); else { S.tut.open = !S.tut.open; tutRender(); } });
 function tutCamera(dt) {
   const f = S.tut.startPose.focus; S.tut.t += dt;
   const a = S.tut.startPose.h + Math.PI + 0.9 + S.tut.t * 0.22, r = 9 + Math.min(S.tut.t, 3) * 0.6;
@@ -210,7 +219,7 @@ function replayStart(rec, back) {
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0; droneM.cans.forEach(c => c.visible = true);
   S.state = 'replay'; S.kind = 'replay'; if (S.cam === 0) S.cam = 1;
   ui.menu.classList.add('hidden'); ui.result.classList.add('hidden'); ui.pause.classList.add('hidden'); ui.hud.classList.remove('hidden');
-  ui.list.classList.add('hidden'); $('rp').classList.remove('hidden'); $('tut').classList.add('hidden'); ui.hud.classList.add('replaying');
+  ui.list.classList.add('hidden'); $('rp').classList.remove('hidden'); $('tut').classList.add('hidden'); document.body.classList.remove('tutBig'); ui.hud.classList.add('replaying');
   const end = rec.s[rec.s.length - 1][0]; $('rpSeek').max = end; $('rpSeek').min = rec.s[0][0];
   updateTags(); replayUI();
 }
@@ -254,7 +263,7 @@ function toMenu() {
   try { commReset(); } catch (e) { } try { if (typeof c1VoiceStop === 'function') c1VoiceStop(); } catch (e) { }   // 메뉴로 나가면 무전·시험장 안내를 바로 끊음 (밀린 것까지)
   glEnd();   // 그 판에서 바꾼 안내 단계는 여기서 끝 → 다시 난이도 기본값
   ['pause', 'result'].forEach(k => ui[k].classList.add('hidden')); ui.hud.classList.add('hidden'); ui.menu.classList.remove('hidden');
-  $('rp').classList.add('hidden'); $('tut').classList.add('hidden'); ui.hud.classList.remove('replaying');
+  $('rp').classList.add('hidden'); $('tut').classList.add('hidden'); document.body.classList.remove('tutBig'); ui.hud.classList.remove('replaying');
   PAY.forEach(p => scene.remove(p.m)); PAY.length = 0;
   resetDrone(startPos(), startHead()); refreshBest(); if (typeof mapView === 'function') mapView('course');
   if (typeof wizGo === 'function') wizGo(3);   // 비행 끝나고 돌아오면 코스 고르기 화면

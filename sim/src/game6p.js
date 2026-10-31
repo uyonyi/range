@@ -150,7 +150,7 @@ const POWER = (function powerLines() {
     TW.forEach((t, i) => { const [u, v] = mxyF(-t.z, t.x); i ? g.lineTo(u, v) : g.moveTo(u, v); }); g.stroke(); g.setLineDash([]); g.fillStyle = '#ffb040'; TW.forEach(t => { const [u, v] = mxyF(-t.z, t.x); g.fillRect(u - 1.5, v - 1.5, 3, 3); }); g.restore(); }
   const api = Object.assign(api0, { G, TW, POLES, SEG, col, topAt, tick, mapDraw });
   window.__POWER = api;
-  if (typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const kb = mapBg, kv = MAPV; mapBg = MAP_CACHE.course; MAPV = MAP_CACHE.course.V || MAPV; drawMapBg(); mapBg = kb; MAPV = kv; } catch (e) { } }
+  if (typeof mapRefresh === 'function') mapRefresh();
   return api;
 })();
 if (window.__sim) Object.assign(window.__sim, { POWER });

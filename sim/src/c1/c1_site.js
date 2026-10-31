@@ -234,7 +234,7 @@ function c1Menu(k) {
   if (!on) { if (C1.on || C1.sun) { SUN_DIR.copy(SUN0); C1.sun = null; } C1.on = false; C1.demo = false; const b = $('c1demo'); if (b) b.classList.add('hidden'); const g = $('c1g'); if (g) g.classList.add('hidden'); const na = $('c1p'); if (na) na.classList.add('hidden'); }
   C1ON = on && !C1S.real;
   const p = $('c1p'); if (p && (!on || S.state === 'menu' || S.state === 'result')) p.classList.add('hidden');
-  if (ui.map) ui.map.style.display = on ? 'none' : '';
+  if (ui.mapBox) ui.mapBox.style.display = on ? 'none' : '';
   const kh = $('keys'); if (kh) kh.style.display = on ? 'none' : '';
   document.body.classList.toggle('c1on', on && S.state !== 'menu');
 }

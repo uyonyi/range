@@ -163,7 +163,7 @@ const OUTER = (function outerWorld() {
   if (STREES && STREES.col) { const oc = STREES.col; STREES.col = (p, Rr) => oc(p, Rr) || col(p, Rr); }
   window.__OUTER = { cand: cand.slice(0, 40).map(c => [Math.round(c.x), Math.round(c.z), +c.sc.toFixed(2)]), trees: T.length, roads: roads.map(rd => ({ w: rd.w, p: rd.p })), blds: B.map(b => [b.x, b.z, b.kind]), vil: vil.map(v => [v.x, v.z]) };
   // 코스 지도(미리 그려 둔 것)에 바깥 지역을 다시 그려 넣음
-  if (typeof MAP_CACHE !== 'undefined' && MAP_CACHE.course) { try { const kb = mapBg, kv = MAPV; mapBg = MAP_CACHE.course; MAPV = MAP_CACHE.course.V || MAPV; drawMapBg(); mapBg = kb; MAPV = kv; } catch (e) { } }
+  if (typeof mapRefresh === 'function') mapRefresh();
   return { lu, B, BM, T, roads, vil, col, CK, CH };
 })();
 })();

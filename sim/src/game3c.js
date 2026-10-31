@@ -35,7 +35,6 @@ if (window.SIM_MOBILE) document.body.classList.add('mobile');
   tap('tbDrop', 'Space'); tap('tbPhoto', 'Enter'); tap('tbCam', 'KeyC'); tap('tbReset', 'KeyR'); tap('tbPause', 'Escape'); tap('tbAssist', 'KeyH'); tap('tbZoom', 'KeyZ'); tap('tbGuide', 'KeyV'); tap('tbHud', 'Digit0'); tap('tbBelly', 'KeyX'); tap('tbLight', 'KeyL'); tap('tbIR', 'KeyT'); tap('tbVec', 'KeyG');
   const bst = $('tbBoost'); bst.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); boostToggle(); });   // 한 번 누르면 켜짐, 다시 누르면 꺼짐
   $('tbFull').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleFull(); });
-  $('tut').addEventListener('pointerdown', () => { if (S.tut && S.tut.st !== 'fly') pressed.push('Enter'); });
   addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('gesturestart', e => e.preventDefault());
   // 세로 화면 안내: 전체화면 전환 중 잠깐 세로로 잡히는 크기 변화는 무시 (0.6초 넘게 세로일 때만)

@@ -30,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
+const SET_KEYS = ['glUser', 'gCus', 'fold', 'mapZ', 'camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -74,7 +74,7 @@ function startRun(kind) {
   ui.menu.classList.add('hidden'); ui.pause.classList.add('hidden'); ui.result.classList.add('hidden'); ui.hud.classList.remove('hidden'); lyApply();
   ui.list.classList.toggle('hidden', kind !== 'course' && !isMission(kind));
   renderList(); updateTags();
-  S.tut = null; $('tut').classList.add('hidden'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
+  S.tut = null; $('tut').classList.add('hidden'); document.body.classList.remove('tutBig'); $('rp').classList.add('hidden'); ui.hud.classList.remove('replaying');
   if (kind !== 'demo' && kind !== 'tutorial') recStart(); else REC = null;   // 모든 임무 기록 (리플레이·영상)
   showMsg(isMission(kind) ? MS_NAME[kind] + ' · ' + AFc().name : kind === 'course' ? ((IS_TOUCH || XR_ON) ? ((XR_ON ? vrStickMode() === 1 : stickMode() === 1) ? 'READY · 오른쪽 스틱 위로 이륙' : 'READY · 왼쪽 스틱 위로 이륙') : 'READY · ' + keyName(KB.up) + ' = TAKEOFF') : kind === 'free' ? 'FREE FLIGHT · ' + AFc().name : kind === 'tutorial' ? '' : 'REFERENCE FLIGHT', '#ffc828', 2.2);
   initAudio(); musicStart();
@@ -602,16 +602,22 @@ function updateCamera(dt, subj) {
 // =====================================================================
 const $ = id => document.getElementById(id);
 const ui = {
-  hud: $('hud'), osd: $('osd'), objNext: $('objNext'), objMsg: $('objMsg'), list: $('list'), map: $('map'), stk: $('stk'),
+  hud: $('hud'), osd: $('osd'), objNext: $('objNext'), objMsg: $('objMsg'), list: $('list'), map: $('mapCv'), mapBox: $('map'), stk: $('stk'),
   payload: $('payload'), camTag: $('camTag'), modeTag: $('modeTag'), cross: $('cross'), arrow: $('arrow'), flash: $('flash'),
   menu: $('menu'), pause: $('pause'), result: $('result'), resSub: $('resSub'), resTable: $('resTable'), resBest: $('resBest'), best: $('best'),
   brk: $('brk'), brkLbl: $('brkLbl'), fpm: $('fpm'), scope: $('scope'), scopeC: $('scopeC'), scopeTxt: $('scopeTxt'), scopeBar: $('scopeBar')
 };
 let msgTimer = 0;
 function showMsg(t, col, dur) { if (t) { S.lastMsg = t; S.lastMsgT = S.t; } if (t && REC) recEvent({ k: 'msg', text: t, col }); ui.objMsg.textContent = t; ui.objMsg.style.color = col || '#fff'; ui.objMsg.classList.add('show'); msgTimer = dur || 1.2; }
+// 과제 목록 (컴퓨터 오른쪽 위): 머리줄 '▾ 과제 3/24' 을 누르면 접고 펼침 (저장)
+function listOut(html, done, total) {
+  const fold = !!(SET.fold && SET.fold.list); ui.list.classList.toggle('fold', fold);
+  ui.list.innerHTML = total ? `<div class="lh" data-lf="1" title="${L2x('목록 접기·펼치기', 'Fold / unfold')}">${fold ? '▸' : '▾'} ${L2x('과제', 'TASKS')} ${done}/${total}</div>` + (fold ? '' : html) : '';
+}
+ui.list.addEventListener('pointerdown', e => { if (!e.target.closest || !e.target.closest('[data-lf]')) return; e.stopPropagation(); e.preventDefault(); if (!SET.fold) SET.fold = {}; SET.fold.list = !SET.fold.list; saveSet(); renderList(); });
 function renderList() {
-  if (isMission()) { ui.list.innerHTML = msListHTML(); return; }
-  if (S.kind !== 'course') { ui.list.innerHTML = ''; return; }
+  if (isMission()) { const L = MS.list || []; listOut(msListHTML(), L.filter(o => o.done).length, L.length); return; }
+  if (S.kind !== 'course') { ui.list.innerHTML = ''; ui.list.classList.remove('fold'); return; }
   let html = ''; const sl = OBJS.map((o, i) => o.kind === 'slalom' ? i : -1).filter(i => i >= 0);
   OBJS.forEach((o, i) => {
     if (o.kind === 'slalom') {
@@ -623,7 +629,7 @@ function renderList() {
     const s = S.objState[i]; const cls = i === S.objIdx ? 'cur' : s === 1 ? 'done' : s === 2 ? 'miss' : '';
     html += `<div class="${cls}">${s === 1 ? '✓' : s === 2 ? '✗' : i === S.objIdx ? '▶' : '·'} ${o.label}</div>`;
   });
-  ui.list.innerHTML = html;
+  listOut(html, S.objState.filter(v => v === 1).length, OBJS.length);
 }
 function updateTags() {
   ui.camTag.textContent = 'CAM ' + CAMS[S.cam];
@@ -635,116 +641,7 @@ function updateTags() {
 // 비행 구역: 중심 (down 150, side 0), 반지름 650 m (쿼드 경계) · 임무 사건은 이 안 (FLY_R_SAFE) 에만 둠
 const FLY_C = { x: 0, z: -150 }, FLY_R = MID ? 1000 : 650, FLY_R_SAFE = MID ? 900 : 560;   // 중간 지형이 있으면 반경 1 km
 function flyL(p) { return Math.hypot(p.x - FLY_C.x, p.z - FLY_C.z); }
-const MAPV_COURSE = (function () {
-  if (!CRS_C) return { d0: -24, d1: 340, s0: -112, s1: 90 };
-  // 전용 코스: 경로·장애물을 다 담는 범위 (세로 300 : 가로 180 비율 유지)
-  let d0 = 1e9, d1 = -1e9, s0 = 1e9, s1 = -1e9;
-  for (const q of CRS_C.path.concat(D.objs.map(o => [o.down, o.side]))) { d0 = Math.min(d0, q[0]); d1 = Math.max(d1, q[0]); s0 = Math.min(s0, q[1]); s1 = Math.max(s1, q[1]); }
-  d0 -= 30; d1 += 30; s0 -= 30; s1 += 30;
-  const kd = (d1 - d0) / 300, ks = (s1 - s0) / 180, k = Math.max(kd, ks), dc = (d0 + d1) / 2, sc = (s0 + s1) / 2;
-  return { d0: dc - 150 * k, d1: dc + 150 * k, s0: sc - 90 * k, s1: sc + 90 * k };
-})();
-let MAPV = MAPV_COURSE, mapBg = document.createElement('canvas'); mapBg.width = 180; mapBg.height = 300;
-const MAP_CACHE = {};
-function mxy(down, side) { return [(side - MAPV.s0) / (MAPV.s1 - MAPV.s0) * 180, (MAPV.d1 - down) / (MAPV.d1 - MAPV.d0) * 300]; }
-function drawMapBg() {
-  const g = mapBg.getContext('2d'); g.clearRect(0, 0, 180, 300);
-  if (TER.h) {   // 음영기복 + 등고선 (5 m 간격, 25 m 마다 굵게)
-    const id = g.createImageData(180, 300), kd = (MAPV.d1 - MAPV.d0) / 300, ks = (MAPV.s1 - MAPV.s0) / 180, CI = kd <= 1.6 ? 5 : kd <= 3.2 ? 10 : 20;   // 넓은 지도는 등고선 간격을 넓힘
-    const hAt = (x, y) => terrainAt(MAPV.s0 + x * ks, -(MAPV.d1 - y * kd));
-    for (let y = 0; y < 300; y++) for (let x = 0; x < 180; x++) {
-      const z = hAt(x, y), zx = (hAt(x + 1, y) - hAt(x - 1, y)) / (2 * ks), zy = (hAt(x, y + 1) - hAt(x, y - 1)) / (2 * kd);
-      const sh = Math.max(0, Math.min(1, 0.55 + (-zx + zy) * 0.6)), o = (y * 180 + x) * 4;
-      const c0 = Math.floor(z / CI), lineA = [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / CI) !== c0);
-      const major = lineA && [hAt(x + 1, y), hAt(x, y + 1)].some(v => Math.floor(v / (CI * 5)) !== Math.floor(z / (CI * 5)));
-      const v = 40 + sh * 70; id.data[o] = v * 0.9; id.data[o + 1] = v; id.data[o + 2] = v * 0.85; id.data[o + 3] = 150;
-      if (lineA) { id.data[o] = 200; id.data[o + 1] = 170; id.data[o + 2] = 110; id.data[o + 3] = major ? 230 : 120; }
-    }
-    g.putImageData(id, 0, 0);
-  }
-  const rect = (d0, d1, s0, s1, c) => { const a = mxy(d1, s0), b = mxy(d0, s1); g.fillStyle = c; g.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); };
-  if (CRS_C) {   // 경로 + 100 m 눈금
-    g.strokeStyle = 'rgba(255,200,40,.55)'; g.lineWidth = 2; g.setLineDash([4, 3]); g.beginPath(); CRS_C.path.forEach((q, i) => { const p = mxy(q[0], q[1]); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.stroke(); g.setLineDash([]);
-    g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '9px Menlo,monospace'; let acc = 0, nx = 100;
-    for (let i = 1; i < CRS_C.path.length; i++) { const a = CRS_C.path[i - 1], b = CRS_C.path[i]; acc += Math.hypot(b[0] - a[0], b[1] - a[1]); if (acc >= nx) { const p = mxy(b[0], b[1]); g.fillRect(p[0] - 2, p[1] - 2, 4, 4); g.fillText(nx + 'm', p[0] + 5, p[1] + 3); nx += 100; } }
-  } else {
-  rect(-6, 335, -15, 15, 'rgba(255,200,40,.10)'); rect(0, 365, -64, -33, 'rgba(120,180,90,.12)');
-  g.strokeStyle = 'rgba(255,200,40,.45)'; g.setLineDash([3, 3]); const a = mxy(335, -15), b = mxy(-6, 15); g.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); g.setLineDash([]);
-  g.fillStyle = 'rgba(255,255,255,.35)'; g.font = '9px Menlo,monospace';
-  for (const d of [100, 200, 300]) { const p = mxy(d, -15); g.fillRect(p[0], p[1], 30 / (MAPV.s1 - MAPV.s0) * 180, 1); g.fillText(d + 'm', mxy(d, 17)[0], p[1] + 3); }
-  }
-  for (const o of D.objs) {
-    const p = mxy(o.down, o.side);
-    const col = { pad: '#fff', gate_sq: '#ffc828', gate_tri: '#ffc828', ring: '#ffc828', pole: '#e0b020', bunker: '#c09060', tunnel: '#9aa', tank: '#a3b26a', mit: '#a3b26a', ivan_group: '#a3b26a' }[o.type] || 'rgba(200,200,200,.45)';
-    g.fillStyle = col; const s = ['building', 'hipbld', 'pavilion', 'bleacher', 'shelter', 'tank'].includes(o.type) ? 5 : 3; g.fillRect(p[0] - s / 2, p[1] - s / 2, s, s);
-  }
-  if (window.__RWY) {   // 활주로: 테두리 있는 흰 띠 + 이륙 방향 시단 표시 + RWY 글자
-    if (window.__RWY.apron) {   // 계류장(회색) + 유도로 + H 패드(노란 점)
-      const ap = window.__RWY.apron.map(v => mxy(-v.z, v.x)); g.fillStyle = 'rgba(170,170,160,.85)'; g.beginPath(); ap.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); g.fill();
-      const A0 = window.__RWY.a, B0 = window.__RWY.b, m0 = mxy(-(A0.z + B0.z) / 2, (A0.x + B0.x) / 2), m1 = [(ap[0][0] + ap[1][0]) / 2, (ap[0][1] + ap[1][1]) / 2]; g.strokeStyle = 'rgba(80,80,80,.95)'; g.lineWidth = 2; g.beginPath(); g.moveTo(m0[0], m0[1]); g.lineTo(m1[0], m1[1]); g.stroke();
-      g.fillStyle = '#ffc828'; window.__RWY.pads.forEach(p => { const q = mxy(-p.z, p.x); g.beginPath(); g.arc(q[0], q[1], 1.8, 0, 6.283); g.fill(); });
-    }
-    const A = window.__RWY.a, B = window.__RWY.b, p = mxy(-A.z, A.x), q = mxy(-B.z, B.x), w = Math.max(3, 12 / (MAPV.s1 - MAPV.s0) * 180 * 1.6);
-    g.setLineDash([]); g.lineCap = 'butt'; g.strokeStyle = 'rgba(10,12,14,.9)'; g.lineWidth = w + 2.5; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
-    g.strokeStyle = '#e8e8e2'; g.lineWidth = w; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
-    g.fillStyle = '#40ff70'; g.beginPath(); g.arc(p[0], p[1], 2.4, 0, 6.283); g.fill();
-    const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, nx = -(q[1] - p[1]), ny = q[0] - p[0], nl = Math.hypot(nx, ny) || 1;
-    g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,.7)'; g.fillText('RWY', mx + nx / nl * 11 + 0.8, my + ny / nl * 11 + 3.8); g.fillStyle = '#ffffff'; g.fillText('RWY', mx + nx / nl * 11, my + ny / nl * 11 + 3);
-  }
-  if (window.__OUTER) {   // 바깥 지역(임의): 길 · 건물
-    const O = window.__OUTER; g.setLineDash([]); g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const rd of O.roads) { g.strokeStyle = rd.w >= 6 ? 'rgba(235,225,200,.8)' : 'rgba(210,200,175,.6)'; g.lineWidth = rd.w >= 6 ? 1.6 : 1; g.beginPath(); rd.p.forEach(([x, z], i) => { const q = mxy(-z, x); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.stroke(); }
-    for (const [x, z, k] of O.blds) { const q = mxy(-z, x); g.fillStyle = k === 'gh' ? 'rgba(230,240,245,.85)' : k === 'shop' ? '#e0a040' : '#d8d0c0'; g.fillRect(q[0] - 1, q[1] - 1, 2, 2); }
-  }
-  if (window.__POWER) window.__POWER.mapDraw(g, mxy);   // 송전선
-  // 비행 구역 경계 (점선 원)
-  { const c = mxy(-FLY_C.z, FLY_C.x), e = mxy(-FLY_C.z + FLY_R, FLY_C.x), r = Math.abs(e[1] - c[1]); g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
-}
-drawMapBg(); MAP_CACHE.course = mapBg;
-// 지도 범위: 코스 = 코스 둘레 / 임무 = 그 임무의 사건·구역이 다 들어오게 (배경은 한 번 만들어 둠)
-// 지도 크게 보기: 지도 누르기(클릭·탭)·J 키·VR 메뉴 → 비행 구역 전체를 크게 · 다시 누르면 원래대로
-const MAPZ = { on: false, keep: null };
-function mapZoom(on) {
-  if (on === MAPZ.on) return;
-  if (on) { MAPZ.keep = { bg: mapBg, V: MAPV }; mapView('area', [[-FLY_C.z, FLY_C.x, FLY_R + 30]]); }
-  else if (MAPZ.keep) { mapBg = MAPZ.keep.bg; MAPV = MAPZ.keep.V; MAPZ.keep = null; }
-  MAPZ.on = on; ui.map.classList.toggle('big', on);
-}
-ui.map.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); mapZoom(!MAPZ.on); });
-function mapView(key, pts, once) {
-  if (MAPZ.on && key !== 'area') { MAPZ.on = false; MAPZ.keep = null; ui.map.classList.remove('big'); }   // 새 비행이 시작되면 기본 지도로
-  if (!pts || !pts.length) key = 'course';
-  if (MAP_CACHE[key] && !once) { mapBg = MAP_CACHE[key]; MAPV = MAP_CACHE[key].V; return; }
-  let d0 = 1e9, d1 = -1e9, s0 = 1e9, s1 = -1e9;
-  for (const [d, s, r] of pts) { d0 = Math.min(d0, d - (r || 0)); d1 = Math.max(d1, d + (r || 0)); s0 = Math.min(s0, s - (r || 0)); s1 = Math.max(s1, s + (r || 0)); }
-  d0 -= 40; d1 += 40; s0 -= 40; s1 += 40;
-  const kd = (d1 - d0) / 300, ks = (s1 - s0) / 180, k = Math.max(kd, ks, 1.0), dc = (d0 + d1) / 2, sc = (s0 + s1) / 2;
-  MAPV = { d0: dc - 150 * k, d1: dc + 150 * k, s0: sc - 90 * k, s1: sc + 90 * k };
-  mapBg = document.createElement('canvas'); mapBg.width = 180; mapBg.height = 300; drawMapBg(); mapBg.V = MAPV; if (!once) MAP_CACHE[key] = mapBg;
-}
-MAP_CACHE.course.V = MAPV_COURSE;
-function drawMap(gpos) {
-  const g = ui.map.getContext('2d'); g.clearRect(0, 0, 180, 300); g.drawImage(mapBg, 0, 0);
-  const toDS = p => [-p.z, p.x];
-  const o0 = curObj(), o = glMap() ? o0 : null;   // 지도의 목표·수색 원·점선: 안내 1(지도) 이상 · 0(무전)이면 지도에도 없음
-  if (o && o.mk && o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s), q = mxy(d + o.search.r, s), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.9)'; g.fillStyle = 'rgba(255,200,40,.14)'; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill(); g.stroke(); g.setLineDash([]); }
-  // 산불: 다른 신고 구역(번호)과 보고 끝난 불씨(✓) 도 지도에
-  if (S.kind === 'fire' && isMission() && MS.list) { g.font = '700 10px monospace'; MS.list.forEach((x, i) => { if (!x.mk) return;
-    if (x.done) { if (!x.tp) return; /* 마지막 활주로 복귀 항목(고정익)은 불씨가 아니라 tp 없음 */ const q = mxy(...toDS(x.tp)); g.fillStyle = '#9aa6ad'; g.fillText('✓' + (i + 1), q[0] + 3, q[1] - 2); g.beginPath(); g.arc(q[0], q[1], 2, 0, 7); g.fill(); return; }
-    if (!x.active || !o) return; const p = mxy(...toDS(x.mk)); if (x !== o) { const q = mxy(...toDS(x.mk.clone().add(new V3(0, 0, -x.search.r)))), rr = Math.max(5, Math.hypot(q[0] - p[0], q[1] - p[1])); g.strokeStyle = 'rgba(255,200,40,.5)'; g.setLineDash([3, 3]); g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke(); g.setLineDash([]); }
-    g.fillStyle = '#ffc828'; g.fillText(String(i + 1), p[0] - 3, p[1] + 4); }); }
-  if (o && o.mk && o.search && S.kind === 'sar') { const p = mxy(...toDS(o.mk)); g.font = '700 10px monospace'; g.fillStyle = '#ffc828'; g.fillText('SAR', p[0] - 9, p[1] + 4); }
-  else if (o && o.mk && !o.search) { const [d, s] = toDS(o.mk); const p = mxy(d, s); g.strokeStyle = '#ffc828'; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 6 + Math.sin(performance.now() / 200) * 1.5, 0, 7); g.stroke(); }
-  // 지금 목표까지 점선 (지상 목표 찾기)
-  if (o && o.mk && S.state === 'run' && S.state !== 'demo') { const a = mxy(...toDS(DR.p)), b = mxy(...toDS(o.mk)); g.save(); g.setLineDash([4, 3]); g.lineWidth = 1.6; g.strokeStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.moveTo(clamp(a[0], 2, 178), clamp(a[1], 2, 298)); g.lineTo(clamp(b[0], 2, 178), clamp(b[1], 2, 298)); g.stroke(); g.restore(); }
-  if (gpos) { const [d, s] = toDS(gpos); const p = mxy(d, s); g.fillStyle = '#4fe3ff'; g.beginPath(); g.arc(p[0], p[1], 3, 0, 7); g.fill(); }
-  if (S.state !== 'demo') {
-    const src = S.state === 'replay' ? RP.pose : DR;
-    const [d, s] = toDS(src.p); const p = mxy(d, s); g.save(); g.translate(clamp(p[0], 4, 176), clamp(p[1], 4, 296));
-    const pu = 7 + (performance.now() / 120 % 8); g.strokeStyle = `rgba(255,60,90,${0.9 - (pu - 7) / 9})`; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, pu, 0, 7); g.stroke();   // 퍼지는 고리
-    g.rotate(src.h); g.fillStyle = '#ff2d55'; g.strokeStyle = '#000'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, -10); g.lineTo(7, 7); g.lineTo(0, 3); g.lineTo(-7, 7); g.closePath(); g.stroke(); g.fill(); g.restore();
-  }
-}
+// 지도: game3m.js (북쪽이 위 · 범위 조절 · 접기)
 function drawSticks() {
   const g = ui.stk.getContext('2d'); g.clearRect(0, 0, 150, 70);
   const box = (x, sx, sy) => {
@@ -763,7 +660,7 @@ impactRing.rotation.x = -Math.PI / 2; impactRing.renderOrder = 6; impactRing.vis
 function updateTargeting(subj) {
   const o = curObj(), fpv = CAMS[S.cam] === 'FPV', running = S.state === 'run' && DR.alive && !(S.tut && S.tut.st === 'intro');
   // 1) 게이트 조준 브래킷(비행 가이드 · 안내 3) + 비행 방향 표시(계기 · 늘)
-  const op = running && glFly() ? openingOf(o) : null;
+  const op = running && gOn('brk') ? openingOf(o) : null;
   let fpmPos = null;
   if (running && fpv && DR.v.length() > 1.0) {
     const s = toScreen(DR.p.clone().addScaledVector(DR.v, 1.2));
@@ -903,6 +800,7 @@ function handleKeys() {
     else if (k === 'KeyZ') { SET.zoom = (SET.zoom + 1) % 3; SET.camDist = ZOOMS[SET.zoom].d; saveSet(); if (typeof syncSeg === 'function') syncSeg(); showMsg('ZOOM ' + ['FAR', 'MID', 'NEAR'][SET.zoom] + ' · ' + SET.camDist.toFixed(1) + ' m', '#fff', 0.7); }
     else if (k === 'KeyP') { SET.showPath = !SET.showPath; GH.line.visible = SET.showPath; }
     else if (k === 'KeyJ') { mapZoom(!MAPZ.on); }
+    else if (k === 'BracketLeft' || k === 'BracketRight') { if (SET.fold && SET.fold.map) mapFold(false); else mapLv(k === 'BracketLeft' ? -1 : 1); showMsg(L2x('지도 ', 'MAP ') + (window.SIM_LANG === 'en' ? MAP_LV[SET.mapZ][2] : MAP_LV[SET.mapZ][1]), '#cfe8ff', 0.8); }   // 지도 범위: [ 넓게 · ] 좁게
     else if (k === 'KeyL') { S.lightOv = !lightOn(); showMsg(S.lightOv ? L2x('조명 켬', 'LIGHT ON') : L2x('조명 끔', 'LIGHT OFF'), '#ffe9a0', 0.9); }
     else if (k === 'KeyM') { AU.on = !AU.on; showMsg(AU.on ? 'SOUND ON' : 'SOUND OFF', '#fff', 0.8); if (AU.master) AU.master.gain.value = AU.on ? 0.55 : 0; }
     else if (k === 'KeyH') { SET.assistLv = SET.assist ? 0 : 2; modeSync(); saveSet(); updateTags(); syncSeg(); showMsg(SET.assist ? 'ASSIST ON' : 'ASSIST OFF', '#fff', 0.8); }
@@ -980,7 +878,7 @@ function frame(now, noRender) {
   if (o) {
     // 지금 과제 강조(게이트 막·슬라롬 쪽·투하 고리·벙커 창·패드 고리) = 목표 표시(안내 2 이상) · 탱크 선회 원 = 비행 가이드(3)
     if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); if (o.hint) o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); }
-    if (o.hint && (o.kind === 'orbit' ? glFly() : glTgt())) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); }
+    if (o.hint && (o.kind === 'orbit' ? gOn('path') : gOn('marker'))) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); }
   }
   marker.visible = false;   // 3D 마름모는 쓰지 않음: 목표 하나에 표시 하나 (PC·휴대폰 = 화면 ◇ navArrow · VR = 고글 OSD 의 ◇)
   const subjPos = subj.p;
