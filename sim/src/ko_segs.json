@@ -446,7 +446,7 @@
 "<i class=\"cat\">재난·구조</i>",
 "<i class=\"cat\">타격</i>",
 "안내 단계 <span class=\"seg\" id=\"segGuide\"><button data-v=\"a\" class=\"on\">자동</button><button data-v=\"3\">가이드</button><button data-v=\"2\">목표</button><button data-v=\"1\">지도</button><button data-v=\"0\">무전</button><button data-v=\"4\">내 설정</button></span> <button id=\"bNavSet\" class=\"segx\">🧭 하나씩 고르기</button>",
-" <b>안내 단계</b> — 가이드: 목표 표시 + 쉐브론·조작 안내 · 목표: ◇·빛기둥만 · 지도: 지도에만 · 무전: 무전 방위·거리만 · 내 설정: 하나씩 고른 그대로. 고른 값이 기본으로 저장됨 (자동 = 난이도별: 입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도) · 비행 중 GD·V 는 그 판에만.",
+" <b>안내 단계</b> — 가이드: 목표 표시 + 조작 안내 · 목표: ◇·빛기둥만 · 지도: 지도에만 · 무전: 무전 방위·거리만 · 내 설정: 하나씩 고른 그대로. 고른 값이 기본으로 저장됨 (자동 = 난이도별: 입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도) · 비행 중 GD·V 는 그 판에만.",
 "<span>실제 지형 드론 훈련 시뮬레이터</span>",
 "<button id=\"bootSkip\" class=\"bskip\">건너뛰기 ▸</button>",
 "<div class=\"battr\">지형 © 국토지리정보원 · Copernicus DEM</div>",
