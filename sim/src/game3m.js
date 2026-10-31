@@ -33,7 +33,8 @@ function mapView(key, pts, once) {   // 비행·임무를 시작할 때: '임무
   if (MAPS.fits[key] && !once) { MAPS.fit = MAPS.fits[key]; MAPC.key = ''; return; }
   const V = mapFit(pts, key === 'course' ? 30 : 40); if (!once) MAPS.fits[key] = V; MAPS.fit = V; MAPC.key = '';
 }
-function mapZoom(on) { if (on === MAPZ.on) return; MAPZ.on = on; if (ui.mapBox) ui.mapBox.classList.toggle('big', on); document.body.classList.toggle('mapBig', on); MAPC.key = ''; }   // 크게 볼 때는 방위 띠·목표 표시가 지도를 덮지 않게 (mapBig)
+function mapZoom(on) { if (on === MAPZ.on) return; MAPZ.on = on; if (ui.mapBox) ui.mapBox.classList.toggle('big', on); document.body.classList.toggle('mapBig', on); MAPC.key = '';
+  const f = ui.mapBox && ui.mapBox.querySelector('[data-m="f"]'); if (f) { f.textContent = on ? '✕' : '▾'; f.title = on ? L2x('작게', 'Shrink') : L2x('지도 접기', 'Hide map'); } }   // 크게 볼 때 ✕ = 작은 지도로 · 작을 때 ▾ = 접기   // 크게 볼 때는 방위 띠·목표 표시가 지도를 덮지 않게 (mapBig)
 function mapLv(dz) { const v = clamp((SET.mapZ | 0) + dz, 0, MAP_LV.length - 1); if (v === SET.mapZ) return; SET.mapZ = v; saveSet(); MAPC.key = ''; }
 function mapFold(on) { SET.fold.map = !!on; saveSet(); if (ui.mapBox) ui.mapBox.classList.toggle('fold', !!on); if (on && MAPZ.on) mapZoom(false); MAPC.key = ''; }
 function mapCurView() {
@@ -232,9 +233,9 @@ function drawMap(gpos) {
   const open = document.createElement('button'); open.className = 'mapOpen'; open.title = L2x('지도 펼치기', 'Show map'); open.textContent = '🗺';
   box.appendChild(bar); box.appendChild(open);
   const stop = e => { e.stopPropagation(); e.preventDefault(); };
-  bar.querySelectorAll('button').forEach(b => { b.addEventListener('pointerdown', e => { stop(e); const m = b.dataset.m; if (m === '-') mapLv(-1); else if (m === '+') mapLv(1); else mapFold(true); }); b.addEventListener('click', stop); });
-  open.addEventListener('pointerdown', e => { stop(e); mapFold(false); }); open.addEventListener('click', stop);
-  ui.map.addEventListener('pointerdown', e => { stop(e); mapZoom(!MAPZ.on); });
+  bar.querySelectorAll('button').forEach(b => { b.addEventListener('pointerdown', e => { stop(e); const m = b.dataset.m; if (m === '-') mapLv(-1); else if (m === '+') mapLv(1); else if (MAPZ.on) mapZoom(false); else mapFold(true); }); b.addEventListener('pointerup', stop); b.addEventListener('click', stop); });
+  open.addEventListener('pointerdown', e => { stop(e); mapFold(false); }); open.addEventListener('pointerup', stop); open.addEventListener('click', stop);
+  ui.map.addEventListener('pointerdown', e => { stop(e); mapZoom(!MAPZ.on); }); ui.map.addEventListener('pointerup', stop);
   if (SET.fold.map) box.classList.add('fold');
 })();
 setTimeout(baseBuild, 0);   // 앱을 다 읽은 뒤 (나무·바깥 지역·연못이 생긴 다음)

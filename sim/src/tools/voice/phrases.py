@@ -70,6 +70,10 @@ cs = srcs[srcs.index('function commStart'):]; cs = cs[:cs.index('\n}\n')]
 for m in re.finditer(r'^\s*\w+: \[', cs, re.M): exprs.append(first_arg(cs, m.end()))
 exprs.append(cs[cs.index('const T = {'):])   # 표 안의 모든 문자열 (함수로 만든 항목 포함)
 exprs.append("'Eagle One, Control. Radio check. How copy? Over.'")
+# 위치 무전 (game5.js vecText): '<이름> at your <시계> o'clock, about <거리> meters from your position[ <참조물>], bearing <숫자>.' 조각
+for nm in ['Target', 'Search area', 'Next structure', 'Smoke sighted, search area']: exprs.append("'" + nm + "'")
+for c in ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven']: exprs.append('"at your ' + c + ' o\'clock"')
+for x in ['near the village', 'near the runway', 'near the launch pad', 'past the village', 'past the runway', 'past the launch pad', 'beyond the power line', 'You are over the target.', 'You are over the search area.', 'Copy imagery.', 'New report.', 'Smoke sighted.']: exprs.append('"' + x + '"')
 for x in ['Winds three meters per second from west-northwest.', 'Winds seven meters per second from west-northwest.', 'Winds three meters per second.', 'Winds seven meters per second.', 'Night ops, keep your strobes on.', 'Eagle One, Control.', 'Over.']: exprs.append("'" + x + "'")
 def speakify(t): return re.sub(r'\bRTB\b', 'R T B', t.replace('EAGLE ONE', 'Eagle One').replace('CONTROL', 'Control'))
 P = set()
