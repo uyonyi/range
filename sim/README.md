@@ -66,6 +66,8 @@ GitHub Pages 주소: `https://uyonyi.github.io/range/sim/` (영문: `en.html`)
 
 원본 수치지형도·DEM 파일은 저장소에 넣지 않습니다.
 
+새 현장을 영상·높이 자료(라이다·위성)만으로 만들 때의 표준 규칙(지형·고도 기준·식생·수계·건물·비행): [`tools/RULES.md`](tools/RULES.md)
+
 ## 다음 단계
 
 - 정사영상 타일 스트리밍 (지금은 4096 px 한 장이라 0.29 m/px, 원본 0.25 m)
