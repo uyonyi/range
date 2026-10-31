@@ -105,7 +105,7 @@ function completeObj(status, msg, col) {
   renderList();
 }
 function finishRun() {
-  S.finished = true; S.running = false;
+  S.finished = true; S.running = false; musicCue('win');
   comm(`${CS}, CONTROL. Course complete, good flying. CONTROL out.`, '코스 완주 · 수고했음');
   const rec = recFinish();
   setTimeout(() => {
@@ -834,7 +834,7 @@ function togglePause() {
   if (S.state === 'run' || S.state === 'demo') { S.prevState = S.state; S.state = 'pause'; ui.pause.classList.remove('hidden'); musicSetLevelPaused(true); }
   else if (S.state === 'pause') { S.state = S.prevState; ui.pause.classList.add('hidden'); last = performance.now(); musicSetLevelPaused(false); }
 }
-function musicSetLevelPaused(p) { if (MUS.bus && AU.ctx) MUS.bus.gain.setTargetAtTime(musicLevel() * (p ? 0.4 : 1), AU.ctx.currentTime, 0.2); }
+function musicSetLevelPaused(p) { if (MUS.bus && AU.ctx) { MUS.bus.gain.setTargetAtTime(musicLevel() * (p ? 0.4 : 1), AU.ctx.currentTime, 0.2); if (MUS.lp) MUS.lp.frequency.setTargetAtTime(p ? 900 : 20000, AU.ctx.currentTime, 0.15); } }   // 일시정지: 작고 먹먹하게
 let flagT = 0, REC_T0_SET = false;
 const TEST = /[?&]test/.test(location.search);
 let XR_ON = false;   // VR(WebXR) 중: 화면 갱신은 XR 세션이 돌림

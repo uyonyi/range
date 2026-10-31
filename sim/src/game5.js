@@ -490,7 +490,7 @@ function lostDrone(why) {
   if (!DR.alive) return;
   const a = AFc();
   if (a.kam && S.kind === 'strike') { if (strikeDetonate()) return; }
-  DR.alive = false; S.deadT = 1.6; S.impacts++; S.lost = (S.lost || 0) + 1;
+  DR.alive = false; S.deadT = 1.6; S.impacts++; S.lost = (S.lost || 0) + 1; musicCue('crash');
   spawnImpact(DR.p.clone(), true); sfx('crash'); rumble(1, 0.8, 300); shake = 0.15;
   if (S.kind === 'strike') showMsg(why === 'stk' ? 'HIT' : 'MISS · 기체 손실', '#ff6060', 1.6);
   else { showMsg(why === 'WATER' && !a.kam ? 'SPLASH · 물에 빠짐 · 기체 손실' : a.kam ? 'DETONATED · 기체 손실' : 'CRASH · 기체 손실', '#ff5050', 1.6); if (S.kind === 'race' || S.kind === 'forest' || S.kind === 'recon') S.pen += 10; }
@@ -931,7 +931,7 @@ function strikeDetonate() {
   return true;
 }
 function msFinish() {
-  S.finished = true; S.running = false; if (REC) LAST_REC = recFinish();
+  S.finished = true; S.running = false; if (REC) LAST_REC = recFinish(); musicCue('win');
   comm(`Mission complete. Good work, ${CS}. CONTROL out.`, '임무 완료 · 수고했음.');
   setTimeout(() => {
     if (S.state !== 'run') return;
