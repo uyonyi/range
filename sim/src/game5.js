@@ -1627,7 +1627,7 @@ function msEvents(dt) {
   if (S.kind === 'fire') {
     for (const [i, f] of MS.list.entries()) {
       if (f.t !== 'fire') continue;
-      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; if (STREES.scorch) STREES.scorch(f.g.position, 9); const bd = brgFrom(DR.p, f.mk); comm(`${f.ignT > 1 ? 'New report. ' : ''}Smoke sighted, bearing ${bd.brgW}, about ${bd.distW} meters from your position.`, `${f.ignT > 1 ? '새 신고 · ' : ''}연기 목격 · 수색 구역 중심: 현 위치에서 방위 ${bd.brg}° · 약 ${bd.dist} m`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
+      if (!f.active && t >= f.ignT) { f.active = true; f.g.visible = true; if (STREES.scorch) STREES.scorch(f.g.position, 9); const v = vecText(f.mk, 'Smoke sighted, search area', '연기 목격 · 수색 구역 중심'); comm(`${f.ignT > 1 ? 'New report. ' : ''}${v[0]}`, `${f.ignT > 1 ? '새 신고 · ' : ''}${v[1]}`); if (f.ignT > 1) comm('Eagle One, wilco.', '이글 원, 수행하겠음.', OP); renderList(); if (MS.idx >= MS.list.length || MS.list[MS.idx].done) MS.idx = i; }
       if (f.active && !f.done && !f.spread && t - f.ignT > 150) { f.spread = true; S.pen += 15; comm(`${CS}, hotspot ${i + 1} is spreading. Expedite your report.`, `불씨 ${i + 1} 번짐 · +15초`); f.g.scale.setScalar(1.8); }
     }
   }
@@ -1657,8 +1657,8 @@ function navRadio(dt) {
   if ((NAVR.t -= dt) > 0 || COMM.sp || COMM.busy > 0 || COMM.q.length) return;   // 명령·확인 무전이 다 나간 뒤 (밀려서 버려지지 않게)
   NAVR.t = 45;
   if (Math.hypot(o.mk.x - DR.p.x, o.mk.z - DR.p.z) < 80) return;
-  const b = brgFrom(DR.p, o.mk);
-  comm(`${CS}, CONTROL. ${o.search ? 'Search area bearing' : 'Bearing'} ${b.brgW}, about ${b.distW} meters from your position. Over.`, `${o.search ? '수색 구역 중심 ' : ''}방위 ${b.brg}° · 현 위치에서 약 ${b.dist} m`, null, 'vec');
+  const v = vecText(o.mk, o.search ? 'Search area' : 'Target', o.search ? '수색 구역 중심' : '목표');
+  comm(`${CS}, CONTROL. ${v[0]} Over.`, v[1], null, 'vec');
 }
 // 실종자·차량 무작위 배치 (scenStart 에서 부름)
 const SAR_POOL = (function () {
@@ -1708,6 +1708,9 @@ function vecRef(from, to) {   // 참조물 하나: 목표 가까이 → '… 근
   for (const p of L.pts) { const u = ((p.x - from.x) * vx + (p.z - from.z) * vz) / vv; if (u < 0.2 || u > 0.85) continue; const qx = from.x + vx * u, qz = from.z + vz * u; if (Math.hypot(p.x - qx, p.z - qz) < 90) return [` past ${p.en}`, ` · ${p.ko} 지나서`]; }
   return ['', ''];
 }
+// 지금 기체 위치·기수 기준 시계 방향 + 수평 거리 + 방위 (임무 중 모든 위치 무전이 같은 꼴: "two o'clock, 350 meters, bearing 245")
+function clkOf(t) { const dx = t.x - DR.p.x, dz = t.z - DR.p.z, rel = Math.atan2(dx, -dz) - DR.h; return ((Math.round(rel / (Math.PI / 6)) % 12) + 12) % 12; }
+function vecText(t, nmEn, nmKo, ref) { const b = brgFrom(DR.p, t), clk = clkOf(t), r = ref || ['', '']; return [`${nmEn} at your ${CLK_W[clk]} o'clock, ${b.distW} meters${r[0]}, bearing ${b.brgW}.`, `${nmKo}: ${clk || 12}시 방향 · 약 ${b.dist} m${r[1]} (방위 ${b.brg}°)`]; }
 let VEC_T = -99;
 function vecCall(auto) {
   if (S.state !== 'run' || !isMission() || S.brief) return false; if (!auto && S.simT - VEC_T < 3) return false; VEC_T = S.simT;
@@ -1717,8 +1720,7 @@ function vecCall(auto) {
   const say = () => {   // 부르는 순간의 위치·기수로 (예전: 요청한 순간의 위치와 1.3초 뒤 기수를 섞어 씀)
     const p = DR.p.clone(), t = o.mk, dx = t.x - p.x, dz = t.z - p.z, dh = Math.hypot(dx, dz);
     if (o.search ? dh < o.search.r * 0.6 : dh < 40) return comm(`${CS}, CONTROL. You are over the ${o.search ? 'search area' : 'target'}.`, `${o.search ? '수색 구역' : '목표'} 위에 있음.`);
-    const rel = Math.atan2(dx, -dz) - DR.h, clk = ((Math.round(rel / (Math.PI / 6)) % 12) + 12) % 12, b = brgFrom(p, t), ref = vecRef(p, t);
-    comm(`${CS}, CONTROL. ${nm[0][0].toUpperCase() + nm[0].slice(1)} at your ${CLK_W[clk]} o'clock, ${b.distW} meters${ref[0]}, bearing ${b.brgW}.`, `${nm[1]}: ${clk || 12}시 방향 · 약 ${b.dist} m${ref[1]} (방위 ${b.brg}°)`);
+    const v = vecText(t, nm[0][0].toUpperCase() + nm[0].slice(1), nm[1], vecRef(p, t)); comm(`${CS}, CONTROL. ${v[0]}`, v[1]);
   };
   if (auto) say(); else setTimeout(say, 1300);
   return true;
@@ -2066,7 +2068,7 @@ function commAck(o, kind) {   // 목표 하나 끝났을 때
   if (o && o.rtb) return;   // 복귀·착륙은 표적이 아님 (임무 완료 무전이 따로 나옴) — 예전엔 착륙하면 '촬영 확인'·'불씨 확인'이라고 답했음
   const rest = MS.list.filter(x => !x.done && !x.rtb), left = rest.length, rtb = MS.list.find(x => !x.done && x.rtb);
   const home = rtb ? (rtb.t === 'rwyland' ? [' RTB and land on the runway.', ' 복귀 · 활주로 착륙.'] : rtb.t === 'land' ? [' RTB to the launch pad.', ' 출발 패드로 복귀.'] : [' RTB.', ' 복귀.']) : ['', ''];
-  if (kind === 'recon') { const x = rest.find(y => y.tp), b = x ? brgFrom(DR.p, x.tp) : null; return comm(`Copy imagery. ${b ? `Next structure bearing ${b.brgW}, about ${b.distW} meters from your position.` : 'All imagery received.' + home[0]}`, b ? `촬영 확인. 다음 대상: 현 위치에서 방위 ${b.brg}° · 약 ${b.dist} m` : '촬영 모두 수신.' + home[1]); }
+  if (kind === 'recon') { const x = rest.find(y => y.tp), v = x ? vecText(x.tp, 'Next structure', '다음 대상') : null; return comm(`Copy imagery. ${v ? v[0] : 'All imagery received.' + home[0]}`, v ? `촬영 확인. ${v[1]}` : '촬영 모두 수신.' + home[1]); }
   if (kind === 'recon-old') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
   if (kind === 'fire') return comm(`Copy imagery, hotspot confirmed at grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? ' Stand by for the next report.' : ' All reported.' + home[0]}`, `사진 접수 · 불씨 확인, 진화대 출동.${left ? ' 다음 신고 대기.' : ' 모두 보고됨.' + home[1]}`);
   if (kind === 'sar' && o.t === 'sarfind') return comm(`Copy imagery, subject located at grid ${grid(SAR.d, SAR.s)}. ${AFc().drop ? 'Drop the rescue kit within five meters.' : 'Return to base.'}`, `실종자 위치 확인. ${AFc().drop ? '구조 키트 5 m 이내 투하.' : '복귀.'}`);
