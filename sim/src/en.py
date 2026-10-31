@@ -469,6 +469,7 @@ EN.update({
 'MISS · 기체 손실': 'MISS · drone lost',
 'DETONATED · 기체 손실': 'DETONATED · drone lost',
 'CRASH · 기체 손실': 'CRASH · drone lost',
+'SPLASH · 물에 빠짐 · 기체 손실': 'SPLASH · in the water · drone lost',
 '숲 게이트 ': 'Forest gate ',
 '쓰러진 나무 넘기': 'Over the fallen log',
 '기운 나무 아래로': 'Under the leaning tree',

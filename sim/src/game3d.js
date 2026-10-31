@@ -152,7 +152,7 @@ function guideChevrons(curve, L, col, sp, wing) {
   for (let i = 0; i < N; i++) {
     const d = d0 + phase + i * gap, o = i * 18, oc = i * 24;
     if (d > L - 0.4) { for (let k = 0; k < 24; k++) C[oc + k] = 0; continue; }
-    const u = d / L; curve.getPointAt(u, _cpt); curve.getTangentAt(u, _ct); { const g = terrainAt(_cpt.x, _cpt.z) + 0.6; if (_cpt.y < g) _cpt.y = g; }
+    const u = d / L; curve.getPointAt(u, _cpt); curve.getTangentAt(u, _ct); { const g = surfAt(_cpt.x, _cpt.z) + 0.6; if (_cpt.y < g) _cpt.y = g; }
     // 면 방향: 도로에 깔린 화살표처럼 수평에 가깝게 + 카메라 쪽으로 조금 세움 (진행 방향을 따라 볼 때도 납작해지지 않게 경로보다 조금 아래에 둠)
     _cn.set(0, 1, 0).addScaledVector(_ct, -_ct.y); if (_cn.lengthSq() < 1e-6) _cn.set(1, 0, 0); _cn.normalize();
     const drop = wing ? 2.2 : 0.9; _cpt.addScaledVector(_cn, -drop);
@@ -264,8 +264,8 @@ function updateGuide(subj) {
   // 지형 위로: 긴 구간은 15 m 마다 점을 넣고 지면 + 1.5 m 아래로 내려가지 않게 (언덕 너머 목표에서 안내가 땅에 묻혀 끊기지 않게)
   { const q = [pts[0]], keep = Math.max(1, pts.length - 2);
     for (let k = 1; k < pts.length; k++) { const A = pts[k - 1], B = pts[k], L0 = A.distanceTo(B), n = Math.floor(L0 / 15);
-      for (let j = 1; j < n; j++) { const m = A.clone().lerp(B, j / n), g = terrainAt(m.x, m.z) + 1.5; if (m.y < g) m.y = g; q.push(m); }
-      const P = k < keep ? B.clone() : B; if (k < keep) { const g = terrainAt(P.x, P.z) + 1.2; if (P.y < g) P.y = g; } q.push(P); }
+      for (let j = 1; j < n; j++) { const m = A.clone().lerp(B, j / n), g = surfAt(m.x, m.z) + 1.5; if (m.y < g) m.y = g; q.push(m); }   // 연못 위: 수면 위로
+      const P = k < keep ? B.clone() : B; if (k < keep) { const g = surfAt(P.x, P.z) + 1.2; if (P.y < g) P.y = g; } q.push(P); }
     pts = q; }
   const curve = pts.length > 2 ? new THREE.CatmullRomCurve3(pts, false, 'centripetal') : new THREE.LineCurve3(pts[0], pts[1]);
   const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
@@ -343,7 +343,7 @@ function renderAttCam() {
   const r = el.getBoundingClientRect(); if (r.width < 10) return;
   const subj = S.state === 'replay' ? RP.pose : DR, h = subj.h, R = Math.max(2.2, (AFc().R || 0.3) * 7);
   _acP.set(subj.p.x - Math.sin(h) * R * 0.75 - Math.cos(h) * R * 0.65, subj.p.y + R * 0.45, subj.p.z + Math.cos(h) * R * 0.75 - Math.sin(h) * R * 0.65);   // 뒤 왼쪽 비스듬히 위
-  const gy = terrainAt(_acP.x, _acP.z) + 0.4; if (_acP.y < gy) _acP.y = gy;
+  const gy = surfAt(_acP.x, _acP.z) + 0.4; if (_acP.y < gy) _acP.y = gy;
   attCam.position.copy(_acP); attCam.up.set(0, 1, 0); _acT.copy(subj.p); attCam.lookAt(_acT); attCam.aspect = r.width / r.height; attCam.updateProjectionMatrix(); attCam.updateMatrixWorld();
   const vis = droneM.g.visible; droneM.g.visible = true; const au = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = false;
   const y = innerHeight - r.bottom;

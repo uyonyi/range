@@ -254,7 +254,7 @@ function stepDrone(dt) {
     if (Math.abs(IN.thr) < 0.05) tv += vyAssist;
     // 지형 추종 (입문: 지면 위 높이 유지 / 쉬움: 오르막에서 부딪히지 않게만)
     if (TER.h && assistOn && Math.abs(IN.thr) < 0.05 && !grounded && vyAssist === 0) {   // 게이트 통과 보조 중엔 끔
-      const la = 0.6, g0 = terrainAt(DR.p.x, DR.p.z), g1 = terrainAt(DR.p.x + DR.v.x * la, DR.p.z + DR.v.z * la), rate = (g1 - g0) / la;
+      const la = 0.6, g0 = surfAt(DR.p.x, DR.p.z), g1 = surfAt(DR.p.x + DR.v.x * la, DR.p.z + DR.v.z * la), rate = (g1 - g0) / la;   // 연못 위에선 수면을 따라감 (바닥을 따라 내려가 물에 빠지지 않게)
       tv += md.autoYaw ? rate : Math.max(0, rate);
     }
     DR.v.y += (tv - DR.v.y) * (1 - Math.exp(-dt / 0.28));
@@ -314,6 +314,7 @@ function droneGround(dt) {
   DR.p.addScaledVector(DR.v, dt);
   // 지면
   const gh = groundAt(DR.p.x, DR.p.z) + 0.06;
+  if (DR.p.y < gh && S.state === 'run' && waterAt(DR.p.x, DR.p.z) >= gh - 0.07) return lostDrone('WATER');   // 수면에 닿으면 추락 (예전엔 물속으로 그대로 내려갔음)
   if (DR.p.y < gh) {
     const hs = Math.hypot(DR.v.x, DR.v.z), vy = DR.v.y;
     DR.p.y = gh;

@@ -575,9 +575,30 @@ function buildPad(o) {
   PADS.push({ b, r: dia / 2, top: PH + 0.02, half: [dia * 0.42 + 0.55, 0.6] });
 }
 let C1ON = false;   // 1종 시험장 (평탄) 사용 중
+// ---- 물웅덩이 (사방댐 위): 수면 높이 · 다각형 (지면 높이·충돌·숲길 배치가 같은 값을 씀 · 그림은 game5.js DAMS) ----
+//  수면 아래로는 못 내려감: 수면에 닿으면 추락(물에 빠짐) · groundAt 은 수면을 땅처럼 돌려줌 (고도·재발진 자리가 물속이 되지 않게)
+var WATER = (function () {   // var: 이 줄보다 먼저 groundAt 을 부르는 곳이 있어도 오류 없이 '물 없음'으로
+  const L = SITE.dams || []; if (!L.length || !TER.h) return [];
+  return L.map(dm => {
+    const n = dm.pool.length, pc = dm.pool.reduce((s, p) => [s[0] + p[0] / n, s[1] + p[1] / n], [0, 0]);
+    const a = W(dm.a[0], dm.a[1], 0), b = W(dm.b[0], dm.b[1], 0), mid = a.clone().lerp(b, 0.5);
+    const crest = Math.max(W(pc[0], pc[1], 0).y + 1.2, terrainAt(mid.x, mid.z) + 2.5), poly = dm.pool.map(p => { const w = W(p[0], p[1], 0); return [w.x, w.z]; });
+    const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+    return { crest, lvl: crest - 0.45, poly, bb: [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)] };
+  });
+})();
+function waterAt(x, z) {   // 수면 높이 (물 위가 아니면 -Infinity)
+  if (!WATER) return -Infinity;
+  for (const w of WATER) { const b = w.bb; if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue; const P = w.poly; let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) if (((P[i][1] > z) !== (P[j][1] > z)) && (x < (P[j][0] - P[i][0]) * (z - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0])) c = !c;
+    if (c) return w.lvl; }
+  return -Infinity;
+}
+function surfAt(x, z) { return Math.max(terrainAt(x, z), waterAt(x, z)); }   // 땅 또는 수면 (착륙장 등 시설물 빼고 · 지형 따라가기·안내선 높이용)
 function groundAt(x, z) {
   if (C1ON) return 0;
   let h = terrainAt(x, z);
+  if (WATER && WATER.length) h = Math.max(h, waterAt(x, z));
   for (const p of PADS) {
     const l = p.b.local(_p.set(x, 0, z));
     const y0 = p.b.g.position.y;
@@ -939,7 +960,7 @@ const FLANE = (function forestLane() {
     const d = a[0] + (b[0] - a[0]) * u, sd = a[1] + (b[1] - a[1]) * u, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return { d, s: sd, td: (b[0] - a[0]) / l, ts: (b[1] - a[1]) / l }; };
   // 시설물
   const G = new THREE.Group(); scene.add(G);
-  const gateM = mat(0xff7a1a, { roughness: 0.6 }), barkM = mat(0x4a3a2c, { roughness: 1 }), leafM = mat(0x3c5634, { roughness: 1 }), tapeM = mat(0xf2e14c, { roughness: 0.7 });
+  const gateM = mat(0xff7a1a, { roughness: 0.6 }), barkM = mat(0x7a6853, { roughness: 1 }), leafM = mat(0x3c5634, { roughness: 1 }), tapeM = mat(0xf2e14c, { roughness: 0.7 });
   const cps = [];
   // 코스 좌표 (down, side, agl) + 길 방향 기준 오프셋 -> world
   const wpt = (q, lat, up) => W(q.d - q.ts * lat, q.s + q.td * lat, up);
@@ -950,43 +971,54 @@ const FLANE = (function forestLane() {
     const q = at(s), hw = w / 2;
     const l0 = wpt(q, -hw - 0.1, 0), l1 = wpt(q, -hw - 0.1, h + 0.1), r0 = wpt(q, hw + 0.1, 0), r1 = wpt(q, hw + 0.1, h + 0.1);
     box(l0, l1, 0.16, gateM, 'fgate'); box(r0, r1, 0.16, gateM, 'fgate'); box(l1, r1, 0.16, gateM, 'fgate');
-    cps.push({ s, q, label, hw, y0: 0.2, y1: h });
+    cps.push({ s, q, label, hw, y0: 0.2, y1: h, k: 'g' });
   }
   function lowLog(s) {   // 쓰러진 나무: 위로 넘기
     const q = at(s), a = wpt(q, -6, 0.75), b = wpt(q, 6.5, 0.55);
     cyl(a, b, 0.32, barkM, 'log');
     for (const k of [-0.3, 0.1, 0.4]) { const p = a.clone().lerp(b, 0.5 + k); box(p, p.clone().add(new V3(0, 0.9, 0.3)), 0.07, barkM); }   // 부러진 가지
-    cps.push({ s, q, label: '쓰러진 나무 넘기', hw: 2.6, y0: 1.25, y1: 4.2 });
+    let top = 0; for (let lat = -2.6; lat <= 2.61; lat += 0.65) top = Math.max(top, a.y + (b.y - a.y) * (lat + 6) / 12.5 + 0.32 - wpt(q, lat, 0).y);   // 통과 창 안 줄기 윗면 (그 자리 땅 위 · 통과 판정과 같은 기준)
+    cps.push({ s, q, k: 'l', label: '쓰러진 나무 넘기', hw: 2.6, y0: Math.round(Math.max(1.25, top + 0.3) * 100) / 100, y1: Math.round(Math.max(4.2, top + 3.2) * 100) / 100 });
   }
-  function arch(s) {   // 기울어진 나무: 아래로 지나기
-    const q = at(s), a = wpt(q, -7, 0.1), b = wpt(q, 6, 4.9);
+  // 장애물 나무를 고급 나무 모형(game6t.js)으로 다시 그릴 목록: 모형이 오면 옛 둥근 수관(old)은 숨김 · { p 밑동, q 방향, s 크기, kind 0 활엽 · 1 소나무 }
+  const deco = [];
+  const taper = (a, dir, h, r0, r1, col) => { const g = new THREE.CylinderGeometry(r1, r0, h, 10, 1); g.translate(0, h / 2, 0); const m = new THREE.Mesh(g, col); m.position.copy(a); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); m.castShadow = true; m.receiveShadow = true; G.add(m); return m; };
+  function arch(s) {   // 기울어진 나무: 아래로 지나기 — 줄기가 길 가운데 땅 위 3.6 m 를 지나게 (옆으로 기운 땅에서도 · 예전엔 2.2~2.8 m 로 너무 낮았음)
+    const q = at(s), c = wpt(q, 0, 0), a = wpt(q, -7, 0.1), b = wpt(q, 6, 0); b.y = Math.max(b.y + 2.5, a.y + (c.y + 3.6 - a.y) * 13 / 7);
     cyl(a, b, 0.28, barkM, 'log');
     const crown = new THREE.Mesh(USPH, leafM); crown.position.copy(b).add(new V3(0, 0.6, 0)); crown.scale.set(2.6, 1.6, 2.6); crown.castShadow = true; G.add(crown);
-    const yc = 0.1 + (7 / 13) * 4.8;   // 길 가운데 높이
-    cps.push({ s, q, label: '기운 나무 아래로', hw: 2.4, y0: 0.25, y1: yc - 0.45 });
+    const dir = b.clone().sub(a).normalize(), up = dir.clone().add(new V3(0, 1, 0)).normalize();   // 수관: 기운 줄기 끝에서 반쯤 일어선 활엽수 (꺾인 곳은 가늘어지는 줄기로 이음)
+    taper(b.clone().addScaledVector(dir, -0.25), up, 2.4, 0.27, 0.13, barkM);
+    deco.push({ p: b.clone(), q: new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), up), s: new V3(3.0, 11, 3.0), kind: 0, old: [crown] });
+    const yc = a.y + (b.y - a.y) * 7 / 13 - c.y;   // 길 가운데에서 줄기 높이 (땅 위) · 통과 위 한계 = 줄기 아랫면 − 기체 반지름
+    cps.push({ s, q, k: 'a', label: '기운 나무 아래로', hw: 2.4, y0: 0.25, y1: Math.round((yc - 0.6) * 100) / 100 });
   }
-  function gap(s) {   // 좁은 나무 틈
+  function gap(s) {   // 좁은 나무 틈: 18.5 m 소나무 두 그루 (고급 나무 모형 · 가지는 5.5 m 위부터) — 충돌은 모형 줄기 굵기대로 (밑 0.15 m · 위 0.12 m)
     const q = at(s);
-    for (const lat of [-1.35, 1.35]) {
-      const a = wpt(q, lat, -0.3), b = wpt(q, lat, 11);
-      cyl(a, b, 0.3, barkM, 'trunk');
-      const c = new THREE.Mesh(USPH, leafM); c.position.copy(wpt(q, lat * 1.8, 9.5)); c.scale.set(2.4, 2.8, 2.4); c.castShadow = true; G.add(c);
+    for (const lat of [-1.2, 1.2]) {
+      const a = wpt(q, lat, -0.3), top = a.clone().add(new V3(0, 3, 0));
+      capCol(a.clone(), top.clone(), 0.15, 'trunk'); capCol(top.clone(), a.clone().add(new V3(0, 12, 0)), 0.12, 'trunk');
+      const t = cyl(a, a.clone().add(new V3(0, 11, 0)), 0.14, barkM);   // 고급 나무가 오기 전 임시 줄기·수관
+      const c = new THREE.Mesh(USPH, leafM); c.position.copy(wpt(q, lat * 2, 9.5)); c.scale.set(2.4, 2.8, 2.4); c.castShadow = true; G.add(c);
+      deco.push({ p: a.clone(), q: new THREE.Quaternion().setFromAxisAngle(new V3(0, 1, 0), s * 0.37 + lat), s: new V3(3.0, 18.5, 3.0), kind: 1, old: [t, c] });
     }
     const t0 = wpt(q, -1.05, 2.2), t1 = wpt(q, 1.05, 2.2); box(t0, t1, 0.04, tapeM);   // 표시 띠
-    cps.push({ s, q, label: '좁은 틈 (2.1 m)', hw: 1.05, y0: 0.2, y1: 6 });
+    cps.push({ s, q, k: 'n', label: '좁은 틈 (2.1 m)', hw: 1.05, y0: 0.2, y1: 5 });
   }
   // 약 17 m 마다 하나씩 (게이트·틈·넘기·아래로 섞어서)
   const PAT = ['g', 'n', 'g', 'l', 'g', 'a', 'n', 'g', 'l', 'g', 'a', 'n'], plan = [];
   for (let s = 16, i = 0; s < total - 30; s += 17, i++) plan.push([s, PAT[i % PAT.length]]);
   plan.push([total - 14, 'f']);
   let gi = 0;
+  const wet = s => { for (let u = s - 8; u <= s + 8; u += 2) { const q = at(Math.max(0, Math.min(total, u))); for (let lat = -8; lat <= 8; lat += 4) { const w = wpt(q, lat, 0); if (waterAt(w.x, w.z) > terrainAt(w.x, w.z) - 0.05) return true; } } return false; };   // 사방댐 물웅덩이 위·가장자리
   for (const [s, k] of plan) {
     if (s > total - 10 && k !== 'f') continue;
+    if (k !== 'f' && wet(s)) continue;   // 물 위에는 장애물을 세우지 않음 (예전: 물속에 세워져 잠수해야 통과) — 연못은 그냥 건넘
     if (k === 'g') gate(s, '숲 게이트 ' + (++gi), 3.0, 2.6); else if (k === 'l') lowLog(s); else if (k === 'a') arch(s); else if (k === 'n') gap(s); else gate(s, '숲길 결승', 3.6, 3.2);
   }
   // 나무 비울 곳 (코스 좌표 점 목록, 반경)
   const clear = lane.filter((_, i) => i % 1 === 0);
-  return { lane, total, at, cps, G, clear, R: 3.0, gateM };
+  return { lane, total, at, cps, G, clear, R: 3.0, gateM, deco };
 })();
 // 나무: 현장 패키지의 trees (정사영상 수관 검출) 를 구역별 InstancedMesh 로 세움 + 충돌 격자
 const STREES = (function siteTrees() {
@@ -1037,14 +1069,43 @@ const STREES = (function siteTrees() {
   // 구역(120 m) 별로 나눠 화면 밖 구역은 그리지 않음
   const CH = 120, groups = new Map(), GRID = new Map(), GC = 10, CHUNKS = [];
   // 숲길 위 나무 빼기 (격자로 빠르게)
-  const skip = new Uint8Array(n);
-  if (FLANE) { const LG = new Map(); for (const p of FLANE.clear) { const k = Math.floor(p[0] / 8) + ',' + Math.floor(p[1] / 8); if (!LG.has(k)) LG.set(k, []); LG.get(k).push(p); }
-    for (let i = 0; i < n; i++) { const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, gd = Math.floor(d / 8), gs = Math.floor(s / 8);
-      for (let a = gd - 1; a <= gd + 1 && !skip[i]; a++) for (let b = gs - 1; b <= gs + 1; b++) { const L = LG.get(a + ',' + b); if (L && L.some(p => Math.hypot(p[0] - d, p[1] - s) < FLANE.R)) { skip[i] = 1; break; } } } }
+  const skip = new Uint8Array(n), MV = new Float32Array(n * 2);   // MV: 숲길 옆 나무를 바깥으로 민 거리 (코스 좌표 d, s)
+  //  숲길: 길 위(3 m 안) 나무는 빼고, 잎·가지가 통로(길 가운데 ±2 m · 높이 4.6 m 아래)로 들어오는 나무는 그만큼 바깥으로 밈 (6 m 넘게 밀어야 하면 뺌)
+  //  잎·가지 퍼짐 = 고급 나무 모형(trees.json)의 높이 10단별 최대 반지름 — 예전엔 3 m 안만 빼서 큰 나무 가지가 길 위 0.6~4 m 높이까지 내려온 곳이 있었음
+  if (FLANE) {
+    const KEY = (a, b) => (a + 2048) * 4096 + (b + 2048), LG = new Map(), NEAR = new Set();
+    for (const p of FLANE.clear) { const a = Math.floor(p[0] / 8), b = Math.floor(p[1] / 8), k = KEY(a, b); if (!LG.has(k)) LG.set(k, []); LG.get(k).push(p);
+      for (let x = a - 2; x <= a + 2; x++) for (let y = b - 2; y <= b + 2; y++) NEAR.add(KEY(x, y)); }
+    const near = (d, s) => { const gd = Math.floor(d / 8), gs = Math.floor(s / 8); let dm = 1e9, np = null;
+      for (let a = gd - 2; a <= gd + 2; a++) for (let b = gs - 2; b <= gs + 2; b++) { const L = LG.get(KEY(a, b)); if (L) for (const p of L) { const e = Math.hypot(p[0] - d, p[1] - s); if (e < dm) { dm = e; np = p; } } }
+      return np ? [dm, np] : null; };
+    const PROF = [[0.04, 0.78, 1.01, 1.2, 1.18, 1.23, 1.34, 1.22, 1.19, 0.62], [0.05, 0.04, 0.06, 0.86, 1.32, 1.39, 1.21, 1.14, 0.99, 0.69],   // 활엽 · 소나무
+      [0.04, 0.55, 1.12, 1.32, 1.13, 1.22, 1.25, 1.22, 0.96, 0.76], [1.19, 0.97, 0.89, 0.81, 0.72, 0.64, 0.55, 0.45, 0.25, 0.12]];   // 관목 · 조림 침엽
+    const CW = 2.0, HC = 4.6;
+    const need = (kind, h, r, hc) => { if (hc <= 0) return 0; const P = PROF[kind] || PROF[0], u = Math.min(10, hc / Math.max(0.5, h) * 10); let m = 0;   // 밑동 위 hc 아래 잎·가지가 줄기에서 퍼진 거리 (가로 크기 r×1.4×최대 1.1)
+      for (let b = 0; b < 10 && b < u; b++) m = Math.max(m, b + 1 <= u ? P[b] : (b ? P[b - 1] : P[0]) + (P[b] - (b ? P[b - 1] : P[0])) * (u - b));
+      return m * r * 1.54; };
+    const baseY = (d, s, r) => { const w = W(d, s, 0); return Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2; };   // 아래 세우는 곳과 같은 밑동 높이
+    for (let i = 0; i < n; i++) {
+      const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10; if (!NEAR.has(KEY(Math.floor(d / 8), Math.floor(s / 8)))) continue;
+      const kind = u8[i * 4 + 3], h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10; let dd = d, ss = s, ok = false;
+      for (let it = 0; it < 4; it++) {   // 민 자리 땅 높이가 달라지므로 몇 번 다시 봄 (길보다 낮은 비탈 아래 나무는 잎이 길 높이로 올라오므로 더 멀리)
+        const q = near(dd, ss); if (!q) { ok = true; break; } const [dm, np] = q;
+        if (dm < FLANE.R) break;
+        const ux = (dd - np[0]) / dm, us = (ss - np[1]) / dm, yL = Math.max(W(np[0], np[1], 0).y, W(np[0] + ux * CW, np[1] + us * CW, 0).y);   // 통로 가운데·가장자리 중 높은 땅
+        const push = need(kind, h, r, HC + yL - baseY(dd, ss, r)) + CW - dm;
+        if (push <= 0) { ok = true; break; }
+        dd += ux * (push + 0.2); ss += us * (push + 0.2);
+        if (Math.hypot(dd - d, ss - s) > 6.5) break;   // 너무 멀리 밀어야 하면 뺌
+      }
+      if (!ok) { skip[i] = 1; continue; }
+      MV[i * 2] = dd - d; MV[i * 2 + 1] = ss - s;
+    }
+  }
   if (LOWQ) for (let i = 0; i < n; i++) if (hsh(i16[i * 4], i16[i * 4 + 1], 9) < 0.35) skip[i] = 1;   // 모바일: 나무 35% 줄임
   for (let i = 0; i < n; i++) {
     if (skip[i]) continue;
-    const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, key = Math.floor(d / CH) + ',' + Math.floor(s / CH) + ',' + u8[i * 4 + 3];
+    const d = i16[i * 4] / 10 + MV[i * 2], s = i16[i * 4 + 1] / 10 + MV[i * 2 + 1], key = Math.floor(d / CH) + ',' + Math.floor(s / CH) + ',' + u8[i * 4 + 3];
     if (!groups.has(key)) groups.set(key, []); groups.get(key).push(i);
   }
   const M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), Y = new V3(0, 1, 0), SCV = new V3(), col = new THREE.Color();
@@ -1055,7 +1116,7 @@ const STREES = (function siteTrees() {
     const geos = GEO[kind].map(view), geo = geos[2];
     const im = new THREE.InstancedMesh(geo, mt, ids.length), bb = new THREE.Box3();
     ids.forEach((i, k) => {
-      const d = i16[i * 4] / 10, s = i16[i * 4 + 1] / 10, h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
+      const d = i16[i * 4] / 10 + MV[i * 2], s = i16[i * 4 + 1] / 10 + MV[i * 2 + 1], h = i16[i * 4 + 2] / 10, r = i16[i * 4 + 3] / 10;
       const w = W(d, s, 0); w.y = Math.min(w.y, terrainAt(w.x + r * 0.4, w.z), terrainAt(w.x - r * 0.4, w.z), terrainAt(w.x, w.z + r * 0.4), terrainAt(w.x, w.z - r * 0.4)) - 0.2;
       Q.setFromAxisAngle(Y, hsh(d, s, 1) * 6.283); SCV.set(r * 1.4 * (0.9 + 0.2 * hsh(s, d, 2)), h, r * 1.4 * (0.9 + 0.2 * hsh(d, d, 3)));
       M4.compose(w, Q, SCV); im.setMatrixAt(k, M4); REF[i * 2] = CHUNKS.length; REF[i * 2 + 1] = k;
