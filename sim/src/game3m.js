@@ -173,7 +173,7 @@ function mapCache(V, kd) {   // 바탕 + 길·시설 + 이름 → 한 장 (범�
     g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,.7)'; g.fillText('RWY', mx + nx / nl * 11 + 0.8, my + ny / nl * 11 + 3.8); g.fillStyle = '#ffffff'; g.fillText('RWY', mx + nx / nl * 11, my + ny / nl * 11 + 3); g.textAlign = 'left';
   }
   if (window.__POWER) window.__POWER.mapDraw(g, mxy);   // 송전선 (주황 점선 + 철탑)
-  { const st = startPos(), q = mxyW(st.x, st.z); g.fillStyle = 'rgba(10,12,14,.85)'; g.beginPath(); g.arc(q[0], q[1], 5.5, 0, 6.283); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.stroke(); g.fillStyle = '#fff'; g.font = 'bold 8px sans-serif'; g.textAlign = 'center'; g.fillText('H', q[0], q[1] + 3); g.textAlign = 'left'; }   // 출발 패드
+  { const st = homePos(), q = mxyW(st.x, st.z); g.fillStyle = 'rgba(10,12,14,.85)'; g.beginPath(); g.arc(q[0], q[1], 5.5, 0, 6.283); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.stroke(); g.fillStyle = '#fff'; g.font = 'bold 8px sans-serif'; g.textAlign = 'center'; g.fillText('H', q[0], q[1] + 3); g.textAlign = 'left'; }   // 출발 패드
   // 비행 구역 경계 (점선 원)
   { const c = mxyW(FLY_C.x, FLY_C.z), r = FLY_R / V.m; g.strokeStyle = 'rgba(255,90,90,.55)'; g.lineWidth = 1.2; g.setLineDash([5, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
   // 이름 (겹치면 뒤의 것은 뺌)

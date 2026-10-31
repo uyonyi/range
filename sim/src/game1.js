@@ -572,7 +572,7 @@ function buildPad(o) {
   const Hh = dia * 0.7, Hw = dia * 0.6, st = dia * 0.135, zt = PH + 0.0225;
   for (const sx of [-1, 1]) b.box(sx * (Hw / 2 - st / 2), 0, zt, st, Hh, 0.005, M.white, { col: false, shadow: false });
   b.box(0, 0, zt, Hw - 2 * st + 0.02, st * 0.95, 0.005, M.white, { col: false, shadow: false });
-  PADS.push({ b, r: dia / 2, top: PH + 0.02, half: [dia * 0.42 + 0.55, 0.6] });
+  PADS.push({ b, r: dia / 2, top: PH + 0.02, rc: [[-dia * 0.42, 0.03], [dia * 0.46, -0.04]] });   // 윗면: 합판 원판(지름 dia) · 팔레트 두 장(1.1 m 사각, 가운데 rc)
 }
 let C1ON = false;   // 1종 시험장 (평탄) 사용 중
 // ---- 물웅덩이 (사방댐 위): 수면 높이 · 다각형 (지면 높이·충돌·숲길 배치가 같은 값을 씀 · 그림은 game5.js DAMS) ----
@@ -595,15 +595,31 @@ function waterAt(x, z) {   // 수면 높이 (물 위가 아니면 -Infinity)
   return -Infinity;
 }
 function surfAt(x, z) { return Math.max(terrainAt(x, z), waterAt(x, z)); }   // 땅 또는 수면 (착륙장 등 시설물 빼고 · 지형 따라가기·안내선 높이용)
+// ---- 노면 판 (활주로·유도로·콘크리트 계류장, game5 RWY): 지형을 따라 깐 판의 높이를 그린 그대로 돌려줌 (꼭짓점 높이 + 같은 삼각형 나눔)
+//  예전엔 groundAt 이 땅 높이만 봐서 기체가 판 속으로 7~16 cm 묻히고 FPV 화면이 판 밑으로 들어갔음
+//  { ox, oz 판 좌표 원점 · ux, uz 길이 방향 · t0..t1 × w0..w1 범위 · nt × nw 칸 · H 꼭짓점 높이 (PlaneGeometry 순서) · ex, ez, r2 대충 거르기 원 }
+const DECKS = [];
+function deckAt(x, z) {
+  let h = -Infinity;
+  for (const d of DECKS) {
+    const ex = x - d.ex, ez = z - d.ez; if (ex * ex + ez * ez > d.r2) continue;
+    const dx = x - d.ox, dz = z - d.oz, t = dx * d.ux + dz * d.uz, w = dz * d.ux - dx * d.uz, u = (w - d.w0) / (d.w1 - d.w0), v = (t - d.t0) / (d.t1 - d.t0);
+    if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+    const fx = u * d.nw, fy = (1 - v) * d.nt, ix = Math.min(d.nw - 1, fx | 0), iy = Math.min(d.nt - 1, fy | 0), n = d.nw + 1, H = d.H;
+    h = Math.max(h, triH(H[iy * n + ix], H[iy * n + ix + 1], H[(iy + 1) * n + ix], H[(iy + 1) * n + ix + 1], fx - ix, fy - iy));
+  }
+  return h;
+}
 function groundAt(x, z) {
   if (C1ON) return 0;
   let h = terrainAt(x, z);
   if (WATER && WATER.length) h = Math.max(h, waterAt(x, z));
+  if (DECKS.length) h = Math.max(h, deckAt(x, z));
   for (const p of PADS) {
     const l = p.b.local(_p.set(x, 0, z));
     const y0 = p.b.g.position.y;
     if (l.lx * l.lx + l.ly * l.ly < p.r * p.r) h = Math.max(h, y0 + p.top);
-    else if (Math.abs(l.lx) < p.half[0] && Math.abs(l.ly) < p.half[1]) h = Math.max(h, y0 + 0.14);
+    else if (p.rc.some(c => Math.abs(l.lx - c[0]) < 0.55 && Math.abs(l.ly - c[1]) < 0.55)) h = Math.max(h, y0 + 0.14);   // 팔레트 윗면 (예전 사각 범위는 오른쪽 팔레트 끝 5 cm 를 놓쳤음)
   }
   return h;
 }

@@ -227,6 +227,14 @@ function makeModel0(id, ghost) {
   return makeDrone(ghost);
 }
 let MODEL_ID = 'x2d', MODEL_PAINT = '';
+// 기체 원점 → 가장 낮은 곳(다리·배터리·탑재물 밑) 높이: 땅에 앉으면 이만큼 위 (예전엔 모든 기체 6 cm → X2D·자폭 FPV 는 다리가 2~4 cm 땅에 묻혔음)
+function modelFoot(m, a) {
+  if (!m || !a || a.cls === 'wing') return 0.06;
+  if (a.c1) return typeof c1p === 'function' ? c1p('skidDrop') : 0.3;   // 1종 연습기: 스키드 바닥 (c1 물리와 같은 값)
+  try { const g = m.g, p0 = g.position.clone(), q0 = g.quaternion.clone(); g.position.set(0, 0, 0); g.quaternion.identity(); g.updateMatrixWorld(true);
+    const y = new THREE.Box3().setFromObject(g).min.y; g.position.copy(p0); g.quaternion.copy(q0); g.updateMatrixWorld(true); return isFinite(y) ? clamp(-y + 0.004, 0.02, 0.15) : 0.06; } catch (e) { return 0.06; }
+}
+DR.foot = modelFoot(droneM, AF.x2d);
 function paintKey(id) { const k = (SET.paint || {})[id || SET.af]; return PAINTS[k] && !/^(yellow|red|cyan)$/.test(k) ? k : ''; }   // 기체별로 고른 색 (없으면 원래 색 · 목록에서 뺀 노랑·빨강·하늘은 기본으로)
 function paintVal(k) { if (!k) return null; const v = PAINTS[k]; if (Array.isArray(v)) { const a = v.slice(); a.key = k; return a; } return v; }   // 모델에 넘길 값: 단색 숫자 / 위장 배열(+key)
 function setAirframe(id) {
@@ -237,7 +245,7 @@ function setAirframe(id) {
     scene.remove(ghostM.g); ghostM = makeModel(id, true); ghostM.g.visible = false; scene.add(ghostM.g);
     MODEL_ID = id; MODEL_PAINT = pk;
   }
-  DR.R = AFc().R;
+  DR.R = AFc().R; DR.foot = modelFoot(droneM, AFc());
   ui.payload.style.display = AFc().drop ? '' : 'none';
   if (typeof syncSeg === 'function') syncSeg();
 }
@@ -364,10 +372,13 @@ const RWY = (function () {
     x.font = 'bold 34px sans-serif'; x.textAlign = 'center'; x.save(); x.translate(64, 96); x.fillText(num(hdg), 0, 0); x.restore();
     x.save(); x.translate(64, 928); x.rotate(Math.PI); x.fillText(num(hdg + 180), 0, 0); x.restore();
     const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
-    const NS = 40, geo = new THREE.PlaneGeometry(Wd, L, 2, NS), pa = geo.attributes.position;
-    for (let i = 0; i < pa.count; i++) { const w = pa.getX(i), t = pa.getY(i), q = at(t, w); pa.setXYZ(i, q.x, groundAt(q.x, q.z) + 0.07, q.z); }
-    geo.computeVertexNormals();
-    const strip = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 })); strip.receiveShadow = true; g.add(strip);
+    // 노면 판: 지형을 따라 깜 (t0..t1 × w0..w1 · nt × nw 칸 · 땅 위 lift) · 그린 높이를 DECKS 에 올려 groundAt 이 그대로 씀 → 기체가 판 속으로 묻히지 않음
+    const deck = (t0, t1, w0, w1, nt, nw, mtl, lift) => { const gg = new THREE.PlaneGeometry(1, 1, nw, nt), pa = gg.attributes.position, H = new Float32Array(pa.count);
+      for (let i = 0; i < pa.count; i++) { const u = pa.getX(i) + 0.5, v = pa.getY(i) + 0.5, q = at(t0 + (t1 - t0) * v, w0 + (w1 - w0) * u); H[i] = surfAt(q.x, q.z) + lift; pa.setXYZ(i, q.x, H[i], q.z); }
+      gg.computeVertexNormals(); const m = new THREE.Mesh(gg, mtl); m.receiveShadow = true; g.add(m);
+      const e = at((t0 + t1) / 2, (w0 + w1) / 2); DECKS.push({ ox: cx, oz: cz, ux, uz, t0, t1, w0, w1, nt, nw, H, ex: e.x, ez: e.z, r2: ((t1 - t0) ** 2 + (w1 - w0) ** 2) / 4 + 4 });
+      return m; };
+    deck(-L / 2, L / 2, -Wd / 2, Wd / 2, 40, 2, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2 }), 0.07);   // 활주로 (무늬 v = 길이 방향)
     // 가장자리 등 (끝: 초록/빨강) · 풍향계
     const lw = new THREE.MeshBasicMaterial({ color: 0xfff1c0, toneMapped: false }), lg = new THREE.MeshBasicMaterial({ color: 0x40ff70, toneMapped: false }), lr = new THREE.MeshBasicMaterial({ color: 0xff4040, toneMapped: false });
     for (let t = -L / 2; t <= L / 2 + 0.1; t += 13) for (const w of [-Wd / 2 - 0.6, Wd / 2 + 0.6]) { const q = at(t, w); const m = new THREE.Mesh(USPH, Math.abs(t + L / 2) < 1 ? lg : Math.abs(t - L / 2) < 1 ? lr : lw); m.scale.setScalar(0.16); m.position.set(q.x, groundAt(q.x, q.z) + 0.3, q.z); g.add(m); }
@@ -377,19 +388,20 @@ const RWY = (function () {
     const flat = sg => { let mx = -1e9, mn = 1e9; for (let t = -22; t <= 22; t += 6) for (let w = 0; w <= 46; w += 6) { const q = at(t, sg * (Wd / 2 + 8 + w)), y = groundAt(q.x, q.z); mx = Math.max(mx, y); mn = Math.min(mn, y); _rv.set(q.x, y + 2, q.z); if (collide(_rv, 1.5)) return 1e9; } return mx - mn; };
     const sg = flat(1) <= flat(-1) ? 1 : -1, AW = 20, AL = 40, aw0 = Wd / 2 + 30, ac = at(0, sg * (aw0 + AW / 2));
     STREES.hideRect && STREES.hideRect(ac.x, ac.z, ux, uz, AL + 16, AW + 16); { const tw = at(0, sg * (Wd / 2 + 15)); STREES.hideRect && STREES.hideRect(tw.x, tw.z, -uz * sg, ux * sg, 34, 14); }
-    const deck = (t0, t1, w0, w1, nt, nw, mtl, lift) => { const gg = new THREE.PlaneGeometry(1, 1, nw, nt), pa = gg.attributes.position;
-      for (let i = 0; i < pa.count; i++) { const u = pa.getX(i) + 0.5, v = pa.getY(i) + 0.5, q = at(t0 + (t1 - t0) * v, w0 + (w1 - w0) * u); pa.setXYZ(i, q.x, groundAt(q.x, q.z) + lift, q.z); }
-      gg.computeVertexNormals(); const m = new THREE.Mesh(gg, mtl); m.receiveShadow = true; g.add(m); return m; };
     const concM = new THREE.MeshStandardMaterial({ color: 0x8d8d86, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
     const taxM = new THREE.MeshStandardMaterial({ color: 0x45474a, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
-    deck(-AL / 2, AL / 2, sg * aw0, sg * (aw0 + AW), 8, 4, concM, 0.08);                         // 계류장
+    deck(-AL / 2, AL / 2, sg * aw0, sg * (aw0 + AW), 16, 8, concM, 0.08);                        // 콘크리트 계류장 (2.5 m 칸: 땅이 판 위로 비치지 않게)
     deck(-3, 3, sg * (Wd / 2 - 0.5), sg * (aw0 + 0.5), 1, 6, taxM, 0.075);                     // 유도로
-    const yl = new THREE.MeshBasicMaterial({ color: 0xf2c230 }); for (let w = Wd / 2 + 1; w < aw0; w += 3) { const q = at(0, sg * w); const m = new THREE.Mesh(UBOX, yl); m.scale.set(0.25, 0.03, 1.6); m.position.set(q.x, groundAt(q.x, q.z) + 0.1, q.z); m.rotation.y = -h + Math.PI / 2; g.add(m); }   // 유도로 노란 중앙선
+    const yl = new THREE.MeshBasicMaterial({ color: 0xf2c230 }); for (let w = Wd / 2 + 1; w < aw0; w += 3) { const q = at(0, sg * w); const m = new THREE.Mesh(UBOX, yl); m.scale.set(0.25, 0.03, 1.6); m.position.set(q.x, groundAt(q.x, q.z) + 0.012, q.z); m.rotation.y = -h + Math.PI / 2; g.add(m); }   // 유도로 노란 중앙선 (판 위에 칠함)
     const padTex = n => { const c = document.createElement('canvas'); c.width = c.height = 256; const x2 = c.getContext('2d'); x2.fillStyle = '#2f3134'; x2.beginPath(); x2.arc(128, 128, 126, 0, 6.283); x2.fill(); x2.strokeStyle = '#f0f0ea'; x2.lineWidth = 10; x2.beginPath(); x2.arc(128, 128, 112, 0, 6.283); x2.stroke();
       x2.fillStyle = '#f0f0ea'; x2.font = 'bold 150px sans-serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('H', 128, 136); x2.fillStyle = '#f2c230'; x2.font = 'bold 40px sans-serif'; x2.fillText(String(n), 200, 60); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; };
-    const pads = [-13, 0, 13].map((t, i) => { const q = at(t, sg * (aw0 + AW / 2)); q.y = groundAt(q.x, q.z); let top = q.y; for (const [dx, dz] of [[2.6, 0], [-2.6, 0], [0, 2.6], [0, -2.6], [1.8, 1.8], [-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8]]) top = Math.max(top, groundAt(q.x + dx, q.z + dz)); const m = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshStandardMaterial({ map: padTex(i + 1), roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -4 }));
-      m.rotation.x = -Math.PI / 2; m.rotation.z = -h; m.position.set(q.x, top + 0.16, q.z); /* 패드는 바닥면보다 위로 */ m.receiveShadow = true; g.add(m); return q; });
+    // H 패드 3개: 계류장 판을 따라 칠한 표지 (판 위 4 mm) — 예전엔 판 위로 최대 16 cm 떠 있는 평판이었고 groundAt 은 땅 높이라 기체가 그 속에 묻혔음
+    const pads = [-13, 0, 13].map((t, i) => { const q = at(t, sg * (aw0 + AW / 2)); q.y = groundAt(q.x, q.z);
+      const pg = new THREE.RingGeometry(0, 3, 40, 6), pp = pg.attributes.position, ch = Math.cos(h), shh = Math.sin(h);
+      for (let k = 0; k < pp.count; k++) { const lx = pp.getX(k), ly = pp.getY(k), x2 = q.x + lx * ch + ly * shh, z2 = q.z + lx * shh - ly * ch; pp.setXYZ(k, x2, groundAt(x2, z2) + 0.004, z2); }   // 무늬 위(H 세로) = 활주로 방향
+      pg.computeVertexNormals(); const m = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({ map: padTex(i + 1), roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -4 })); m.receiveShadow = true; g.add(m); return q; });
     window.__RWY = { a: at(-L / 2, 0), b: at(L / 2, 0), apron: [at(-AL / 2, sg * aw0), at(AL / 2, sg * aw0), at(AL / 2, sg * (aw0 + AW)), at(-AL / 2, sg * (aw0 + AW))], pads };
+    { const a = GRASS.instanceMatrix.array; let n = 0; for (let i = 0; i < GRASS.count; i++) if (deckAt(a[i * 16 + 12], a[i * 16 + 14]) > -Infinity) { for (let k = 0; k < 12; k++) a[i * 16 + k] = 0; n++; } if (n) GRASS.instanceMatrix.needsUpdate = true; }   // 판 위로 솟은 풀잎 치움
     // PAPI (진입각 지시등): 시단에서 20 m 안쪽, 접근 방향 기준 왼쪽 14 m 에 4등 · 3° 경로면 하양 2 · 빨강 2 (높으면 하양이 늘고 낮으면 빨강이 늚)
     const papi = [-1, 1].map(end => { const t0 = end * (L / 2 - 20), side = -end * sg * 14, lights = [], box = new THREE.MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.9 });
       for (let i = 0; i < 4; i++) { const q = at(t0, side + end * sg * (i - 1.5) * 2.4); const gy = groundAt(q.x, q.z); const bm = new THREE.Mesh(UBOX, box); bm.scale.set(0.5, 0.35, 0.5); bm.position.set(q.x, gy + 0.3, q.z); bm.rotation.y = -h; g.add(bm);
@@ -450,7 +462,9 @@ function rtbObj(a) {
   if (wingRwyOK(a)) { const td = RWY.at(-RWY.L / 2 + 20, 0), ap = RWY.at(-RWY.L / 2 - 300, 0); td.y = groundAt(td.x, td.z) + 1; ap.y = groundAt(ap.x, ap.z) + 35;
     return { kind: 'ms', t: 'rwyland', rtb: true, label: L2('복귀 · 활주로 착륙', 'Return · land on the runway'), mk: td.clone().setY(td.y + 4), pts(p) { return [p.clone(), ap.clone(), td.clone()]; } }; }
   if (a.cls === 'wing') return Object.assign(passCP('복귀 · 출발점 상공 통과', { d: BY.pad_start.down, s: BY.pad_start.side, td: 1, ts: 0 }, 0, 35, 35, 14), { rtb: true });
-  return { kind: 'ms', t: 'land', rtb: true, label: '출발 패드로 복귀 · 착륙', mk: startPos().add(new V3(0, 1.5, 0)), pts(p) { return [p.clone(), this.mk.clone()]; } };
+  const pad = homePos(); pad.y = groundAt(pad.x, pad.z);   // 쿼드: 콘크리트 계류장 H1 패드 (착륙장이 없으면 코스 출발 패드)
+  return { kind: 'ms', t: 'padland', rtb: true, tol: 2.5, label: homeOn() ? L2('H1 패드로 복귀 · 착륙', 'Return to pad H1 · land') : '출발 패드로 복귀 · 착륙', pad, mk: pad.clone().setY(pad.y + 3),
+    pts(q) { return [q.clone(), this.pad.clone().setY(Math.max(q.y, this.pad.y + 6)), this.pad.clone().setY(this.pad.y + 1)]; } };
 }
 // 기체 잃음: 추락 / 자폭 기폭
 function lostDrone(why) {
@@ -555,7 +569,7 @@ const STRIKE = (function () {
 function msObj() { return MS.list[MS.idx] || null; }
 // 임무 지도 범위: 그 임무에서 나올 수 있는 사건·구역 전부 + 출발점 ([down, side, 반지름])
 function missionMapPts(kind, run) {   // run: 이번 비행에 정해진 위치만 (산불·수색·정찰·추적은 매번 다름)
-  const P = [], add = (p, r) => { if (p) P.push([-p.z, p.x, r || 0]); }, st = startPos(); add(st, 30);
+  const P = [], add = (p, r) => { if (p) P.push([-p.z, p.x, r || 0]); }, st = homePos(kind); add(st, 30);
   if (RWY && AFc().cls === 'wing' && !AFc().kam) { add(RWY.at(-RWY.L / 2 - 120, 0), 20); add(RWY.at(RWY.L / 2, 0), 20); }   // 고정익: 활주로·접근로
   if (kind === 'field' && RWY) { if (AFc().cls === 'wing') { add(RWY.at(-RWY.L / 2 - 250, 0), 30); add(RWY.at(RWY.L / 2 + 190, -RWY.sg * 220), 30); } RWY.pads.forEach(p => add(p, 15)); add(RWY.at(-RWY.L / 2, 0), 15); add(RWY.at(RWY.L / 2, 0), 15); return P; }
   if (run && kind === 'fire') { MS.list.forEach(f => { add(f.mk, 115); add(f.tp, 20); }); return P; }
@@ -586,10 +600,11 @@ function msStart(kind) {
   const SC = scenStart(kind, a); if (SC) L = SC;
   if (typeof isC1 === 'function' && isC1(kind)) L = c1Start(a);
   if (wingRwyOK(a) && ['recon', 'fire', 'ridge'].includes(kind)) L = L.concat([rtbObj(a)]);   // 고정익: 임무 끝에 활주로 착륙
-  L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; MS.list = L; MS.kind = kind; MS.splits = []; { const el = $('split'); if (el) el.classList.remove('on'); } MS.t0 = 0; MS.events = []; S.decoyHit = 0;
+  else if (homeOn(kind) && ['forest', 'race', 'ridge', 'recon', 'fire'].includes(kind) && L.length) L = L.concat([rtbObj(a)]);   // 쿼드: 콘크리트 계류장 H1 패드에서 떠서 끝나면 돌아와 내려앉기 (수색·차량 추적은 원래 복귀 착륙)
+  L.forEach(o => { o.done = false; o.miss = false; }); S.msNear = null; S.padErr = []; MS.list = L; MS.kind = kind; MS.splits = []; { const el = $('split'); if (el) el.classList.remove('on'); } MS.t0 = 0; MS.events = []; S.decoyHit = 0;
   // 시작 위치: 고정익·자폭 고정익은 공중에서
   const c1s = typeof isC1 === 'function' && isC1(kind) ? c1StartPose() : null;
-  const p0 = c1s ? c1s.p : kind === 'field' && RWY && a.cls !== 'wing' ? RWY.pads[0].clone().setY(RWY.pads[0].y + 0.06) : startPos(), o = msObj(); let h = startHead();
+  const p0 = c1s ? c1s.p : homePos(kind), o = msObj(); let h = homeHead(kind);   // 쿼드: H1 패드 (장애물 코스·1종 말고)
   if (c1s) h = c1s.h; else if (o && o.mk) { const d = o.mk.clone().sub(p0); h = Math.atan2(d.x, -d.z); }
   if (wingRwyOK(a) && kind !== 'strike') wingGround(); else if (a.cls === 'wing') { p0.y = groundAt(p0.x, p0.z) + (a.kam ? 45 : 30); wingAir(p0, h); } else resetDrone(p0, h);
   MS.launch = { p: DR.p.clone(), h: DR.gnd ? DR.h : h };
@@ -621,7 +636,8 @@ function passCross(o, prev, cur) {
 const RACE_PEN = 8;   // 레이스: 놓친 링 하나당 +8 s
 // 구간 기록: 통과점마다 지금 시간을 적고, 같은 임무·기체·모드의 최고 기록 구간과 비교해 녹/적 델타 표시 (Liftoff 랩 타이머식)
 const SPLIT = { t: 0 };
-function splitKey() { return 'fpvsim_ms_split_' + S.kind + '_' + AFc().id + '_' + SET.diff + SITE_KEY; }
+function recV(k) { return homeOn(k) && k !== 'field' ? '_h1' : ''; }   // 쿼드 임무 기록: H1 패드 출발·도착으로 바뀐 뒤 따로 (예전 기록은 복귀 착륙이 없어 비교가 안 됨)
+function splitKey() { return 'fpvsim_ms_split_' + S.kind + '_' + AFc().id + '_' + SET.diff + SITE_KEY + recV(S.kind); }
 function splitMark() {
   if (!(S.kind === 'race' || S.kind === 'ridge' || S.kind === 'forest')) return;
   const now = S.t + S.pen; MS.splits = MS.splits || []; while (MS.splits.length <= MS.idx) MS.splits.push(now);   // 건너뛴 링도 같은 시각으로 채워 인덱스를 맞춤
@@ -671,7 +687,8 @@ function msStep(prev, cur, dt) {
     if (r === true) msNext(); else if (r === false && S.bumpT <= 0) { showMsg(L2('MISS · 다시 통과', 'MISS · fly through again'), '#ff9a40', 1); sfx('bad'); S.bumpT = 0.6; }
   } else if (o.t === 'padland') {
     const e = Math.hypot(DR.p.x - o.pad.x, DR.p.z - o.pad.z);
-    if (DR.landed && DR.v.length() < 0.6) { if (e <= 1.5) { (S.padErr = S.padErr || []).push(e); msNext(L2(`착륙 ✓ 오차 ${e.toFixed(2)} m`, `Landed ✓ ${e.toFixed(2)} m off`), '#5dff9a'); } else if (e < 6 && S.bumpT <= 0) { showMsg(L2(`패드 밖 ${e.toFixed(1)} m · 다시 떠서 가운데로`, `Off the pad ${e.toFixed(1)} m · lift and recentre`), '#ff9a40', 1.4); S.bumpT = 1.5; } }
+    const tol = o.tol || 1.5;   // 정밀 착륙(야전 착륙장) 1.5 m · 임무 끝 복귀 착륙 2.5 m (H 원 반지름 3 m)
+    if (DR.landed && DR.v.length() < 0.6) { if (e <= tol) { (S.padErr = S.padErr || []).push(e); msNext(L2(`착륙 ✓ 오차 ${e.toFixed(2)} m`, `Landed ✓ ${e.toFixed(2)} m off`), '#5dff9a'); } else if (e < tol + 4.5 && S.bumpT <= 0) { showMsg(L2(`패드 밖 ${e.toFixed(1)} m · 다시 떠서 가운데로`, `Off the pad ${e.toFixed(1)} m · lift and recentre`), '#ff9a40', 1.4); S.bumpT = 1.5; } }
   } else if (o.t === 'rwyland') { if (DR.gnd && (DR.as || 0) < 2) msNext(L2('활주로 착륙 ✓', 'Landed on the runway ✓'), '#5dff9a'); }
   else if (o.t === 'fire') fireStep(cur, dt);
   else if (o.t === 'strikeAll') strikeAim(o, cur);
@@ -907,7 +924,7 @@ function msFinish() {
     else if (S.lost) rows.push(['기체 손실', S.lost + ' 대']);
     if (S.kind === 'sar' && S.sarXY) rows.push(['실종자 위치 (EPSG:5186)', S.sarXY[0].toFixed(0) + ', ' + S.sarXY[1].toFixed(0)]);
     if (S.kind === 'sar' && S.kitErr !== undefined) rows.push(['키트 오차', S.kitErr.toFixed(1) + ' m']);
-    if (S.kind === 'field' && S.padErr && S.padErr.length) rows.push([L2('착륙 오차', 'Landing error'), S.padErr.map(e => e.toFixed(2)).join(' / ') + ' m']);
+    if (S.padErr && S.padErr.length) rows.push([L2('착륙 오차', 'Landing error'), S.padErr.map(e => e.toFixed(2)).join(' / ') + ' m']);
     if (S.kind === 'track') rows.push(['추적 유지', S.trT.toFixed(0) + ' / ' + S.trWin.toFixed(0) + ' s'], [L2('최대 노출', 'Peak exposure'), Math.round(TRACK.susMax || 0) + '%'], [L2('발각', 'Spotted'), TRACK.burn ? L2('예 (-30)', 'yes (-30)') : L2('아니오', 'no')], ['판정', S.trackOK ? '성공' : '실패']);
     if (S.kind === 'race') rows.push([L2('놓친 링', 'Missed rings'), MS.list.filter(x => x.miss).length + ' / ' + MS.list.length + L2(' (링당 +8 s)', ' (+8 s each)')]);
     if (S.kind === 'ridge' && RIDGE) rows.push(['정상 해발', RIDGE.top.toFixed(0) + ' m']);
@@ -916,7 +933,7 @@ function msFinish() {
     debriefShow(MS.list.filter(x => x.done && !x.miss).length, MS.list.length, MS.par || 0);
     const ph = (S.photos || []).filter(p => p.ok), rp = $('resPhotos');
     if (rp) { rp.style.display = ph.length ? 'flex' : 'none'; rp.innerHTML = ph.map((p, i) => `<figure><a href="${p.url}" download="report_${S.kind}_${i + 1}.jpg"><img src="${p.url}" alt=""></a>${L2('보고 ', 'Report ')}${i + 1}${p.xy ? ' · ' + p.xy[0].toFixed(0) + ', ' + p.xy[1].toFixed(0) : ''}</figure>`).join(''); }
-    const key = 'fpvsim_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY; let best = null;
+    const key = 'fpvsim_ms_best_' + S.kind + '_' + a.id + '_' + SET.diff + SITE_KEY + recV(S.kind); let best = null;
     try { best = parseFloat(localStorage.getItem(key)); } catch (e) { }
     if (!best || total < best) { try { localStorage.setItem(key, String(total)); if (MS.splits) localStorage.setItem(splitKey(), JSON.stringify(MS.splits)); } catch (e) { } ui.resBest.textContent = '★ 최고 기록 갱신'; }
     else ui.resBest.textContent = '최고 기록 ' + fmt(best);
@@ -1524,7 +1541,7 @@ function nearOrder(L, p) { const out = [], rest = L.slice(); let c = p; while (r
 function reconPick() {
   const ok = RECON.filter(r => flyL(r.tp) <= FLY_R_SAFE), pool = ok.length >= 4 ? ok : RECON.slice().sort((a, b) => flyL(a.tp) - flyL(b.tp));
   const nR = SET.diff === 'train' ? 3 : SET.diff === 'sport' ? 5 : 4;   // 난이도별 대상 수
-  const L = nearOrder(shuffle(pool).slice(0, Math.min(nR, pool.length)), startPos());
+  const L = nearOrder(shuffle(pool).slice(0, Math.min(nR, pool.length)), homePos('recon'));
   L.forEach((o, i) => { o.label = `정찰 ${i + 1} · 건물 (${o.wl})`; o.done = false; }); return L;
 }
 // 산불: 후보 8곳 중 5곳, 3곳은 처음부터 · 2곳은 나중에 신고
@@ -1568,6 +1585,13 @@ function strikeAim(o, cur) { let b = null, bd = 1e9; for (const t of STRIKE) { i
 function msPar(kind, L) {
   if (kind === 'class1' || kind === 'class1x' || kind === 'class1d') return 900;
   const a = AFc(), v = a.cls === 'wing' ? a.cruise : Math.min(a.top, 12);
+  if (homeOn(kind) && L && L.length && L[L.length - 1].rtb && kind !== 'sar' && kind !== 'track') {   // 쿼드: H1 패드에서 첫 목표까지 + 마지막 목표에서 패드로 돌아와 내려앉기
+    const hp = homePos(kind), P = L.filter(o => !o.rtb && (o.c || o.mk || o.tp)).map(o => o.c || o.mk || o.tp), d = P.length ? hp.distanceTo(P[0]) + hp.distanceTo(P[P.length - 1]) : 0;
+    return msPar0(kind, L.filter(o => !o.rtb), a, v) + d / (v * 0.75) + 20;
+  }
+  return msPar0(kind, L, a, v);
+}
+function msPar0(kind, L, a, v) {
   if (kind === 'forest') return (FLANE ? FLANE.total : 400) / Math.min(v, 6) + 15;
   if (kind === 'race') return (PATHL ? PATHL.total : 500) / (v * 0.85) + 10;
   if (kind === 'ridge') return (RIDGE ? RIDGE.len : 900) / (v * 0.8) + 20;
@@ -1612,7 +1636,8 @@ const BRIEF = window.SIM_LANG === 'en' ? {
 function briefShow(kind, L) {
   const b = BRIEF[kind], el = $('brief'); if (!b || !el) return;
   const cond = [WIND.lv ? (WIND.lv === 1 ? L2('바람 약 3 m/s', 'Wind 3 m/s') : L2('바람 강 7 m/s', 'Wind 7 m/s')) : L2('바람 없음', 'No wind'), ENV.night ? L2('밤', 'Night') : L2('낮', 'Day'), AFc().name].join(' · ');
-  el.innerHTML = `<div class="bc"><div class="bt">BRIEFING</div><h3>${b[0]}</h3><p>${b[1]}</p><p class="bn">${b[2]}</p><div class="bm">${cond} · ${L2('기준 시간', 'Par time')} ${fmt(MS.par)}</div><button class="primary" id="briefGo">${L2('시작', 'Start')}</button></div>`;
+  const hp = homeOn(kind) && kind !== 'field' ? `<p class="bn">🅷 ${L && L.length && L[L.length - 1].rtb ? L2('콘크리트 계류장 H1 패드에서 이륙 → 임무를 마치면 H1 패드로 돌아와 착륙', 'Take off from pad H1 on the concrete apron → when done, return and land on pad H1') : L2('콘크리트 계류장 H1 패드에서 이륙', 'Take off from pad H1 on the concrete apron')}</p>` : '';
+  el.innerHTML = `<div class="bc"><div class="bt">BRIEFING</div><h3>${b[0]}</h3><p>${b[1]}</p><p class="bn">${b[2]}</p>${hp}<div class="bm">${cond} · ${L2('기준 시간', 'Par time')} ${fmt(MS.par)}</div><button class="primary" id="briefGo">${L2('시작', 'Start')}</button></div>`;
   el.classList.remove('hidden'); S.brief = true;
   const go = () => { el.classList.add('hidden'); S.brief = false; commStart(kind); };
   $('briefGo').onclick = go; el.onpointerdown = e => { if (e.target === el) go(); };
@@ -1690,13 +1715,14 @@ function brgFrom(o, p) {   // o 에서 p 까지 방위(진북)·거리 (무전�
 const CLK_W = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
 let LMK = null;
 function lmkList() {
-  if (LMK) return LMK; LMK = { pts: [], line: null };
+  if (LMK) { const sp = homePos(); LMK.lp.x = sp.x; LMK.lp.z = sp.z; return LMK; }   // 출발 패드: 쿼드는 계류장 H1 패드 · 그 밖엔 코스 출발 패드
+  LMK = { pts: [], line: null };
   try { const B = window.__BLD3 && window.__BLD3.LIST; if (B && B.length) { const G = new Map(); for (const b of B) { const k = Math.round(b[0] / 120) + ',' + Math.round(b[1] / 120); G.set(k, (G.get(k) || 0) + 1); } let best = null, bn = 0; for (const [k, n] of G) if (n > bn) { bn = n; best = k; }
     if (bn >= 6) { const [kx, kz] = best.split(',').map(Number); let sx = 0, sz = 0, c = 0; for (const b of B) if (Math.abs(b[0] / 120 - kx) <= 1 && Math.abs(b[1] / 120 - kz) <= 1) { sx += b[0]; sz += b[1]; c++; } LMK.pts.push({ x: sx / c, z: sz / c, r: 160, en: 'the village', ko: '마을' }); } } } catch (e) { }
   try { if (RWY) { const c = RWY.at(0, 0); LMK.pts.push({ x: c.x, z: c.z, r: RWY.L / 2 + 40, en: 'the runway', ko: '활주로' }); } } catch (e) { }
-  const sp = startPos(); LMK.pts.push({ x: sp.x, z: sp.z, r: 70, en: 'the launch pad', ko: '출발 패드' });
+  LMK.lp = { x: 0, z: 0, r: 70, en: 'the launch pad', ko: '출발 패드' }; LMK.pts.push(LMK.lp);
   const P = window.__POWER; if (P && P.TW && P.TW.length > 1) LMK.line = P.TW.map(t => [t.x, t.z]);
-  return LMK;
+  return lmkList();
 }
 function segX(ax, az, bx, bz, cx, cz, dx, dz) { const d = (bx - ax) * (dz - cz) - (bz - az) * (dx - cx); if (Math.abs(d) < 1e-9) return false; const u = ((cx - ax) * (dz - cz) - (cz - az) * (dx - cx)) / d, v = ((cx - ax) * (bz - az) - (cz - az) * (bx - ax)) / d; return u > 0.05 && u < 0.95 && v >= 0 && v <= 1; }
 function vecRef(from, to) {   // 참조물 하나: 목표 가까이 → '… 근처' · 가는 길에 송전선 → '송전선 너머' · 가는 길 옆 → '… 지나서'
@@ -1743,7 +1769,7 @@ function hdgTick() {
 }
 function fromLaunch(p) {
   if (!p) return brgFrom(null, null);
-  const st = startPos(), dx = p.x - st.x, dz = p.z - st.z, h = Math.atan2(dx, -dz), brg = ((Math.round(((SITE.brg || 0) + h * 180 / Math.PI) / 5) * 5) % 360 + 360) % 360, dist = Math.max(50, Math.round(Math.hypot(dx, dz) / 50) * 50);
+  const st = MS.launch ? MS.launch.p : homePos(), dx = p.x - st.x, dz = p.z - st.z, h = Math.atan2(dx, -dz), brg = ((Math.round(((SITE.brg || 0) + h * 180 / Math.PI) / 5) * 5) % 360 + 360) % 360, dist = Math.max(50, Math.round(Math.hypot(dx, dz) / 50) * 50);
   return { brg: String(brg).padStart(3, '0'), dist, brgW: String(brg).padStart(3, '0').split('').map(c => DIG[+c]).join(' '), distW: numWords(dist) };
 }
 function numWords(n) { if (n >= 1000) return 'one thousand' + (n % 1000 ? ' ' + numWords(n % 1000) : ''); const U = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'], h = Math.floor(n / 100), r = n % 100; return [h ? (h >= 10 ? 'one thousand' : U[h] + ' hundred') : '', r === 50 ? 'fifty' : r ? String(r) : ''].filter(Boolean).join(' '); }
@@ -2067,14 +2093,15 @@ let COMM_LAST = 0;
 function commAck(o, kind) {   // 목표 하나 끝났을 때
   if (o && o.rtb) return;   // 복귀·착륙은 표적이 아님 (임무 완료 무전이 따로 나옴) — 예전엔 착륙하면 '촬영 확인'·'불씨 확인'이라고 답했음
   const rest = MS.list.filter(x => !x.done && !x.rtb), left = rest.length, rtb = MS.list.find(x => !x.done && x.rtb);
-  const home = rtb ? (rtb.t === 'rwyland' ? [' RTB and land on the runway.', ' 복귀 · 활주로 착륙.'] : rtb.t === 'land' ? [' RTB to the launch pad.', ' 출발 패드로 복귀.'] : [' RTB.', ' 복귀.']) : ['', ''];
+  const home = rtb ? (rtb.t === 'rwyland' ? [' RTB and land on the runway.', ' 복귀 · 활주로 착륙.'] : rtb.t === 'land' || rtb.t === 'padland' ? [' RTB to the launch pad.', homeOn() ? ' H1 패드로 복귀.' : ' 출발 패드로 복귀.'] : [' RTB.', ' 복귀.']) : ['', ''];
   if (kind === 'recon') { const x = rest.find(y => y.tp), v = x ? vecText(x.tp, 'Next structure', '다음 대상') : null; return comm(`Copy imagery. ${v ? v[0] : 'All imagery received.' + home[0]}`, v ? `촬영 확인. ${v[1]}` : '촬영 모두 수신.' + home[1]); }
   if (kind === 'recon-old') return comm(`Copy imagery. ${left ? `Next structure, grid ${(() => { const x = MS.list.find(y => !y.done); return x ? grid(x.d, x.s) : '—'; })()}.` : 'All imagery received.'}`, left ? '촬영 확인. 다음 대상 좌표 전달.' : '촬영 모두 수신.');
   if (kind === 'fire') return comm(`Copy imagery, hotspot confirmed at grid ${grid(o.d, o.s)}. Fire crews dispatched.${left ? ' Stand by for the next report.' : ' All reported.' + home[0]}`, `사진 접수 · 불씨 확인, 진화대 출동.${left ? ' 다음 신고 대기.' : ' 모두 보고됨.' + home[1]}`);
   if (kind === 'sar' && o.t === 'sarfind') return comm(`Copy imagery, subject located at grid ${grid(SAR.d, SAR.s)}. ${AFc().drop ? 'Drop the rescue kit within five meters.' : 'Return to base.'}`, `실종자 위치 확인. ${AFc().drop ? '구조 키트 5 m 이내 투하.' : '복귀.'}`);
   if (kind === 'sar' && o.t === 'sarkit') return comm('Good drop, kit on the ground. Ground team is en route. RTB.', '키트 전달 확인. 구조대 이동 중. 복귀.');
   if (kind === 'forest' || kind === 'race' || kind === 'ridge') {
-    const done = MS.list.length - left, half = Math.floor(MS.list.length / 2);
+    const tot = MS.list.filter(x => !x.rtb).length, done = tot - left, half = Math.floor(tot / 2);   // 통과점만 셈 (끝의 복귀 착륙 빼고)
+    if (!left && rtb) return comm('All checkpoints clear. RTB to the launch pad.', '통과점 모두 통과.' + home[1]);
     if (o.label && /정상|Summit/.test(o.label)) return comm(`Summit reached. Nice work, ${CS}. Head down the far ridge.`, '정상 도착. 반대편 능선으로 하강.');
     if (done === half) return comm(`Halfway. ${S.pen ? 'Watch your clearances.' : 'Looking clean, keep it up.'}`, `절반 통과. ${S.pen ? '간격 주의.' : '깔끔함, 계속.'}`);
     if (left === 1) return comm('Final gate ahead. Bring it home.', '마지막 통과점. 마무리.');
@@ -2285,7 +2312,7 @@ function menuAfPanel() {
   const st = $('afStats'); if (st) { st.style.setProperty('--cc', col); st.innerHTML = afStats(a).map(r => `<span class="k">${r[0]}</span><span class="sbar"><i style="width:${Math.round(clamp(r[1], 0.04, 1) * 100)}%"></i></span><span class="v">${r[2]}</span>`).join('') + `<span class="note2">${a.note}</span>`; }
 }
 function menuBest(k) {
-  let key = k === 'course' ? 'fpvsim_fpv_best_' + SET.diff + SITE_KEY : isMission(k) ? 'fpvsim_ms_best_' + k + '_' + SET.af + '_' + SET.diff + SITE_KEY : null, b = null;
+  let key = k === 'course' ? 'fpvsim_fpv_best_' + SET.diff + SITE_KEY : isMission(k) ? 'fpvsim_ms_best_' + k + '_' + SET.af + '_' + SET.diff + SITE_KEY + recV(k) : null, b = null;
   if (key) try { b = parseFloat(localStorage.getItem(key)); } catch (e) { }
   return b > 0 ? b : null;
 }
@@ -3065,7 +3092,7 @@ if ($('msGoVR')) $('msGoVR').onclick = () => { if (window.SIM_VR_URL) location.h
 if ($('vrBackGo')) $('vrBackGo').onclick = () => vrStart();
 
 setAirframe(SET.af); afUI(); menuSel(MENU.ms);
-Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, vecCall, FLANE, DAMS, sky, startPos, startHead, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
+Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, vecCall, FLANE, DAMS, sky, startPos, startHead, homePos, homeOn, deckAt, DECKS, FLY_C, wizGo, pilotSetUI: () => pilotSetUI(), LY, stickMode, GL, gdLevel, glSet, glCycle, BEACON, GCHEV, marker, NAVR, navRadio, vrMenuDraw, vrOsdDraw, splitKey, RWY, rwyLocal, rwyApproach, msObj, setWxFx, wxSense, SNOW_U, setTod, setWx, WX, SAR_POOL, MAPV, mxy, trackPose, debriefShow, DBF, RV, rvPlan, rvNorm, VID, exportReplayVideo, RP, getLastRec: () => LAST_REC, VR_MAP, vrMenuOpen, commEngine, TTSW, commSpeak, VR_PIP_RT: VR_PIP.rt, ENV, XR, VRS, VR_MENU, VR_OSD, VR_SCR, VR_RT, vrMenuClick, vrMenuHit, vrStart, vrStop, xrInput, VR_OK, getXR: () => XR_ON, DAMS, MENU, menuSel, menuGo, menuTab, LY, lyEdit, lyApply, comm, grid, COMM, WIND, windAt, SAR, TRACK, RIDGE, FIRE, irSet, ENV, envApply, AF, setAirframe, MS, msObj, FLANE, RACE, RECON, STRIKE, effMode });
 // ---- 옵션 사용성: 탭 · 고른 값 설명 · 코스 화면의 빠른 설정 ----
 (function optUX() {
   const P = $('optPanel'); if (!P || !$('optTabs')) return;
