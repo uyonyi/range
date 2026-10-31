@@ -1710,7 +1710,7 @@ function vecRef(from, to) {   // 참조물 하나: 목표 가까이 → '… 근
 }
 // 지금 기체 위치·기수 기준 시계 방향 + 수평 거리 + 방위 (임무 중 모든 위치 무전이 같은 꼴: "two o'clock, 350 meters, bearing 245")
 function clkOf(t) { const dx = t.x - DR.p.x, dz = t.z - DR.p.z, rel = Math.atan2(dx, -dz) - DR.h; return ((Math.round(rel / (Math.PI / 6)) % 12) + 12) % 12; }
-function vecText(t, nmEn, nmKo, ref) { const b = brgFrom(DR.p, t), clk = clkOf(t), r = ref || ['', '']; return [`${nmEn} at your ${CLK_W[clk]} o'clock, about ${b.distW} meters from your position${r[0]}, bearing ${b.brgW}.`,   // 영어는 녹음 조각(tools/voice)으로만 이어 붙일 수 있는 꼴 `${nmKo}: ${clk || 12}시 방향 · 약 ${b.dist} m${r[1]} (방위 ${b.brg}°)`]; }
+function vecText(t, nmEn, nmKo, ref) { const b = brgFrom(DR.p, t), clk = clkOf(t), r = ref || ['', '']; return [`${nmEn} at your ${CLK_W[clk]} o'clock, about ${b.distW} meters from your position${r[0]}, bearing ${b.brgW}.`, `${nmKo}: ${clk || 12}시 방향 · 약 ${b.dist} m${r[1]} (방위 ${b.brg}°)`]; }   // 영어는 녹음 조각(tools/voice)으로만 이어 붙일 수 있는 꼴
 let VEC_T = -99;
 function vecCall(auto) {
   if (S.state !== 'run' || !isMission() || S.brief) return false; if (!auto && S.simT - VEC_T < 3) return false; VEC_T = S.simT;
