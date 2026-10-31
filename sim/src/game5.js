@@ -1045,13 +1045,13 @@ function irGrain(on) {
     (function jig() { if (el.style.display !== 'none') el.style.backgroundPosition = `${(Math.random() * 128) | 0}px ${(Math.random() * 128) | 0}px`; requestAnimationFrame(jig); })(); }
   el.style.display = XR_ON ? 'none' : '';
 }
-function envHemi() { return ENV.ir ? 0.55 : ENV.night ? 0.3 : 0.5; }
+function envHemi() { return ENV.ir ? 0.55 : ENV.night ? 0.3 : (ENV.wx === 'rain' || ENV.wx === 'snow') ? (ENV.dusk ? 0.62 : 0.9) : 0.5; }   // 비·눈(흐림): 해 대신 하늘빛으로 밝기
 function envApply() {
   const n = ENV.night, ir = ENV.ir, dk = ENV.dusk && !n, wx = ENV.wx || 'clear', wet = wx !== 'clear';
   // 해질녘: 낮은 서쪽 해·주황 하늘·긴 그림자 / 비·눈: 흐림(해 약하게)·안개 짙게
   SUN_DIR.copy(dk ? new V3(-0.86, 0.2, -0.34).normalize() : SUN0);
   if (typeof c1Sun === 'function' && typeof isC1 === 'function' && isC1() && S.state !== 'menu') c1Sun();   // 1종: 시험 시각의 해 위치
-  sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? 0.85 : DAY0.sun * (wet ? 0.45 : 1); sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
+  sun.intensity = ir ? (n ? 0.15 : 0.6) : n ? 0.32 : dk ? (wet ? 0.3 : 0.85) : DAY0.sun * (wet ? 0.16 : 1);   // 흐린 날은 해가 거의 가려져 그림자·번들거림이 희미 sun.color.copy(n ? new THREE.Color(0x9fb4ff) : dk ? new THREE.Color(0xffa565) : wet ? new THREE.Color(0xdfe4ea) : DAY0.sunC);
   hemi.color.copy(n ? new THREE.Color(0x4a5f8a) : dk ? new THREE.Color(0x9a7a8e) : wet ? new THREE.Color(0xb9c2cc) : DAY0.hs); hemi.groundColor.copy(n ? new THREE.Color(0x0c0c10) : dk ? new THREE.Color(0x3a2a20) : DAY0.hg);
   const wxBg = wx === 'snow' ? 0xc9ced4 : 0x8e969e, bg = ir ? 'ir' : n ? 0x05070d : dk ? 'dusk' : wet ? wxBg : null;
   sky.visible = bg === null; scene.background = bg === null ? null : bg === 'ir' ? irBg(n) : bg === 'dusk' ? (wet ? DUSK_WET_BG : DUSK_BG) : new THREE.Color(bg);
@@ -1185,7 +1185,7 @@ function snowify(m) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); sh.uniforms.uSnow = SNOW_U;
     sh.vertexShader = 'varying float vSnowN;\n' + sh.vertexShader.replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n  { vec3 snN = objectNormal;\n  #ifdef USE_INSTANCING\n  snN = mat3(instanceMatrix) * snN;\n  #endif\n  vSnowN = normalize(mat3(modelMatrix) * snN).y; }');
-    sh.fragmentShader = 'uniform float uSnow; varying float vSnowN;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.83, 0.87), uSnow * smoothstep(0.45, 0.92, vSnowN));'); };
+    sh.fragmentShader = 'uniform float uSnow; varying float vSnowN;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.70, 0.73, 0.78), uSnow * smoothstep(0.45, 0.92, vSnowN));'); };
   const ck = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => ''; m.customProgramCacheKey = () => ck() + '|snow'; m.needsUpdate = true;
 }
 function snowPatch() {   // 처음 눈이 올 때 한 번: 장면의 지형·나무·건물 재질에 덧칠 (드론·하늘 제외)
@@ -1209,6 +1209,9 @@ function seasonApply() {
 function syncSeason() { const v = SET.season || 'auto'; document.querySelectorAll('#segSeason button').forEach(x => x.classList.toggle('on', x.dataset.v === v)); }
 document.querySelectorAll('#segSeason button').forEach(b => b.addEventListener('click', () => { SET.season = b.dataset.v; saveSet(); seasonApply(); syncSeason(); }));
 seasonApply(); syncSeason();
+function syncTreeQ() { const v = SET.treeQ || 'auto'; document.querySelectorAll('#segTreeQ button').forEach(x => x.classList.toggle('on', x.dataset.v === v)); }
+document.querySelectorAll('#segTreeQ button').forEach(b => b.addEventListener('click', () => { SET.treeQ = b.dataset.v; saveSet(); syncTreeQ(); if (STREES.LODD) STREES.LODD.q = b.dataset.v === 'auto' ? 1 : +b.dataset.v; }));
+syncTreeQ(); if (SET.treeQ && SET.treeQ !== 'auto' && STREES.LODD) STREES.LODD.q = +SET.treeQ || 1;
 function wxTick(dt) {
   // 눈: 서서히 쌓이고(약 30초), 그치면 녹음(약 15초) · 풀은 눈 속에 묻힘 · 나무는 위를 향한 잎·가지에 (game6t)
   { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 15, dt / 30); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
@@ -3142,6 +3145,7 @@ Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, vecCall, FLANE, D
     segAcro: { 0: ['스틱을 놓으면 기체가 수평으로 돌아옵니다', 'The aircraft levels out when you let go'], 1: ['기울어진 채로 유지되는 완전 수동 · 숙련자용', 'Fully manual, stays banked · for experienced pilots'] },
     segTime: { 0: ['밝은 낮 · 가장 잘 보입니다', 'Daylight · best visibility'], 2: ['해가 낮아 그림자가 길고 역광이 생깁니다', 'Low sun, long shadows and glare'], 1: ['어두움 · IR 카메라와 조명이 중요합니다', 'Dark · IR camera and lights matter'] },
     segWx: { clear: ['비·눈을 고르면 시야가 줄고 산불 감시는 쉽니다', 'Rain or snow cuts visibility and stops fire watch'], rain: ['빗줄기·안개로 시야가 줄어듭니다 · 산불 감시 불가', 'Rain and fog cut visibility · no fire watch'], snow: ['땅과 나무가 눈에 덮입니다 · 산불 감시 불가', 'Ground and trees under snow · no fire watch'] },
+    segTreeQ: { auto: ['비행 중 화면이 넉넉히 빠르면 자세한 나무를 더 멀리까지 (최대 약 1.9배), 느려지면 줄입니다', 'Draws detailed trees farther when there is frame-rate headroom (up to ~1.9×), backs off when it slows'], 1: ['기본 거리 (가까이 70 m · 중간 210 m, 그 너머는 판 나무)', 'Default distances (near 70 m · mid 210 m, cut-out trees beyond)'], 1.5: ['1.5배 멀리까지 자세한 나무 · 그리는 삼각형 최대 약 1.5배 (높은 고도)', 'Detailed trees 1.5× farther · up to ~1.5× the triangles (at altitude)'], 2: ['2배 멀리까지 · 높은 고도에서 숲이 가장 자연스럽지만 삼각형 최대 약 2배 (느린 기기·휴대폰은 끊길 수 있음)', '2× farther · best forests from altitude but up to ~2× the triangles (slow devices and phones may stutter)'] },
     segSeason: { auto: ['오늘 날짜에 맞춰 나무·풀·땅 색이 서서히 바뀝니다 (4월 새순 · 10월 말 단풍 · 겨울 마른 잎)', 'Trees, grass and ground follow today\'s date (April green-up, late-October foliage, bare winter)'], spring: ['새순 연두빛 잎 · 파릇한 풀', 'Fresh light-green leaves and grass'], summer: ['짙은 녹음', 'Deep summer green'], autumn: ['단풍 (활엽수는 나무마다 노랑·주황·빨강·갈색) · 누런 풀', 'Autumn colours on broadleaf trees, yellowing grass'], winter: ['활엽수는 마른 잎만 성기게 · 나무 위에 살짝 남은 눈 · 마른 풀', 'Sparse dry leaves, a dusting of snow on the trees, dry grass'] },
     segWxFx: { 0: ['날씨는 보이기만 하고 비행에는 영향 없음', 'Weather is visual only'], 1: ['돌풍이 불고 카메라·센서 시야가 떨어집니다', 'Gusts, and reduced camera and sensor range'] },
     segWind: { 0: ['바람 없음', 'Calm'], 1: ['정지 비행이 조금씩 밀립니다', 'Hover drifts a little'], 2: ['제자리에서도 계속 수정 조작이 필요합니다', 'Constant correction needed even in a hover'] },

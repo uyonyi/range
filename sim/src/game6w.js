@@ -19,9 +19,9 @@ const WX2 = (function weatherFx() {
         'float wetH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
         'float wetV(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wetH(i), wetH(i + vec2(1.0, 0.0)), f.x), mix(wetH(i + vec2(0.0, 1.0)), wetH(i + vec2(1.0, 1.0)), f.x), f.y); }\n' +
         sh.fragmentShader
-          .replace('#include <color_fragment>', '#include <color_fragment>\n  float wUp = uWet * smoothstep(0.25, 0.85, vWetN);\n  float wPud = uWet * smoothstep(0.975, 0.995, vWetN) * smoothstep(0.63, 0.72, wetV(vWetP.xz * 0.14) * 0.65 + wetV(vWetP.xz * 0.55) * 0.35);\n  diffuseColor.rgb *= 1.0 - 0.3 * wUp - 0.4 * wPud;')
-          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.45, wUp); roughnessFactor = mix(roughnessFactor, 0.05, wPud);')
-          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { vec3 wvd = normalize(vViewPosition); vec3 wuv = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz); float wfr = pow(1.0 - clamp(dot(wvd, wuv), 0.0, 1.0), 3.0); totalEmissiveRadiance += uWetSky * wPud * (0.1 + 0.55 * wfr); }'); };
+          .replace('#include <color_fragment>', '#include <color_fragment>\n  float wUp = uWet * smoothstep(0.25, 0.85, vWetN);\n  float wPud = uWet * smoothstep(0.975, 0.995, vWetN) * smoothstep(0.7, 0.78, wetV(vWetP.xz * 0.14) * 0.65 + wetV(vWetP.xz * 0.55) * 0.35);\n  diffuseColor.rgb *= 1.0 - 0.24 * wUp - 0.3 * wPud;')
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.72, wUp); roughnessFactor = mix(roughnessFactor, 0.16, wPud);')
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  { vec3 wvd = normalize(vViewPosition); vec3 wuv = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz); float wfr = pow(1.0 - clamp(dot(wvd, wuv), 0.0, 1.0), 3.0); totalEmissiveRadiance += uWetSky * wPud * (0.025 + 0.3 * wfr); }'); };
     const ck = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => ''; m.customProgramCacheKey = () => ck() + '|wet'; m.needsUpdate = true;
   }
   function wetPatch() {
