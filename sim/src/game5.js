@@ -1710,7 +1710,7 @@ function vecRef(from, to) {   // 참조물 하나: 목표 가까이 → '… 근
 }
 // 지금 기체 위치·기수 기준 시계 방향 + 수평 거리 + 방위 (임무 중 모든 위치 무전이 같은 꼴: "two o'clock, 350 meters, bearing 245")
 function clkOf(t) { const dx = t.x - DR.p.x, dz = t.z - DR.p.z, rel = Math.atan2(dx, -dz) - DR.h; return ((Math.round(rel / (Math.PI / 6)) % 12) + 12) % 12; }
-function vecText(t, nmEn, nmKo, ref) { const b = brgFrom(DR.p, t), clk = clkOf(t), r = ref || ['', '']; return [`${nmEn} at your ${CLK_W[clk]} o'clock, ${b.distW} meters${r[0]}, bearing ${b.brgW}.`, `${nmKo}: ${clk || 12}시 방향 · 약 ${b.dist} m${r[1]} (방위 ${b.brg}°)`]; }
+function vecText(t, nmEn, nmKo, ref) { const b = brgFrom(DR.p, t), clk = clkOf(t), r = ref || ['', '']; return [`${nmEn} at your ${CLK_W[clk]} o'clock, about ${b.distW} meters from your position${r[0]}, bearing ${b.brgW}.`, `${nmKo}: ${clk || 12}시 방향 · 약 ${b.dist} m${r[1]} (방위 ${b.brg}°)`]; }   // 영어는 녹음 조각(tools/voice)으로만 이어 붙일 수 있는 꼴
 let VEC_T = -99;
 function vecCall(auto) {
   if (S.state !== 'run' || !isMission() || S.brief) return false; if (!auto && S.simT - VEC_T < 3) return false; VEC_T = S.simT;
@@ -2427,10 +2427,12 @@ function pilotSetUI() {
     (fp ? '' : `<p class="psnote">${L2('지금은 옵션에서 직접 맞춘 설정입니다', 'Currently using your own settings from Options')}</p>`) + `</div>` +
     `<div class="psg g-stick"><div class="pslbl">${L2('조종기 모드', 'Stick mode')} <small>${vrm ? L2('Quest 컨트롤러 (쿼드)', 'Quest controllers (quad)') : L2('휴대폰 터치 · 게임패드 (RC 조종기는 조종기 설정을 따름)', 'Touch and gamepad (RC transmitters follow their own setup)')}</small></div>` +
     `<div class="psseg">${[[2, L2('모드 2', 'Mode 2'), L2('왼쪽 스틱: 상승·회전 / 오른쪽: 전진·좌우', 'Left: climb·yaw / right: fwd·strafe')], [1, L2('모드 1', 'Mode 1'), L2('왼쪽 스틱: 전진·회전 / 오른쪽: 상승·좌우', 'Left: fwd·yaw / right: climb·strafe')]].concat(vrm ? [[3, L2('머리 방향', 'Head steer'), L2('보는 쪽으로 비행', 'Fly where you look')]] : []).map(([v, a, b]) => `<button data-s="${v}" class="${sm === v ? 'on' : ''}"><b>${a}</b><small>${b}</small></button>`).join('')}</div></div>` +
+    `<div class="psg g-nav"><div class="pslbl">${L2('안내 방식', 'Nav aids')} <small>${L2('목표 표시와 비행 가이드 · 저장됨 · 비행 중 GD 로 잠깐 바꿈', 'Target markers and guidance · saved · GD in flight changes it for one sortie')}</small></div>` +
+    `<div class="psseg nav">${[['a', L2('자동', 'Auto'), L2('난이도별', 'by flight style')], ['3', L2('가이드', 'Guide'), L2('목표 + 경로·조작 안내', 'markers + path and hints')], ['2', L2('목표', 'Target'), L2('◇·빛기둥만', 'markers only')], ['1', L2('지도', 'Map'), L2('지도·방위 띠·무전', 'map, heading tape, radio')], ['0', L2('무전', 'Radio'), L2('무전 방위만', 'radio bearings only')], ['4', L2('내 설정 ✎', 'Custom ✎'), L2('하나씩 고르기', 'pick each')]].map(([v, n, d]) => `<button data-n="${v}" class="${(glUserLv() == null ? 'a' : String(glUserLv())) === v ? 'on' : ''}"><b>${n}</b><small>${d}</small></button>`).join('')}</div></div>` +
     `<div class="psg g-ly"><div class="pslbl">${L2('화면 구성', 'Screen layout')} <small>${devN}</small></div>` +
     `<div class="pscards ly">${LY_PRE[dev].map(p => `<button class="pcd${lp === p ? ' on' : ''}" data-l="${p.id}">${pvHTML(p.pv, dev === 'vr')}<b>${nm(p.n)}</b><small>${nm(p.d)}</small></button>`).join('')}` +
     (dev === 'vr' ? '' : `<button class="pcd ed${lp ? '' : ' on'}" data-l="edit"><span class="pv ed"><i>✎</i></span><b>${L2('직접 배치', 'Arrange')}</b><small>${L2('창·버튼을 끌어서 옮기고 크기 조절', 'Drag panels and buttons, resize or hide')}</small></button>`) + `</div></div>` +
-    `<div class="psg g-foot psfoot"><button id="psNav">🧭 ${L2('안내', 'Nav')} · <b>${(() => { const u = glUserLv(); return u == null ? L2('자동', 'Auto') : L2(GL_NM[u][0], GL_NM[u][1]); })()}</b></button><button id="psOpt">⚙ ${L2('모든 옵션', 'All options')}</button></div>`;
+    `<div class="psg g-foot psfoot"><button id="psOpt">⚙ ${L2('모든 옵션', 'All options')}</button></div>`;
   box.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { const p = FLY_PRE.find(x => x.id === b.dataset.f); Object.assign(SET, p.set); if (RATE_PRESET[p.set.feel]) { SET.rates = ratePreset(p.set.feel, 'p'); SET.ratesY = ratePreset(p.set.feel, 'y'); } modeChanged(); try { syncExpo(); } catch (e) { } pilotSetUI(); });
   box.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { const v = +b.dataset.s; if (vrm) SET.vrMode = v; else { SET.stick = v; stickApply(); } saveSet(); pilotSetUI(); });
   box.querySelectorAll('[data-l]').forEach(b => b.onclick = () => {
@@ -2440,7 +2442,7 @@ function pilotSetUI() {
     else { LY.d = Object.assign({ __v3: 1, __p: p.id }, JSON.parse(JSON.stringify(p.ly))); lySave(); lyApply(); SET.hud = p.hud; }
     saveSet(); try { syncHud(); } catch (e) { } pilotSetUI(); });
   const o = $('psOpt'); if (o) o.onclick = () => optOpen('fly');
-  const nv = $('psNav'); if (nv) nv.onclick = () => navPanelOpen();
+  box.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { if (b.dataset.n === '4') { if (glUserLv() !== 4) glPref(4); navPanelOpen(); } else glPref(b.dataset.n); pilotSetUI(); });
 }
 
 // 첫 화면 비밀번호 (간단한 출입 확인용 · 이 기기에서 한 번 맞히면 기억)
