@@ -908,7 +908,7 @@ function frame(now, noRender) {
   if (o) {
     // 지금 과제 강조(게이트 막·슬라롬 쪽·투하 고리·벙커 창·패드 고리) = 목표 표시(안내 2 이상) · 탱크 선회 원 = 비행 가이드(3)
     if (o.follow) { const w = OBJ.mit.world(OBJ.mit.car.position.x, 0, 0); if (o.hint) o.hint.position.set(w.x, 0.05, w.z); o.mk.set(w.x, 4.2, w.z); }
-    if (o.hint && (o.kind === 'orbit' ? gOn('path') : gOn('marker'))) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); }
+    if (o.hint && gOn('marker')) { o.hint.visible = true; o.hint.material.opacity = (o.kind === 'drop' || o.kind === 'land' ? 0.45 : 0.16) + 0.1 * Math.sin(S.simT * 5); }
   }
   marker.visible = false;   // 3D 마름모는 쓰지 않음: 목표 하나에 표시 하나 (PC·휴대폰 = 화면 ◇ navArrow · VR = 고글 OSD 의 ◇)
   const subjPos = subj.p;

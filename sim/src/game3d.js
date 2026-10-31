@@ -1,11 +1,11 @@
 
 // =====================================================================
-//  안내 단계 · 목표 표시 · 비행 가이드(쉐브론 + 조작 안내 문구) · 아래 카메라
+//  안내 단계 · 목표 표시 · 비행 가이드(조작 안내 문구) · 아래 카메라
 // =====================================================================
 const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
 // ---- 안내 단계 (GD 버튼 · V 키 · VR 메뉴 · 옵션): 3 가이드 → 2 목표 → 1 지도 → 0 무전 → 4 내 설정 → 3 ----
 //  목표 표시 "어디로" (화면 ◇·가장자리 화살표·거리 = marker, 빛기둥 = beacon, 방위 띠 ▼ = tape) ……… 2 이상
-//  비행 가이드 "어떻게" (쉐브론 경로 = path, 조작 안내 문구 = hint, 게이트 조준 틀 = brk) ………………… 3
+//  비행 가이드 "어떻게" (조작 안내 문구 = hint, 게이트 조준 틀 = brk) ………………………………………… 3
 //  지도·항법 (지도의 목표·수색 원·점선, DIST·AREA, UAS 방위계 목표 바늘 = map) …………………………… 1 이상
 //  무전 위치 안내: 목표가 바뀔 때 (radio = 1·0) · 45초마다 (radioP = 0)
 //  4 내 설정: 위 요소를 하나씩 고른 그대로 (첫 화면 🧭 안내 방식 · 옵션) — 저장
@@ -20,19 +20,18 @@ const G_KEYS = [   // [키, 한국어, 영어, 묶음]
   ['beacon', '빛기둥 (목표 위로 솟은 빛)', 'Light beam over the target', 't'],
   ['tape', '방위 띠에 목표 방향 ▼', 'Target bearing ▼ on the heading tape', 't'],
   ['map', '지도에 목표 · 수색 구역 · 점선 · 거리', 'Target, search area, dotted line and distance on the map', 'm'],
-  ['path', '비행 경로 (화살 모양 쉐브론)', 'Flight path chevrons', 'f'],
   ['hint', '조작 안내 문구 (↑ 올리기 · 왼쪽 스틱 …)', 'Stick / key hints', 'f'],
   ['brk', '게이트 조준 틀', 'Gate aiming bracket', 'f'],
   ['radio', '무전 위치 안내 (목표가 바뀔 때)', 'Radio vector when the target changes', 'r'],
   ['radioP', '무전 방위 안내 (45초마다)', 'Radio bearing every 45 s', 'r']];
-const G_PRE = [{ tape: 0, radio: 1, radioP: 1 }, { map: 1, radio: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1, path: 1, hint: 1, brk: 1 }];
+const G_PRE = [{ tape: 0, radio: 1, radioP: 1 }, { map: 1, radio: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1, hint: 1, brk: 1 }];
 if (!SET.gCus || typeof SET.gCus !== 'object') SET.gCus = { marker: 1, tape: 1, map: 1, radio: 1 };   // 내 설정 처음 값: 화면 ◇·방위 띠·지도 + 무전
 function gOn(k) { const v = gdLevel(); return !!(v === 4 ? SET.gCus[k] : (G_PRE[v] || G_PRE[3])[k]); }
 function glDefFor(d) { const v = { train: 3, easy: 2, atti: 2, sport: 1 }[d]; return v == null ? 2 : v; }   // 난이도별 기본 안내 단계
 function glUserLv() { const u = SET.glUser; return u == null || !(u >= 0 && u <= 4) ? null : u | 0; }   // 저장된 기본 안내 (없으면 '자동')
 function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; const u = glUserLv(); return u != null ? u : glDefFor(SET.diff); }
 function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : glDef('menu'); }
-const glTgt = () => gOn('marker'), glFly = () => gOn('path') || gOn('hint'), glMap = () => gOn('map');
+const glTgt = () => gOn('marker'), glFly = () => gOn('hint'), glMap = () => gOn('map');
 function glStart(kind) {   // startRun 에서
   if (GL.live && GL.user && GL.kind === kind) { }   // 같은 임무 다시: 비행 중 고른 단계 그대로
   else { GL.lv = glDef(kind); GL.user = false; }
@@ -182,39 +181,9 @@ function guideAxis(C, A, before, after, col) {
   const L = before + after, cur = new THREE.LineCurve3(_axA.clone(), _axB.clone());
   stripAlong(GAXIS, cur, L, col, (d, L, dist) => (Math.floor(d / 1.5) % 2 ? 0.08 : 0.55) * Math.min(1, d / 2) * clamp((dist - 1.5) / 2, 0, 1), 0.0035);
 }
-// 쉐브론 안내 (자동차 증강현실 내비 방식): 기체 앞에서 목표까지 경로 위에 ▶ 모양이 일정 간격으로 놓이고 천천히 앞으로 흘러감
-//  · 화살촉 면은 늘 카메라 쪽을 향하게 (어느 각도에서 봐도 진행 방향이 보임) · 가까운 것은 진하고 멀수록 옅게
-const GCHEV = (function () {
-  const N = 16, g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6 * 3), 3)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 6 * 4), 4));
-  const idx = []; for (let i = 0; i < N; i++) { const b = i * 6; idx.push(b, b + 1, b + 2, b, b + 2, b + 3, b, b + 3, b + 4, b, b + 4, b + 5); } g.setIndex(idx);   // 0 끝(바깥) · 1,2 오른팔 · 3 끝(안쪽) · 4,5 왼팔
-  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-  m.renderOrder = 8; m.frustumCulled = false; m.visible = false; scene.add(m); return { m, N, col: new THREE.Color() };
-})();
-const _ct = new V3(), _cs = new V3(), _cv = new V3(), _cpt = new V3(), _cn = new V3();
-function guideChevrons(curve, L, col, sp, wing) {
-  const { m, N } = GCHEV, P = m.geometry.attributes.position.array, C = m.geometry.attributes.color.array, cam = camera.position, c = GCHEV.col.set(col);
-  const gap = wing ? clamp(6 + sp * 0.25, 6, 14) : clamp(2.6 + sp * 0.12, 2.6, 5), d0 = wing ? 10 : CAMS[S.cam] === 'FPV' ? 5 : 3.2, phase = (S.simT * (wing ? 6 : 2.2)) % gap;   // 천천히 앞으로 흐름
-  for (let i = 0; i < N; i++) {
-    const d = d0 + phase + i * gap, o = i * 18, oc = i * 24;
-    if (d > L - 0.4) { for (let k = 0; k < 24; k++) C[oc + k] = 0; continue; }
-    const u = d / L; curve.getPointAt(u, _cpt); curve.getTangentAt(u, _ct); { const g = surfAt(_cpt.x, _cpt.z) + 0.6; if (_cpt.y < g) _cpt.y = g; }
-    // 면 방향: 도로에 깔린 화살표처럼 수평에 가깝게 + 카메라 쪽으로 조금 세움 (진행 방향을 따라 볼 때도 납작해지지 않게 경로보다 조금 아래에 둠)
-    _cn.set(0, 1, 0).addScaledVector(_ct, -_ct.y); if (_cn.lengthSq() < 1e-6) _cn.set(1, 0, 0); _cn.normalize();
-    const drop = wing ? 2.2 : 0.9; _cpt.addScaledVector(_cn, -drop);
-    _cv.subVectors(_cpt, cam); const dist = _cv.length(); _cv.addScaledVector(_ct, -_cv.dot(_ct));   // 경로에 수직인 시선 성분
-    _cn.addScaledVector(_cv, -3.0 / Math.max(dist, 1e-3)).normalize(); _cs.crossVectors(_ct, _cn); if (_cs.lengthSq() < 1e-8) _cs.set(1, 0, 0); _cs.normalize();
-    const w = (wing ? 2.2 : 0.75) + dist * 0.012, h = w * 0.62, th = w * 0.46;   // 팔 길이(옆) · 앞뒤 길이 · 두께
-    const put = (k, ft, sd) => { P[o + k * 3] = _cpt.x + _ct.x * ft + _cs.x * sd; P[o + k * 3 + 1] = _cpt.y + _ct.y * ft + _cs.y * sd; P[o + k * 3 + 2] = _cpt.z + _ct.z * ft + _cs.z * sd; };
-    put(0, h, 0); put(1, -h, w); put(2, -h - th, w); put(3, h - th * 1.25, 0); put(4, -h - th, -w); put(5, -h, -w);
-    const a = 0.9 * clamp((d - d0 + 0.3) / 1.6, 0, 1) * clamp((L - d) / 2.5, 0, 1) * (1 - 0.55 * Math.min(1, (d - d0) / (gap * N))) * clamp((dist - 3) / 4, 0, 1);   // 카메라 바로 앞은 옅게
-    for (let k = 0; k < 6; k++) { C[oc + k * 4] = c.r; C[oc + k * 4 + 1] = c.g; C[oc + k * 4 + 2] = c.b; C[oc + k * 4 + 3] = a; }
-  }
-  m.geometry.attributes.position.needsUpdate = true; m.geometry.attributes.color.needsUpdate = true; m.visible = true;
-}
 function repKey() { return XR_ON ? (window.SIM_LANG === 'en' ? 'R trigger' : 'R트리거') : IS_TOUCH ? '📷 REPORT' : 'Enter/📷'; }   // 사진 보고 단추 이름 (기기별)
 function hideNav() { const na = $('navArrow'); if (na) na.classList.add('hidden'); }
-function hideFly() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; GCHEV.m.visible = false; $('guide').classList.add('hidden'); GUIDE.html = ''; if (GUIDE.hy) GUIDE.hy = {}; }
+function hideFly() { GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false; $('guide').classList.add('hidden'); GUIDE.html = ''; if (GUIDE.hy) GUIDE.hy = {}; }
 function hideGuide() { BEACON.g.visible = false; hideFly(); hideNav(); }
 // ---- 지상 목표 찾기 (정찰·산불·수색·활주로·패드): 목표에 하늘로 솟은 빛기둥 + 바닥 고리 · 멀리서도 보임 ----
 const TGT_STYLE = { recon: [0x4fe3ff, 'RECON', '정찰'], fire: [0xff8a2a, 'FIRE', '산불'], sarfind: [0x5dff9a, 'SAR', '수색'], sarkit: [0x5dff9a, 'DROP', '투하'], rwyland: [0xffd23a, 'RWY', '활주로'], land: [0xffd23a, 'PAD', '패드'], padland: [0xffd23a, 'PAD', '패드'] };   // 타격·차량 추적은 빛기둥 없음 (기만체·은밀 추적이 쉬워지지 않게)
@@ -270,13 +239,13 @@ function updateGuide(subj) {
   const o = active ? curObj() : null;
   GUIDE.next = null;
   if (!o || (typeof isC1 === 'function' && isC1())) { hideGuide(); return; }
-  const tgtOn = gOn('marker'), pathOn = gOn('path'), hintOn = gOn('hint'), flyOn = pathOn || hintOn;   // 안내 요소 (단계 · 내 설정)
+  const tgtOn = gOn('marker'), hintOn = gOn('hint'), flyOn = hintOn;   // 안내 요소 (단계 · 내 설정)
   if (gOn('beacon')) beaconUpdate(o, subj); else BEACON.g.visible = false;
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
     hideFly(); hideNav(); if (!hintOn) return;
     const el = $('guide'), html = `<div class="ok">${L2x('정찰 중 · 안에서 잠시 머무르기', 'Scanning · hold inside for a moment')}</div>`; el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; } return;
   }
-  // 수색 구역(산불·실종자) 안: 쉐브론은 끄고 (눈·열화상으로 찾기) 구역 중심 ◇ + 할 일·고도 안내
+  // 수색 구역(산불·실종자) 안: 구역 중심 ◇ + 할 일·고도 안내 (눈·열화상으로 찾기)
   if (o.kind === 'ms' && searchIn(o, subj.p)) {
     hideFly();
     const dcc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z);
@@ -300,7 +269,6 @@ function updateGuide(subj) {
   GUIDE.next = pts[1];   // 입문 자동 방향 보조도 씀 (안내 단계와 상관없이)
   if (tgtOn) navArrow(o.mk || pts[pts.length - 1], subj, o); else hideNav();
   if (!flyOn) { hideFly(); return; }
-  // 비행 경로: 지금 날아가는 방향으로 먼저 이어졌다가 선회 반경만큼 휘어 목표로 (직선으로 꺾지 않음)
   { const v = subj.v || DR.v, sp = Math.hypot(v.x, v.z), wing = AFc().cls === 'wing', hd = sp > 1 ? new V3(v.x / sp, 0, v.z / sp) : new V3(Math.sin(DR.h), 0, -Math.cos(DR.h));
     const to = pts[1].clone().sub(pts[0]); to.y = 0; const dist = to.length(); if (dist > 0.5) to.divideScalar(dist);
     const turnR = wing ? Math.max(15, sp * sp / (9.8 * Math.tan((AFc().bank || 45) * DEG * 0.8))) : sp * 0.6;
@@ -317,9 +285,8 @@ function updateGuide(subj) {
   const vsp = Math.hypot(DR.v.x, DR.v.z), GSP = AFc().cls === 'wing' ? 6 : clamp(2.6 + vsp * 0.18, 2.6, 5);   // 빠를수록 표시 간격을 넓혀 더 멀리까지
   const L = curve.getLength();
   const gcol = GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff;
-  GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;   // 예전 틀·띠·점선은 쓰지 않음 (쉐브론으로 바꿈)
-  if (L > 1.5 && pathOn) guideChevrons(curve, L, gcol, Math.hypot(DR.v.x, DR.v.z), AFc().cls === 'wing'); else GCHEV.m.visible = false;
-  if (pathOn && o.t === 'rwyland' && typeof rwyGlide === 'function' && RWY) {   // 활주로 착륙: 접지점에서 뒤로 올라가는 3° 진입선 (점선)
+  GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;
+  if (flyOn && o.t === 'rwyland' && typeof rwyGlide === 'function' && RWY) {   // 활주로 착륙: 접지점에서 뒤로 올라가는 3° 진입선 (점선)
     const td = RWY.at(-RWY.L / 2 + 20, 0); td.y = groundAt(td.x, td.z); const u = new V3(RWY.ux, 0, RWY.uz), A = u.clone().multiplyScalar(Math.cos(3 * DEG)).add(new V3(0, -Math.sin(3 * DEG), 0)).normalize();
     guideAxis(td, A, 600, 0, 0xffd23a); }
   // ---- 조작 안내 문구 ----
