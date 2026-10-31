@@ -45,25 +45,48 @@ const TREES3 = (function () {
     g.setAttribute('normal', new THREE.BufferAttribute(T(Int8Array, o.N), 3, true));
     g.setAttribute('uv', new THREE.BufferAttribute(T(Uint16Array, o.UV), 2, true));
     g.setAttribute('color', new THREE.BufferAttribute(T(Uint8Array, o.C), 3, true));
+    { const C = o.C, n = C.length / 3, L = new Uint8Array(n); for (let i = 0; i < n; i++) L[i] = Math.min(C[i * 3], C[i * 3 + 1], C[i * 3 + 2]) > 150 ? 255 : 0; g.setAttribute('aLeaf', new THREE.BufferAttribute(L, 1, true)); }   // 잎 = 밝은 회색 꼭짓점 색 · 줄기·가지 = 갈색 (계절 색은 잎에만)
     g.setIndex(Array.isArray(o.I) ? o.I : new THREE.BufferAttribute(o.I, 1)); return g;
   }
-  function makeMat(tex) {
+  // 계절 (SEASON_U: 봄·가을·겨울·남은 눈) — 잎에만: 봄 연두 · 가을 활엽은 나무마다 노랑·주황·빨강·갈색 · 겨울 활엽은 마른 잎 갈색에 성기게 · 침엽은 조금 어둡게
+  //  눈: 위를 향한 잎·가지에 (겨울엔 살짝 남은 눈 · 눈이 오면 SNOW_U 따라 점점) — 쌓임 덧칠(snowify)은 이 재질엔 따로 안 씀
+  function makeMat(tex, decid) {
     const m = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.92, metalness: 0 });
+    m.userData.snowy = true;
     m.onBeforeCompile = sh => {
       sh.uniforms.uTime = st.time; sh.uniforms.uIR = st.ir; sh.uniforms.uIRv = st.irv; sh.uniforms.uIRe = st.ire;
-      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      sh.uniforms.uSea = SEASON_U; sh.uniforms.uSnow = SNOW_U; sh.uniforms.uDecid = { value: decid ? 1 : 0 };
+      sh.vertexShader = 'uniform float uTime;\nattribute float aLeaf;\nvarying float vLeaf; varying float vTreeR; varying float vUpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        vLeaf = aLeaf; vTreeR = 0.5;
         #ifdef USE_INSTANCING
           { float hh = max(0.0, position.y); vec3 ip = instanceMatrix[3].xyz; float ph = ip.x * 0.13 + ip.z * 0.17;
-            transformed.x += sin(uTime * 1.3 + ph) * 0.022 * hh * hh; transformed.z += cos(uTime * 1.07 + ph * 1.3) * 0.018 * hh * hh; }
-        #endif`);
-      sh.fragmentShader = 'uniform float uIR; uniform float uIRv; uniform float uIRe;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+            transformed.x += sin(uTime * 1.3 + ph) * 0.022 * hh * hh; transformed.z += cos(uTime * 1.07 + ph * 1.3) * 0.018 * hh * hh;
+            vTreeR = fract(sin(dot(floor(ip.xz * 2.0), vec2(12.9898, 78.233))) * 43758.5453); }
+        #endif`).replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
+        { vec3 un = objectNormal;
+          #ifdef USE_INSTANCING
+          un = mat3(instanceMatrix) * un;
+          #endif
+          vUpN = normalize(mat3(modelMatrix) * un).y; }`);
+      sh.fragmentShader = 'uniform float uIR; uniform float uIRv; uniform float uIRe; uniform vec4 uSea; uniform float uSnow; uniform float uDecid;\nvarying float vLeaf; varying float vTreeR; varying float vUpN;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        if (vLeaf > 0.5) {
+          vec3 c = diffuseColor.rgb; float L = dot(c, vec3(0.299, 0.587, 0.114));
+          c = mix(c, c * vec3(1.06, 1.22, 0.76) + vec3(0.012, 0.03, 0.0), uSea.x * (0.45 + 0.55 * uDecid));
+          vec3 a = vTreeR < 0.3 ? vec3(1.0, 0.76, 0.18) : vTreeR < 0.55 ? vec3(1.0, 0.48, 0.12) : vTreeR < 0.72 ? vec3(0.86, 0.2, 0.09) : vTreeR < 0.9 ? vec3(0.66, 0.42, 0.17) : vec3(0.66, 0.7, 0.26);
+          c = mix(c, a * L * 2.4, uSea.y * uDecid);
+          c = mix(c, c * vec3(0.84, 0.9, 0.96), (uSea.y * 0.35 + uSea.z) * (1.0 - uDecid));
+          c = mix(c, vec3(0.55, 0.43, 0.31) * L * 2.1, uSea.z * uDecid);
+          diffuseColor.rgb = c;
+          if (diffuseColor.a < 0.42 + 0.3 * uSea.z * uDecid) discard;
+        }
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.83, 0.88), max(uSea.w, uSnow * 0.62) * smoothstep(0.5, 0.95, vUpN));   // 선형 색 공간: 작은 비율도 꽤 하얗게 보임
         if (uIR > 0.5) diffuseColor.rgb = vec3(uIRv);`).replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         if (uIR > 0.5) totalEmissiveRadiance += vec3(uIRe);   // 열화상: 나무 온도 (밤엔 열린 땅보다 따뜻, 낮엔 시원)`).replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         #ifdef DOUBLE_SIDED
           normal *= faceDirection;   // 잎 판 뒷면도 바깥쪽 법선 그대로 (수관 덩어리처럼 빛을 받게)
         #endif`);
     };
-    m.customProgramCacheKey = () => 'trees3';
+    m.customProgramCacheKey = () => 'trees3s';
     return m;
   }
   function apply() {
@@ -74,7 +97,7 @@ const TREES3 = (function () {
       const mean = [[69, 90, 55], [50, 76, 41], [55, 76, 41], [50, 78, 41]], tone = [[0.62, 0.68, 0.56], [0.54, 0.62, 0.52], [0.66, 0.70, 0.58], [0.50, 0.60, 0.52]], c = new THREE.Color(), u8 = STREES.u8;
       for (const k of STREES.CHUNKS) {
         const sp = k.kind === 2 ? 2 : k.kind === 1 ? 1 : k.kind === 3 ? 3 : 0;
-        k.geos = G[sp].map(g0 => view(g0, k)); k.im.geometry = k.geos[k.lod]; k.im.material = mat; k.im.customDepthMaterial = dmat;
+        k.geos = G[sp].map(g0 => view(g0, k)); k.im.geometry = k.geos[k.lod]; k.im.material = sp === 1 || sp === 3 ? st.matC : mat; k.im.customDepthMaterial = dmat;   // 소나무·조림 침엽은 침엽 재질
         // 색: 정사영상 색을 종 평균 대비 비율로만 써서 잎 그림 색을 살림 (나무마다 조금씩 다른 녹색)
         k.ids.forEach((i, j) => { const mu = mean[k.kind] || mean[0], tn = tone[k.kind] || tone[0], f = q => clamp(0.5 + 0.5 * (u8[i * 4 + q] / mu[q]), 0.7, 1.3);
           c.setRGB(f(0) * tn[0], f(1) * tn[1], f(2) * tn[2]); k.im.setColorAt(j, c); });
@@ -86,7 +109,7 @@ const TREES3 = (function () {
         const M4 = new THREE.Matrix4(), by = new Map(), _v = new V3();
         for (const x of FLANE.deco) { const key = Math.floor(x.p.x / 120) + ',' + Math.floor(x.p.z / 120) + ',' + x.kind; if (!by.has(key)) by.set(key, []); by.get(key).push(x); }
         for (const [key, L] of by) {
-          const kind = +key.split(',')[2], tn = tone[kind], im = new THREE.InstancedMesh(G[kind][2], mat, L.length), bb = new THREE.Box3();
+          const kind = +key.split(',')[2], tn = tone[kind], im = new THREE.InstancedMesh(G[kind][2], kind === 1 || kind === 3 ? st.matC : mat, L.length), bb = new THREE.Box3();
           L.forEach((x, j) => { M4.compose(x.p, x.q, x.s); im.setMatrixAt(j, M4); const v = 0.92 + 0.16 * ((j * 0.618) % 1); im.setColorAt(j, c.setRGB(tn[0] * v, tn[1] * v, tn[2] * v));
             bb.expandByPoint(x.p); bb.expandByPoint(_v.set(0, x.s.y, 0).applyQuaternion(x.q).add(x.p)); x.old.forEach(o => { o.visible = false; }); });
           bb.expandByScalar(6); const sph = bb.getBoundingSphere(new THREE.Sphere()), k = { im, c: sph.center, r: sph.radius, lod: 2, kind, ids: [], bb, sph, deco: true };
@@ -104,7 +127,7 @@ const TREES3 = (function () {
         const meshes = [];
         for (const [list, sp] of [[ck.ls, 0], [ck.cs, 3]]) {
           if (!list || !list.length) continue;
-          const im = new THREE.InstancedMesh(G[sp][2], mat, list.length), bb = new THREE.Box3();
+          const im = new THREE.InstancedMesh(G[sp][2], sp === 3 ? st.matC : mat, list.length), bb = new THREE.Box3();
           list.forEach((i, j) => { const t = T[i]; P3.set(t[0], t[1], t[2]); Q.setFromAxisAngle(Y, (i * 2.39) % 6.283); const r = sp ? t[4] * 1.15 : t[4] * 1.25; S3.set(r, t[3], r); M4.compose(P3, Q, S3); im.setMatrixAt(j, M4);
             const v = 0.82 + ((i * 7919) % 100) / 500; im.setColorAt(j, sp ? c.setRGB(0.5 * v, 0.6 * v, 0.5 * v) : c.setRGB(0.62 * v, 0.7 * v, 0.56 * v)); bb.expandByPoint(P3); bb.expandByPoint(S3.set(t[0], t[1] + t[3], t[2])); });
           bb.expandByScalar(6); const sph = bb.getBoundingSphere(new THREE.Sphere()); const geos = [1, 2].map(l => { const g = new THREE.BufferGeometry(), G0 = G[sp][l]; for (const a in G0.attributes) g.setAttribute(a, G0.attributes[a]); g.setIndex(G0.index); g.boundingSphere = sph; g.boundingBox = bb; return g; });
@@ -137,7 +160,7 @@ const TREES3 = (function () {
       const tex = new THREE.DataTexture(L0.data, L0.width, L0.height, THREE.RGBAFormat); tex.mipmaps = lv; tex.generateMipmaps = false; tex.flipY = false;
       tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter; tex.encoding = THREE.sRGBEncoding; tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); tex.needsUpdate = true;
       st.geo = lods.map(L => L.map(geoFrom));
-      st.mat = makeMat(tex);
+      st.mat = makeMat(tex, true); st.matC = makeMat(tex, false);   // 활엽(참나무·관목) · 침엽(소나무·조림)
       st.dmat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.42 });
       apply(); st.ms = Math.round(performance.now() - st.t0);
     } catch (e) { st.err = String(e); }

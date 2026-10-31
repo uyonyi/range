@@ -596,4 +596,5 @@ EN.update({
 EN.update({
 "<td>두 스틱의 위아래가 서로 바뀜 (왼쪽 = 전진·후진 · 오른쪽 = 상승·하강) · 조종사 단계에서 고름</td>": "<td>The sticks' up/down swap (left = forward/back · right = climb/descend) · chosen in the pilot step</td>",
 "<td>모드 1</td>": "<td>Mode 1</td>",
+'계절 <span class="seg" id="segSeason"><button data-v="auto" class="on">자동 (오늘 날짜)</button><button data-v="spring">봄</button><button data-v="summer">여름</button><button data-v="autumn">가을</button><button data-v="winter">겨울</button></span>': 'Season <span class="seg" id="segSeason"><button data-v="auto" class="on">Auto (today\'s date)</button><button data-v="spring">Spring</button><button data-v="summer">Summer</button><button data-v="autumn">Autumn</button><button data-v="winter">Winter</button></span>',
 })

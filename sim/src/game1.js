@@ -244,6 +244,21 @@ groundMat.onBeforeCompile = sh => {
     '#include <map_fragment>\n vec3 dA = texture2D(detail, vUv * 240.0).rgb; vec3 dB = texture2D(detail, vUv * 37.0).rgb;\n' +
     ' diffuseColor.rgb *= mix(vec3(1.0), (dA * 0.55 + 0.45) * (dB * 0.45 + 0.55) * 1.12, detailK);');
 };
+// ---- 계절 색 (값은 game5 seasonApply): x 봄 · y 가을 · z 겨울 (0~1, 자동이면 날짜 따라 서서히) · w 나무에 남은 눈 (겨울 살짝) ----
+const SEASON_U = { value: new THREE.Vector4(0, 0, 0, 0) };
+//  땅: 초록이 도는 곳(풀밭·논밭·숲 그림)만 — 봄 연두 · 가을 누렇게 · 겨울 마른 갈색 (흙·길·물·눈은 그대로)
+const SEA_GROUND = `{ vec3 c = diffuseColor.rgb; float gd = clamp((c.g - max(c.r, c.b)) / max(c.g, 0.002) * 3.0, 0.0, 1.0), L = dot(c, vec3(0.299, 0.587, 0.114));   // 초록 정도 (선형 색이라 비율로)
+  c = mix(c, c * vec3(0.96, 1.08, 0.86), uSea.x * gd);
+  c = mix(c, vec3(L * 1.3, L * 1.02, L * 0.45), uSea.y * gd * 0.6);
+  c = mix(c, vec3(L * 1.2, L * 0.98, L * 0.72), uSea.z * gd * 0.75);
+  diffuseColor.rgb = c; }`;
+function seasonGround(m) {   // 지형 재질에 계절 색 (색·정사영상·그늘 색을 다 곱한 뒤 · 눈 쌓임은 그 위에)
+  if (!m || m.userData.sea) return; m.userData.sea = true;
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => { if (prev) prev(sh, r); sh.uniforms.uSea = SEASON_U; sh.fragmentShader = 'uniform vec4 uSea;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + SEA_GROUND); };
+  const ck = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => ''; m.customProgramCacheKey = () => ck() + '|sea';
+}
+seasonGround(groundMat);
 const TER = { n: 241, step: GSZ / 240, h: SITE_L.dec ? SITE_L.dec.inner : null };   // 코스 주변 고해상도 지형 (5 m)
 if (TER.h) { scene.fog.near = 180; scene.fog.far = 6500; camera.far = 9000; camera.updateProjectionMatrix(); }
 // 지형 조각 나누기: 큰 지형 메시 하나를 격자 조각(인덱스만 따로, 꼭짓점 버퍼는 공유)으로 나눠 시야 밖 조각은 그리지 않음
@@ -317,7 +332,7 @@ const FAR = (function farTerrain() {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
-  m.receiveShadow = false; scene.add(m); return chunkify(m, 4, 4);
+  m.receiveShadow = false; scene.add(m); seasonGround(m.material); return chunkify(m, 4, 4);
 })();
 // ---- 중간 지형: 비행 구역(반경 약 1 km)을 덮는 10 m 격자 · 원경 격자를 부드럽게 보간 + 잔기복 · 고해상도 구역 경계는 이어 붙임 ----
 const MID = (function midTerrain() {
@@ -357,7 +372,7 @@ const MID = (function midTerrain() {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
   const cv = document.createElement('canvas'); cv.width = cv.height = 2048; const cg = cv.getContext('2d'); cg.fillStyle = '#5f6b3e'; cg.fillRect(0, 0, 2048, 2048);
   const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
-  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.material.userData.terrain = true; mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
+  const mesh0 = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })); mesh0.material.userData.terrain = true; seasonGround(mesh0.material); mesh0.receiveShadow = true; scene.add(mesh0); const mesh = chunkify(mesh0, 4, 4);
   // 원경 그물: 중간 지형 상자 안은 비움 (조각별 인덱스에서 걸러냄)
   if (FAR) { const n = FN; for (const ch of (FAR.userData.chunks || [FAR])) { const fi = ch.geometry.index.array, keep = [];
     const FP = FAR.geometry.attributes.position.array;

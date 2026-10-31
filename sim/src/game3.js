@@ -30,7 +30,7 @@ function setDiff(v) {   // 옛 난이도 값 → 세 축 (VR 메뉴 등)
   SET.mode = v === 'atti' ? 'atti' : v === 'sport' ? (SET.mode === 'acro' ? 'acro' : 'man') : 'gps'; SET.assistLv = v === 'train' ? 2 : v === 'easy' ? 1 : 0; SET.feel = v === 'train' ? 'train' : v === 'easy' ? 'std' : 'real'; modeSync();
 }
 modeSync();
-const SET_KEYS = ['glUser', 'gCus', 'fold', 'mapZ', 'camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
+const SET_KEYS = ['glUser', 'gCus', 'fold', 'mapZ', 'camDist', 'rumble', 'mode', 'assistLv', 'feel', 'rates', 'ratesY', 'thrHover', 'fov', 'boostFov', 'belly', 'keymap', 'zoom', 'diff', 'ghost', 'ghostSrc', 'tilt', 'assist', 'autoFull', 'af', 'acro', 'night', 'wind', 'voice', 'vrMode', 'vrScreen', 'vrCam', 'vrPip', 'vrMap', 'vrScr2', 'vrModeW', 'hud', 'expo', 'tod', 'wx', 'wxFx', 'season', 'musSynth', 'radioLang', 'paint', 'stick', 'vrBtn', 'attCam'];
 function saveSet() {
   try { const o = {}; for (const k of SET_KEYS) if (SET[k] !== undefined) o[k] = SET[k];
     for (const g of SET_GROUPS) { const sub = {}; let n = 0; for (const k in SET) if (k.startsWith(g) && k.length > g.length && SET[k] !== undefined) { sub[k.slice(g.length)] = SET[k]; n++; } if (n) o[g] = sub; }   // 종목 설정은 접두사로 모아 묶음 (새 키를 따로 등록할 필요 없음)
@@ -51,7 +51,7 @@ function resetDrone(pos, heading) {
   DR.landed = pos.y <= groundAt(pos.x, pos.z) + footH() + 0.01; DR.thrust = 0; S.stun = 0;
   for (const k in ks) ks[k] = 0;
 }
-function footH() { return DR.foot || 0.06; }   // 기체 원점 → 가장 낮은 곳(다리·배 밑) 높이: 땅에 앉으면 이만큼 위 (기체 모형마다 · game5 setAirframe)
+function footH() { return DR.foot || 0.06; }   // 기체 원점 → 가장 낮은 곳(다리·배 밑) 높이: 땅에 앉으면 이만큼 위 (기체 모형마다 · game5 modelGear)
 function startHead() { return -num(BY.pad_start.yaw, 0) * DEG; }
 function startPos() { const ps = BY.pad_start; const p = W(ps.down, ps.side, 0); p.y = groundAt(p.x, p.z) + footH(); return p; }
 // 쿼드 출발·도착 자리: 장애물 코스·튜토리얼·기준 비행·1종 말고는 야전 착륙장 콘크리트 계류장의 H1 패드 (착륙장이 없는 훈련장은 코스 출발 패드)
@@ -71,6 +71,7 @@ function startRun(kind) {
   resetDrone(homePos(kind), homeHead(kind)); DR.R = AFc().R; droneM.g.visible = true; LOS.ok = false; chaseH = null;
   if (!isMission(kind)) { if (kind === 'free' && AFc().cls === 'wing' && typeof rwyMapView === 'function') rwyMapView(); else mapView('course'); }
   dbfStart(); if (kind !== 'demo') { S.lastKind = kind; LAST_REC = null; } ORDER.m = null; commReset(); try { if (typeof c1VoiceStop === 'function') c1VoiceStop(); } catch (e) { }   // 이전 비행 기록·명령·무전이 섞이지 않게
+  try { if (ENV.wx === 'snow') SNOW.k = Math.max(SNOW.k, 0.5); } catch (e) { }   // 눈 오는 날 출발: 이미 살짝 쌓인 채로 (비행하는 동안 더 쌓임)
   if (isMission(kind)) msStart(kind);
   else { Object.values(MSG).forEach(g => g.visible = false); STRIKE.forEach(t => t.col.off = true); MS.list = []; MS.launch = null; if (AFc().cls === 'wing' && typeof wingRwyOK === 'function' && wingRwyOK(AFc())) { wingGround(); MS.launch = { p: DR.p.clone(), h: DR.h }; } else if (AFc().cls === 'wing') { const p = startPos(); p.y += 30; wingAir(p, startHead()); } }
   if (kind === 'demo') S.cam = 1;
@@ -210,8 +211,8 @@ function stepDrone(dt) {
   if (md.acro && !grounded) {   // 수동(Acro): 스틱 = 기울기 속도, 놓아도 수평으로 돌아오지 않음
     DR.pitch = clamp(DR.pitch + ip * 210 * DEG * dt, -80 * DEG, 80 * DEG); DR.roll = clamp(DR.roll + ir * 210 * DEG * dt, -80 * DEG, 80 * DEG);
   } else {
-    DR.pitch += ((grounded ? 0 : ip * tiltB) - DR.pitch) * a;
-    DR.roll += ((grounded ? 0 : ir * md.maxTilt) - DR.roll) * a;
+    DR.pitch += ((grounded ? DR.gp || 0 : ip * tiltB) - DR.pitch) * a;   // 앉아 있으면 땅 기울기를 따라 (비탈·기운 패드)
+    DR.roll += ((grounded ? DR.gr || 0 : ir * md.maxTilt) - DR.roll) * a;
   }
   const o = curObj(), assistOn = SET.assist && md.assist > 0;
   if (!grounded) {
@@ -303,7 +304,7 @@ function stepAcro(dt) {
   if (!grounded) {   // 기체 축 회전: 앞으로 밀면 기수 내림(-X) · 오른쪽 요(-Y) · 오른쪽 롤(-Z)  (모델 좌표계: 앞 -Z · 오른쪽 +X · 위 +Y)
     _ar.set(-DR.w.x, -DR.w.y, -DR.w.z); const ang = _ar.length() * dt;
     if (ang > 1e-7) { _ar.normalize(); _qd.setFromAxisAngle(_ar, ang); DR.q.multiply(_qd).normalize(); }
-  } else { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(0, _ve.y, 0); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); }
+  } else { _ve.setFromQuaternion(DR.q, 'YXZ'); eul.set(-(DR.gp || 0), _ve.y, -(DR.gr || 0)); DR.q.setFromEuler(eul); DR.w.set(0, 0, 0); }   // 앉아 있으면 땅 기울기를 따라
   _ve.setFromQuaternion(DR.q, 'YXZ'); DR.pitch = -_ve.x; DR.h = -_ve.y; DR.roll = -_ve.z;
   _bu.set(0, 1, 0).applyQuaternion(DR.q); DR.upY = _bu.y;
   const wv = windAt(DR.p), rvx = DR.v.x - wv.x, rvy = DR.v.y - wv.y, rvz = DR.v.z - wv.z, sp = Math.hypot(rvx, rvy, rvz);
@@ -318,8 +319,11 @@ function stepAcro(dt) {
 function droneGround(dt) {
   DR.p.addScaledVector(DR.v, dt);
   // 지면 (땅 · 수면 · 패드 · 활주로·계류장 판) — 기체 다리 높이(footH)만큼 위가 닿는 면
-  const fh = footH(), gh = groundAt(DR.p.x, DR.p.z) + fh, idle = !!DR.idle;
-  if (DR.p.y < gh && S.state === 'run' && waterAt(DR.p.x, DR.p.z) >= gh - fh - 0.01) return lostDrone('WATER');   // 수면에 닿으면 추락 (예전엔 물속으로 그대로 내려갔음)
+  //  가운데 한 점만 보지 않고 다리 네 끝(앞·뒤·오른쪽·왼쪽, 지금 기울기 반영)이 모두 땅 위에 있게 · 비탈·기운 패드에서 기체가 반쯤 잠겨 보이던 문제
+  const fh = footH(), idle = !!DR.idle, x = DR.p.x, z = DR.p.z, g0 = groundAt(x, z), Gr = DR.gear || { f: 0.12, b: 0.12, r: 0.12, l: 0.12 }, sh = Math.sin(DR.h), ch = Math.cos(DR.h);
+  const hF = groundAt(x + sh * Gr.f, z - ch * Gr.f), hB = groundAt(x - sh * Gr.b, z + ch * Gr.b), hR = groundAt(x + ch * Gr.r, z + sh * Gr.r), hL = groundAt(x - ch * Gr.l, z - sh * Gr.l);
+  const sp = Math.sin(DR.pitch), sr = Math.sin(DR.roll), gh = Math.max(g0, hF + Gr.f * sp, hB - Gr.b * sp, hR + Gr.r * sr, hL - Gr.l * sr) + fh;
+  if (DR.p.y < g0 + fh && S.state === 'run' && waterAt(x, z) >= g0 - 0.01) return lostDrone('WATER');   // 수면에 닿으면 추락 (예전엔 물속으로 그대로 내려갔음)
   let touch = false;   // 이번 걸음에 땅(또는 물체 윗면)에 닿아 있음 → 착지 · 마찰
   if (DR.p.y < gh) {
     const hs = Math.hypot(DR.v.x, DR.v.z), vy = DR.v.y;
@@ -339,6 +343,7 @@ function droneGround(dt) {
   }
   DR.onTop = top && !touch;
   if (touch || top) { DR.landed = true; const f = Math.exp(-(idle ? 14 : 9) * dt); DR.v.x *= f; DR.v.z *= f; }   // 닿아 있는 동안 마찰: 착지하면 미끄러지지 않고 섬
+  if (touch) { DR.gp = clamp(-Math.atan2(hF - hB, Gr.f + Gr.b), -0.5, 0.5); DR.gr = clamp(-Math.atan2(hR - hL, Gr.r + Gr.l), -0.5, 0.5); } else if (top || !DR.landed) DR.gp = DR.gr = 0;   // 앉은 자리 땅 기울기 (최대 약 29°) → 앉아 있는 동안 기체가 그만큼 기움
   else if (DR.p.y > gh + 0.03) DR.landed = false;
   // 비행 구역 경계: 밀어냄
   const rx = DR.p.x, rz = DR.p.z + 150, l = Math.hypot(rx, rz);
