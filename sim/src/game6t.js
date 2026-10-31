@@ -81,6 +81,19 @@ const TREES3 = (function () {
         if (k.im.instanceColor) k.im.instanceColor.needsUpdate = true;
       }
       for (const b of STREES.BURNT || []) { b.im.getColorAt(b.k, c); b.c0 = c.clone(); b.im.setColorAt(b.k, c.setRGB(0.035, 0.03, 0.025)); }
+      // 숲길 장애물 나무 (FLANE.deco: 좁은 틈 소나무 · 기운 나무 끝 수관): 옛 둥근 공 수관 → 같은 고급 모형 · 세밀도도 현장 나무와 함께 바뀜 (STREES.CHUNKS 끝에 붙임)
+      if (typeof FLANE !== 'undefined' && FLANE && FLANE.deco && FLANE.deco.length) {
+        const M4 = new THREE.Matrix4(), by = new Map(), _v = new V3();
+        for (const x of FLANE.deco) { const key = Math.floor(x.p.x / 120) + ',' + Math.floor(x.p.z / 120) + ',' + x.kind; if (!by.has(key)) by.set(key, []); by.get(key).push(x); }
+        for (const [key, L] of by) {
+          const kind = +key.split(',')[2], tn = tone[kind], im = new THREE.InstancedMesh(G[kind][2], mat, L.length), bb = new THREE.Box3();
+          L.forEach((x, j) => { M4.compose(x.p, x.q, x.s); im.setMatrixAt(j, M4); const v = 0.92 + 0.16 * ((j * 0.618) % 1); im.setColorAt(j, c.setRGB(tn[0] * v, tn[1] * v, tn[2] * v));
+            bb.expandByPoint(x.p); bb.expandByPoint(_v.set(0, x.s.y, 0).applyQuaternion(x.q).add(x.p)); x.old.forEach(o => { o.visible = false; }); });
+          bb.expandByScalar(6); const sph = bb.getBoundingSphere(new THREE.Sphere()), k = { im, c: sph.center, r: sph.radius, lod: 2, kind, ids: [], bb, sph, deco: true };
+          k.geos = G[kind].map(g0 => view(g0, k)); im.geometry = k.geos[2]; im.customDepthMaterial = dmat; im.castShadow = !LOWQ; im.receiveShadow = !LOWQ; im.frustumCulled = true; im.userData.irBase = 0.13;
+          FLANE.G.add(im); STREES.CHUNKS.push(k);
+        }
+      }
       STREES.LODD.near = LOWQ ? 40 : 70; STREES.LODD.mid = LOWQ ? 130 : 210;   // 멀리는 임포스터(6 삼각형)라 중간 거리를 당김
       STREES.lod(camera.position);
     }
