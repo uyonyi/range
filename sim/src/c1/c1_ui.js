@@ -6,7 +6,7 @@ function c1Start(a) {
   C1.side = SET.c1side === 1 ? 1 : -1;
   C1.M = c1Build(C1.side);
   C1.M.forEach(m => { m.done = false; m.miss = false; m.fail = false; m.why = []; m.label = m.name; m.steps.forEach(s => { s.T = s.T || c1R('hoverT'); }); });
-  S.cam = 1; ui.map.style.display = 'none'; document.body.classList.add('c1on');
+  S.cam = 1; ui.mapBox.style.display = 'none'; document.body.classList.add('c1on');
   c1Panel(true); c1ALoad(); c1Sun(); if ((typeof XR_ON !== 'undefined' && XR_ON) || window.C1_VRTEST) c1XRInit();
   c1Ev('start', { exam: C1.exam, side: C1.side < 0 ? 'left-first' : 'right-first', profile: C1P.ver, rules: C1RULES.ver, wind: WIND.lv });
   return C1.M;

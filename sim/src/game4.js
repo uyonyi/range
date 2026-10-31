@@ -352,7 +352,7 @@ document.querySelectorAll('#segAssist button').forEach(b => b.addEventListener('
 document.querySelectorAll('#segBelly button').forEach(b => b.addEventListener('click', () => { SET.belly = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segAttCam button').forEach(b => b.addEventListener('click', () => { SET.attCam = b.dataset.v === '1'; saveSet(); syncSeg(); }));
 document.querySelectorAll('#segFull button').forEach(b => b.addEventListener('click', () => { SET.autoFull = b.dataset.v === '1'; saveSet(); syncSeg(); }));
-const PANELS = ['setPanel', 'recPanel', 'helpPanel', 'optPanel', 'ctlPanel'];
+const PANELS = ['setPanel', 'recPanel', 'helpPanel', 'optPanel', 'ctlPanel', 'navPanel'];
 function openPanel(id) { PANELS.forEach(p => $(p).classList.toggle('hidden', p !== id)); if (id === 'recPanel') renderRecords(); if (id === 'helpPanel') kbHelp(); }
 function closePanels() { let any = false; PANELS.concat(['tutMenu', 'kbPanel']).forEach(p => { if (!$(p).classList.contains('hidden')) any = true; $(p).classList.add('hidden'); }); KBCAP = null; if (any) try { if (MENU.step === 1) pilotSetUI(); } catch (e) { } return any; }
 $('bSet').onclick = () => openPanel('setPanel'); $('bRec').onclick = () => openPanel('recPanel'); $('bHelp').onclick = () => openPanel('helpPanel');
@@ -418,6 +418,7 @@ const KB_SHORT = { up: '상승', down: '하강', yawL: '좌회전', yawR: '우�
 const KB_GROUP = { up: 'alt', down: 'alt', yawL: 'alt', yawR: 'alt', fwd: 'mov', back: 'mov', left: 'mov', right: 'mov', boost: 'bst' };
 const KB_FIXED = { KeyF: '전체화면', KeyV: '가이드', KeyX: '아래캠', KeyB: '음악', KeyN: '건너뛰기', KeyT: '열화상', KeyM: '소리', KeyL: '조명', KeyP: '경로선', Escape: '정지' };
 KB_FIXED.KeyJ = L2x('지도 크게', 'Big map'); if (!KB_RESERVED.includes('KeyJ')) KB_RESERVED.push('KeyJ');
+KB_FIXED.BracketLeft = L2x('지도 넓게', 'Map out'); KB_FIXED.BracketRight = L2x('지도 좁게', 'Map in'); for (const k of ['BracketLeft', 'BracketRight']) if (!KB_RESERVED.includes(k)) KB_RESERVED.push(k);
 KB_FIXED.KeyV = L2x('안내 단계', 'Nav aids');
 function renderKbd(el) {
   if (!el) return;
@@ -435,7 +436,8 @@ function renderKbd(el) {
 }
 $('bKB2').onclick = kbOpen;
 document.querySelectorAll('#segGhostSrc button').forEach(b => b.addEventListener('click', () => { SET.ghostSrc = b.dataset.v; saveSet(); syncSeg(); }));
-document.querySelectorAll('#segGuide button').forEach(b => b.addEventListener('click', () => glSet(+b.dataset.v, true)));   // 메뉴에서 = 다음 출격에 · 비행 중(일시정지 옵션) = 이 판에
+document.querySelectorAll('#segGuide button').forEach(b => b.addEventListener('click', () => glPref(b.dataset.v)));   // 고른 값 = 기본 안내로 저장 (비행 중이면 이 판에도)
+if ($('bNavSet')) $('bNavSet').onclick = () => navPanelOpen();
 $('bAgain').onclick = () => startRun(S.lastKind || S.kind);
 $('bOrtho').onclick = () => $('orthoFile').click();
 $('orthoFile').addEventListener('change', async e => {

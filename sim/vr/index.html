@@ -57,12 +57,13 @@ body.nohud #hud>:not(#tc):not(#vig):not(#flash):not(#cross):not(#irTag),body.noh
 #obj{position:absolute;top:12px;left:50%;transform:translateX(-50%);text-align:center}
 #objNext{display:inline-block;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);padding:7px 14px;font:600 15px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.04em;white-space:nowrap}
 #objNext small{color:var(--mute);font-weight:500;margin-left:8px}
-#objMsg{margin-top:10px;font:700 30px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .25s}
+#objMsg{margin-top:34px;font:700 30px "SF Mono",Menlo,Consolas,monospace;letter-spacing:.06em;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .25s}
 #objMsg.show{opacity:1}
 #list{position:absolute;right:14px;top:14px;background:var(--panel);border:1px solid var(--line);padding:8px 10px;font:12px/1.55 "SF Mono",Menlo,Consolas,monospace;min-width:190px}
 #list div{white-space:nowrap;color:var(--mute)}
 #list .done{color:var(--green)}#list .miss{color:var(--red)}#list .cur{color:var(--amber);font-weight:700}
-#map{position:absolute;right:14px;bottom:14px;background:rgba(10,13,16,.7);border:1px solid var(--line)}
+#list .lh{pointer-events:auto;cursor:pointer;color:#cfe8ff;font-weight:700;margin:-2px 0 3px;padding-bottom:3px;border-bottom:1px solid rgba(255,255,255,.12)}#list.fold .lh{border:0;margin:0;padding:0}#list.fold{min-width:0;padding:5px 10px}
+#map{position:absolute;right:14px;bottom:14px;width:180px;height:300px;background:rgba(10,13,16,.7);border:1px solid var(--line)}
 #sticks{position:absolute;left:14px;bottom:14px;background:var(--panel);border:1px solid var(--line);padding:6px}
 #bottom{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;align-items:center;font:600 13px "SF Mono",Menlo,Consolas,monospace}
 #bottom span{background:var(--panel);border:1px solid var(--line);padding:6px 10px}
@@ -80,6 +81,14 @@ body.nohud #hud>:not(#tc):not(#vig):not(#flash):not(#cross):not(#irTag),body.noh
 #demPanel select,#demPanel input[type=number],#demPanel input[type=text]{background:#11161b;color:var(--text);border:1px solid var(--line);padding:6px 8px;font:13px "SF Mono",Menlo,monospace}
 .rcvr td{padding:3px 10px 3px 0}.rcvr select{background:#11161b;color:var(--text);border:1px solid var(--line);padding:5px 8px;font-size:13px;border-radius:6px}
 #segSite button{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.navCard{max-width:700px!important}.navCard .navlv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0 10px}
+.navCard .navlv button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:left;color:#e8eef2;min-width:0}
+.navCard .navlv button b{font-size:14px}.navCard .navlv button small{color:var(--mute);font-size:11px;line-height:1.3;font-weight:400}.navCard .navlv button.on{border-color:var(--amber);background:rgba(255,200,40,.12)}.navCard .navlv button.on b{color:var(--amber)}
+.navCard .navel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 16px}.navCard .ng{display:flex;flex-direction:column;gap:4px;padding:6px 0}.navCard .ng i{font-style:normal;font-size:11px;font-weight:700;color:var(--cyan);letter-spacing:.03em}
+.navCard label{display:flex;gap:8px;align-items:center;font-size:13px;color:#b9c4c9;cursor:pointer;line-height:1.3}.navCard label.cus{color:#fff}.navCard input[type=checkbox]{width:17px;height:17px;margin:0;flex:none;accent-color:#ffc828}
+.navCard .note{font-size:11.5px;color:var(--mute);margin:10px 0 0;line-height:1.45}.navCard .btns{margin-top:12px}
+#bNavSet.segx{margin:2px 0 0;padding:5px 10px;font-size:12px;grid-column:2;justify-self:start}
+@media (max-height:520px){.navCard h2{display:none}.navCard h1{font-size:16px;margin:0}.navCard .navlv{grid-template-columns:repeat(6,minmax(0,1fr));margin:6px 0}.navCard .navlv button{padding:5px 7px}.navCard .navlv button small{display:none}.navCard .navlv button b{font-size:12.5px}.navCard label{font-size:12px}.navCard .ng{padding:3px 0;gap:3px}.navCard .note{font-size:10.5px;margin-top:5px}.navCard .btns{margin-top:6px}}
 @media (max-width:760px){.demGrid{grid-template-columns:1fr}}
 .card{margin:auto;background:rgba(14,18,22,.94);border:1px solid var(--line);border-top:3px solid var(--amber);max-width:880px;width:100%;padding:26px 28px}
 #menu>.card{max-width:1220px}#menu.panel{background:rgba(6,8,10,.3);-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -131,7 +140,9 @@ input[type=range]{vertical-align:middle;width:120px}
 #tut p{margin:6px 0}#tut .spec{margin-top:8px;padding:6px 8px;background:rgba(255,255,255,.05);font:12px "SF Mono",Menlo,Consolas,monospace;color:#d9e0e4}
 #tut ol{margin:8px 0 0;padding-left:20px}#tut li{color:var(--mute)}#tut li.cur{color:var(--amber);font-weight:700}#tut li.done{color:var(--green)}
 #tut .go{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);color:var(--amber)}#tut .go.ok{color:var(--green)}#tut .go.dim{color:var(--mute);font-size:12px}
-#tut.mini .body{display:none}#tut.mini{width:300px}
+#tut{pointer-events:auto;cursor:pointer}#tut.mini{width:auto;max-width:min(420px,46vw);padding:6px 10px;line-height:1.3}
+#tut .tline{display:flex;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden}#tut .tline .k{font-size:10px}#tut .tline b{font-size:13px}#tut .tline .cur{color:var(--amber);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+#tut .tg{margin-left:auto;padding-left:8px;font:600 11px system-ui,sans-serif;color:var(--cyan);letter-spacing:0;flex:none}#tut .k .tg{float:right}#tut.flyopen{max-height:calc(100vh - 230px);overflow:auto}
 #rp{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:var(--panel);border:1px solid var(--line);padding:8px 10px;pointer-events:auto}
 #rp button{padding:6px 10px;font-size:13px;white-space:nowrap}
 #hud.replaying #sticks,#hud.replaying #keys,#hud.replaying #scope{display:none}#rpSeek{width:300px}#rpTime{font:600 12px "SF Mono",Menlo,Consolas,monospace;min-width:120px;text-align:center}
@@ -170,13 +181,20 @@ body.touch .panel{touch-action:pan-y}
 body.touch #keys,body.touch #sticks,body.touch #list{display:none!important}
 body.touch #osd{font-size:14px;left:calc(10px + env(safe-area-inset-left));top:8px}body.touch #osd .big{font-size:19px}body.touch #osd b{width:40px}
 body.touch #objNext{font-size:13px;padding:5px 10px}body.touch #objMsg{font-size:20px}
-#map{pointer-events:auto;cursor:zoom-in}
+#map{pointer-events:auto}#mapCv{display:block;width:100%;height:100%;border-radius:inherit;cursor:zoom-in}#map.big #mapCv{cursor:zoom-out}
+#map .mapBar{position:absolute;top:4px;right:4px;display:flex;gap:3px;z-index:1}#map .mapBar button{width:22px;height:22px;min-width:0;padding:0;margin:0;font:700 15px/20px ui-monospace,Menlo,monospace;background:rgba(8,12,16,.78);color:#e8eef2;border:1px solid rgba(255,255,255,.28);border-radius:6px;cursor:pointer;box-shadow:none}
+#map .mapBar button:hover{border-color:var(--amber);color:var(--amber)}#map.big .mapBar button{width:30px;height:30px;font-size:18px;line-height:28px}
+#map .mapOpen{display:none}#map.fold{width:40px!important;height:40px!important;aspect-ratio:auto!important;cursor:pointer}#map.fold #mapCv,#map.fold .mapBar{display:none}
+#map.fold .mapOpen{display:block;width:100%;height:100%;min-width:0;padding:0;margin:0;font-size:20px;line-height:38px;background:none;border:0;box-shadow:none;cursor:pointer}
+body.touch #map:not(.big) .mapBar button[data-m="-"],body.touch #map:not(.big) .mapBar button[data-m="+"]{display:none}body.touch #map:not(.big) .mapBar{top:3px;right:3px}body.touch #map:not(.big) .mapBar button{width:19px;height:19px;font-size:12px;line-height:17px;border-radius:5px}body.touch #map.fold{width:38px!important;height:38px!important}
 #map.big{background:rgba(8,11,14,.96)!important;right:50%!important;bottom:50%!important;left:auto!important;top:auto!important;transform:translate(50%,50%)!important;width:min(56vh,430px)!important;height:auto!important;aspect-ratio:3/5;z-index:30;cursor:zoom-out;box-shadow:0 0 0 2px var(--amber),0 8px 40px rgba(0,0,0,.6)}
 body.touch #map{width:84px;height:140px;right:auto;left:calc(10px + env(safe-area-inset-left));bottom:auto;top:118px}
 body.touch #bottom{bottom:auto;top:44px;font-size:10px}body.touch #bottom span{padding:3px 6px}
 body.touch #scope{left:calc(102px + env(safe-area-inset-left));right:auto;bottom:auto;top:118px;padding:4px}body.touch #scopeC{width:96px!important;height:96px!important}body.touch #scopeTxt{min-width:110px;font-size:10px}body.touch #scope .t{font-size:9px}
-body.touch #tut{top:auto;bottom:auto;top:96px;left:auto;right:calc(180px + env(safe-area-inset-right));width:300px;font-size:12px;line-height:1.5;max-height:58vh;overflow:auto;pointer-events:auto;padding:9px 11px}
-body.touch #tut h4{font-size:15px}body.touch #tut.mini{width:220px}
+body.touch #tut{top:auto;bottom:auto;top:96px;left:calc(10px + env(safe-area-inset-left));right:auto;width:280px;font-size:11.5px;line-height:1.4;max-height:calc(100vh - 104px);overflow:auto;pointer-events:auto;padding:8px 10px}body.touch #tut p{margin:4px 0}body.touch #tut .spec{margin-top:5px;padding:4px 7px;font-size:11px}
+body.touch #tut.mini{top:94px;width:auto;max-width:calc(100vw - 420px);padding:4px 9px}body.touch #tut .tline b{font-size:12px}body.touch #tut .tline .cur{font-size:11px}
+body.touch.tutBig #map{visibility:hidden}body.mapBig #hdgTape,body.mapBig #navArrow{visibility:hidden!important}
+body.touch #tut h4{font-size:15px}
 body.touch #rp{bottom:10px;flex-wrap:wrap;justify-content:center;max-width:96vw}body.touch #rpSeek{width:180px}
 body.touch .card{padding:16px}body.touch .card h1{font-size:20px}body.touch button{padding:10px 14px}
 #rot{position:fixed;inset:0;z-index:50;background:#0b0e11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:16px;text-align:center;padding:24px}
@@ -196,7 +214,7 @@ body.kmB .kmA,body:not(.kmB) .kmB{display:none!important}
 body.touch #attcam{right:auto;left:calc(102px + env(safe-area-inset-left));bottom:auto;top:118px;width:min(24vw,230px)}body.touch.bellyon #attcam{display:none}   /* 휴대폰: 아래 카메라 자리 (아래 카메라가 켜지면 자세 창은 숨김) */
 body.touch #belly{top:118px;right:auto;left:calc(102px + env(safe-area-inset-left));width:min(24vw,230px);animation:none}
 body.touch #hud.bellyon #scope{display:none}
-body.touch #objMsg{margin-top:36px}
+body.touch #objMsg{margin-top:54px}
 @media (max-width:900px){body.touch #obj,body.touch #bottom{left:calc(50% - 72px)}}
 @media (max-width:720px){body.touch #modeTag{display:none}body.touch #objNext small{display:none}}
 body.touch #guide{bottom:14px;top:auto;font-size:13px;max-width:min(60vw,520px);white-space:normal;line-height:1.3}
@@ -444,7 +462,7 @@ body.touch #map{border-radius:9px}
   #menuCard .s1 .g-stick{grid-area:stick;min-height:0}
   #menuCard .s1 .g-ly{grid-area:ly;min-height:0;display:flex;flex-direction:column}
   #menuCard .s1 .g-foot{grid-area:foot;margin:0;align-self:end;padding-top:5px}
-  #menuCard .s1 .g-foot button{padding:8px 12px;font-size:13px}
+  #menuCard .s1 .g-foot button{padding:8px 10px;font-size:12.5px;white-space:nowrap}#menuCard .s1 .g-foot{gap:6px;flex-wrap:nowrap}
   #menuCard .s1 .wzbtns{grid-area:btns}
   #menuCard #pilotName{font-size:16px;padding:7px 10px;margin:0}
   #menuCard .s1 .wzhint{display:none}
@@ -815,7 +833,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
   <div id="split"></div>
   <div id="obj"><div id="objNext"></div><div id="objMsg"></div></div>
   <div id="list"></div>
-  <canvas id="map" width="180" height="300"></canvas>
+  <div id="map"><canvas id="mapCv" width="360" height="600"></canvas></div>
   <div id="sticks"><canvas id="stk" width="150" height="70"></canvas></div>
   <div id="keys"></div>
   <div id="bottom"><span id="payload"></span><span id="camTag"></span><span id="modeTag"></span></div>
@@ -911,6 +929,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
   </div>
 </div>
 
+<div id="navPanel" class="panel hidden"><div class="card navCard" id="navCard"></div></div>
 <div id="optPanel" class="panel hidden">
   <div class="card optCard" style="max-width:760px">
     <h1>OPTIONS</h1><h2>옵션 · 비행 모드와 화면·환경</h2>
@@ -920,7 +939,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
       <div>비행 보조 <span class="seg" id="segAssistLv"><button data-v="2" class="on">전체</button><button data-v="1">약하게</button><button data-v="0">끔</button></span></div>
       <div>비행감 <span class="seg" id="segFeel"><button data-v="train">입문</button><button data-v="std" class="on">표준</button><button data-v="real">실기체</button></span></div>
       <div>스틱 반응 <span class="seg" id="segExpo"><button data-v="real">실기체 (선형)</button><button data-v="soft" class="on">부드럽게 (엑스포)</button></span></div>
-      <div>안내 단계 <span class="seg" id="segGuide"><button data-v="3" class="on">가이드</button><button data-v="2">목표</button><button data-v="1">지도</button><button data-v="0">무전</button></span></div>
+      <div>안내 단계 <span class="seg" id="segGuide"><button data-v="a" class="on">자동</button><button data-v="3">가이드</button><button data-v="2">목표</button><button data-v="1">지도</button><button data-v="0">무전</button><button data-v="4">내 설정</button></span> <button id="bNavSet" class="segx">🧭 하나씩 고르기</button></div>
       <div id="feelAdv" class="feeladv">
         <div class="fh">ACRO 세부 (FPV · 자폭 FPV) <span class="seg small" id="segRatePre"><button data-v="train">입문</button><button data-v="std">Betaflight 기본</button><button data-v="racer">레이서</button></span></div>
         <div class="frow">Rates 롤·피치 <label>중심 <input id="rc0" type="number" min="10" max="400" step="5"></label><label>최대 <input id="rc1" type="number" min="100" max="1800" step="10"></label><label>Expo <input id="rc2" type="number" min="0" max="1" step="0.05"></label> <span class="mono" id="rcV"></span></div>
@@ -928,7 +947,7 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
         <div class="frow">스로틀 중앙 = 정지 비행 <span class="seg small" id="segThrHover"><button data-v="auto" class="on">자동 (조종기만 하단 기준)</button><button data-v="1">항상</button><button data-v="0">끔 · 하단 = 아이들</button></span> <span class="mono" id="hovV"></span></div>
       </div>
     </div>
-    <div class="note"><b>비행 모드</b> — GPS: 스틱을 놓으면 멈춤 · ATTI: 자세만 잡고 관성·바람에 흐름 · 수동: 기울기 제한 안에서 자세 보조 · ACRO: 기울기 제한 없음(플립·배면), 추력∝회전수², 하단 스틱 아이들. <b>보조</b> — 전체: 자동 방향·게이트 유도·지형 추종 · 약하게: 게이트 유도만. <b>비행감</b> — 입문: 속도·기울기 제한 · 표준 · 실기체: 제원 그대로. 충돌하면 튕기고 벌점. <b>안내 단계</b> — 가이드: 목표 표시 + 쉐브론·조작 안내 · 목표: ◇·빛기둥만 · 지도: 지도에만 · 무전: 무전 방위·거리만. 기본값은 난이도(입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도), 바꾸면 이번 출격에만 · 비행 중 GD·V.</div></div>
+    <div class="note"><b>비행 모드</b> — GPS: 스틱을 놓으면 멈춤 · ATTI: 자세만 잡고 관성·바람에 흐름 · 수동: 기울기 제한 안에서 자세 보조 · ACRO: 기울기 제한 없음(플립·배면), 추력∝회전수², 하단 스틱 아이들. <b>보조</b> — 전체: 자동 방향·게이트 유도·지형 추종 · 약하게: 게이트 유도만. <b>비행감</b> — 입문: 속도·기울기 제한 · 표준 · 실기체: 제원 그대로. 충돌하면 튕기고 벌점. <b>안내 단계</b> — 가이드: 목표 표시 + 쉐브론·조작 안내 · 목표: ◇·빛기둥만 · 지도: 지도에만 · 무전: 무전 방위·거리만 · 내 설정: 하나씩 고른 그대로. 고른 값이 기본으로 저장됨 (자동 = 난이도별: 입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도) · 비행 중 GD·V 는 그 판에만.</div></div>
     <div class="otab" data-t="env"><div class="opt col">
       <div>시간대 <span class="seg" id="segTime"><button data-v="0" class="on">낮</button><button data-v="2">해질녘</button><button data-v="1">밤</button></span></div>
       <div>날씨 <span class="seg" id="segWx"><button data-v="clear" class="on">맑음</button><button data-v="rain">비</button><button data-v="snow">눈</button></span></div>
@@ -1161,6 +1180,6 @@ if(endImg){var im=new Image();im.src=endImg;}set(6);})();</script>
 <script>window.SIM_GEOTIFF_URL='../lib/geotiff.js';</script>
 
 <script>window.SIM_LANG='ko';window.SIM_VR=true;window.SIM_BASE='../';window.SIM_TREES_V='789408ab';window.SIM_MUSIC_V='cd49dd40';window.SIM_RV_V='60de2668';window.SIM_API='https://fpv-rank.unsokyi1.workers.dev';</script>
-<script>(function(){var L=[["../lib/three.min.js", 34, "3D ENGINE"], ["../lib/proj4.js", 44, "TERRAIN DATA"], ["../sites/yeongin.js?v=7804484e", 62, "SIMULATOR"]],run=function(){L.forEach(function(x){var e=document.createElement('script');e.src=x[0];e.async=false;e.onload=function(){window.__boot&&__boot(x[1],x[2])};document.body.appendChild(e);});var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='js/app.ko.js?v=18cef849';s.async=false;s.onload=function(){if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))(function(){var n=0,go=function(){var V=window.__bootVideo;if(V&&V.busy&&n++<37){setTimeout(go,1000);return;}navigator.serviceWorker.register('../sw.js').then(function(){return navigator.serviceWorker.ready}).then(function(r){if(r&&r.active)r.active.postMessage({add:[location.href.split('#')[0].split('?')[0],s.src]})}).catch(function(){});};setTimeout(go,3000);})();};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();};if(window.__appWait)__appWait(run);else run();})();</script>
+<script>(function(){var L=[["../lib/three.min.js", 34, "3D ENGINE"], ["../lib/proj4.js", 44, "TERRAIN DATA"], ["../sites/yeongin.js?v=7804484e", 62, "SIMULATOR"]],run=function(){L.forEach(function(x){var e=document.createElement('script');e.src=x[0];e.async=false;e.onload=function(){window.__boot&&__boot(x[1],x[2])};document.body.appendChild(e);});var s=document.createElement('script'),d=0,go=function(){if(d)return;d=1;document.body.appendChild(s);};s.src='js/app.ko.js?v=1cae72a1';s.async=false;s.onload=function(){if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))(function(){var n=0,go=function(){var V=window.__bootVideo;if(V&&V.busy&&n++<37){setTimeout(go,1000);return;}navigator.serviceWorker.register('../sw.js').then(function(){return navigator.serviceWorker.ready}).then(function(r){if(r&&r.active)r.active.postMessage({add:[location.href.split('#')[0].split('?')[0],s.src]})}).catch(function(){});};setTimeout(go,3000);})();};var P=window.__preload&&window.__preload();if(P&&P.warm){P.warm.then(go,go);setTimeout(go,400);}else go();};if(window.__appWait)__appWait(run);else run();})();</script>
 </body>
 </html>

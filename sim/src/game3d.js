@@ -3,38 +3,84 @@
 //  안내 단계 · 목표 표시 · 비행 가이드(쉐브론 + 조작 안내 문구) · 아래 카메라
 // =====================================================================
 const GUIDE = { n: 10, sp: 2.6, meshes: [], next: null, detour: false };
-// ---- 안내 단계 (GD 버튼 · V 키 · VR 메뉴 · 옵션): 3 가이드 → 2 목표 → 1 지도 → 0 무전 → 3 ----
-//  목표 표시 "어디로" (화면 ◇·가장자리 화살표·거리, 빛기둥, 수색 구역 고리, 지금 과제 강조) ……… 2 이상
-//  비행 가이드 "어떻게" (쉐브론 경로, 조작 안내 문구, 게이트 조준 틀, 선회 원) ……………………… 3
-//  지도·항법 (지도의 목표·수색 원·점선, DIST·AREA, UAS 방위계 목표 바늘) …………………………… 1 이상 · 0 은 무전 방위·거리만
-//  단계와 상관없이 늘: 코스·임무 물체(링·게이트·패드·연기·차량)와 링 통과 방향, 다음 과제 이름, 계기, 투하 조준경, 무전
-//  기본값은 난이도: 입문 3 · 쉬움·ATTI 2 · 스포츠 1 (튜토리얼 3) · 바꾸면 그 판에만 (같은 임무 다시 포함) · 메뉴로 나가면 기본값
-var GL = { lv: 3, kind: null, user: false, live: false, pre: null, preDiff: null };
-const GL_NM = [['무전', 'Radio'], ['지도', 'Map'], ['목표', 'Target'], ['가이드', 'Guide']];
-const GL_DESC = [['지도에도 없음 · 방위 띠와 무전 위치 요청(G)', 'radio only · heading tape + vector request (G)'], ['화면 표시 없음 · 지도·방위·무전(G)', 'no screen markers · map, heading, vectors (G)'], ['초보 · 목표 표시', 'beginner · target markers'], ['초보 · 목표 + 경로·조작', 'beginner · markers + path']];   // 바꿀 때 잠깐 뜨는 한 줄
+// ---- 안내 단계 (GD 버튼 · V 키 · VR 메뉴 · 옵션): 3 가이드 → 2 목표 → 1 지도 → 0 무전 → 4 내 설정 → 3 ----
+//  목표 표시 "어디로" (화면 ◇·가장자리 화살표·거리 = marker, 빛기둥 = beacon, 방위 띠 ▼ = tape) ……… 2 이상
+//  비행 가이드 "어떻게" (쉐브론 경로 = path, 조작 안내 문구 = hint, 게이트 조준 틀 = brk) ………………… 3
+//  지도·항법 (지도의 목표·수색 원·점선, DIST·AREA, UAS 방위계 목표 바늘 = map) …………………………… 1 이상
+//  무전 위치 안내: 목표가 바뀔 때 (radio = 1·0) · 45초마다 (radioP = 0)
+//  4 내 설정: 위 요소를 하나씩 고른 그대로 (첫 화면 🧭 안내 방식 · 옵션) — 저장
+//  단계와 상관없이 늘: 코스·임무 물체(링·게이트·패드·연기·차량)와 링 통과 방향, 다음 과제 이름, 계기, 투하 조준경, 무전 요청(G)
+//  기본값: 첫 화면·옵션에서 고른 값 (저장 · SET.glUser) · '자동'이면 난이도별 (입문 3 · 쉬움·ATTI 2 · 스포츠 1) · 튜토리얼은 3
+//  비행 중 GD·V 로 바꾸면 그 판에만 (같은 임무 다시 포함)
+var GL = { lv: 3, kind: null, user: false, live: false };
+const GL_NM = [['무전', 'Radio'], ['지도', 'Map'], ['목표', 'Target'], ['가이드', 'Guide'], ['내 설정', 'Custom']];
+const GL_DESC = [['지도에도 없음 · 방위 띠와 무전 위치 요청(G)', 'radio only · heading tape + vector request (G)'], ['화면 표시 없음 · 지도·방위·무전(G)', 'no screen markers · map, heading, vectors (G)'], ['초보 · 목표 표시', 'beginner · target markers'], ['초보 · 목표 + 경로·조작', 'beginner · markers + path'], ['내가 고른 표시만', 'only what you picked']];   // 바꿀 때 잠깐 뜨는 한 줄
+const G_KEYS = [   // [키, 한국어, 영어, 묶음]
+  ['marker', '화면 목표 표시 ◇ · 가장자리 화살표 · 거리', 'On-screen target ◇ · edge arrow · distance', 't'],
+  ['beacon', '빛기둥 (목표 위로 솟은 빛)', 'Light beam over the target', 't'],
+  ['tape', '방위 띠에 목표 방향 ▼', 'Target bearing ▼ on the heading tape', 't'],
+  ['map', '지도에 목표 · 수색 구역 · 점선 · 거리', 'Target, search area, dotted line and distance on the map', 'm'],
+  ['path', '비행 경로 (화살 모양 쉐브론)', 'Flight path chevrons', 'f'],
+  ['hint', '조작 안내 문구 (↑ 올리기 · 왼쪽 스틱 …)', 'Stick / key hints', 'f'],
+  ['brk', '게이트 조준 틀', 'Gate aiming bracket', 'f'],
+  ['radio', '무전 위치 안내 (목표가 바뀔 때)', 'Radio vector when the target changes', 'r'],
+  ['radioP', '무전 방위 안내 (45초마다)', 'Radio bearing every 45 s', 'r']];
+const G_PRE = [{ tape: 0, radio: 1, radioP: 1 }, { map: 1, radio: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1 }, { marker: 1, beacon: 1, tape: 1, map: 1, path: 1, hint: 1, brk: 1 }];
+if (!SET.gCus || typeof SET.gCus !== 'object') SET.gCus = { marker: 1, tape: 1, map: 1, radio: 1 };   // 내 설정 처음 값: 화면 ◇·방위 띠·지도 + 무전
+function gOn(k) { const v = gdLevel(); return !!(v === 4 ? SET.gCus[k] : (G_PRE[v] || G_PRE[3])[k]); }
 function glDefFor(d) { const v = { train: 3, easy: 2, atti: 2, sport: 1 }[d]; return v == null ? 2 : v; }   // 난이도별 기본 안내 단계
-function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; return glDefFor(SET.diff); }
-function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : (GL.pre != null && GL.preDiff === SET.diff) ? GL.pre : glDef('menu'); }
-const glTgt = () => gdLevel() >= 2, glFly = () => gdLevel() >= 3, glMap = () => gdLevel() >= 1;
+function glUserLv() { const u = SET.glUser; return u == null || !(u >= 0 && u <= 4) ? null : u | 0; }   // 저장된 기본 안내 (없으면 '자동')
+function glDef(kind) { if ((kind || S.kind) === 'tutorial') return 3; const u = glUserLv(); return u != null ? u : glDefFor(SET.diff); }
+function gdLevel() { if (!GL) return 3; return GL.live ? GL.lv : glDef('menu'); }
+const glTgt = () => gOn('marker'), glFly = () => gOn('path') || gOn('hint'), glMap = () => gOn('map');
 function glStart(kind) {   // startRun 에서
-  if (GL.live && GL.user && GL.kind === kind) { }                                        // 같은 임무 다시: 고른 단계 그대로
-  else if (GL.pre != null && GL.preDiff === SET.diff) { GL.lv = GL.pre; GL.user = true; }   // 출격 전에 옵션에서 고른 단계
+  if (GL.live && GL.user && GL.kind === kind) { }   // 같은 임무 다시: 비행 중 고른 단계 그대로
   else { GL.lv = glDef(kind); GL.user = false; }
-  GL.pre = null; GL.kind = kind; GL.live = true; glSync();
+  GL.kind = kind; GL.live = true; glSync();
 }
 function glEnd() { GL.live = false; GL.user = false; glSync(); }   // toMenu 에서 (그 판 끝)
-function glSet(v, quiet) {
-  v = ((v % 4) + 4) % 4;
-  if (GL.live) { GL.lv = v; GL.user = true; } else { GL.pre = v; GL.preDiff = SET.diff; }
+function glSet(v, quiet) {   // 비행 중 GD·V·VR 메뉴: 그 판에만 · 메뉴에서는 기본값으로 저장
+  v = ((v % 5) + 5) % 5;
+  if (GL.live) { GL.lv = v; GL.user = true; } else { SET.glUser = v; saveSet(); }
   glSync();
   if (!quiet && GL.live && S.state !== 'menu') showMsg(L2x('안내: ', 'NAV: ') + L2x(GL_NM[v][0], GL_NM[v][1]).toUpperCase() + ' (' + L2x(GL_DESC[v][0], GL_DESC[v][1]) + ')', '#fff', 1.6);
 }
-function glCycle() { const v = gdLevel(); glSet(v > 0 ? v - 1 : 3); }
+function glPref(v) {   // 첫 화면 🧭 · 옵션: 기본 안내로 저장 ('a' = 난이도별 자동) · 비행 중이면 이 판에도 바로
+  SET.glUser = v === 'a' || v == null ? null : ((+v % 5) + 5) % 5; saveSet();
+  if (GL.live) { GL.lv = glDef(GL.kind || S.kind); GL.user = true; }
+  glSync();
+}
+function gCusSet(k, on) { if (gdLevel() !== 4) { const base = G_PRE[gdLevel()] || G_PRE[3]; SET.gCus = {}; G_KEYS.forEach(([x]) => SET.gCus[x] = base[x] ? 1 : 0); } SET.gCus[k] = on ? 1 : 0; glPref(4); }   // 하나라도 바꾸면 '내 설정' (지금 단계에서 시작)
+const GL_ORDER = [3, 2, 1, 0, 4];
+function glCycle() { const i = GL_ORDER.indexOf(gdLevel()); glSet(GL_ORDER[(i + 1) % GL_ORDER.length]); }
 function glSync() {
-  const v = gdLevel(), b = $('tbGuide'), nm = L2x(GL_NM[v][0], GL_NM[v][1]);
+  const v = gdLevel(), b = $('tbGuide'), nm = L2x(GL_NM[v][0], GL_NM[v][1]), u = glUserLv();
   if (b && b.dataset.lv !== String(v)) { b.dataset.lv = v; b.innerHTML = `GD<small>${nm}</small>`; }
-  document.querySelectorAll('#segGuide button').forEach(x => x.classList.toggle('on', +x.dataset.v === v));
+  document.querySelectorAll('#segGuide button').forEach(x => x.classList.toggle('on', x.dataset.v === (u == null ? 'a' : String(u))));
+  try { navPanelSync(); } catch (e) { }
   if (S.state !== 'menu') try { updateTags(); } catch (e) { }   // 비행 화면 아래 상태 표시 (안내 …)
+}
+// ---- 🧭 안내 방식 고르기 (첫 화면 · 옵션 · 일시정지): 단계 + 내 설정 요소 ----
+function navPanelOpen() { navPanelSync(true); openPanel('navPanel'); }
+function navPanelSync(build) {
+  const card = $('navCard'); if (!card) return;
+  if (build || !card.dataset.built) {
+    card.dataset.built = 1;
+    const lvs = [['a', L2x('자동', 'Auto'), L2x('난이도별 (입문 가이드 · 쉬움·ATTI 목표 · 스포츠 지도)', 'by flight style (training guide · easy target · sport map)')]].concat([3, 2, 1, 0, 4].map(v => [String(v), L2x(GL_NM[v][0], GL_NM[v][1]), L2x(GL_DESC[v][0], GL_DESC[v][1])]));
+    const grp = { t: L2x('목표 표시 · 어디로', 'Target · where'), m: L2x('지도', 'Map'), f: L2x('비행 가이드 · 어떻게', 'Flight guide · how'), r: L2x('무전', 'Radio') };
+    card.innerHTML = `<h1>NAV</h1><h2>${L2x('안내 방식 · 목표 표시와 가이드', 'Navigation aids · target markers and guidance')}</h2>` +
+      `<div class="navlv">${lvs.map(([v, n, d]) => `<button data-v="${v}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>` +
+      `<div class="navel">${['t', 'm', 'f', 'r'].map(gk => `<div class="ng"><i>${grp[gk]}</i>${G_KEYS.filter(k => k[3] === gk).map(([k, ko, en]) => `<label><input type="checkbox" data-g="${k}"> ${L2x(ko, en)}</label>`).join('')}</div>`).join('')}</div>` +
+      `<p class="note">${L2x('여기서 고른 값이 기본으로 저장됩니다 · 칸을 하나라도 바꾸면 ‘내 설정’ · 비행 중 GD 단추(V 키)로 잠깐 바꿀 수 있고, 무전 위치 요청(G)·방위 띠는 늘 씁니다', 'Saved as your default · changing any box switches to Custom · GD button (V) changes it for one flight; radio vector request (G) and the heading tape are always available')}</p>` +
+      `<div class="btns"><button class="primary" id="navOk">${L2x('확인', 'OK')}</button></div>`;
+    card.querySelectorAll('.navlv button').forEach(b => b.onclick = () => glPref(b.dataset.v));
+    card.querySelectorAll('input[data-g]').forEach(c => c.onchange = () => gCusSet(c.dataset.g, c.checked));
+    $('navOk').onclick = () => { closePanels(); if (S.state === 'pause' && ui.pause) ui.pause.classList.remove('hidden'); };
+  }
+  const u = glUserLv(), v = gdLevel(), cur = GL.live ? v : (u == null ? null : u);
+  card.querySelectorAll('.navlv button').forEach(b => b.classList.toggle('on', b.dataset.v === (u == null ? 'a' : String(u))));
+  card.querySelectorAll('input[data-g]').forEach(c => { c.checked = gOn(c.dataset.g); c.closest('label').classList.toggle('cus', v === 4); });
+  card.classList.toggle('live', GL.live && cur !== u);
 }
 (function makeFrames() {
   // 비행 경로에 수직으로 서는 사각 틀 ('하늘의 길' 방식) - FPV·추적 시점 모두에서 잘 보임
@@ -224,10 +270,10 @@ function updateGuide(subj) {
   const o = active ? curObj() : null;
   GUIDE.next = null;
   if (!o || (typeof isC1 === 'function' && isC1())) { hideGuide(); return; }
-  const tgtOn = glTgt(), flyOn = glFly();   // 목표 표시(2 이상) · 비행 가이드(3)
-  if (tgtOn) beaconUpdate(o, subj); else BEACON.g.visible = false;
+  const tgtOn = gOn('marker'), pathOn = gOn('path'), hintOn = gOn('hint'), flyOn = pathOn || hintOn;   // 안내 요소 (단계 · 내 설정)
+  if (gOn('beacon')) beaconUpdate(o, subj); else BEACON.g.visible = false;
   if (o.kind === 'bunker' && !S.scanned && insideBunker(subj.p)) {
-    hideFly(); hideNav(); if (!flyOn) return;
+    hideFly(); hideNav(); if (!hintOn) return;
     const el = $('guide'), html = `<div class="ok">${L2x('정찰 중 · 안에서 잠시 머무르기', 'Scanning · hold inside for a moment')}</div>`; el.classList.remove('hidden'); if (GUIDE.html !== html) { GUIDE.html = html; el.innerHTML = html; } return;
   }
   // 수색 구역(산불·실종자) 안: 쉐브론은 끄고 (눈·열화상으로 찾기) 구역 중심 ◇ + 할 일·고도 안내
@@ -235,7 +281,7 @@ function updateGuide(subj) {
     hideFly();
     const dcc = Math.hypot(o.mk.x - subj.p.x, o.mk.z - subj.p.z);
     if (tgtOn && dcc > o.search.r * 0.8) navArrow(o.mk, subj, o); else hideNav();   // 구역 안에서는 중심 표시를 치움 (가장자리에 가까우면 중심 쪽 화살표)
-    if (!flyOn) return;
+    if (!hintOn) return;
     const agl = subj.p.y - terrainAt(subj.p.x, subj.p.z), lines = [], fire = o.t === 'fire', band = fire ? [35, 70] : [15, 35];
     const en = window.SIM_LANG === 'en';
     const rk = repKey();
@@ -272,11 +318,12 @@ function updateGuide(subj) {
   const L = curve.getLength();
   const gcol = GUIDE.detour ? 0xffc828 : o.kind === 'orbit' ? 0x5dff9a : 0x4fe3ff;
   GUIDE.meshes.forEach(x => x.g.visible = false); GPATH.m.visible = false; GAXIS.m.visible = false;   // 예전 틀·띠·점선은 쓰지 않음 (쉐브론으로 바꿈)
-  if (L > 1.5) guideChevrons(curve, L, gcol, Math.hypot(DR.v.x, DR.v.z), AFc().cls === 'wing'); else GCHEV.m.visible = false;
-  if (o.t === 'rwyland' && typeof rwyGlide === 'function' && RWY) {   // 활주로 착륙: 접지점에서 뒤로 올라가는 3° 진입선 (점선)
+  if (L > 1.5 && pathOn) guideChevrons(curve, L, gcol, Math.hypot(DR.v.x, DR.v.z), AFc().cls === 'wing'); else GCHEV.m.visible = false;
+  if (pathOn && o.t === 'rwyland' && typeof rwyGlide === 'function' && RWY) {   // 활주로 착륙: 접지점에서 뒤로 올라가는 3° 진입선 (점선)
     const td = RWY.at(-RWY.L / 2 + 20, 0); td.y = groundAt(td.x, td.z); const u = new V3(RWY.ux, 0, RWY.uz), A = u.clone().multiplyScalar(Math.cos(3 * DEG)).add(new V3(0, -Math.sin(3 * DEG), 0)).normalize();
     guideAxis(td, A, 600, 0, 0xffd23a); }
   // ---- 조작 안내 문구 ----
+  if (!hintOn) { $('guide').classList.add('hidden'); GUIDE.html = ''; return; }
   const T = XR_ON && vrStickMode() === 3 ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: (window.SIM_LANG === 'en' ? 'look ←' : '고개 ←'), yawR: (window.SIM_LANG === 'en' ? 'look →' : '고개 →'), fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: 'R트리거', boost: 'L트리거' }
     : (XR_ON ? vrStickMode() === 1 : IS_TOUCH && stickMode() === 1) ? { up: '오른쪽 스틱 ↑', down: '오른쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '왼쪽 스틱 ↑', back: '왼쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' }
     : (IS_TOUCH || XR_ON) ? { up: '왼쪽 스틱 ↑', down: '왼쪽 스틱 ↓', yawL: '왼쪽 스틱 ←', yawR: '왼쪽 스틱 →', fwd: '오른쪽 스틱 ↑', back: '오른쪽 스틱 ↓', left: '오른쪽 스틱 ←', right: '오른쪽 스틱 →', drop: XR_ON ? 'R트리거' : 'DROP', boost: XR_ON ? 'L트리거' : 'BST' } : null;

@@ -147,4 +147,4 @@ const TREES3 = (function () {
   setTimeout(load, 0);   // 미리 만들어 둔 게 있으면 첫 장면부터 고급 나무 (무거운 계산은 작업 스레드)
   return st;
 })();
-if (window.__sim) Object.assign(window.__sim, { TREES3, STREES, OUTER });
+if (window.__sim) Object.assign(window.__sim, { TREES3, STREES, OUTER, mapZoom, mapFold, mapLv, MAPS, BASE, drawMap, gOn, glPref, navPanelOpen, tutRender: () => tutRender() });
