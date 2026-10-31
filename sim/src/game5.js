@@ -227,14 +227,25 @@ function makeModel0(id, ghost) {
   return makeDrone(ghost);
 }
 let MODEL_ID = 'x2d', MODEL_PAINT = '';
-// 기체 원점 → 가장 낮은 곳(다리·배터리·탑재물 밑) 높이: 땅에 앉으면 이만큼 위 (예전엔 모든 기체 6 cm → X2D·자폭 FPV 는 다리가 2~4 cm 땅에 묻혔음)
-function modelFoot(m, a) {
-  if (!m || !a || a.cls === 'wing') return 0.06;
-  if (a.c1) return typeof c1p === 'function' ? c1p('skidDrop') : 0.3;   // 1종 연습기: 스키드 바닥 (c1 물리와 같은 값)
-  try { const g = m.g, p0 = g.position.clone(), q0 = g.quaternion.clone(); g.position.set(0, 0, 0); g.quaternion.identity(); g.updateMatrixWorld(true);
-    const y = new THREE.Box3().setFromObject(g).min.y; g.position.copy(p0); g.quaternion.copy(q0); g.updateMatrixWorld(true); return isFinite(y) ? clamp(-y + 0.004, 0.02, 0.15) : 0.06; } catch (e) { return 0.06; }
+// 착륙 다리: 기체 원점 → 가장 낮은 곳(다리·배터리·탑재물 밑) 높이(foot) + 바닥 가까운 부분(바닥 3 cm 안)이 앞·뒤·오른쪽·왼쪽으로 뻗은 거리
+//  땅에 앉으면 foot 만큼 위 · 비탈에서는 이 네 점이 땅 밑으로 들어가지 않게 높이를 정하고 기체를 비탈 따라 기울임 (droneGround)
+//  예전엔 모든 기체 6 cm · 가운데 한 점 높이만 봐서 X2D·자폭 FPV 는 다리가 묻히고, 비탈·기운 패드에선 기체 반쯤이 땅에 잠겨 보였음
+function modelGear(m, a) {
+  const G0 = { foot: 0.06, f: 0.12, b: 0.12, r: 0.12, l: 0.12 };
+  if (!m || !a || a.cls === 'wing') return G0;
+  if (a.c1) { const sd = typeof c1p === 'function' ? c1p('skidDrop') : 0.3; return { foot: sd, f: 0.55, b: 0.55, r: 0.45, l: 0.45 }; }   // 1종 연습기: 스키드 (c1 물리와 같은 값)
+  try {
+    const g = m.g, p0 = g.position.clone(), q0 = g.quaternion.clone(); g.position.set(0, 0, 0); g.quaternion.identity(); g.updateMatrixWorld(true);
+    const V = [], v = new V3(); let mn = Infinity;
+    g.traverse(o => { if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return; const pa = o.geometry.attributes.position; for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); V.push(v.x, v.y, v.z); if (v.y < mn) mn = v.y; } });
+    g.position.copy(p0); g.quaternion.copy(q0); g.updateMatrixWorld(true);
+    if (!isFinite(mn)) return G0;
+    let f = 0, b = 0, r = 0, l = 0; for (let i = 0; i < V.length; i += 3) if (V[i + 1] < mn + 0.03) { const x = V[i], z = V[i + 2]; f = Math.max(f, -z); b = Math.max(b, z); r = Math.max(r, x); l = Math.max(l, -x); }
+    const E = e => clamp(e, 0.06, 0.4);
+    return { foot: clamp(-mn + 0.004, 0.02, 0.15), f: E(f), b: E(b), r: E(r), l: E(l) };
+  } catch (e) { return G0; }
 }
-DR.foot = modelFoot(droneM, AF.x2d);
+DR.gear = modelGear(droneM, AF.x2d); DR.foot = DR.gear.foot;
 function paintKey(id) { const k = (SET.paint || {})[id || SET.af]; return PAINTS[k] && !/^(yellow|red|cyan)$/.test(k) ? k : ''; }   // 기체별로 고른 색 (없으면 원래 색 · 목록에서 뺀 노랑·빨강·하늘은 기본으로)
 function paintVal(k) { if (!k) return null; const v = PAINTS[k]; if (Array.isArray(v)) { const a = v.slice(); a.key = k; return a; } return v; }   // 모델에 넘길 값: 단색 숫자 / 위장 배열(+key)
 function setAirframe(id) {
@@ -245,7 +256,7 @@ function setAirframe(id) {
     scene.remove(ghostM.g); ghostM = makeModel(id, true); ghostM.g.visible = false; scene.add(ghostM.g);
     MODEL_ID = id; MODEL_PAINT = pk;
   }
-  DR.R = AFc().R; DR.foot = modelFoot(droneM, AFc());
+  DR.R = AFc().R; DR.gear = modelGear(droneM, AFc()); DR.foot = DR.gear.foot;
   ui.payload.style.display = AFc().drop ? '' : 'none';
   if (typeof syncSeg === 'function') syncSeg();
 }
@@ -388,6 +399,14 @@ const RWY = (function () {
     const flat = sg => { let mx = -1e9, mn = 1e9; for (let t = -22; t <= 22; t += 6) for (let w = 0; w <= 46; w += 6) { const q = at(t, sg * (Wd / 2 + 8 + w)), y = groundAt(q.x, q.z); mx = Math.max(mx, y); mn = Math.min(mn, y); _rv.set(q.x, y + 2, q.z); if (collide(_rv, 1.5)) return 1e9; } return mx - mn; };
     const sg = flat(1) <= flat(-1) ? 1 : -1, AW = 20, AL = 40, aw0 = Wd / 2 + 30, ac = at(0, sg * (aw0 + AW / 2));
     STREES.hideRect && STREES.hideRect(ac.x, ac.z, ux, uz, AL + 16, AW + 16); { const tw = at(0, sg * (Wd / 2 + 15)); STREES.hideRect && STREES.hideRect(tw.x, tw.z, -uz * sg, ux * sg, 34, 14); }
+    // 계류장 터 다지기: 산비탈이면 콘크리트 패드가 15° 넘게 기울었음 → 계류장(40×20 m)은 평평하게, 둘레 12 m 는 흙 비탈로 원래 땅에 이음 (비탈 자리 나무도 치움)
+    //  둘레에 건물·시설이 있거나 높낮이가 너무 크면 다지지 않음 (판은 그대로 땅을 따름)
+    if (TER.h) { let sum = 0, n = 0, mn = 1e9, mx = -1e9; const B = 12;
+      for (let t = -AL / 2; t <= AL / 2; t += 2.5) for (let w = 0; w <= AW; w += 2.5) { const q = at(t, sg * (aw0 + w)), y = terrainAt(q.x, q.z); sum += y; n++; mn = Math.min(mn, y); mx = Math.max(mx, y); }
+      let ok = mx - mn < 14;
+      for (let t = -AL / 2 - B; t <= AL / 2 + B && ok; t += 3) for (let w = -B; w <= AW + B && ok; w += 3) { if (t > -AL / 2 && t < AL / 2 && w > 0 && w < AW) continue; const q = at(t, sg * (aw0 + w)); _rv.set(q.x, terrainAt(q.x, q.z) + 1.5, q.z); if (collide(_rv, 1.5)) ok = false; }
+      if (ok) { flattenRect(ac.x, ac.z, -h, AW / 2 + 0.5, AL / 2 + 0.5, B, sum / n); applyTerrain(TER.h); grassRefit(); STREES.hideRect && STREES.hideRect(ac.x, ac.z, ux, uz, AL + 2 * B + 6, AW + 2 * B + 6); }
+    }
     const concM = new THREE.MeshStandardMaterial({ color: 0x8d8d86, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
     const taxM = new THREE.MeshStandardMaterial({ color: 0x45474a, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
     deck(-AL / 2, AL / 2, sg * aw0, sg * (aw0 + AW), 16, 8, concM, 0.08);                        // 콘크리트 계류장 (2.5 m 칸: 땅이 판 위로 비치지 않게)
@@ -1174,9 +1193,25 @@ function snowPatch() {   // 처음 눈이 올 때 한 번: 장면의 지형·나
   const skip = new Set(); [droneM && droneM.g, ghostM && ghostM.g, sky].forEach(o => o && o.traverse(c => skip.add(c)));
   scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && !skip.has(o) && o !== GRASS) (Array.isArray(o.material) ? o.material : [o.material]).forEach(snowify); });
 }
+// ---- 계절: 자동(오늘 날짜) · 봄 · 여름 · 가을 · 겨울 → SEASON_U (game1: 땅 · game6t: 나무 잎·남은 눈) + 풀 색 ----
+//  자동은 날짜 따라 서서히: 4월 말 새순 연두 · 7~9월 짙은 녹음 · 10월 말~11월 초 단풍 · 12~2월 겨울 (활엽은 마른 잎, 나무 위에 살짝 남은 눈)
+const SEA_KEYS = [[0, 0, 0, 1], [59, 0, 0, 0.85], [84, 0.4, 0, 0.35], [110, 1, 0, 0], [150, 0.35, 0, 0], [181, 0, 0, 0], [258, 0, 0, 0], [283, 0, 0.55, 0], [302, 0, 1, 0], [326, 0, 0.7, 0.35], [347, 0, 0, 1], [366, 0, 0, 1]];   // [1월 1일부터 날 수, 봄, 가을, 겨울]
+function seasonVals(k) {
+  if (k === 'spring') return [1, 0, 0]; if (k === 'summer') return [0, 0, 0]; if (k === 'autumn') return [0, 1, 0]; if (k === 'winter') return [0, 0, 1];
+  const d = new Date(), x = (d - new Date(d.getFullYear(), 0, 1)) / 864e5;
+  for (let i = 1; i < SEA_KEYS.length; i++) { const a = SEA_KEYS[i - 1], b = SEA_KEYS[i]; if (x <= b[0]) { const u = (x - a[0]) / (b[0] - a[0]); return [1, 2, 3].map(j => a[j] + (b[j] - a[j]) * u); } }
+  return [0, 0, 1];
+}
+function seasonApply() {
+  const [sp, au, wi] = seasonVals(SET.season || 'auto'); SEASON_U.value.set(sp, au, wi, wi * 0.07);   // w: 겨울 나무 위 남은 눈 (선형 색이라 7 % 만 섞어도 희끗희끗)
+  if (typeof GRASS !== 'undefined' && GRASS && GRASS.material) GRASS.material.color.setRGB(1 - 0.06 * sp + 0.22 * au + 0.12 * wi, 1 + 0.1 * sp + 0.02 * au - 0.08 * wi, 1 - 0.15 * sp - 0.45 * au - 0.3 * wi);   // 풀: 봄 연두 · 가을 누렇게 · 겨울 마른 풀
+}
+function syncSeason() { const v = SET.season || 'auto'; document.querySelectorAll('#segSeason button').forEach(x => x.classList.toggle('on', x.dataset.v === v)); }
+document.querySelectorAll('#segSeason button').forEach(b => b.addEventListener('click', () => { SET.season = b.dataset.v; saveSet(); seasonApply(); syncSeason(); }));
+seasonApply(); syncSeason();
 function wxTick(dt) {
-  // 눈: 몇 초에 걸쳐 쌓이고, 그치면 서서히 녹음 · 풀은 눈 속에 묻힘
-  { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 6, dt / 6); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
+  // 눈: 서서히 쌓이고(약 30초), 그치면 녹음(약 15초) · 풀은 눈 속에 묻힘 · 나무는 위를 향한 잎·가지에 (game6t)
+  { const want = (ENV.wx === 'snow' && !ENV.ir) ? 1 : 0; if (want && !SNOW.patched) snowPatch(); SNOW.k += clamp(want - SNOW.k, -dt / 15, dt / 30); SNOW_U.value = SNOW.k * 0.85; if (typeof GRASS !== 'undefined' && GRASS) GRASS.visible = SNOW.k < 0.5; }
   if (!WX.g || (ENV.wx || 'clear') === 'clear') return;
   // 입자는 땅에 고정: 묶음은 드론을 따라가되, 드론이 움직인 만큼 입자를 반대로 옮김 -> 날아가면 비·눈이 스쳐 지나감
   const c = (S.state === 'replay' && RP.pose) ? RP.pose.p : DR.p;
@@ -3107,6 +3142,7 @@ Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, vecCall, FLANE, D
     segAcro: { 0: ['스틱을 놓으면 기체가 수평으로 돌아옵니다', 'The aircraft levels out when you let go'], 1: ['기울어진 채로 유지되는 완전 수동 · 숙련자용', 'Fully manual, stays banked · for experienced pilots'] },
     segTime: { 0: ['밝은 낮 · 가장 잘 보입니다', 'Daylight · best visibility'], 2: ['해가 낮아 그림자가 길고 역광이 생깁니다', 'Low sun, long shadows and glare'], 1: ['어두움 · IR 카메라와 조명이 중요합니다', 'Dark · IR camera and lights matter'] },
     segWx: { clear: ['비·눈을 고르면 시야가 줄고 산불 감시는 쉽니다', 'Rain or snow cuts visibility and stops fire watch'], rain: ['빗줄기·안개로 시야가 줄어듭니다 · 산불 감시 불가', 'Rain and fog cut visibility · no fire watch'], snow: ['땅과 나무가 눈에 덮입니다 · 산불 감시 불가', 'Ground and trees under snow · no fire watch'] },
+    segSeason: { auto: ['오늘 날짜에 맞춰 나무·풀·땅 색이 서서히 바뀝니다 (4월 새순 · 10월 말 단풍 · 겨울 마른 잎)', 'Trees, grass and ground follow today\'s date (April green-up, late-October foliage, bare winter)'], spring: ['새순 연두빛 잎 · 파릇한 풀', 'Fresh light-green leaves and grass'], summer: ['짙은 녹음', 'Deep summer green'], autumn: ['단풍 (활엽수는 나무마다 노랑·주황·빨강·갈색) · 누런 풀', 'Autumn colours on broadleaf trees, yellowing grass'], winter: ['활엽수는 마른 잎만 성기게 · 나무 위에 살짝 남은 눈 · 마른 풀', 'Sparse dry leaves, a dusting of snow on the trees, dry grass'] },
     segWxFx: { 0: ['날씨는 보이기만 하고 비행에는 영향 없음', 'Weather is visual only'], 1: ['돌풍이 불고 카메라·센서 시야가 떨어집니다', 'Gusts, and reduced camera and sensor range'] },
     segWind: { 0: ['바람 없음', 'Calm'], 1: ['정지 비행이 조금씩 밀립니다', 'Hover drifts a little'], 2: ['제자리에서도 계속 수정 조작이 필요합니다', 'Constant correction needed even in a hover'] },
     segHud: { auto: ['기체 종류에 맞춰 자동으로 고릅니다', 'Picked automatically for the airframe'], fpv: ['고도·속도 숫자 위주의 간단한 표시', 'Simple altitude and speed readouts'], uas: ['피치 사다리 · 속도·고도 테이프 · HSI 방위계', 'Pitch ladder, speed and altitude tapes, HSI'] },
@@ -3132,7 +3168,7 @@ Object.assign(window.__sim, { HG, SMK, SAR, smkReset, commAck, vecCall, FLANE, D
   const segT = id => { const b = $(id) && $(id).querySelector('button.on'); return b ? b.textContent.replace(/\s*\(.*\)\s*$/, '').trim() : '—'; };
   Object.keys(H).forEach(id => { const s = $(id); if (!s) return; const h = document.createElement('small'); h.className = 'oh'; h.dataset.for = id; s.parentNode.insertBefore(h, s.nextSibling); });
   // 빠른 설정 (코스 고르는 화면)
-  const QS = [['segMode', '🎚', '비행 모드', 'Mode'], ['segFeel', '🏎', '비행감', 'Feel'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '안내', 'Nav'], ['segVoice', '🔊', '음성', 'Voice']];
+  const QS = [['segMode', '🎚', '비행 모드', 'Mode'], ['segFeel', '🏎', '비행감', 'Feel'], ['segTime', '🕐', '시간대', 'Time'], ['segWx', '🌦', '날씨', 'Weather'], ['segSeason', '🍂', '계절', 'Season'], ['segWind', '💨', '바람', 'Wind'], ['segWxFx', '⛈', '기상 영향', 'Weather fx'], ['segHud', '📟', '계기', 'HUD'], ['segGuide', '🧭', '안내', 'Nav'], ['segVoice', '🔊', '음성', 'Voice']];
   const bar = $('qsBar');
   const draw = () => {
     P.querySelectorAll('small.oh').forEach(h => { const m = (AFc().cls === 'wing' && HW[h.dataset.for]) || H[h.dataset.for], v = segV(h.dataset.for), t = m && m[v]; h.textContent = t ? L2(t[0], t[1]) : ''; });
